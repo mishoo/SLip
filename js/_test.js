@@ -12,13 +12,8 @@
         console.log(ast);
 
         var code = compile(ast);
-        console.log(code);
-        console.log(comp_show(code));
-
-
-        code = assemble(code);
         console.log(JSON.stringify(code));
-        //console.log(code);
+        console.log(comp_show(code));
 
         console.time("run");
         console.log(run_bytecode(code));

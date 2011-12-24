@@ -258,6 +258,14 @@ function PO(code) {
         throw new Error("Undefined opbyte: " + code);
 };
 
+function LispLabel(name) {
+        this.name = name;
+        this.index = null;
+};
+LispLabel.prototype.toString = function() {
+        return this.name;
+};
+
 ///////////////// compiler
 (function(){
 
@@ -272,14 +280,6 @@ function PO(code) {
         var S_NIL     = LispSymbol("NIL");
         var S_NOT     = LispSymbol("NOT");
 
-        function Label(name) {
-                this.name = name;
-                this.index = null;
-        };
-        Label.prototype.toString = function() {
-                return this.name;
-        };
-
         function append() {
                 var ret = [];
                 for (var i = 0; i < arguments.length; ++i) {
@@ -291,13 +291,13 @@ function PO(code) {
         };
 
         function gen_label() {
-                return new Label("L" + (++LABEL_NUM));
+                return new LispLabel("L" + (++LABEL_NUM));
         };
 
         var seq = append;
 
-        function gen() {
-                return [ slice(arguments) ];
+        function gen(op) {
+                return [ [ OP(op) ].concat(slice(arguments, 1)) ];
         };
 
         function constantp(x) {
@@ -522,12 +522,10 @@ function PO(code) {
         };
 
         function comp_lambda(args, body, env) {
-                return gen("FN", [
-                        args,
-                        env,
+                return gen("FN",
                         seq(gen("ARGS", nullp(args) ? 0 : args.length),
                             comp_seq(body, [ args ].concat(env), true, false))
-                ]);
+                );
         };
 
         this.compile = function(x) {
@@ -546,19 +544,22 @@ function PO(code) {
                 var skip_indent = false;
                 for (var i = 0; i < x.length; ++i) {
                         var el = x[i];
-                        if (el instanceof Label) {
+                        if (el instanceof LispLabel) {
                                 line += pad_string(el.name + ":", level * INDENT_LEVEL);
                                 skip_indent = true;
                                 continue;
                         }
                         if (!skip_indent) line += indent(level);
                         skip_indent = false;
-                        if (el[0] == "FN") {
+                        if (el[0] == OP("FN")) {
                                 line += "FN\n";
-                                line += show_code(el[1][2], level + 1);
+                                line += show_code(el[1], level + 1);
                         }
                         else {
-                                line += el.map(function(el){ return pad_string(el, 8) }).join("");
+                                line += el.map(function(el, i){
+                                        if (i == 0) el = PO(el);
+                                        return pad_string(el, 8);
+                                }).join("");
                         }
                         ret.push(line);
                         line = "";
@@ -570,45 +571,34 @@ function PO(code) {
                 return show_code(x, 0);
         };
 
-        function assemble(code) {
-                var ret = [];
-                for (var i = 0; i < code.length; ++i) {
-                        var el = code[i];
-                        if (el instanceof Label) {
-                                el.index = ret.length;
-                        }
-                        else if (el[0] == "FN") {
-                                ret.push(OP("FN"), assemble(el[1][2]));
-                        }
-                        else {
-                                ret.push.apply(ret, [ OP(el[0]) ].concat(el.slice(1)));
-                        }
-                }
-                for (var i = ret.length; --i >= 0;) {
-                        var el = ret[i];
-                        if (el instanceof Label)
-                                ret[i] = el.index;
-                        else if (LispSymbol.is(el))
-                                ret[i] = el.name;
-                }
-                return ret;
-        };
-
-        this.assemble = function(code) {
-                code = assemble(code);
-                code.push(OP("CALLJ"), 0);
-                return code;
-        };
-
 })();
 
 ////////////// bytecode interpreter
 
 (function(){
 
-        function preprocess(code) {
+        function assemble(code) {
                 var ret = [];
-
+                for (var i = 0; i < code.length; ++i) {
+                        var el = code[i];
+                        if (el instanceof LispLabel) {
+                                el.index = ret.length;
+                        }
+                        else if (el[0] == OP("FN")) {
+                                ret.push(OP("FN"), assemble(el[1]));
+                        }
+                        else {
+                                ret.push.apply(ret, [ el[0] ].concat(el.slice(1)));
+                        }
+                }
+                for (var i = ret.length; --i >= 0;) {
+                        var el = ret[i];
+                        if (el instanceof LispLabel)
+                                ret[i] = el.index;
+                        else if (LispSymbol.is(el))
+                                ret[i] = el.name;
+                }
+                return ret;
         };
 
         function run(code, glob_env) {
@@ -684,6 +674,8 @@ function PO(code) {
         };
 
         this.run_bytecode = function(code, glob_env) {
+                code = assemble(code);
+                code.push(OP("CALLJ"), 0);
                 if (glob_env == null)
                         glob_env = new LispGlobalEnv();
                 return run(code, glob_env);
