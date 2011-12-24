@@ -15,8 +15,11 @@
         console.log(JSON.stringify(code));
         console.log(comp_show(code));
 
+        var m = new LispMachine();
+
         console.time("run");
-        console.log(run_bytecode(code));
+        code = m.assemble(code);
+        console.log(m.run(code));
         console.timeEnd("run");
 
 })();

@@ -403,8 +403,6 @@ LispLabel.prototype.toString = function() {
                 return gen("GVAR", name);
         };
 
-        /////
-
         function comp_const(x, VAL, MORE) {
                 if (VAL) return seq(
                         gen("CONST", x),
@@ -529,7 +527,7 @@ LispLabel.prototype.toString = function() {
         };
 
         this.compile = function(x) {
-                return comp_lambda([], x, []);
+                return comp_seq(x, [], true, false);
         };
 
         var INDENT_LEVEL = 8;
@@ -568,130 +566,165 @@ LispLabel.prototype.toString = function() {
         };
 
         this.comp_show = function(x) {
-                return show_code(x, 0);
+                return show_code(x, 1);
         };
 
 })();
 
-////////////// bytecode interpreter
+function LispMachine(glob_env) {
+        this.glob_env = glob_env || {};
+        this.code = null;
+        this.pc = null;
+        this.stack = null;
+        this.env = null;
+        this.n_args = null;
+};
+LispMachine.prototype = {
+        lvar: function(i, j) {
+                return this.env[i][j];
+        },
+        lset: function(i, j, val) {
+                this.env[i][j] = val;
+        },
+        gvar: function(name) {
+                return this.glob_env[name];
+        },
+        gset: function(name, val) {
+                this.glob_env[name] = val;
+        },
+        push: function(v) {
+                this.stack.push(v);
+        },
+        pop: function() {
+                return this.stack.pop();
+        },
+        top: function() {
+                return this.stack[this.stack.length - 1];
+        },
+        run: function(code) {
+                this.code = code;
+                this.env = [];
+                this.stack = [ [] ];
+                this.pc = 0;
+                while (true) {
+                        if (this.pc == null) return this.pop();
+                        this.code[this.pc++].run(this);
+                }
+        }
+};
+
+function LispClosure(code, env) {
+        this.name = null;
+        this.code = code;
+        this.env = env;
+};
+LispClosure.prototype = {
+        type: "function",
+        display: function() {
+                return "<function" + (this.name ? " " + this.name : "") + ">";
+        }
+};
 
 (function(){
+        var OPS = {};
+        function show(indent, level) {
+                return this.code.map(function(el, i){
+                        if (i == 0) el = PO(el);
+                        return pad_string(el, indent);
+                }).join("");
+        };
+        function def(name, run, init) {
+                function op(a1, a2){
+                        this.a1 = a1;
+                        this.a2 = a2;
+                        if (init) init.call(this);
+                };
+                op.prototype = {
+                        name: name,
+                        run: run,
+                        show: show
+                };
+                return OPS[OP(name)] = op;
+        };
+        def("LVAR", function(m){
+                m.push(m.lvar(this.a1, this.a2));
+        });
+        def("LSET", function(m){
+                m.lset(this.a1, this.a2, m.top());
+        });
+        def("GVAR", function(m){
+                m.push(m.gvar(this.a1));
+        });
+        def("GSET", function(m){
+                m.gset(this.a1, m.top());
+        });
+        def("POP", function(m){
+                m.pop();
+        });
+        def("CONST", function(m){
+                m.push(this.a1);
+        });
+        def("JUMP", function(m){
+                m.pc = this.a1;
+        });
+        def("TJUMP", function(m){
+                if (m.pop() !== null) m.pc = this.a1;
+        });
+        def("FJUMP", function(m){
+                if (m.pop() === null) m.pc = this.a1;
+        });
+        def("SAVE", function(m){
+                m.push([ m.code, this.a1, m.env.slice() ]);
+        });
+        def("RET", function(m){
+                var a = m.stack.splice(m.stack.length - 2, 1)[0];
+                m.code = a[0]; m.pc = a[1]; m.env = a[2];
+        });
+        def("CALLJ", function(m){
+                m.n_args = this.a1;
+                m.env = m.env.slice(1);
+                var a = m.pop();
+                m.code = a.code; m.env = a.env; m.pc = 0;
+        });
+        def("ARGS", function(m){
+                if (m.n_args != this.a1) throw new Error("Wrong number of arguments");
+                var frame = m.stack.splice(m.stack.length - this.a1, this.a1);
+                m.env = [ frame ].concat(m.env);
+        });
+        def("FN", function(m){
+                m.push(new LispClosure(this.a1, m.env.slice()));
+        });
+        def("PRIM", function(m){
+                m.push(this.func.apply(m, m.stack.splice(m.stack.length - this.args, this.args)));
+        }, function(){
+                this.prim = LispPrimitive(this.a1);
+                this.func = this.prim.func;
+                this.args = this.prim.args;
+        });
 
-        function assemble(code) {
+        LispMachine.prototype.assemble = function assemble(code) {
                 var ret = [];
                 for (var i = 0; i < code.length; ++i) {
                         var el = code[i];
-                        if (el instanceof LispLabel) {
-                                el.index = ret.length;
-                        }
-                        else if (el[0] == OP("FN")) {
-                                ret.push(OP("FN"), assemble(el[1]));
-                        }
-                        else {
-                                ret.push.apply(ret, [ el[0] ].concat(el.slice(1)));
-                        }
+                        if (el instanceof LispLabel) el.index = ret.length;
+                        else ret.push(el);
                 }
                 for (var i = ret.length; --i >= 0;) {
                         var el = ret[i];
-                        if (el instanceof LispLabel)
-                                ret[i] = el.index;
-                        else if (LispSymbol.is(el))
-                                ret[i] = el.name;
-                }
-                return ret;
-        };
-
-        function run(code, glob_env) {
-                var pc = 0;
-                var env = [];
-                var stack = [ [ [ OP("HALT") ], 0 ] ];
-                var n_args;
-                var tmp;
-                while (true) {
-                        switch (code[pc++]) {
-                            case OP("LVAR"):
-                                stack.push(env[code[pc++]][code[pc++]]);
-                                break;
-                            case OP("LSET"):
-                                env[code[pc++]][code[pc++]] = stack[stack.length - 1];
-                                break;
-                            case OP("GVAR"):
-                                stack.push(glob_env.get(code[pc++]));
-                                break;
-                            case OP("GSET"):
-                                glob_env.set(code[pc++], stack[stack.length - 1]);
-                                break;
-                            case OP("POP"):
-                                stack.pop();
-                                break;
-                            case OP("CONST"):
-                                stack.push(code[pc++]);
+                        switch (el[0]) {
+                            case OP("FN"):
+                                ret[i] = new OPS[OP("FN")](assemble(el[1]));
                                 break;
                             case OP("JUMP"):
-                                pc = code[pc];
-                                break;
                             case OP("TJUMP"):
-                                stack.pop() !== null ? pc = code[pc] : ++pc;
-                                break;
                             case OP("FJUMP"):
-                                stack.pop() === null ? pc = code[pc] : ++pc;
-                                break;
                             case OP("SAVE"):
-                                stack.push([ code, code[pc++], env.slice() ]);
-                                break;
-                            case OP("RET"):
-                                tmp = stack.splice(stack.length - 2, 1)[0];
-                                code = tmp[0], pc = tmp[1], env = tmp[2];
-                                break;
-                            case OP("CALLJ"):
-                                n_args = code[pc];
-                                env = env.slice(1);
-                                tmp = stack.pop();
-                                code = tmp[0], env = tmp[1], pc = 0;
-                                break;
-                            case OP("ARGS"):
-                                tmp = code[pc++];
-                                if (tmp != n_args) throw new Error("Wrong number of arguments");
-                                var frame = [];
-                                env = [ frame ].concat(env);
-                                while (--tmp >= 0) frame[tmp] = stack.pop();
-                                break;
-                            case OP("FN"):
-                                stack.push([ code[pc++], env.slice() ]);
-                                break;
-                            case OP("PRIM"):
-                                tmp = LispPrimitive(code[pc++]);
-                                stack.push(tmp.func.apply(
-                                        glob_env,
-                                        stack.splice(stack.length - tmp.args, tmp.args)
-                                ));
-                                break;
-                            case OP("HALT"):
-                                return stack.pop();
-                                break;
+                                el[1] = el[1].index;
+                            default:
+                                ret[i] = new OPS[el[0]](el[1], el[2]);
                         }
                 }
-        };
-
-        this.run_bytecode = function(code, glob_env) {
-                code = assemble(code);
-                code.push(OP("CALLJ"), 0);
-                if (glob_env == null)
-                        glob_env = new LispGlobalEnv();
-                return run(code, glob_env);
-        };
-
-        function LispGlobalEnv() {
-                this.vars = {};
-        };
-
-        LispGlobalEnv.prototype = {
-                set: function(name, val) {
-                        return this.vars[name] = val;
-                },
-                get: function(name) {
-                        return this.vars[name];
-                }
+                return ret;
         };
 
 })();
