@@ -1,3 +1,22 @@
+var LispSymbol = (function(SYMBOLS){
+        function LispSymbol(name) {
+                this.name = name;
+                this.value = null;
+        };
+        LispSymbol.prototype.toString = function() { return this.name };
+        LispSymbol.prototype.serialize = function() {
+                return "s(" + JSON.stringify(this.name) + ")";
+        };
+        function get(name) {
+                name = name.toUpperCase();
+                return HOP(SYMBOLS, name) ? SYMBOLS[name] : (
+                        SYMBOLS[name] = new LispSymbol(name)
+                );
+        };
+        get.is = function(thing) { return thing instanceof LispSymbol };
+        return get;
+})({});
+
 function LispCons(a, b) {
         this.car = a;
         this.cdr = b;
@@ -90,7 +109,7 @@ LispMachine.prototype = {
 
 LispMachine.OPS = {};
 
-LispMachine.prototype.assemble = function assemble(code) {
+LispMachine.assemble = function assemble(code) {
         var ret = [];
         for (var i = 0; i < code.length; ++i) {
                 var el = code[i];
@@ -115,6 +134,24 @@ LispMachine.prototype.assemble = function assemble(code) {
         return ret;
 };
 
+LispMachine.serialize = function(code) {
+        return "[" + code.map(function(op){
+                return op._disp();
+        }).join(",") + "]";
+};
+
+LispMachine.serialize_const = function(val) {
+        if (LispSymbol.is(val)) return val.serialize();
+        if (val instanceof Array) return "l(" + val.map(LispMachine.serialize_const).join(",") + ")";
+        if (typeof val == "string") return JSON.stringify(val);
+        return val + "";
+};
+
+LispMachine.OP = function() {};
+LispMachine.OP.prototype = {
+        _init: function(){}
+};
+
 LispMachine.defop = function(name, args, proto) {
         args = args ? args.split(" ") : [];
         var ctor = new Function(
@@ -123,10 +160,9 @@ LispMachine.defop = function(name, args, proto) {
                                 return "this." + arg + " = " + arg;
                         }).join("; ") + "; this._init() };"
         )();
-        ctor.prototype = {
-                _name: name,
-                _init: noop
-        };
+        ctor.prototype = new LispMachine.OP;
+        proto._name = name;
+        proto._args = args;
         for (var i in proto) if (HOP(proto, i)) {
                 ctor.prototype[i] = proto[i];
         }
@@ -134,90 +170,113 @@ LispMachine.defop = function(name, args, proto) {
 };
 
 [
-
         ["LVAR", "i j", {
                 run: function(m) {
                         m.push(m.lvar(this.i, this.j));
+                },
+                _disp: function() {
+                        return "LVAR(" + this.i + "," + this.j + ")";
                 }
         }],
-
         ["LSET", "i j", {
                 run: function(m) {
                         m.lset(this.i, this.j, m.top());
+                },
+                _disp: function() {
+                        return "LSET(" + this.i + "," + this.j + ")";
                 }
         }],
-
         ["GVAR", "name", {
                 run: function(m) {
                         m.push(m.gvar(this.name));
+                },
+                _disp: function() {
+                        return "GVAR(" + this.name.serialize() + ")";
                 }
         }],
-
         ["GSET", "name", {
                 run: function(m) {
                         m.gset(this.name, m.top());
+                },
+                _disp: function() {
+                        return "GSET(" + this.name.serialize() + ")";
                 }
         }],
-
         ["POP", 0, {
                 run: function(m) {
                         m.pop();
+                },
+                _disp: function() {
+                        return "POP()";
                 }
         }],
-
         ["CONST", "val", {
                 run: function(m) {
                         m.push(this.val);
+                },
+                _disp: function() {
+                        return "CONST(" + LispMachine.serialize_const(this.val) + ")";
                 }
         }],
-
         ["JUMP", "addr", {
                 run: function(m) {
                         m.pc = this.addr;
+                },
+                _disp: function() {
+                        return "JUMP(" + this.addr + ")";
                 }
         }],
-
         ["TJUMP", "addr", {
                 run: function(m) {
                         if (m.pop() !== null) m.pc = this.addr;
+                },
+                _disp: function() {
+                        return "TJUMP(" + this.addr + ")";
                 }
         }],
-
         ["FJUMP", "addr", {
                 run: function(m) {
                         if (m.pop() === null) m.pc = this.addr;
+                },
+                _disp: function() {
+                        return "FJUMP(" + this.addr + ")";
                 }
         }],
-
         ["SAVE", "addr", {
                 run: function(m) {
                         m.push(new LispRet(m.code, this.addr, m.env));
+                },
+                _disp: function() {
+                        return "SAVE(" + this.addr + ")";
                 }
         }],
-
         ["RET", 0, {
                 run: function(m) {
                         var val = m.pop(), r = m.pop();
                         m.code = r.code; m.pc = r.pc; m.env = r.env;
                         m.push(val);
+                },
+                _disp: function() {
+                        return "RET()";
                 }
         }],
-
         ["CALLJ", "count", {
                 run: function(m){
                         m.n_args = this.count;
                         var a = m.pop();
                         m.code = a.code; m.env = a.env; m.pc = 0;
+                },
+                _disp: function() {
+                        return "CALLJ(" + this.count + ")";
                 }
         }],
-
         ["ARGS", "count", {
                 run: function(m){
                         var count = this.count;
                         if (m.n_args != count) throw new Error("Wrong number of arguments");
                         var frame;
                         // for a small count, pop is *much* more
-                        // efficient than splice; in FF the difference enormous.
+                        // efficient than splice; in FF the difference is enormous.
                         switch (count) {
                             case 0: frame = []; break;
                             case 1: frame = [ m.pop() ]; break;
@@ -226,22 +285,29 @@ LispMachine.defop = function(name, args, proto) {
                             default: frame = m.stack.splice(m.stack.length - count, count);
                         }
                         m.env = new LispCons(frame, m.env);
+                },
+                _disp: function() {
+                        return "ARGS(" + this.count + ")";
                 }
         }],
-
         ["FN", "code", {
                 run: function(m) {
                         m.push(new LispClosure(this.code, m.env));
+                },
+                _disp: function() {
+                        return "FN(" + LispMachine.serialize(this.code) + ")";
                 }
         }],
-
-        ["PRIM", "name func", {
+        ["PRIM", "name", {
                 run: function(m) {
                         m.push(this.func(m));
                 },
                 _init: function() {
                         var prim = LispPrimitive(this.name);
                         this.func = prim.func;
+                },
+                _disp: function() {
+                        return "PRIM(" + this.name.serialize() + ")";
                 }
         }]
 

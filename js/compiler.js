@@ -27,19 +27,6 @@ Stream.prototype = {
         }
 };
 
-var LispSymbol = (function(SYMBOLS){
-        function LispSymbol(name) { this.name = name };
-        LispSymbol.prototype.toString = function() { return this.name };
-        function get(name) {
-                name = name.toUpperCase();
-                return HOP(SYMBOLS, name) ? SYMBOLS[name] : (
-                        SYMBOLS[name] = new LispSymbol(name)
-                );
-        };
-        get.is = function(thing) { return thing instanceof LispSymbol };
-        return get;
-})({});
-
 ////////////////// basic parser
 function lisp_parse(code) {
         var input = new Stream("(" + code + ")");

@@ -9,6 +9,8 @@
 //                     (lambda () (set! val (+ val 1)))) 0)) \
 // (* (+ (counter) (counter)) (+ (counter) (counter)))) nil)');
 
+        //var ast = lisp_parse("'(foo bar baz)")
+
         console.log(ast);
 
         var code = compile(ast);
@@ -17,11 +19,13 @@
 
         var m = new LispMachine();
 
-        code = m.assemble(code);
+        code = LispMachine.assemble(code);
 
-        console.time("run");
-        console.log(m.run(code));
-        console.timeEnd("run");
+        console.log(LispMachine.serialize(code));
+
+        time_it(function(){
+                console.log(m.run(code));
+        });
 
         // console.time("run_threaded");
         // m.run_threaded(code, function(ret){
@@ -31,3 +35,9 @@
         // });
 
 })();
+
+function time_it(f) {
+        var start = Date.now();
+        f();
+        console.log(((Date.now() - start) / 1000).toFixed(2));
+}
