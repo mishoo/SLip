@@ -90,6 +90,49 @@ LispMachine.prototype = {
 
 LispMachine.OPS = {};
 
+LispMachine.prototype.assemble = function assemble(code) {
+        var ret = [];
+        for (var i = 0; i < code.length; ++i) {
+                var el = code[i];
+                if (el instanceof LispLabel) el.index = ret.length;
+                else ret.push(el);
+        }
+        for (var i = ret.length; --i >= 0;) {
+                var el = ret[i];
+                switch (el[0]) {
+                    case "FN":
+                        ret[i] = new LispMachine.OPS.FN(assemble(el[1]));
+                        break;
+                    case "JUMP":
+                    case "TJUMP":
+                    case "FJUMP":
+                    case "SAVE":
+                        el[1] = el[1].index;
+                    default:
+                        ret[i] = new LispMachine.OPS[el[0]](el[1], el[2]);
+                }
+        }
+        return ret;
+};
+
+LispMachine.defop = function(name, args, proto) {
+        args = args ? args.split(" ") : [];
+        var ctor = new Function(
+                "return function " + name + "(" + args.join(", ") + "){ " +
+                        args.map(function(arg){
+                                return "this." + arg + " = " + arg;
+                        }).join("; ") + "; this._init() };"
+        )();
+        ctor.prototype = {
+                _name: name,
+                _init: noop
+        };
+        for (var i in proto) if (HOP(proto, i)) {
+                ctor.prototype[i] = proto[i];
+        }
+        LispMachine.OPS[name] = ctor;
+};
+
 [
 
         ["LVAR", "i j", {
@@ -202,47 +245,4 @@ LispMachine.OPS = {};
                 }
         }]
 
-].map(function(_){
-        var name = _[0], args = _[1], proto = _[2];
-        args = args ? args.split(" ") : [];
-        var ctor = new Function(
-                "return function " + name + "(" + args.join(", ") + "){ " +
-                        args.map(function(arg){
-                                return "this." + arg + " = " + arg;
-                        }).join("; ") + "; this._init() };"
-        )();
-        ctor.prototype = {
-                _name: name,
-                _code: OP(name),
-                _init: noop
-        };
-        for (var i in proto) if (HOP(proto, i)) {
-                ctor.prototype[i] = proto[i];
-        }
-        LispMachine.OPS[OP(name)] = ctor;
-});
-
-LispMachine.prototype.assemble = function assemble(code) {
-        var ret = [];
-        for (var i = 0; i < code.length; ++i) {
-                var el = code[i];
-                if (el instanceof LispLabel) el.index = ret.length;
-                else ret.push(el);
-        }
-        for (var i = ret.length; --i >= 0;) {
-                var el = ret[i];
-                switch (el[0]) {
-                    case OP("FN"):
-                        ret[i] = new LispMachine.OPS[OP("FN")](assemble(el[1]));
-                        break;
-                    case OP("JUMP"):
-                    case OP("TJUMP"):
-                    case OP("FJUMP"):
-                    case OP("SAVE"):
-                        el[1] = el[1].index;
-                    default:
-                        ret[i] = new LispMachine.OPS[el[0]](el[1], el[2]);
-                }
-        }
-        return ret;
-};
+].map(function(_){ LispMachine.defop(_[0], _[1], _[2]) });

@@ -181,54 +181,6 @@ function find_var(name, env) {
         }
 };
 
-function OP(name) {
-        switch (name) {
-            case "HALT"   : return  0;
-            case "CONST"  : return  1;
-            case "LVAR"   : return  2;
-            case "GVAR"   : return  3;
-            case "LSET"   : return  4;
-            case "GSET"   : return  5;
-            case "POP"    : return  6;
-            case "TJUMP"  : return  7;
-            case "FJUMP"  : return  8;
-            case "JUMP"   : return  9;
-            case "RET"    : return 10;
-            case "ARGS"   : return 11;
-            case "CALLJ"  : return 12;
-            case "SAVE"   : return 13;
-            case "SETCC"  : return 14;
-            case "CC"     : return 15;
-            case "PRIM"   : return 16;
-            case "FN"     : return 17;
-        }
-        throw new Error("Undefined opcode: " + name);
-};
-
-function PO(code) {
-        switch (code) {
-            case  0 : return "HALT";
-            case  1 : return "CONST";
-            case  2 : return "LVAR";
-            case  3 : return "GVAR";
-            case  4 : return "LSET";
-            case  5 : return "GSET";
-            case  6 : return "POP";
-            case  7 : return "TJUMP";
-            case  8 : return "FJUMP";
-            case  9 : return "JUMP";
-            case 10 : return "RET";
-            case 11 : return "ARGS";
-            case 12 : return "CALLJ";
-            case 13 : return "SAVE";
-            case 14 : return "SETCC";
-            case 15 : return "CC";
-            case 16 : return "PRIM";
-            case 17 : return "FN";
-        }
-        throw new Error("Undefined opbyte: " + code);
-};
-
 function LispLabel(name) {
         this.name = name;
         this.index = null;
@@ -267,8 +219,8 @@ LispLabel.prototype.toString = function() {
 
         var seq = append;
 
-        function gen(op) {
-                return [ [ OP(op) ].concat(slice(arguments, 1)) ];
+        function gen() {
+                return [ slice(arguments) ];
         };
 
         function constantp(x) {
@@ -520,13 +472,12 @@ LispLabel.prototype.toString = function() {
                         }
                         if (!skip_indent) line += indent(level);
                         skip_indent = false;
-                        if (el[0] == OP("FN")) {
+                        if (el[0] == "FN") {
                                 line += "FN\n";
                                 line += show_code(el[1], level + 1);
                         }
                         else {
                                 line += el.map(function(el, i){
-                                        if (i == 0) el = PO(el);
                                         return pad_string(el, 8);
                                 }).join("");
                         }
