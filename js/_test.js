@@ -17,9 +17,17 @@
 
         var m = new LispMachine();
 
-        console.time("run");
         code = m.assemble(code);
+
+        console.time("run");
         console.log(m.run(code));
         console.timeEnd("run");
+
+        // console.time("run_threaded");
+        // m.run_threaded(code, function(ret){
+        //         console.timeEnd("run_threaded");
+        //         console.log("threaded run finished");
+        //         console.log(ret);
+        // });
 
 })();

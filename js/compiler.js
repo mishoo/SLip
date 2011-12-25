@@ -171,35 +171,6 @@ function lisp_parse(code) {
 
 ///////////////// primitive functions
 
-var LispPrimitive = (function(){
-        var PR = {};
-        function get(name) { return PR[name] };
-        function prim(name, args, side_effect, func) {
-                name = name.toUpperCase();
-                PR[name] = {
-                        name        : name,
-                        args        : args,
-                        side_effect : side_effect,
-                        func        : func
-                };
-        };
-
-        prim("+", 2, false, function(a, b){ return a + b });
-        prim("-", 2, false, function(a, b){ return a - b });
-        prim("*", 2, false, function(a, b){ return a * b });
-        prim("/", 2, false, function(a, b){ return a / b });
-        prim("=", 2, false, function(a, b){ return a == b ? true : null });
-        prim("eq", 2, false, function(a, b){ return a === b ? true : null });
-
-        get.is = function(name, env, args) {
-                return !find_var(name, env) && HOP(PR, name) && PR[name].args == args;
-        };
-        get.side_effect = function(name) {
-                return PR[name] && PR[name].side_effect;
-        };
-        return get;
-})();
-
 function find_var(name, env) {
         for (var i = 0; i < env.length; ++i) {
                 var frame = env[i];
@@ -489,7 +460,7 @@ LispLabel.prototype.toString = function() {
 
         function comp_funcall(f, args, env, VAL, MORE) {
                 if (LispPrimitive.is(f, env, args.length)) {
-                        if (!VAL && !LispPrimitive.side_effect(f)) {
+                        if (!VAL && !LispPrimitive.seff(f)) {
                                 return comp_seq(args, env, false, MORE);
                         }
                         return seq(comp_list(args, env),
@@ -567,164 +538,6 @@ LispLabel.prototype.toString = function() {
 
         this.comp_show = function(x) {
                 return show_code(x, 1);
-        };
-
-})();
-
-function LispMachine(glob_env) {
-        this.glob_env = glob_env || {};
-        this.code = null;
-        this.pc = null;
-        this.stack = null;
-        this.env = null;
-        this.n_args = null;
-};
-LispMachine.prototype = {
-        lvar: function(i, j) {
-                return this.env[i][j];
-        },
-        lset: function(i, j, val) {
-                this.env[i][j] = val;
-        },
-        gvar: function(name) {
-                return this.glob_env[name];
-        },
-        gset: function(name, val) {
-                this.glob_env[name] = val;
-        },
-        push: function(v) {
-                this.stack.push(v);
-        },
-        pop: function() {
-                return this.stack.pop();
-        },
-        top: function() {
-                return this.stack[this.stack.length - 1];
-        },
-        run: function(code) {
-                this.code = code;
-                this.env = [];
-                this.stack = [ [] ];
-                this.pc = 0;
-                while (true) {
-                        if (this.pc == null) return this.pop();
-                        this.code[this.pc++].run(this);
-                }
-        }
-};
-
-function LispClosure(code, env) {
-        this.name = null;
-        this.code = code;
-        this.env = env;
-};
-LispClosure.prototype = {
-        type: "function",
-        display: function() {
-                return "<function" + (this.name ? " " + this.name : "") + ">";
-        }
-};
-
-(function(){
-        var OPS = {};
-        function show(indent, level) {
-                return this.code.map(function(el, i){
-                        if (i == 0) el = PO(el);
-                        return pad_string(el, indent);
-                }).join("");
-        };
-        function def(name, run, init) {
-                function op(a1, a2){
-                        this.a1 = a1;
-                        this.a2 = a2;
-                        if (init) init.call(this);
-                };
-                op.prototype = {
-                        name: name,
-                        run: run,
-                        show: show
-                };
-                return OPS[OP(name)] = op;
-        };
-        def("LVAR", function(m){
-                m.push(m.lvar(this.a1, this.a2));
-        });
-        def("LSET", function(m){
-                m.lset(this.a1, this.a2, m.top());
-        });
-        def("GVAR", function(m){
-                m.push(m.gvar(this.a1));
-        });
-        def("GSET", function(m){
-                m.gset(this.a1, m.top());
-        });
-        def("POP", function(m){
-                m.pop();
-        });
-        def("CONST", function(m){
-                m.push(this.a1);
-        });
-        def("JUMP", function(m){
-                m.pc = this.a1;
-        });
-        def("TJUMP", function(m){
-                if (m.pop() !== null) m.pc = this.a1;
-        });
-        def("FJUMP", function(m){
-                if (m.pop() === null) m.pc = this.a1;
-        });
-        def("SAVE", function(m){
-                m.push([ m.code, this.a1, m.env.slice() ]);
-        });
-        def("RET", function(m){
-                var a = m.stack.splice(m.stack.length - 2, 1)[0];
-                m.code = a[0]; m.pc = a[1]; m.env = a[2];
-        });
-        def("CALLJ", function(m){
-                m.n_args = this.a1;
-                m.env = m.env.slice(1);
-                var a = m.pop();
-                m.code = a.code; m.env = a.env; m.pc = 0;
-        });
-        def("ARGS", function(m){
-                if (m.n_args != this.a1) throw new Error("Wrong number of arguments");
-                var frame = m.stack.splice(m.stack.length - this.a1, this.a1);
-                m.env = [ frame ].concat(m.env);
-        });
-        def("FN", function(m){
-                m.push(new LispClosure(this.a1, m.env.slice()));
-        });
-        def("PRIM", function(m){
-                m.push(this.func.apply(m, m.stack.splice(m.stack.length - this.args, this.args)));
-        }, function(){
-                this.prim = LispPrimitive(this.a1);
-                this.func = this.prim.func;
-                this.args = this.prim.args;
-        });
-
-        LispMachine.prototype.assemble = function assemble(code) {
-                var ret = [];
-                for (var i = 0; i < code.length; ++i) {
-                        var el = code[i];
-                        if (el instanceof LispLabel) el.index = ret.length;
-                        else ret.push(el);
-                }
-                for (var i = ret.length; --i >= 0;) {
-                        var el = ret[i];
-                        switch (el[0]) {
-                            case OP("FN"):
-                                ret[i] = new OPS[OP("FN")](assemble(el[1]));
-                                break;
-                            case OP("JUMP"):
-                            case OP("TJUMP"):
-                            case OP("FJUMP"):
-                            case OP("SAVE"):
-                                el[1] = el[1].index;
-                            default:
-                                ret[i] = new OPS[el[0]](el[1], el[2]);
-                        }
-                }
-                return ret;
         };
 
 })();
