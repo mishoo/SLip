@@ -3,19 +3,18 @@ var LispCons = DEFTYPE("cons", function(D, P){
                 this.car = a;
                 this.cdr = b;
         };
-        D.is = function(thing) {
+        D.isList = function(thing) {
                 return thing === null || thing instanceof D;
         };
-        P.forEach = function(callback) {
-                var p = this;
+        D.forEach = function(p, callback) {
                 while (p !== null) {
                         callback(p.car);
                         p = p.cdr;
                 }
         };
-        P.map = function(callback) {
+        D.map = function(list, callback) {
                 var ret = null, p;
-                this.forEach(function(el){
+                D.forEach(list, function(el){
                         var cell = new D(callback(el), null);
                         if (ret) p.cdr = cell;
                         else ret = cell;
@@ -33,9 +32,16 @@ var LispCons = DEFTYPE("cons", function(D, P){
                 });
                 return ret;
         };
-        P.toArray = function() {
+        D.len = function(list) {
+                var len = 0;
+                while (list !== null) {
+                        ++len;
+                        list = list.cdr;
+                }
+        };
+        D.toArray = function(list) {
                 var a = [];
-                this.forEach(function(el){
+                D.forEach(list, function(el){
                         a.push(el);
                 });
                 return a;

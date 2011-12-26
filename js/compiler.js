@@ -98,7 +98,7 @@ function lisp_parse(code) {
                         }
                 });
                 if (str.length > 0 && /^[0-9]*\.?[0-9]*$/.test(str))
-                        return parseFloat(str);
+                        return new LispNumber(parseFloat(str));
                 return LispSymbol.get(str);
         };
         function read_char() {
@@ -110,15 +110,15 @@ function lisp_parse(code) {
                 });
                 if (ch.length > 1)
                         croak("Character names not supported: " + ch);
-                return ch;
+                return new LispChar(ch);
         };
         function read_sharp() {
                 skip("#");
-                var ch = next();
-                switch (ch) {
-                    case "\\": return read_char();
+                switch (peek()) {
+                    case "\\": next(); return read_char();
+                    case "(": return read_list();
                     default:
-                        croak("Unsupported sharp syntax: #" + ch);
+                        croak("Unsupported sharp syntax: #" + peek());
                 }
         };
         function read_quote() {
@@ -129,7 +129,7 @@ function lisp_parse(code) {
                 skip_ws();
                 var ch = peek();
                 switch (ch) {
-                    case "\"": return read_string();
+                    case "\"": return new LispString(read_string());
                     case "(": return read_list();
                     case ";": return skip_comment();
                     case "#": return read_sharp();
@@ -204,11 +204,7 @@ function lisp_parse(code) {
 
         function constantp(x) {
                 if (x === S_T || x === S_NIL) return true;
-                switch (typeof x) {
-                    case "string":
-                    case "number":
-                        return true;
-                }
+                if (LispNumber.is(x) || LispString.is(x)) return true;
         };
 
         function equal(a, b) {
@@ -255,38 +251,35 @@ function lisp_parse(code) {
                         }
                         return comp_var(x, env, VAL, MORE);
                 }
-                else switch (typeof x) {
-                    case "string":
-                    case "number":
+                else if (constantp(x)) {
                         return comp_const(x, VAL, MORE);
+                }
+                else switch (x[0]) {
+                    case S_QUOTE:
+                        arg_count(x, 1);
+                        return comp_const(x[1], VAL, MORE);
+                    case S_PROGN:
+                        return comp_seq(x.slice(1), env, VAL, MORE);
+                    case S_SET:
+                        arg_count(x, 2);
+                        assert(LispSymbol.is(x[1]), "Only symbols can be set");
+                        return seq(comp(x[2], env, true, true),
+                                   gen_set(x[1], env),
+                                   VAL ? null : gen("POP"),
+                                   MORE ? null : gen("RET"));
+                    case S_IF:
+                        arg_count(x, 2, 3);
+                        return comp_if(x[1], x[2], x[3], env, VAL, MORE);
+                    case S_CC:
+                        arg_count(x, 0);
+                        return VAL ? seq(gen("CC")) : [];
+                    case S_LAMBDA:
+                        return VAL ? seq(
+                                comp_lambda(x[1], x.slice(2), env),
+                                MORE ? null : gen("RET")
+                        ) : [];
                     default:
-                        switch (x[0]) {
-                            case S_QUOTE:
-                                arg_count(x, 1);
-                                return comp_const(x[1], VAL, MORE);
-                            case S_PROGN:
-                                return comp_seq(x.slice(1), env, VAL, MORE);
-                            case S_SET:
-                                arg_count(x, 2);
-                                assert(LispSymbol.is(x[1]), "Only symbols can be set");
-                                return seq(comp(x[2], env, true, true),
-                                           gen_set(x[1], env),
-                                           VAL ? null : gen("POP"),
-                                           MORE ? null : gen("RET"));
-                            case S_IF:
-                                arg_count(x, 2, 3);
-                                return comp_if(x[1], x[2], x[3], env, VAL, MORE);
-                            case S_CC:
-                                arg_count(x, 0);
-                                return VAL ? seq(gen("CC")) : [];
-                            case S_LAMBDA:
-                                return VAL ? seq(
-                                        comp_lambda(x[1], x.slice(2), env),
-                                        MORE ? null : gen("RET")
-                                ) : [];
-                            default:
-                                return comp_funcall(x[0], x.slice(1), env, VAL, MORE);
-                        }
+                        return comp_funcall(x[0], x.slice(1), env, VAL, MORE);
                 }
         };
 

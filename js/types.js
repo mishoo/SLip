@@ -14,6 +14,15 @@ var LispNumber = DEFTYPE("number", function(D, P){
         };
 });
 
+var LispChar = DEFTYPE("char", function(D, P){
+        P.INIT = function(val) {
+                this.value = val;
+        };
+        P.valueOf = P.toString = function() {
+                return this.value;
+        };
+});
+
 var LispString = DEFTYPE("string", function(D, P){
         P.INIT = function(val) {
                 this.value = val;
