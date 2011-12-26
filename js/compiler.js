@@ -99,7 +99,7 @@ function lisp_parse(code) {
                 });
                 if (str.length > 0 && /^[0-9]*\.?[0-9]*$/.test(str))
                         return parseFloat(str);
-                return LispSymbol(str);
+                return LispSymbol.get(str);
         };
         function read_char() {
                 var ch = next() + read_while(function(ch){
@@ -123,7 +123,7 @@ function lisp_parse(code) {
         };
         function read_quote() {
                 skip("'");
-                return [ LispSymbol("quote"), read_token() ];
+                return [ LispSymbol.get("quote"), read_token() ];
         };
         function read_token() {
                 skip_ws();
@@ -151,7 +151,7 @@ function lisp_parse(code) {
                 }
                 skip(")");
                 if (ret.length == 0)
-                        return LispSymbol("nil");
+                        return LispSymbol.get("nil");
                 return ret;
         };
         return read_token();
@@ -172,15 +172,15 @@ function lisp_parse(code) {
 
         var LABEL_NUM = 0;
 
-        var S_LAMBDA  = LispSymbol("LAMBDA");
-        var S_IF      = LispSymbol("IF");
-        var S_PROGN   = LispSymbol("PROGN");
-        var S_QUOTE   = LispSymbol("QUOTE");
-        var S_SET     = LispSymbol("SET!");
-        var S_T       = LispSymbol("T");
-        var S_NIL     = LispSymbol("NIL");
-        var S_NOT     = LispSymbol("NOT");
-        var S_CC      = LispSymbol("C/C");
+        var S_LAMBDA  = LispSymbol.get("LAMBDA");
+        var S_IF      = LispSymbol.get("IF");
+        var S_PROGN   = LispSymbol.get("PROGN");
+        var S_QUOTE   = LispSymbol.get("QUOTE");
+        var S_SET     = LispSymbol.get("SET!");
+        var S_T       = LispSymbol.get("T");
+        var S_NIL     = LispSymbol.get("NIL");
+        var S_NOT     = LispSymbol.get("NOT");
+        var S_CC      = LispSymbol.get("C/C");
 
         function append() {
                 var ret = [];

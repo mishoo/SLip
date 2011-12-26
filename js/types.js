@@ -1,6 +1,5 @@
 function DEFTYPE(name, func) {
         return DEFCLASS(name, null, function(D, P){
-                D.is = function(thing) { return thing instanceof D };
                 P.type = name;
                 return func(D, P);
         });
@@ -21,5 +20,41 @@ var LispString = DEFTYPE("string", function(D, P){
         };
         P.valueOf = P.toString = function() {
                 return this.value;
+        };
+});
+
+var LispPackage = DEFTYPE("package", function(D, P){
+        var PACKAGES = {};
+        P.INIT = function(name) {
+                this.name = name + "";
+                this.symbols = {};
+        };
+        P.toString = function() { return this.name };
+        P.serialize = function() {
+                return "p(" + this.name + ")";
+        };
+        D.get = function(name) {
+                name = name.toUpperCase();
+                return HOP(PACKAGES, name) ? PACKAGES[name] : (
+                        PACKAGES[name] = new D(name)
+                );
+        };
+});
+
+var LispSymbol = DEFTYPE("symbol", function(D, P){
+        var SYMBOLS = {};
+        P.INIT = function(name) {
+                this.name = name;
+                this.value = null;
+        };
+        P.toString = function() { return this.name };
+        P.serialize = function() {
+                return "s(" + JSON.stringify(this.name) + ")";
+        };
+        D.get = function(name) {
+                name = name.toUpperCase();
+                return HOP(SYMBOLS, name) ? SYMBOLS[name] : (
+                        SYMBOLS[name] = new D(name)
+                );
         };
 });

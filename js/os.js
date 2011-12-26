@@ -61,15 +61,15 @@ function pad_string(str, width) {
         return str + repeat_string(" ", width - str.length);
 };
 
-var DEFCLASS = this.DEFCLASS = (function(NOINIT){
+var DEFCLASS = (function(NOINIT){
         return function(name, BASE, func) {
-                var code;
-                code = "return function " + (name || "D") + " (a){\n\
+                var code = "return function " + (name || "D") + " (a){\n\
 if (a !== NOINIT) {\n";
                 if (BASE) code += "BASE.apply(this, arguments);\n";
                 code += "this.INIT.apply(this, arguments); }}";
                 var D = new Function("NOINIT", "BASE", code)(NOINIT, BASE);
                 D.INIT = noop;
+                D.is = function(thing) { return thing instanceof D };
                 if (BASE) {
                         D.BASE = BASE;
                         D.prototype = new BASE(NOINIT);

@@ -6,25 +6,6 @@ LispLabel.prototype.toString = function() {
         return this.name;
 };
 
-var LispSymbol = (function(SYMBOLS){
-        function LispSymbol(name) {
-                this.name = name;
-                this.value = null;
-        };
-        LispSymbol.prototype.toString = function() { return this.name };
-        LispSymbol.prototype.serialize = function() {
-                return "s(" + JSON.stringify(this.name) + ")";
-        };
-        function get(name) {
-                name = name.toUpperCase();
-                return HOP(SYMBOLS, name) ? SYMBOLS[name] : (
-                        SYMBOLS[name] = new LispSymbol(name)
-                );
-        };
-        get.is = function(thing) { return thing instanceof LispSymbol };
-        return get;
-})({});
-
 function LispClosure(code, env) {
         this.name = null;
         this.code = code;

@@ -27,5 +27,5 @@
 function time_it(name, f) {
         var start = Date.now();
         f();
-        console.log("Name: " + ((Date.now() - start) / 1000).toFixed(2));
+        console.log(name + ": " + ((Date.now() - start) / 1000).toFixed(2) + "s");
 }

@@ -1,9 +1,9 @@
-;; ((lambda (sum)
-;;    (set! sum (lambda (n)
-;;                (if (= n 0) 0
-;;                    (+ n (sum (- n 1))))))
-;;    (clog (sum 100000)))
-;;  nil)
+((lambda (sum)
+   (set! sum (lambda (n)
+               (if (= n 0) 0
+                   (+ n (sum (- n 1))))))
+   (clog (sum 100000)))
+ nil)
 
 ((lambda (cont n)
    (clog (+ "//" ((lambda (k)
@@ -11,6 +11,6 @@
    (if (> n 0)
        (progn
          (set! n (- n 1))
-         (cont n)))
+         (cont (* n 2))))
    n)
  nil 10)
