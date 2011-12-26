@@ -278,7 +278,7 @@ function lisp_parse(code) {
                                 return comp_if(x[1], x[2], x[3], env, VAL, MORE);
                             case S_CC:
                                 arg_count(x, 0);
-                                return seq(gen("CC"));
+                                return VAL ? seq(gen("CC")) : [];
                             case S_LAMBDA:
                                 return VAL ? seq(
                                         comp_lambda(x[1], x.slice(2), env),
@@ -426,9 +426,9 @@ function lisp_parse(code) {
 
         function comp_lambda(args, body, env) {
                 return gen("FN",
-                        seq(gen("ARGS", nullp(args) ? 0 : args.length),
-                            comp_seq(body, [ args ].concat(env), true, false))
-                );
+                           seq(gen("ARGS", nullp(args) ? 0 : args.length),
+                               comp_seq(body, [ args ].concat(env), true, false))
+                          );
         };
 
         this.compile = function(x) {
@@ -460,6 +460,7 @@ function lisp_parse(code) {
                         }
                         else {
                                 line += el.map(function(el, i){
+                                        if (i > 0 && typeof el == "string") el = JSON.stringify(el);
                                         return pad_string(el, 8);
                                 }).join("");
                         }

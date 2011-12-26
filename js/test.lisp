@@ -5,10 +5,12 @@
 ;;    (clog (sum 100000)))
 ;;  nil)
 
-(progn
-  (clog 1)
-  ((lambda (k)
-     (clog 3)
-     (k nil)
-     (clog 4)) (c/c))
-  (clog 2))
+((lambda (cont n)
+   (clog (+ "//" ((lambda (k)
+                    (set! cont k) n) (c/c))))
+   (if (> n 0)
+       (progn
+         (set! n (- n 1))
+         (cont n)))
+   n)
+ nil 10)

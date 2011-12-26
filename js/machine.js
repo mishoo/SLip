@@ -246,7 +246,7 @@ LispMachine.defop = function(name, args, proto) {
         }],
         ["SETCC", 0, {
                 run: function(m) {
-                        m.stack = m.top();
+                        m.stack = m.top().slice();
                 },
                 _disp: function() {
                         return "SETCC()"
