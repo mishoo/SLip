@@ -64,14 +64,11 @@ function pad_string(str, width) {
 var DEFCLASS = this.DEFCLASS = (function(NOINIT){
         return function(name, BASE, func) {
                 var code;
-                code = "return function " + (name || "D") + " (args){\n\
-if (args !== NOINIT) {\n\
-args = slice(arguments);\n\
-args = this.BEFORE_BASE && this.BEFORE_BASE(args) || args;\n\
-if (BASE) BASE.apply(this, args);\n\
-" + (name || "D") + ".INIT.apply(this, args);\n\
-}}";
-                var D = new Function("BASE", "NOINIT", "slice", code)(BASE, NOINIT, slice);
+                code = "return function " + (name || "D") + " (a){\n\
+if (a !== NOINIT) {\n";
+                if (BASE) code += "BASE.apply(this, arguments);\n";
+                code += "this.INIT.apply(this, arguments); }}";
+                var D = new Function("NOINIT", "BASE", code)(NOINIT, BASE);
                 D.INIT = noop;
                 if (BASE) {
                         D.BASE = BASE;
@@ -80,7 +77,8 @@ if (BASE) BASE.apply(this, args);\n\
                 var P = D.prototype;
                 if (name) P.$objectType = name;
                 P.constructor = D;
-                func(D, P, BASE);
+                P.INIT = noop;
+                if (func) return func(D, P, BASE) || D;
                 return D;
         };
 })({});

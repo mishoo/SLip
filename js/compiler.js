@@ -93,6 +93,7 @@ function lisp_parse(code) {
                             case "=": case "<": case ">":
                             case "[": case "]":
                             case "{": case "}":
+                            case "/":
                                 return true;
                         }
                 });
@@ -156,28 +157,18 @@ function lisp_parse(code) {
         return read_token();
 };
 
-///////////////// primitive functions
-
-function find_var(name, env) {
-        for (var i = 0; i < env.length; ++i) {
-                var frame = env[i];
-                for (var j = 0; j < frame.length; ++j) {
-                        if (frame[j] == name)
-                                return [ i, j ];
-                }
-        }
-};
-
-function LispLabel(name) {
-        this.name = name;
-        this.index = null;
-};
-LispLabel.prototype.toString = function() {
-        return this.name;
-};
-
 ///////////////// compiler
 (function(){
+
+        function find_var(name, env) {
+                for (var i = 0; i < env.length; ++i) {
+                        var frame = env[i];
+                        for (var j = 0; j < frame.length; ++j) {
+                                if (frame[j] == name)
+                                        return [ i, j ];
+                        }
+                }
+        };
 
         var LABEL_NUM = 0;
 
@@ -189,6 +180,7 @@ LispLabel.prototype.toString = function() {
         var S_T       = LispSymbol("T");
         var S_NIL     = LispSymbol("NIL");
         var S_NOT     = LispSymbol("NOT");
+        var S_CC      = LispSymbol("C/C");
 
         function append() {
                 var ret = [];
@@ -284,6 +276,9 @@ LispLabel.prototype.toString = function() {
                             case S_IF:
                                 arg_count(x, 2, 3);
                                 return comp_if(x[1], x[2], x[3], env, VAL, MORE);
+                            case S_CC:
+                                arg_count(x, 0);
+                                return seq(gen("CC"));
                             case S_LAMBDA:
                                 return VAL ? seq(
                                         comp_lambda(x[1], x.slice(2), env),

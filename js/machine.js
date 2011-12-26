@@ -1,3 +1,11 @@
+function LispLabel(name) {
+        this.name = name;
+        this.index = null;
+};
+LispLabel.prototype.toString = function() {
+        return this.name;
+};
+
 var LispSymbol = (function(SYMBOLS){
         function LispSymbol(name) {
                 this.name = name;
@@ -16,16 +24,6 @@ var LispSymbol = (function(SYMBOLS){
         get.is = function(thing) { return thing instanceof LispSymbol };
         return get;
 })({});
-
-function LispCons(a, b) {
-        this.car = a;
-        this.cdr = b;
-};
-LispCons.prototype = {
-        type: "cons",
-        display: function() {
-        }
-};
 
 function LispClosure(code, env) {
         this.name = null;
@@ -85,7 +83,7 @@ LispMachine.prototype = {
                 self.env = null;
                 self.stack = [ [] ];
                 self.pc = 0;
-                var quota = 1000;
+                var quota = 10000;
                 function runit() {
                         for (var i = quota; --i > 0;) {
                                 if (self.pc == null) return onfinish(self.pop());
@@ -120,7 +118,7 @@ LispMachine.assemble = function assemble(code) {
                 var el = ret[i];
                 switch (el[0]) {
                     case "FN":
-                        ret[i] = new LispMachine.OPS.FN(assemble(el[1]));
+                        ret[i] = LispMachine.OPS.FN.make(assemble(el[1]));
                         break;
                     case "JUMP":
                     case "TJUMP":
@@ -128,7 +126,7 @@ LispMachine.assemble = function assemble(code) {
                     case "SAVE":
                         el[1] = el[1].index;
                     default:
-                        ret[i] = new LispMachine.OPS[el[0]](el[1], el[2]);
+                        ret[i] = LispMachine.OPS[el[0]].make.apply(null, el.slice(1));
                 }
         }
         return ret;
@@ -161,6 +159,10 @@ LispMachine.defop = function(name, args, proto) {
                         }).join("; ") + "; this._init() };"
         )();
         ctor.prototype = new LispMachine.OP;
+        ctor.make = new Function(
+                "OP",
+                "return function(" + args.join(",") + "){return new OP(" + args.join(",") + ")}"
+        )(ctor);
         proto._name = name;
         proto._args = args;
         for (var i in proto) if (HOP(proto, i)) {
@@ -242,6 +244,14 @@ LispMachine.defop = function(name, args, proto) {
                         return "FJUMP(" + this.addr + ")";
                 }
         }],
+        ["SETCC", 0, {
+                run: function(m) {
+                        m.stack = m.top();
+                },
+                _disp: function() {
+                        return "SETCC()"
+                }
+        }],
         ["SAVE", "addr", {
                 run: function(m) {
                         m.push(new LispRet(m.code, this.addr, m.env));
@@ -312,3 +322,24 @@ LispMachine.defop = function(name, args, proto) {
         }]
 
 ].map(function(_){ LispMachine.defop(_[0], _[1], _[2]) });
+
+// it's necessary to take this out of the above array, because it
+// needs other operations to be defined at compile-time (it calls assemble).
+LispMachine.defop("CC", 0, {
+        run: (function(cc){
+                return function(m) {
+                        m.push(new LispClosure(cc, new LispCons([ m.stack.slice() ], null)));
+                }
+        })(
+                LispMachine.assemble([
+                        ["ARGS", 1],
+                        ["LVAR", 1, 0],
+                        ["SETCC"],
+                        ["LVAR", 0, 0],
+                        ["RET"]
+                ])
+        ),
+        _disp: function() {
+                return "CC()";
+        }
+});

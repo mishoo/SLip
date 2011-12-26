@@ -1,5 +1,16 @@
 var LispPrimitive = (function(){
         var PR = {};
+
+        function find_var(name, env) {
+                for (var i = 0; i < env.length; ++i) {
+                        var frame = env[i];
+                        for (var j = 0; j < frame.length; ++j) {
+                                if (frame[j] == name)
+                                        return [ i, j ];
+                        }
+                }
+        };
+
         function get(name) { return PR[name] };
         function prim(name, seff, func) {
                 var m = /function\s*\(\s*((.|\n)*?)\s*\)\s*\{((.|\n)*)\}/.exec(func);
@@ -38,3 +49,7 @@ LispPrimitive.def("eq", false, function(a, b){ return a === b ? true : null });
 LispPrimitive.def("cons", false, function(a, b){ return new LispCons(a, b) });
 LispPrimitive.def("car", false, function(c){ return c.car });
 LispPrimitive.def("cdr", false, function(c){ return c.cdr });
+
+
+
+LispPrimitive.def("clog", true, function(o){ console.log(o) });
