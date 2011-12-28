@@ -38,6 +38,7 @@ var LispCons = DEFTYPE("cons", function(D, P){
                         ++len;
                         list = list.cdr;
                 }
+                return len;
         };
         D.toArray = function(list) {
                 var a = [];
@@ -46,4 +47,21 @@ var LispCons = DEFTYPE("cons", function(D, P){
                 });
                 return a;
         };
+        D.cons = function(a, b) {
+                return new D(a, b);
+        };
+
+        function car(cell) {
+                return cell === null ? null : cell.car;
+        };
+        function cdr(cell) {
+                return cell === null ? null : cell.cdr;
+        };
+
+        D.car = car;
+        D.cdr = cdr;
+        D.cadr = compose(car, cdr);
+        D.caddr = compose(car, cdr, cdr);
+        D.cadddr = compose(car, cdr, cdr, cdr);
+        D.cddr = compose(cdr, cdr);
 });

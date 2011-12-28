@@ -130,7 +130,7 @@ function lisp_parse(code) {
                 var ch = peek();
                 switch (ch) {
                     case "\"": return new LispString(read_string());
-                    case "(": return read_list();
+                    case "(": return LispCons.fromArray(read_list());
                     case ";": return skip_comment();
                     case "#": return read_sharp();
                     case "'": return read_quote();
@@ -158,7 +158,7 @@ function lisp_parse(code) {
 };
 
 ///////////////// compiler
-(function(){
+(function(LC, cons, car, cdr, cadr, caddr, cadddr, cddr, length){
 
         function find_var(name, env) {
                 for (var i = 0; i < env.length; ++i) {
@@ -203,8 +203,14 @@ function lisp_parse(code) {
         };
 
         function constantp(x) {
-                if (x === S_T || x === S_NIL) return true;
-                if (LispNumber.is(x) || LispString.is(x)) return true;
+                switch (x) {
+                    case S_T:
+                    case S_NIL:
+                    case true:
+                    case null:
+                        return true;
+                }
+                return LispNumber.is(x) || LispString.is(x);
         };
 
         function equal(a, b) {
@@ -233,7 +239,7 @@ function lisp_parse(code) {
 
         function arg_count(form, min, max) {
                 if (max == null) max = min;
-                var len = form.length - 1;
+                var len = length(cdr(form));
                 if (len < min) throw new Error("Expecting at least " + min + " arguments");
                 if (len > max) throw new Error("Expecting at most " + max + " arguments");
         };
@@ -254,32 +260,32 @@ function lisp_parse(code) {
                 else if (constantp(x)) {
                         return comp_const(x, VAL, MORE);
                 }
-                else switch (x[0]) {
+                else switch (car(x)) {
                     case S_QUOTE:
                         arg_count(x, 1);
-                        return comp_const(x[1], VAL, MORE);
+                        return comp_const(cadr(x), VAL, MORE);
                     case S_PROGN:
-                        return comp_seq(x.slice(1), env, VAL, MORE);
+                        return comp_seq(cdr(x), env, VAL, MORE);
                     case S_SET:
                         arg_count(x, 2);
-                        assert(LispSymbol.is(x[1]), "Only symbols can be set");
-                        return seq(comp(x[2], env, true, true),
-                                   gen_set(x[1], env),
+                        assert(LispSymbol.is(cadr(x)), "Only symbols can be set");
+                        return seq(comp(caddr(x), env, true, true),
+                                   gen_set(cadr(x), env),
                                    VAL ? null : gen("POP"),
                                    MORE ? null : gen("RET"));
                     case S_IF:
                         arg_count(x, 2, 3);
-                        return comp_if(x[1], x[2], x[3], env, VAL, MORE);
+                        return comp_if(cadr(x), caddr(x), cadddr(x), env, VAL, MORE);
                     case S_CC:
                         arg_count(x, 0);
                         return VAL ? seq(gen("CC")) : [];
                     case S_LAMBDA:
                         return VAL ? seq(
-                                comp_lambda(x[1], x.slice(2), env),
+                                comp_lambda(cadr(x), cddr(x), env),
                                 MORE ? null : gen("RET")
                         ) : [];
                     default:
-                        return comp_funcall(x[0], x.slice(1), env, VAL, MORE);
+                        return comp_funcall(car(x), cdr(x), env, VAL, MORE);
                 }
         };
 
@@ -316,18 +322,16 @@ function lisp_parse(code) {
         };
 
         function comp_seq(exps, env, VAL, MORE) {
-                switch (exps.length) {
-                    case 0: return comp_const(null, VAL, MORE);
-                    case 1: return comp(exps[0], env, VAL, MORE);
-                }
-                return seq(comp(exps[0], env, false, true),
-                           comp_seq(exps.slice(1), env, VAL, MORE));
+                if (nullp(exps)) return comp_const(null, VAL, MORE);
+                if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
+                return seq(comp(car(exps), env, false, true),
+                           comp_seq(cdr(exps), env, VAL, MORE));
         };
 
         function comp_list(exps, env) {
-                if (exps.length > 0) return seq(
-                        comp(exps[0], env, true, true),
-                        comp_list(exps.slice(1), env)
+                if (!nullp(exps)) return seq(
+                        comp(car(exps), env, true, true),
+                        comp_list(cdr(exps), env)
                 );
         };
 
@@ -338,8 +342,8 @@ function lisp_parse(code) {
                 if (constantp(pred)) {
                         return comp(tthen, env, VAL, MORE);
                 }
-                if (pred instanceof Array && pred[0] === S_NOT && pred.length == 2) {
-                        return comp_if(pred[1], telse, tthen, env, VAL, MORE);
+                if (LispCons.is(pred) && car(pred) === S_NOT && LispCons.len(pred) == 2) {
+                        return comp_if(cadr(pred), telse, tthen, env, VAL, MORE);
                 }
                 var pcode = comp(pred, env, true, true);
                 var tcode = comp(tthen, env, VAL, MORE);
@@ -386,7 +390,7 @@ function lisp_parse(code) {
         };
 
         function comp_funcall(f, args, env, VAL, MORE) {
-                if (LispPrimitive.is(f, env, args.length)) {
+                if (LispPrimitive.is(f, env, length(args))) {
                         if (!VAL && !LispPrimitive.seff(f)) {
                                 return comp_seq(args, env, false, MORE);
                         }
@@ -395,9 +399,9 @@ function lisp_parse(code) {
                                    VAL ? null : gen("POP"),
                                    MORE ? null : gen("RET"));
                 }
-                if (f instanceof Array && f[0] === S_LAMBDA && f[1].length == 0) {
+                if (LispCons.is(f) && car(f) === S_LAMBDA && nullp(cadr(f))) {
                         assert(nullp(args), "Too many arguments");
-                        return comp_seq(f.slice(2), env, VAL, MORE);
+                        return comp_seq(cddr(f), env, VAL, MORE);
                 }
                 if (MORE) {
                         var k = gen_label();
@@ -405,7 +409,7 @@ function lisp_parse(code) {
                                 gen("SAVE", k),
                                 comp_list(args, env),
                                 comp(f, env, true, true),
-                                gen("CALLJ", args.length),
+                                gen("CALLJ", length(args)),
                                 [ k ],
                                 VAL ? null : gen("POP")
                         );
@@ -413,15 +417,14 @@ function lisp_parse(code) {
                 return seq(
                         comp_list(args, env),
                         comp(f, env, true, true),
-                        gen("CALLJ", args.length)
+                        gen("CALLJ", length(args))
                 );
         };
 
         function comp_lambda(args, body, env) {
                 return gen("FN",
-                           seq(gen("ARGS", nullp(args) ? 0 : args.length),
-                               comp_seq(body, [ args ].concat(env), true, false))
-                          );
+                           seq(gen("ARGS", length(args)),
+                               comp_seq(body, [ LC.toArray(args) ].concat(env), true, false)));
         };
 
         this.compile = function(x) {
@@ -467,4 +470,12 @@ function lisp_parse(code) {
                 return show_code(x, 1);
         };
 
-})();
+})(LispCons,
+   LispCons.cons,
+   LispCons.car,
+   LispCons.cdr,
+   LispCons.cadr,
+   LispCons.caddr,
+   LispCons.cadddr,
+   LispCons.cddr,
+   LispCons.len);

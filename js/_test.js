@@ -17,6 +17,7 @@
                 console.log(comp_show(bc));
                 var m = new LispMachine();
                 bc = LispMachine.assemble(bc);
+                console.log(LispMachine.serialize(bc));
                 time_it("run", function(){
                         console.log(m.run(bc));
                 });
