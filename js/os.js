@@ -58,7 +58,8 @@ function repeat_string(str, i) {
 
 function pad_string(str, width) {
         str += "";
-        return str + repeat_string(" ", width - str.length);
+        var len = Math.ceil(str.length / width) * width;
+        return str + repeat_string(" ", len - str.length);
 };
 
 var DEFCLASS = (function(NOINIT){

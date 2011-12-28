@@ -141,11 +141,15 @@ function lisp_parse(code) {
                 if (in_qq == 0) croak("Comma outside quasiquote");
                 skip(",");
                 skip_ws();
+                var ret;
+                --in_qq;
                 if (peek() == "@") {
                         next();
-                        return list([ LispSymbol.get("qq-splice"), read_token() ]);
+                        ret = list([ LispSymbol.get("qq-splice"), read_token() ]);
                 }
-                return list([ LispSymbol.get("qq-unquote"), read_token() ]);
+                else ret = list([ LispSymbol.get("qq-unquote"), read_token() ]);
+                ++in_qq;
+                return ret;
         };
         function read_token() {
                 skip_ws();
@@ -182,14 +186,16 @@ function lisp_parse(code) {
 };
 
 ///////////////// compiler
-(function(LC, cons, car, cdr, cadr, caddr, cadddr, cddr, length){
+(function(LC){
 
         var cons = LC.cons
         , car = LC.car
         , cdr = LC.cdr
         , cadr = LC.cadr
+        , caddr = LC.caddr
         , cadddr = LC.cadddr
         , cddr = LC.cddr
+        , cdddr = LC.cdddr
         , length = LC.len
         , list = LC.fromArray;
 
@@ -214,6 +220,7 @@ function lisp_parse(code) {
         var S_NIL     = LispSymbol.get("NIL");
         var S_NOT     = LispSymbol.get("NOT");
         var S_CC      = LispSymbol.get("C/C");
+        var S_DEFMAC  = LispSymbol.get("DEFMACRO");
 
         function append() {
                 var ret = [];
@@ -312,14 +319,39 @@ function lisp_parse(code) {
                     case S_CC:
                         arg_count(x, 0);
                         return VAL ? seq(gen("CC")) : [];
+                    case S_DEFMAC:
+                        assert(LispSymbol.is(cadr(x)), "DEFMACRO requires a symbol name for the macro");
+                        return comp_defmac(cadr(x), caddr(x), cdddr(x), env);
                     case S_LAMBDA:
                         return VAL ? seq(
                                 comp_lambda(cadr(x), cddr(x), env),
                                 MORE ? null : gen("RET")
                         ) : [];
                     default:
+                        if (LispSymbol.is(car(x)) && car(x).macro())
+                                return comp_macroexpand(car(x), cdr(x), env, VAL, MORE);
                         return comp_funcall(car(x), cdr(x), env, VAL, MORE);
                 }
+        };
+
+        function comp_macroexpand(name, args, env, VAL, MORE) {
+                //console.log("Macroexpanding " + name + " / " + LispMachine.dump(args));
+                var m = new LispMachine();
+                var code = LispMachine.assemble(
+                        comp_list(LC.map(args, function(el){
+                                return list([ S_QUOTE, el ]);
+                        }), [])
+                ).concat(name.macro(), LispMachine.assemble(gen("CALLJ", length(args))));
+                //console.log(LispMachine.serialize(code));
+                var ret = comp(m.run(code), env, VAL, MORE);
+                //console.log(show_code(ret, 1));
+                return ret;
+        };
+
+        function comp_defmac(name, args, body, env) {
+                var func = comp_lambda(args, body, env);
+                func = LispMachine.assemble(func);
+                name.set("macro", func);
         };
 
         /////
@@ -423,12 +455,12 @@ function lisp_parse(code) {
         };
 
         function comp_funcall(f, args, env, VAL, MORE) {
-                if (LispPrimitive.is(f, env, length(args))) {
+                if (LispPrimitive.is(f, env)) {
                         if (!VAL && !LispPrimitive.seff(f)) {
                                 return comp_seq(args, env, false, MORE);
                         }
                         return seq(comp_list(args, env),
-                                   gen("PRIM", f),
+                                   gen("PRIM", f, length(args)),
                                    VAL ? null : gen("POP"),
                                    MORE ? null : gen("RET"));
                 }
@@ -489,7 +521,7 @@ function lisp_parse(code) {
                         }
                         else {
                                 line += el.map(function(el, i){
-                                        if (i > 0 && typeof el == "string") el = JSON.stringify(el);
+                                        if (i > 0) el = LispMachine.serialize_const(el);
                                         return pad_string(el, 8);
                                 }).join("");
                         }

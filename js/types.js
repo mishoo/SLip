@@ -54,11 +54,20 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         var SYMBOLS = {};
         P.INIT = function(name) {
                 this.name = name;
-                this.value = null;
+                this.plist = {};
         };
         P.toString = function() { return this.name };
         P.serialize = function() {
                 return "s(" + JSON.stringify(this.name) + ")";
+        };
+        P.set = function(key, val) {
+                this.plist[key] = val;
+        };
+        P.get = function(key) {
+                return this.plist[key];
+        };
+        P.macro = function() {
+                return this.get("macro");
         };
         D.get = function(name) {
                 name = name.toUpperCase();

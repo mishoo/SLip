@@ -60,8 +60,34 @@ var LispCons = DEFTYPE("cons", function(D, P){
 
         D.car = car;
         D.cdr = cdr;
-        D.cadr = compose(car, cdr);
-        D.caddr = compose(car, cdr, cdr);
-        D.cadddr = compose(car, cdr, cdr, cdr);
-        D.cddr = compose(cdr, cdr);
+
+        D.caar = function(l){return car(car(l))};
+        D.cadr = function(l){return car(cdr(l))};
+        D.cdar = function(l){return cdr(car(l))};
+        D.cddr = function(l){return cdr(cdr(l))};
+        D.caaar = function(l){return car(car(car(l)))};
+        D.caadr = function(l){return car(car(cdr(l)))};
+        D.cadar = function(l){return car(cdr(car(l)))};
+        D.caddr = function(l){return car(cdr(cdr(l)))};
+        D.cdaar = function(l){return cdr(car(car(l)))};
+        D.cdadr = function(l){return cdr(car(cdr(l)))};
+        D.cddar = function(l){return cdr(cdr(car(l)))};
+        D.cdddr = function(l){return cdr(cdr(cdr(l)))};
+        D.caaaar = function(l){return car(car(car(car(l))))};
+        D.caaadr = function(l){return car(car(car(cdr(l))))};
+        D.caadar = function(l){return car(car(cdr(car(l))))};
+        D.caaddr = function(l){return car(car(cdr(cdr(l))))};
+        D.cadaar = function(l){return car(cdr(car(car(l))))};
+        D.cadadr = function(l){return car(cdr(car(cdr(l))))};
+        D.caddar = function(l){return car(cdr(cdr(car(l))))};
+        D.cadddr = function(l){return car(cdr(cdr(cdr(l))))};
+        D.cdaaar = function(l){return cdr(car(car(car(l))))};
+        D.cdaadr = function(l){return cdr(car(car(cdr(l))))};
+        D.cdadar = function(l){return cdr(car(cdr(car(l))))};
+        D.cdaddr = function(l){return cdr(car(cdr(cdr(l))))};
+        D.cddaar = function(l){return cdr(cdr(car(car(l))))};
+        D.cddadr = function(l){return cdr(cdr(car(cdr(l))))};
+        D.cdddar = function(l){return cdr(cdr(cdr(car(l))))};
+        D.cddddr = function(l){return cdr(cdr(cdr(cdr(l))))};
+
 });

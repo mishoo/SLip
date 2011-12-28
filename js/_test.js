@@ -14,14 +14,24 @@
         load("test.lisp", function(code){
                 var ast = lisp_parse(code);
                 console.log(LispMachine.dump(ast));
-                // var bc = compile(ast);
-                // console.log(comp_show(bc));
-                // var m = new LispMachine();
-                // bc = LispMachine.assemble(bc);
-                // console.log(LispMachine.serialize(bc));
-                // time_it("run", function(){
-                //         console.log(m.run(bc));
-                // });
+
+                var m = new LispMachine();
+
+                LispCons.forEach(ast, function(ast){
+                        ast = new LispCons(ast, null);
+                        console.log(LispMachine.dump(ast));
+                        var bc = compile(ast);
+                        if (bc) {
+                                console.log(comp_show(bc));
+                                bc = LispMachine.assemble(bc);
+                                console.log(LispMachine.serialize(bc));
+                                time_it("run", function(){
+                                        console.log(LispMachine.dump(m.run(bc)));
+                                });
+                        }
+                        console.log("****************************************************");
+                });
+                
         });
 
 })();

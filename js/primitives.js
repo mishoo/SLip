@@ -13,7 +13,7 @@ var LispPrimitive = (function(){
 
         function get(name) { return PR[name] };
         function prim(name, seff, func) {
-                var m = /function\s*\(\s*((.|\n)*?)\s*\)\s*\{((.|\n)*)\}/.exec(func);
+                var m = /function.*\(\s*((.|\n)*?)\s*\)\s*\{((.|\n)*)\}/.exec(func);
                 name = name.toUpperCase();
                 var args = m[1].split(/\s*,\s*/);
                 var code = m[3];
@@ -31,19 +31,20 @@ var LispPrimitive = (function(){
         };
 
         get.is = function(name, env, args) {
-                return !find_var(name, env) && HOP(PR, name) && PR[name].args.length == args;
+                return !find_var(name, env) && HOP(PR, name);
         };
         get.seff = function(name) {
                 return PR[name] && PR[name].seff;
         };
         get.def = prim;
+        get.PR = PR;
         return get;
 })();
 
-LispPrimitive.def("+", false, function(a, b){ return a + b });
-LispPrimitive.def("-", false, function(a, b){ return a - b });
-LispPrimitive.def("*", false, function(a, b){ return a * b });
-LispPrimitive.def("/", false, function(a, b){ return a / b });
+LispPrimitive.def("+", false, function(a, b){ return new LispNumber(a + b) });
+LispPrimitive.def("-", false, function(a, b){ return new LispNumber(a - b) });
+LispPrimitive.def("*", false, function(a, b){ return new LispNumber(a * b) });
+LispPrimitive.def("/", false, function(a, b){ return new LispNumber(a / b) });
 LispPrimitive.def("<", false, function(a, b){ return a < b ? true : null });
 LispPrimitive.def("<=", false, function(a, b){ return a <= b ? true : null });
 LispPrimitive.def(">", false, function(a, b){ return a > b ? true : null });
@@ -52,9 +53,48 @@ LispPrimitive.def("=", false, function(a, b){ return a == b ? true : null });
 LispPrimitive.def("/=", false, function(a, b){ return a != b ? true : null });
 LispPrimitive.def("eq", false, function(a, b){ return a === b ? true : null });
 LispPrimitive.def("cons", false, function(a, b){ return new LispCons(a, b) });
-LispPrimitive.def("car", false, function(c){ return c.car });
-LispPrimitive.def("cdr", false, function(c){ return c.cdr });
+LispPrimitive.def("listp", false, function(x){ return LispCons.isList(x) ? true : null });
+LispPrimitive.def("consp", false, function(x){ return LispCons.is(x) ? true : null });
+LispPrimitive.def("nullp", false, function(x){ return x === null ? true : null });
 
-
+(function(make, i){
+        for (i in LispCons) if (HOP(LispCons, i) && /^c[ad]+r$/.test(i)) {
+                var name = i.toUpperCase();
+                LispPrimitive.PR[name] = {
+                        name: name,
+                        args: [ "x" ],
+                        seff: false,
+                        func: make(LispCons[i])
+                };
+        }
+})(function(func){
+        return function (m) {
+                return func(m.pop());
+        };
+});
 
 LispPrimitive.def("clog", true, function(o){ console.log(o) });
+
+LispPrimitive.PR.LIST = {
+        name: "LIST",
+        seff: false,
+        func: function(m, nargs) {
+                var a = [];
+                while (nargs-- > 0) {
+                        a.unshift(m.pop());
+                }
+                return LispCons.fromArray(a);
+        }
+};
+
+LispPrimitive.PR.APPEND = {
+        name: "APPEND",
+        seff: false,
+        func: function(m, nargs) {
+                var a = [];
+                while (nargs-- > 0) {
+                        a.unshift.apply(a, LispCons.toArray(m.pop()));
+                }
+                return LispCons.fromArray(a);
+        }
+};

@@ -24,8 +24,7 @@ function LispRet(code, pc, env) {
         this.env = env;
 };
 
-function LispMachine(glob_env) {
-        this.glob_env = glob_env || {};
+function LispMachine() {
         this.code = null;
         this.pc = null;
         this.stack = null;
@@ -44,10 +43,10 @@ LispMachine.prototype = {
                 e.car[j] = val;
         },
         gvar: function(name) {
-                return this.glob_env[name];
+                return name.value;
         },
         gset: function(name, val) {
-                this.glob_env[name] = val;
+                name.value = val;
         },
         push: function(v) {
                 this.stack.push(v);
@@ -121,7 +120,9 @@ LispMachine.serialize = function(code) {
 
 LispMachine.serialize_const = function(val) {
         if (LispSymbol.is(val)) return val.serialize();
-        if (val instanceof Array) return "l(" + val.map(LispMachine.serialize_const).join(",") + ")";
+        if (val === null || val === true) return val + "";
+        if (val instanceof Array) return "v(" + val.map(LispMachine.serialize_const).join(",") + ")";
+        if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(LispMachine.serialize_const).join(",") + ")";
         if (typeof val == "string") return JSON.stringify(val);
         return val + "";
 };
@@ -289,16 +290,16 @@ LispMachine.defop = function(name, args, proto) {
                         return "FN(" + LispMachine.serialize(this.code) + ")";
                 }
         }],
-        ["PRIM", "name", {
+        ["PRIM", "name nargs", {
                 run: function(m) {
-                        m.push(this.func(m));
+                        m.push(this.func(m, this.nargs));
                 },
                 _init: function() {
                         var prim = LispPrimitive(this.name);
                         this.func = prim.func;
                 },
                 _disp: function() {
-                        return "PRIM(" + this.name.serialize() + ")";
+                        return "PRIM(" + this.name.serialize() + "," + this.nargs + ")";
                 }
         }]
 
