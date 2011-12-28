@@ -29,6 +29,7 @@ Stream.prototype = {
 
 ////////////////// basic parser
 function lisp_parse(code) {
+        var list = LispCons.fromArray;
         var input = new Stream("(" + code + ")");
         function next() { return input.next(); };
         function peek() { return input.peek(); };
@@ -123,16 +124,39 @@ function lisp_parse(code) {
         };
         function read_quote() {
                 skip("'");
-                return [ LispSymbol.get("quote"), read_token() ];
+                return list([ LispSymbol.get("quote"), read_token() ]);
+        };
+        var in_qq = 0;
+        function read_quasiquote() {
+                skip("`");
+                skip_ws();
+                if (peek() != "(")
+                        return list([ LispSymbol.get("quote"), read_token() ]);
+                ++in_qq;
+                var ret = list([ LispSymbol.get("quasiquote"), read_token() ]);
+                --in_qq;
+                return ret;
+        };
+        function read_comma() {
+                if (in_qq == 0) croak("Comma outside quasiquote");
+                skip(",");
+                skip_ws();
+                if (peek() == "@") {
+                        next();
+                        return list([ LispSymbol.get("qq-splice"), read_token() ]);
+                }
+                return list([ LispSymbol.get("qq-unquote"), read_token() ]);
         };
         function read_token() {
                 skip_ws();
                 var ch = peek();
                 switch (ch) {
                     case "\"": return new LispString(read_string());
-                    case "(": return LispCons.fromArray(read_list());
+                    case "(": return list(read_list());
                     case ";": return skip_comment();
                     case "#": return read_sharp();
+                    case "`": return read_quasiquote();
+                    case ",": return read_comma();
                     case "'": return read_quote();
                 }
                 return read_symbol();
@@ -159,6 +183,15 @@ function lisp_parse(code) {
 
 ///////////////// compiler
 (function(LC, cons, car, cdr, cadr, caddr, cadddr, cddr, length){
+
+        var cons = LC.cons
+        , car = LC.car
+        , cdr = LC.cdr
+        , cadr = LC.cadr
+        , cadddr = LC.cadddr
+        , cddr = LC.cddr
+        , length = LC.len
+        , list = LC.fromArray;
 
         function find_var(name, env) {
                 for (var i = 0; i < env.length; ++i) {
@@ -342,7 +375,7 @@ function lisp_parse(code) {
                 if (constantp(pred)) {
                         return comp(tthen, env, VAL, MORE);
                 }
-                if (LispCons.is(pred) && car(pred) === S_NOT && LispCons.len(pred) == 2) {
+                if (LC.is(pred) && car(pred) === S_NOT && LC.len(pred) == 2) {
                         return comp_if(cadr(pred), telse, tthen, env, VAL, MORE);
                 }
                 var pcode = comp(pred, env, true, true);
@@ -399,7 +432,7 @@ function lisp_parse(code) {
                                    VAL ? null : gen("POP"),
                                    MORE ? null : gen("RET"));
                 }
-                if (LispCons.is(f) && car(f) === S_LAMBDA && nullp(cadr(f))) {
+                if (LC.is(f) && car(f) === S_LAMBDA && nullp(cadr(f))) {
                         assert(nullp(args), "Too many arguments");
                         return comp_seq(cddr(f), env, VAL, MORE);
                 }
@@ -470,12 +503,4 @@ function lisp_parse(code) {
                 return show_code(x, 1);
         };
 
-})(LispCons,
-   LispCons.cons,
-   LispCons.car,
-   LispCons.cdr,
-   LispCons.cadr,
-   LispCons.caddr,
-   LispCons.cadddr,
-   LispCons.cddr,
-   LispCons.len);
+})(LispCons);

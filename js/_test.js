@@ -13,14 +13,15 @@
 
         load("test.lisp", function(code){
                 var ast = lisp_parse(code);
-                var bc = compile(ast);
-                console.log(comp_show(bc));
-                var m = new LispMachine();
-                bc = LispMachine.assemble(bc);
-                console.log(LispMachine.serialize(bc));
-                time_it("run", function(){
-                        console.log(m.run(bc));
-                });
+                console.log(LispMachine.dump(ast));
+                // var bc = compile(ast);
+                // console.log(comp_show(bc));
+                // var m = new LispMachine();
+                // bc = LispMachine.assemble(bc);
+                // console.log(LispMachine.serialize(bc));
+                // time_it("run", function(){
+                //         console.log(m.run(bc));
+                // });
         });
 
 })();
