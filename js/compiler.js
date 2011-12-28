@@ -345,6 +345,7 @@ function lisp_parse(code) {
         };
 
         function comp_macroexpand(name, args, env, VAL, MORE) {
+                //console.log("Macroexpanding %o: %o", name, LispMachine.dump(args));
                 var m = new LispMachine();
                 var code = LispMachine.assemble(
                         comp_list(LC.map(args, function(el){
@@ -404,6 +405,7 @@ function lisp_parse(code) {
                         comp(car(exps), env, true, true),
                         comp_list(cdr(exps), env)
                 );
+                return [];
         };
 
         function comp_if(pred, tthen, telse, env, VAL, MORE) {
@@ -493,9 +495,25 @@ function lisp_parse(code) {
         };
 
         function comp_lambda(args, body, env) {
-                return gen("FN",
-                           seq(gen("ARGS", length(args)),
-                               comp_seq(body, [ LC.toArray(args) ].concat(env), true, false)));
+                if (LispSymbol.is(args)) {
+                        return gen("FN",
+                                   seq(gen("ARG_", 0),
+                                       comp_seq(body, [ [ args ] ].concat(env), true, false)));
+                } else {
+                        var dot = LC.isDotted(args);
+                        if (!dot) {
+                                return gen("FN",
+                                           seq(gen("ARGS", length(args)),
+                                               comp_seq(body, [ LC.toArray(args) ].concat(env), true, false)));
+                        }
+                        var a = LC.toArray(args);
+                        var tmp = a.pop();
+                        a.pop();
+                        a.push(tmp);
+                        return gen("FN",
+                                   seq(gen("ARG_", dot),
+                                       comp_seq(body, [ a ].concat(env), true, false)));
+                }
         };
 
         this.compile = function(x) {

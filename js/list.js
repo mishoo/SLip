@@ -67,6 +67,15 @@ var LispCons = DEFTYPE("cons", function(D, P){
         D.cons = function(a, b) {
                 return new D(a, b);
         };
+        D.isDotted = function(x) {
+                var i = 0;
+                while (x !== null) {
+                        if (!listp(x)) return i;
+                        x = x.cdr;
+                        i++;
+                }
+                return false;
+        };
 
         function car(cell) {
                 return cell === null ? null : cell.car;
@@ -106,5 +115,4 @@ var LispCons = DEFTYPE("cons", function(D, P){
         D.cddadr = function(l){return cdr(cdr(car(cdr(l))))};
         D.cdddar = function(l){return cdr(cdr(cdr(car(l))))};
         D.cddddr = function(l){return cdr(cdr(cdr(cdr(l))))};
-
 });

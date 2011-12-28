@@ -56,6 +56,19 @@ LispPrimitive.def("cons", false, function(a, b){ return new LispCons(a, b) });
 LispPrimitive.def("listp", false, function(x){ return LispCons.isList(x) ? true : null });
 LispPrimitive.def("consp", false, function(x){ return LispCons.is(x) ? true : null });
 LispPrimitive.def("nullp", false, function(x){ return x === null ? true : null });
+LispPrimitive.def("not", false, function(x){ return x === null ? true : null });
+
+(function(N){
+        LispPrimitive.PR.GENSYM = {
+                name: "GENSYM",
+                seff: false,
+                func: function(m, nargs) {
+                        if (nargs > 1) throw new Error("Too many arguments in GENSYM");
+                        var name = (nargs == 0 ? "SYM" : name) + (++N);
+                        return new LispSymbol(name);
+                }
+        };
+})(0);
 
 (function(make, i){
         for (i in LispCons) if (HOP(LispCons, i) && /^c[ad]+r$/.test(i)) {

@@ -89,6 +89,7 @@ LispMachine.OPS = {};
 
 LispMachine.assemble = function assemble(code) {
         var ret = [];
+        if (!code) debugger;
         for (var i = 0; i < code.length; ++i) {
                 var el = code[i];
                 if (el instanceof LispLabel) el.index = ret.length;
@@ -280,6 +281,27 @@ LispMachine.defop = function(name, args, proto) {
                 },
                 _disp: function() {
                         return "ARGS(" + this.count + ")";
+                }
+        }],
+        ["ARG_", "count", {
+                run: function(m) {
+                        var count = this.count;
+                        var passed = m.n_args;
+                        if (passed < count) throw new Error("Insufficient number of arguments");
+                        var frame = [];
+                        var p = null;
+                        while (passed > count) {
+                                p = new LispCons(m.pop(), p);
+                                passed--;
+                        }
+                        frame[count] = p;
+                        while (--count >= 0) {
+                                frame[count] = m.pop();
+                        }
+                        m.env = new LispCons(frame, m.env);
+                },
+                _disp: function() {
+                        return "ARG_(" + this.count + ")";
                 }
         }],
         ["FN", "code", {
