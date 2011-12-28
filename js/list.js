@@ -1,21 +1,30 @@
 var LispCons = DEFTYPE("cons", function(D, P){
+        var DOT = {};
+        DOT.toString = function(){ return "DOT" };
+        function listp(thing) {
+                return thing === null || thing instanceof D;
+        };
         P.INIT = function(a, b) {
                 this.car = a;
                 this.cdr = b;
         };
-        D.isList = function(thing) {
-                return thing === null || thing instanceof D;
-        };
+        D.DOT = DOT;
+        D.isList = listp;
         D.forEach = function(p, callback) {
+                var i = 0;
                 while (p !== null) {
-                        callback(p.car);
+                        callback(p.car, i++);
                         p = p.cdr;
+                        if (!listp(p)) {
+                                callback(p, i, true);
+                                break;
+                        }
                 }
         };
         D.map = function(list, callback) {
                 var ret = null, p;
-                D.forEach(list, function(el){
-                        var cell = new D(callback(el), null);
+                D.forEach(list, function(el, i, dot){
+                        var cell = new D(callback(el, i, dot), null);
                         if (ret) p.cdr = cell;
                         else ret = cell;
                         p = cell;
@@ -23,12 +32,19 @@ var LispCons = DEFTYPE("cons", function(D, P){
                 return ret;
         };
         D.fromArray = function(a) {
-                var ret = null;
+                var ret = null, dot = false;
                 a.forEach(function(el){
-                        var cell = new D(el, null);
-                        if (ret) p.cdr = cell;
-                        else ret = cell;
-                        p = cell;
+                        if (el === DOT) {
+                                dot = true;
+                        } else {
+                                if (dot) p.cdr = el;
+                                else {
+                                        var cell = new D(el, null);
+                                        if (ret) p.cdr = cell;
+                                        else ret = cell;
+                                        p = cell;
+                                }
+                        }
                 });
                 return ret;
         };
@@ -42,7 +58,8 @@ var LispCons = DEFTYPE("cons", function(D, P){
         };
         D.toArray = function(list) {
                 var a = [];
-                D.forEach(list, function(el){
+                D.forEach(list, function(el, i, dot){
+                        if (dot) a.push(DOT);
                         a.push(el);
                 });
                 return a;

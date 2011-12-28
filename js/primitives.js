@@ -41,16 +41,16 @@ var LispPrimitive = (function(){
         return get;
 })();
 
-LispPrimitive.def("+", false, function(a, b){ return new LispNumber(a + b) });
-LispPrimitive.def("-", false, function(a, b){ return new LispNumber(a - b) });
-LispPrimitive.def("*", false, function(a, b){ return new LispNumber(a * b) });
-LispPrimitive.def("/", false, function(a, b){ return new LispNumber(a / b) });
-LispPrimitive.def("<", false, function(a, b){ return a < b ? true : null });
-LispPrimitive.def("<=", false, function(a, b){ return a <= b ? true : null });
-LispPrimitive.def(">", false, function(a, b){ return a > b ? true : null });
-LispPrimitive.def(">=", false, function(a, b){ return a >= b ? true : null });
-LispPrimitive.def("=", false, function(a, b){ return a == b ? true : null });
-LispPrimitive.def("/=", false, function(a, b){ return a != b ? true : null });
+LispPrimitive.def("+", false, function(a, b){ return new LispNumber(a.value + b.value) });
+LispPrimitive.def("-", false, function(a, b){ return new LispNumber(a.value - b.value) });
+LispPrimitive.def("*", false, function(a, b){ return new LispNumber(a.value * b.value) });
+LispPrimitive.def("/", false, function(a, b){ return new LispNumber(a.value / b.value) });
+LispPrimitive.def("<", false, function(a, b){ return a.value < b.value ? true : null });
+LispPrimitive.def("<=", false, function(a, b){ return a.value <= b.value ? true : null });
+LispPrimitive.def(">", false, function(a, b){ return a.value > b.value ? true : null });
+LispPrimitive.def(">=", false, function(a, b){ return a.value >= b.value ? true : null });
+LispPrimitive.def("=", false, function(a, b){ return a.value == b.value ? true : null });
+LispPrimitive.def("/=", false, function(a, b){ return a.value != b.value ? true : null });
 LispPrimitive.def("eq", false, function(a, b){ return a === b ? true : null });
 LispPrimitive.def("cons", false, function(a, b){ return new LispCons(a, b) });
 LispPrimitive.def("listp", false, function(x){ return LispCons.isList(x) ? true : null });

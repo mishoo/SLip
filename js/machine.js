@@ -329,6 +329,19 @@ LispMachine.defop("CC", 0, {
 LispMachine.dump = function(thing) {
         if (thing === null) return "NIL";
         if (thing === true) return "T";
-        if (LispCons.is(thing)) return "(" + LispCons.toArray(LispCons.map(thing, LispMachine.dump)).join(" ") + ")";
+        if (LispCons.is(thing)) {
+                var ret = "(", first = true;
+                while (thing !== null) {
+                        if (!first) ret += " ";
+                        else first = false;
+                        ret += LispMachine.dump(LispCons.car(thing));
+                        thing = LispCons.cdr(thing);
+                        if (!LispCons.isList(thing)) {
+                                ret += " . " + LispMachine.dump(thing);
+                                break;
+                        }
+                }
+                return ret + ")";
+        }
         return thing + "";
 };

@@ -59,6 +59,7 @@ function repeat_string(str, i) {
 function pad_string(str, width) {
         str += "";
         var len = Math.ceil(str.length / width) * width;
+        if (len == str.length) len += width;
         return str + repeat_string(" ", len - str.length);
 };
 

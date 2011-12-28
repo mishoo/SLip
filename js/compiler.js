@@ -117,7 +117,7 @@ function lisp_parse(code) {
                 skip("#");
                 switch (peek()) {
                     case "\\": next(); return read_char();
-                    case "(": return read_list();
+                    case "(": return LispCons.toArray(read_list());
                     default:
                         croak("Unsupported sharp syntax: #" + peek());
                 }
@@ -156,7 +156,7 @@ function lisp_parse(code) {
                 var ch = peek();
                 switch (ch) {
                     case "\"": return new LispString(read_string());
-                    case "(": return list(read_list());
+                    case "(": return read_list();
                     case ";": return skip_comment();
                     case "#": return read_sharp();
                     case "`": return read_quasiquote();
@@ -166,15 +166,25 @@ function lisp_parse(code) {
                 return read_symbol();
         };
         function read_list() {
-                var ret = [];
+                var ret = null, p;
                 skip("(");
                 skip_ws();
                 out: while (true) switch (peek()) {
                     case ")": break out;
                     case null: break out;
+                    case ".":
+                        next();
+                        p.cdr = read_token();
+                        skip_ws();
+                        break out;
                     default:
                         var tok = read_token();
-                        if (tok != null) ret.push(tok);
+                        if (tok != null) {
+                                var cell = new LispCons(tok, null);
+                                if (ret) p.cdr = cell;
+                                else ret = cell;
+                                p = cell;
+                        }
                         skip_ws();
                 }
                 skip(")");
@@ -335,17 +345,13 @@ function lisp_parse(code) {
         };
 
         function comp_macroexpand(name, args, env, VAL, MORE) {
-                //console.log("Macroexpanding " + name + " / " + LispMachine.dump(args));
                 var m = new LispMachine();
                 var code = LispMachine.assemble(
                         comp_list(LC.map(args, function(el){
                                 return list([ S_QUOTE, el ]);
                         }), [])
                 ).concat(name.macro(), LispMachine.assemble(gen("CALLJ", length(args))));
-                //console.log(LispMachine.serialize(code));
-                var ret = comp(m.run(code), env, VAL, MORE);
-                //console.log(show_code(ret, 1));
-                return ret;
+                return comp(m.run(code), env, VAL, MORE);
         };
 
         function comp_defmac(name, args, body, env) {
