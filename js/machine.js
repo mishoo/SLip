@@ -266,7 +266,9 @@ LispMachine.defop = function(name, args, proto) {
         ["ARGS", "count", {
                 run: function(m){
                         var count = this.count;
-                        if (m.n_args != count) throw new Error("Wrong number of arguments");
+                        if (m.n_args != count) {
+                                throw new Error("Wrong number of arguments");
+                        }
                         var frame;
                         // for a small count, pop is *much* more
                         // efficient than splice; in FF the difference is enormous.
@@ -351,6 +353,8 @@ LispMachine.defop("CC", 0, {
 LispMachine.dump = function(thing) {
         if (thing === null) return "NIL";
         if (thing === true) return "T";
+        if (LispString.is(thing)) return JSON.stringify(thing.value);
+        if (LispNumber.is(thing)) return thing.value;
         if (LispCons.is(thing)) {
                 var ret = "(", first = true;
                 while (thing !== null) {

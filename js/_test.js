@@ -13,7 +13,7 @@
 
         load("test.lisp", function(code){
                 var ast = lisp_parse(code);
-                console.log(LispMachine.dump(ast));
+                //console.log(LispMachine.dump(ast));
 
                 var m = new LispMachine();
 
@@ -31,7 +31,7 @@
                         }
                         console.log("****************************************************");
                 });
-                
+
         });
 
 })();

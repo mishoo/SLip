@@ -188,8 +188,6 @@ function lisp_parse(code) {
                         skip_ws();
                 }
                 skip(")");
-                if (ret.length == 0)
-                        return LispSymbol.get("nil");
                 return ret;
         };
         return read_token();
@@ -210,6 +208,7 @@ function lisp_parse(code) {
         , list = LC.fromArray;
 
         function find_var(name, env) {
+                //console.log("Looking for %o in %o", name, env);
                 for (var i = 0; i < env.length; ++i) {
                         var frame = env[i];
                         for (var j = 0; j < frame.length; ++j) {
@@ -236,7 +235,7 @@ function lisp_parse(code) {
                 var ret = [];
                 for (var i = 0; i < arguments.length; ++i) {
                         var el = arguments[i];
-                        if (el && el.length > 0)
+                        if (el.length > 0)
                                 ret.push.apply(ret, el);
                 }
                 return ret;
@@ -321,8 +320,8 @@ function lisp_parse(code) {
                         assert(LispSymbol.is(cadr(x)), "Only symbols can be set");
                         return seq(comp(caddr(x), env, true, true),
                                    gen_set(cadr(x), env),
-                                   VAL ? null : gen("POP"),
-                                   MORE ? null : gen("RET"));
+                                   VAL ? [] : gen("POP"),
+                                   MORE ? [] : gen("RET"));
                     case S_IF:
                         arg_count(x, 2, 3);
                         return comp_if(cadr(x), caddr(x), cadddr(x), env, VAL, MORE);
@@ -331,11 +330,11 @@ function lisp_parse(code) {
                         return VAL ? seq(gen("CC")) : [];
                     case S_DEFMAC:
                         assert(LispSymbol.is(cadr(x)), "DEFMACRO requires a symbol name for the macro");
-                        return comp_defmac(cadr(x), caddr(x), cdddr(x), env);
+                        return comp_defmac(cadr(x), caddr(x), cdddr(x), env, VAL, MORE);
                     case S_LAMBDA:
                         return VAL ? seq(
                                 comp_lambda(cadr(x), cddr(x), env),
-                                MORE ? null : gen("RET")
+                                MORE ? [] : gen("RET")
                         ) : [];
                     default:
                         if (LispSymbol.is(car(x)) && car(x).macro())
@@ -345,20 +344,26 @@ function lisp_parse(code) {
         };
 
         function comp_macroexpand(name, args, env, VAL, MORE) {
-                //console.log("Macroexpanding %o: %o", name, LispMachine.dump(args));
                 var m = new LispMachine();
                 var code = LispMachine.assemble(
                         comp_list(LC.map(args, function(el){
                                 return list([ S_QUOTE, el ]);
                         }), [])
                 ).concat(name.macro(), LispMachine.assemble(gen("CALLJ", length(args))));
-                return comp(m.run(code), env, VAL, MORE);
+                var ast = m.run(code);
+                //console.log(LispMachine.dump(ast));
+                var ret = comp(ast, env, VAL, MORE);
+                return ret;
         };
 
-        function comp_defmac(name, args, body, env) {
+        function comp_defmac(name, args, body, env, VAL, MORE) {
                 var func = comp_lambda(args, body, env);
                 func = LispMachine.assemble(func);
                 name.set("macro", func);
+                return seq(
+                        VAL ? gen("CONST", name) : "POP",
+                        MORE ? [] : gen("RET")
+                );
         };
 
         /////
@@ -380,17 +385,17 @@ function lisp_parse(code) {
         };
 
         function comp_const(x, VAL, MORE) {
-                if (VAL) return seq(
+                return VAL ? seq(
                         gen("CONST", x),
-                        MORE ? null : gen("RET")
-                );
+                        MORE ? [] : gen("RET")
+                ) : [];
         };
 
         function comp_var(x, env, VAL, MORE) {
-                if (VAL) return seq(
+                return VAL ? seq(
                         gen_var(x, env),
-                        MORE ? null : gen("RET")
-                );
+                        MORE ? [] : gen("RET")
+                ) : [];
         };
 
         function comp_seq(exps, env, VAL, MORE) {
@@ -436,7 +441,7 @@ function lisp_parse(code) {
                                 gen("TJUMP", l2),
                                 ecode,
                                 [ l2 ],
-                                MORE ? null : gen("RET")
+                                MORE ? [] : gen("RET")
                         );
                 }
                 if (nullp(ecode)) {
@@ -446,7 +451,7 @@ function lisp_parse(code) {
                                 gen("FJUMP", l1),
                                 tcode,
                                 [ l1 ],
-                                MORE ? null : gen("RET")
+                                MORE ? [] : gen("RET")
                         );
                 }
                 l1 = gen_label();
@@ -455,10 +460,10 @@ function lisp_parse(code) {
                         pcode,
                         gen("FJUMP", l1),
                         tcode,
-                        MORE && gen("JUMP", l2),
+                        MORE ? gen("JUMP", l2) : [],
                         [ l1 ],
                         ecode,
-                        MORE && [ l2 ]
+                        MORE ? [ l2 ] : []
                 );
         };
 
@@ -469,8 +474,8 @@ function lisp_parse(code) {
                         }
                         return seq(comp_list(args, env),
                                    gen("PRIM", f, length(args)),
-                                   VAL ? null : gen("POP"),
-                                   MORE ? null : gen("RET"));
+                                   VAL ? [] : gen("POP"),
+                                   MORE ? [] : gen("RET"));
                 }
                 if (LC.is(f) && car(f) === S_LAMBDA && nullp(cadr(f))) {
                         assert(nullp(args), "Too many arguments");
@@ -484,7 +489,7 @@ function lisp_parse(code) {
                                 comp(f, env, true, true),
                                 gen("CALLJ", length(args)),
                                 [ k ],
-                                VAL ? null : gen("POP")
+                                VAL ? [] : gen("POP")
                         );
                 }
                 return seq(
@@ -507,9 +512,7 @@ function lisp_parse(code) {
                                                comp_seq(body, [ LC.toArray(args) ].concat(env), true, false)));
                         }
                         var a = LC.toArray(args);
-                        var tmp = a.pop();
-                        a.pop();
-                        a.push(tmp);
+                        a.push([ a.pop(), a.pop() ][0]);
                         return gen("FN",
                                    seq(gen("ARG_", dot),
                                        comp_seq(body, [ a ].concat(env), true, false)));

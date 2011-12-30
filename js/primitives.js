@@ -57,6 +57,7 @@ LispPrimitive.def("listp", false, function(x){ return LispCons.isList(x) ? true 
 LispPrimitive.def("consp", false, function(x){ return LispCons.is(x) ? true : null });
 LispPrimitive.def("nullp", false, function(x){ return x === null ? true : null });
 LispPrimitive.def("not", false, function(x){ return x === null ? true : null });
+LispPrimitive.def("length", false, function(x){ return new LispNumber(LispCons.len(x)) });
 
 (function(N){
         LispPrimitive.PR.GENSYM = {
@@ -86,7 +87,7 @@ LispPrimitive.def("not", false, function(x){ return x === null ? true : null });
         };
 });
 
-LispPrimitive.def("clog", true, function(o){ console.log(o) });
+LispPrimitive.def("clog", true, function(o){ console.log(LispMachine.dump(o)); return null; });
 
 LispPrimitive.PR.LIST = {
         name: "LIST",

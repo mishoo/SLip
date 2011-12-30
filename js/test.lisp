@@ -93,19 +93,49 @@
 (defmacro with-cc (name . body)
   `((lambda (,name) ,@body) (c/c)))
 
+;;;;;
+
+(set! *amb-fail* (lambda (arg)
+                   (clog "TOTAL FAILURE")))
+
+(defmacro amb alternatives
+  (if alternatives
+      `(let ((+prev-amb-fail *amb-fail*))
+         (with-cc +sk
+           ,@(mapcar (lambda (alt)
+                       `(with-cc +fk
+                          (set! *amb-fail* +fk)
+                          (+sk ,alt)))
+                     alternatives)
+           (set! *amb-fail* +prev-amb-fail)
+           (+prev-amb-fail nil)))
+      `(*amb-fail* nil)))
+
+(defun sumis (n sum)
+  (let (solutions)
+    (with-cc *amb-fail*
+      (labels ((add (numbers)
+                 (labels ((rec (sum numbers)
+                            (if numbers
+                                (rec (+ sum (car numbers)) (cdr numbers))
+                                sum)))
+                   (rec 0 numbers)))
+               (required-sum? (numbers)
+                 (= sum (add numbers)))
+               (rec (numbers next)
+                 (if (= next 0)
+                     (progn
+                       (when (required-sum? numbers)
+                         (set! solutions (cons numbers solutions)))
+                       (amb))
+                     (rec (cons (amb next (- 0 next))
+                                numbers)
+                          (- next 1)))))
+        (rec (list) n)))
+    (clog (length solutions))))
+
+(sumis 14 1)
 
 
 
 
-
-
-
-;; (let ((n 10)
-;;       cont)
-;;   (clog (+ "//" (with-cc k
-;;                   (set! cont k) n)))
-;;   (if (> n 0)
-;;       (progn
-;;         (set! n (- n 1))
-;;         (cont (* n 2))))
-;;   n)
