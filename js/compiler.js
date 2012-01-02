@@ -151,13 +151,14 @@ function lisp_parse(code) {
                 ++in_qq;
                 return ret;
         };
+        var COMMENT = {};
         function read_token() {
                 skip_ws();
                 var ch = peek();
                 switch (ch) {
                     case "\"": return new LispString(read_string());
                     case "(": return read_list();
-                    case ";": return skip_comment();
+                    case ";": skip_comment(); return COMMENT;
                     case "#": return read_sharp();
                     case "`": return read_quasiquote();
                     case ",": return read_comma();
@@ -179,13 +180,13 @@ function lisp_parse(code) {
                         break out;
                     default:
                         var tok = read_token();
-                        if (tok != null) {
+                        if (tok !== COMMENT) {
                                 var cell = new LispCons(tok, null);
                                 if (ret) p.cdr = cell;
                                 else ret = cell;
                                 p = cell;
+                                skip_ws();
                         }
-                        skip_ws();
                 }
                 skip(")");
                 return ret;
@@ -262,25 +263,29 @@ function lisp_parse(code) {
                 return LispNumber.is(x) || LispString.is(x);
         };
 
-        function equal(a, b) {
-                var ta = typeof a;
-                if (ta != typeof b) return false;
-                if (a instanceof Array) {
-                        if (a.length != b.length) return false;
-                        for (var i = a.length; --i >= 0;)
-                                if (!equal(a[i], b[i]))
-                                        return false;
-                        return true;
-                }
-                if (ta == "object") {
-                        for (var i in a) if (HOP(a, i)) {
-                                if (!equal(a[i], b[i]))
-                                        return false;
-                        }
-                        return true;
-                }
-                return a == b;
-        };
+        // function equal(a, b) {
+        //         var ta = typeof a;
+        //         if (ta != typeof b) return false;
+        //         if (LispNumber.is(a) && LispNumber.is(b))
+        //                 return a.value == b.value;
+        //         if (LispString.is(a) && LispString.is(b))
+        //                 return a.value == b.value;
+        //         if (a instanceof Array) {
+        //                 if (a.length != b.length) return false;
+        //                 for (var i = a.length; --i >= 0;)
+        //                         if (!equal(a[i], b[i]))
+        //                                 return false;
+        //                 return true;
+        //         }
+        //         if (ta == "object") {
+        //                 for (var i in a) if (HOP(a, i)) {
+        //                         if (!equal(a[i], b[i]))
+        //                                 return false;
+        //                 }
+        //                 return true;
+        //         }
+        //         return a == b;
+        // };
 
         function nullp(x) {
                 return x === S_NIL || x == null || (x instanceof Array && x.length == 0);
@@ -429,10 +434,10 @@ function lisp_parse(code) {
                 var l1, l2;
 
                 // not really sure this optimization is worthy
-                if (equal(tcode, ecode)) return seq(
-                        comp(pred, env, false, true),
-                        ecode
-                );
+                // if (equal(tcode, ecode)) return seq(
+                //         comp(pred, env, false, true),
+                //         ecode
+                // );
 
                 if (nullp(tcode)) {
                         l2 = gen_label();

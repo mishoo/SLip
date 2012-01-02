@@ -54,6 +54,11 @@ LispMachine.prototype = {
         pop: function() {
                 return this.stack.pop();
         },
+        pop_number: function() {
+                var n = this.pop();
+                if (!LispNumber.is(n)) throw new Error("Number argument expected");
+                return n.value;
+        },
         top: function() {
                 return this.stack[this.stack.length - 1];
         },

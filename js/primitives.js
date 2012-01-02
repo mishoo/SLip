@@ -30,56 +30,153 @@ var LispPrimitive = (function(){
                 };
         };
 
-        get.is = function(name, env, args) {
+        function prim2(name, seff, func) {
+                name = name.toUpperCase();
+                LispPrimitive.PR[name] = {
+                        name: name,
+                        seff: seff,
+                        func: func
+                };
+        };
+
+        get.is = function(name, env) {
                 return !find_var(name, env) && HOP(PR, name);
         };
         get.seff = function(name) {
                 return PR[name] && PR[name].seff;
         };
         get.def = prim;
+        get.def2 = prim2;
         get.PR = PR;
         return get;
 })();
 
-LispPrimitive.def("+", false, function(a, b){ return new LispNumber(a.value + b.value) });
-LispPrimitive.def("-", false, function(a, b){ return new LispNumber(a.value - b.value) });
-LispPrimitive.def("*", false, function(a, b){ return new LispNumber(a.value * b.value) });
-LispPrimitive.def("/", false, function(a, b){ return new LispNumber(a.value / b.value) });
-LispPrimitive.def("<", false, function(a, b){ return a.value < b.value ? true : null });
-LispPrimitive.def("<=", false, function(a, b){ return a.value <= b.value ? true : null });
-LispPrimitive.def(">", false, function(a, b){ return a.value > b.value ? true : null });
-LispPrimitive.def(">=", false, function(a, b){ return a.value >= b.value ? true : null });
 LispPrimitive.def("=", false, function(a, b){ return a.value == b.value ? true : null });
 LispPrimitive.def("/=", false, function(a, b){ return a.value != b.value ? true : null });
 LispPrimitive.def("eq", false, function(a, b){ return a === b ? true : null });
+
+LispPrimitive.def2("<", false, function(m, nargs){
+        if (nargs == 0) throw new Error("Invalid number of arguments in <");
+        var prev = m.pop_number();
+        while (--nargs > 0) {
+                if (!(m.pop_number() < prev)) return null;
+        }
+        return true;
+});
+
+LispPrimitive.def2("<=", false, function(m, nargs){
+        if (nargs == 0) throw new Error("Invalid number of arguments in <=");
+        var prev = m.pop_number();
+        while (--nargs > 0) {
+                if (!(m.pop_number() <= prev)) return null;
+        }
+        return true;
+});
+
+LispPrimitive.def2(">", false, function(m, nargs){
+        if (nargs == 0) throw new Error("Invalid number of arguments in >");
+        var prev = m.pop_number();
+        while (--nargs > 0) {
+                if (!(m.pop_number() > prev)) return null;
+        }
+        return true;
+});
+
+LispPrimitive.def2(">=", false, function(m, nargs){
+        if (nargs == 0) throw new Error("Invalid number of arguments in >=");
+        var prev = m.pop_number();
+        while (--nargs > 0) {
+                if (!(m.pop_number() >= prev)) return null;
+        }
+        return true;
+});
+
+LispPrimitive.def2("=", false, function(m, nargs){
+        if (nargs == 0) throw new Error("Invalid number of arguments in =");
+        var prev = m.pop_number();
+        while (--nargs > 0) {
+                if (!(m.pop_number() == prev)) return null;
+        }
+        return true;
+});
+
+LispPrimitive.def2("/=", false, function(m, nargs){
+        if (nargs == 0) throw new Error("Invalid number of arguments in /=");
+        var a = [];
+        while (nargs-- > 0) a.push(m.pop_number());
+        for (var i = a.length; --i >= 0;) {
+                for (var j = i; --j >= 0;) {
+                        if (a[i] == a[j]) return null;
+                }
+        }
+        return true;
+});
+
+LispPrimitive.def2("+", false, function(m, nargs){
+        var ret = 0;
+        while (nargs-- > 0) {
+                ret += m.pop_number();
+        }
+        return new LispNumber(ret);
+});
+
+LispPrimitive.def2("*", false, function(m, nargs){
+        var ret = 1;
+        while (nargs-- > 0) {
+                ret *= m.pop_number();
+        }
+        return new LispNumber(ret);
+});
+
+LispPrimitive.def2("-", false, function(m, nargs){
+        var i = nargs;
+        if (i == 0) throw new Error("Invalid number of arguments in -");
+        var a = [];
+        while (--i >= 0) {
+                a[i] = m.pop_number();
+        }
+        var ret = a[++i];
+        if (nargs == 1) ret = -ret;
+        while (++i < nargs) {
+                ret = ret - a[i];
+        }
+        return new LispNumber(ret);
+});
+
+LispPrimitive.def2("/", false, function(m, nargs){
+        var i = nargs;
+        if (i == 0) throw new Error("Invalid number of arguments in /");
+        var a = [];
+        while (--i >= 0) {
+                a[i] = m.pop_number();
+        }
+        var ret = a[++i];
+        if (nargs == 1) ret = 1/ret;
+        while (++i < nargs) {
+                ret = ret / a[i];
+        }
+        return new LispNumber(ret);
+});
+
 LispPrimitive.def("cons", false, function(a, b){ return new LispCons(a, b) });
 LispPrimitive.def("listp", false, function(x){ return LispCons.isList(x) ? true : null });
 LispPrimitive.def("consp", false, function(x){ return LispCons.is(x) ? true : null });
 LispPrimitive.def("nullp", false, function(x){ return x === null ? true : null });
 LispPrimitive.def("not", false, function(x){ return x === null ? true : null });
 LispPrimitive.def("length", false, function(x){ return new LispNumber(LispCons.len(x)) });
+LispPrimitive.def("elt", false, function(list, i){ return LispCons.elt(list, i) });
 
 (function(N){
-        LispPrimitive.PR.GENSYM = {
-                name: "GENSYM",
-                seff: false,
-                func: function(m, nargs) {
-                        if (nargs > 1) throw new Error("Too many arguments in GENSYM");
-                        var name = (nargs == 0 ? "SYM" : name) + (++N);
-                        return new LispSymbol(name);
-                }
-        };
+        LispPrimitive.def2("gensym", false, function(m, nargs) {
+                if (nargs > 1) throw new Error("Too many arguments in GENSYM");
+                var name = (nargs == 0 ? "SYM" : name) + (++N);
+                return new LispSymbol(name);
+        });
 })(0);
 
 (function(make, i){
         for (i in LispCons) if (HOP(LispCons, i) && /^c[ad]+r$/.test(i)) {
-                var name = i.toUpperCase();
-                LispPrimitive.PR[name] = {
-                        name: name,
-                        args: [ "x" ],
-                        seff: false,
-                        func: make(LispCons[i])
-                };
+                LispPrimitive.def2(i, false, make(LispCons[i]));
         }
 })(function(func){
         return function (m) {
@@ -89,26 +186,30 @@ LispPrimitive.def("length", false, function(x){ return new LispNumber(LispCons.l
 
 LispPrimitive.def("clog", true, function(o){ console.log(LispMachine.dump(o)); return null; });
 
-LispPrimitive.PR.LIST = {
-        name: "LIST",
-        seff: false,
-        func: function(m, nargs) {
-                var a = [];
-                while (nargs-- > 0) {
-                        a.unshift(m.pop());
-                }
-                return LispCons.fromArray(a);
-        }
-};
+LispPrimitive.def2("list", false, function(m, nargs) {
+        var p = null;
+        while (nargs-- > 0)
+                p = new LispCons(m.pop(), p);
+        return p;
+});
 
-LispPrimitive.PR.APPEND = {
-        name: "APPEND",
-        seff: false,
-        func: function(m, nargs) {
-                var a = [];
-                while (nargs-- > 0) {
-                        a.unshift.apply(a, LispCons.toArray(m.pop()));
+LispPrimitive.def2("append", false, function(m, nargs) {
+        var p = null;
+        while (nargs-- > 0) {
+                if (p === null) p = m.pop();
+                else {
+                        var last = null;
+                        var list = m.pop();
+                        if (list !== null) {
+                                list = LispCons.map(list, function(x, i, dot, cell){
+                                        if (dot) throw new Error("Improper list in APPEND");
+                                        last = cell;
+                                        return x;
+                                });
+                                last.cdr = p;
+                                p = list;
+                        }
                 }
-                return LispCons.fromArray(a);
         }
-};
+        return p;
+});

@@ -24,7 +24,8 @@ var LispCons = DEFTYPE("cons", function(D, P){
         D.map = function(list, callback) {
                 var ret = null, p;
                 D.forEach(list, function(el, i, dot){
-                        var cell = new D(callback(el, i, dot), null);
+                        var cell = new D(null, null);
+                        cell.car = callback(el, i, dot, cell);
                         if (ret) p.cdr = cell;
                         else ret = cell;
                         p = cell;
@@ -75,6 +76,13 @@ var LispCons = DEFTYPE("cons", function(D, P){
                         i++;
                 }
                 return false;
+        };
+        D.elt = function(list, i) {
+                var p = list;
+                while (p !== null && i-- > 0) {
+                        p = cdr(p);
+                }
+                return car(p);
         };
 
         function car(cell) {
