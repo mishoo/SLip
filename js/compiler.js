@@ -263,30 +263,6 @@ function lisp_parse(code) {
                 return LispNumber.is(x) || LispString.is(x);
         };
 
-        // function equal(a, b) {
-        //         var ta = typeof a;
-        //         if (ta != typeof b) return false;
-        //         if (LispNumber.is(a) && LispNumber.is(b))
-        //                 return a.value == b.value;
-        //         if (LispString.is(a) && LispString.is(b))
-        //                 return a.value == b.value;
-        //         if (a instanceof Array) {
-        //                 if (a.length != b.length) return false;
-        //                 for (var i = a.length; --i >= 0;)
-        //                         if (!equal(a[i], b[i]))
-        //                                 return false;
-        //                 return true;
-        //         }
-        //         if (ta == "object") {
-        //                 for (var i in a) if (HOP(a, i)) {
-        //                         if (!equal(a[i], b[i]))
-        //                                 return false;
-        //                 }
-        //                 return true;
-        //         }
-        //         return a == b;
-        // };
-
         function nullp(x) {
                 return x === S_NIL || x == null || (x instanceof Array && x.length == 0);
         };
@@ -354,7 +330,7 @@ function lisp_parse(code) {
                         comp_list(LC.map(args, function(el){
                                 return list([ S_QUOTE, el ]);
                         }), [])
-                ).concat(name.macro(), LispMachine.assemble(gen("CALLJ", length(args))));
+                ).concat(name.macro(), LispMachine.assemble(gen("CALL", length(args))));
                 var ast = m.run(code);
                 //console.log(LispMachine.dump(ast));
                 var ret = comp(ast, env, VAL, MORE);
@@ -433,12 +409,6 @@ function lisp_parse(code) {
                 var ecode = comp(telse, env, VAL, MORE);
                 var l1, l2;
 
-                // not really sure this optimization is worthy
-                // if (equal(tcode, ecode)) return seq(
-                //         comp(pred, env, false, true),
-                //         ecode
-                // );
-
                 if (nullp(tcode)) {
                         l2 = gen_label();
                         return seq(
@@ -492,7 +462,7 @@ function lisp_parse(code) {
                                 gen("SAVE", k),
                                 comp_list(args, env),
                                 comp(f, env, true, true),
-                                gen("CALLJ", length(args)),
+                                gen("CALL", length(args)),
                                 [ k ],
                                 VAL ? [] : gen("POP")
                         );
@@ -500,7 +470,7 @@ function lisp_parse(code) {
                 return seq(
                         comp_list(args, env),
                         comp(f, env, true, true),
-                        gen("CALLJ", length(args))
+                        gen("CALL", length(args))
                 );
         };
 

@@ -258,14 +258,14 @@ LispMachine.defop = function(name, args, proto) {
                         return "RET()";
                 }
         }],
-        ["CALLJ", "count", {
+        ["CALL", "count", {
                 run: function(m){
                         m.n_args = this.count;
                         var a = m.pop();
                         m.code = a.code; m.env = a.env; m.pc = 0;
                 },
                 _disp: function() {
-                        return "CALLJ(" + this.count + ")";
+                        return "CALL(" + this.count + ")";
                 }
         }],
         ["ARGS", "count", {
