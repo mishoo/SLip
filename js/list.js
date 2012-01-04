@@ -1,6 +1,7 @@
 var LispCons = DEFTYPE("cons", function(D, P){
-        var DOT = {};
-        DOT.toString = function(){ return "DOT" };
+        var DOT = {
+                toString: function(){ return "DOT" }
+        };
         function listp(thing) {
                 return thing === null || thing instanceof D;
         };

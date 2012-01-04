@@ -6,17 +6,16 @@ LispLabel.prototype.toString = function() {
         return this.name;
 };
 
-function LispClosure(code, env) {
-        this.name = null;
-        this.code = code;
-        this.env = env;
-};
-LispClosure.prototype = {
-        type: "function",
-        display: function() {
+var LispClosure = DEFTYPE("closure", function(D, P){
+        P.INIT = function(code, env) {
+                this.name = null;
+                this.code = code;
+                this.env = env;
+        };
+        P.display = function() {
                 return "<function" + (this.name ? " " + this.name : "") + ">";
-        }
-};
+        };
+});
 
 function LispRet(code, pc, env, denv) {
         this.code = code;
@@ -162,6 +161,8 @@ LispMachine.serialize_const = function(val) {
         if (val instanceof Array) return "v(" + val.map(LispMachine.serialize_const).join(",") + ")";
         if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(LispMachine.serialize_const).join(",") + ")";
         if (typeof val == "string") return JSON.stringify(val);
+        if (LispString.is(val)) return JSON.stringify(val.value);
+        if (LispNumber.is(val)) return val.value;
         return val + "";
 };
 
@@ -189,20 +190,20 @@ LispMachine.defop = function(name, args, proto) {
 };
 
 [
-        ["LVAR", "i j name", {
+        ["LVAR", "i j", {
                 run: function(m) {
                         m.push(m.lvar(this.i, this.j));
                 },
                 _disp: function() {
-                        return "LVAR(" + this.i + "," + this.j + "," + this.name.serialize() + ")";
+                        return "LVAR(" + this.i + "," + this.j + ")";
                 }
         }],
-        ["LSET", "i j name", {
+        ["LSET", "i j", {
                 run: function(m) {
                         m.lset(this.i, this.j, m.top());
                 },
                 _disp: function() {
-                        return "LSET(" + this.i + "," + this.j + "," + this.name.serialize() + ")";
+                        return "LSET(" + this.i + "," + this.j + ")";
                 }
         }],
         ["GVAR", "name", {

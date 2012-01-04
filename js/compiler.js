@@ -353,7 +353,7 @@ function lisp_parse(code) {
         function gen_set(name, env) {
                 if (!name.special()) {
                         var p = find_var(name, env);
-                        if (p) return gen("LSET", p[0], p[1], name);
+                        if (p) return gen("LSET", p[0], p[1]);
                 }
                 return gen("GSET", name);
         };
@@ -361,7 +361,7 @@ function lisp_parse(code) {
         function gen_var(name, env) {
                 if (!name.special()) {
                         var pos = find_var(name, env);
-                        if (pos) return gen("LVAR", pos[0], pos[1], name);
+                        if (pos) return gen("LVAR", pos[0], pos[1]);
                 }
                 return gen("GVAR", name);
         };
@@ -396,42 +396,10 @@ function lisp_parse(code) {
         };
 
         function comp_if(pred, tthen, telse, env, VAL, MORE) {
-                if (nullp(pred)) {
-                        return comp(telse, env, VAL, MORE);
-                }
-                if (constantp(pred)) {
-                        return comp(tthen, env, VAL, MORE);
-                }
-                if (LC.is(pred) && car(pred) === S_NOT && LC.len(pred) == 2) {
-                        return comp_if(cadr(pred), telse, tthen, env, VAL, MORE);
-                }
                 var pcode = comp(pred, env, true, true);
                 var tcode = comp(tthen, env, VAL, MORE);
                 var ecode = comp(telse, env, VAL, MORE);
-                var l1, l2;
-
-                if (nullp(tcode)) {
-                        l2 = gen_label();
-                        return seq(
-                                pcode,
-                                gen("TJUMP", l2),
-                                ecode,
-                                [ l2 ],
-                                MORE ? [] : gen("RET")
-                        );
-                }
-                if (nullp(ecode)) {
-                        l1 = gen_label();
-                        return seq(
-                                pcode,
-                                gen("FJUMP", l1),
-                                tcode,
-                                [ l1 ],
-                                MORE ? [] : gen("RET")
-                        );
-                }
-                l1 = gen_label();
-                if (MORE) l2 = gen_label();
+                var l1 = gen_label(), l2 = gen_label();
                 return seq(
                         pcode,
                         gen("FJUMP", l1),
