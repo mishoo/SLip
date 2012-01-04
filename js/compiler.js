@@ -169,23 +169,24 @@ function lisp_parse(code) {
         function read_list() {
                 var ret = null, p;
                 skip("(");
-                skip_ws();
-                out: while (true) switch (peek()) {
-                    case ")": break out;
-                    case null: break out;
-                    case ".":
-                        next();
-                        p.cdr = read_token();
+                out: while (true) {
                         skip_ws();
-                        break out;
-                    default:
-                        var tok = read_token();
-                        if (tok !== COMMENT) {
-                                var cell = new LispCons(tok, null);
-                                if (ret) p.cdr = cell;
-                                else ret = cell;
-                                p = cell;
+                        switch (peek()) {
+                            case ")": break out;
+                            case null: break out;
+                            case ".":
+                                next();
+                                p.cdr = read_token();
                                 skip_ws();
+                                break out;
+                            default:
+                                var tok = read_token();
+                                if (tok !== COMMENT) {
+                                        var cell = new LispCons(tok, null);
+                                        if (ret) p.cdr = cell;
+                                        else ret = cell;
+                                        p = cell;
+                                }
                         }
                 }
                 skip(")");
@@ -349,18 +350,18 @@ function lisp_parse(code) {
 
         /////
 
-        function gen_set(x, env) {
-                var p = find_var(x, env);
-                if (p) {
-                        return gen("LSET", p[0], p[1]);
+        function gen_set(name, env) {
+                if (!name.special()) {
+                        var p = find_var(name, env);
+                        if (p) return gen("LSET", p[0], p[1], name);
                 }
-                return gen("GSET", x);
+                return gen("GSET", name);
         };
 
         function gen_var(name, env) {
-                var pos = find_var(name, env);
-                if (pos) {
-                        return gen("LVAR", pos[0], pos[1]);
+                if (!name.special()) {
+                        var pos = find_var(name, env);
+                        if (pos) return gen("LVAR", pos[0], pos[1], name);
                 }
                 return gen("GVAR", name);
         };
@@ -481,15 +482,22 @@ function lisp_parse(code) {
                                        comp_seq(body, [ [ args ] ].concat(env), true, false)));
                 } else {
                         var dot = LC.isDotted(args);
+                        var a = LC.toArray(args);
+                        if (dot) a.push([ a.pop(), a.pop() ][0]);
+                        var dyn = [];
+                        for (var i = a.length; --i >= 0;) {
+                                if (a[i].special())
+                                        dyn.push([ "BIND", a[i], i ]);
+                        }
                         if (!dot) {
                                 return gen("FN",
-                                           seq(gen("ARGS", length(args)),
-                                               comp_seq(body, [ LC.toArray(args) ].concat(env), true, false)));
+                                           seq(gen("ARGS", a.length),
+                                               dyn,
+                                               comp_seq(body, [ a ].concat(env), true, false)));
                         }
-                        var a = LC.toArray(args);
-                        a.push([ a.pop(), a.pop() ][0]);
                         return gen("FN",
                                    seq(gen("ARG_", dot),
+                                       dyn,
                                        comp_seq(body, [ a ].concat(env), true, false)));
                 }
         };

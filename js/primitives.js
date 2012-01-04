@@ -166,6 +166,15 @@ LispPrimitive.def("not", false, function(x){ return x === null ? true : null });
 LispPrimitive.def("length", false, function(x){ return new LispNumber(LispCons.len(x)) });
 LispPrimitive.def("elt", false, function(list, i){ return LispCons.elt(list, i) });
 
+LispPrimitive.def2("special", false, function(m, nargs) {
+        while (nargs-- > 0) {
+                var name = m.pop();
+                if (!LispSymbol.is(name)) throw new Error("SPECIAL expects only symbol arguments");
+                name.set("special", true);
+        }
+        return null;
+});
+
 (function(N){
         LispPrimitive.def2("gensym", false, function(m, nargs) {
                 if (nargs > 1) throw new Error("Too many arguments in GENSYM");

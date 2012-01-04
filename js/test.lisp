@@ -254,7 +254,7 @@
                (iff (eq nat 'german) (eq tob 'rothmans))
                (let* ((h (list nat bev tob pet col))
                       (houses (append houses (list h))))
-                 (clog houses) ; log something so we don't look like we're frozen.
+                 ;;(clog houses) ; log something so we don't look like we're frozen.
                  (if (= index 4)
                      (progn
                        (neighbors houses ':tobacco 'marlboro ':pet 'cats)
@@ -268,3 +268,5 @@
     (add () 0)))
 
 (who-owns-the-fish)
+
+;;(special '*foo*)

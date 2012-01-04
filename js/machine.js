@@ -18,17 +18,31 @@ LispClosure.prototype = {
         }
 };
 
-function LispRet(code, pc, env) {
+function LispRet(code, pc, env, denv) {
         this.code = code;
         this.pc = pc;
         this.env = env;
+        this.denv = denv;
 };
+
+function LispCC(stack, denv) {
+        this.stack = stack;
+        this.denv = denv;
+};
+
+var LispBinding = DEFCLASS("LispBinding", null, function(D, P){
+        P.INIT = function(symbol, value) {
+                this.symbol = symbol;
+                this.value = value;
+        };
+});
 
 function LispMachine() {
         this.code = null;
         this.pc = null;
         this.stack = null;
         this.env = null;
+        this.denv = null;
         this.n_args = null;
 };
 LispMachine.prototype = {
@@ -42,11 +56,29 @@ LispMachine.prototype = {
                 while (i-- > 0) e = e.cdr;
                 e.car[j] = val;
         },
-        gvar: function(name) {
-                return name.value;
+        find_dvar: function(symbol) {
+                if (symbol.special()) {
+                        var p = this.denv;
+                        while (p != null) {
+                                var el = p.car;
+                                if (LispBinding.is(el) && el.symbol === symbol)
+                                        return el;
+                                p = p.cdr;
+                        }
+                }
+                return symbol;
         },
-        gset: function(name, val) {
-                name.value = val;
+        gvar: function(symbol) {
+                return this.find_dvar(symbol).value;
+        },
+        gset: function(symbol, val) {
+                this.find_dvar(symbol).value = val;
+        },
+        bind: function(symbol, i) {
+                this.denv = new LispCons(
+                        new LispBinding(symbol, this.env.car[i]),
+                        this.denv
+                );
         },
         push: function(v) {
                 this.stack.push(v);
@@ -59,24 +91,25 @@ LispMachine.prototype = {
                 if (!LispNumber.is(n)) throw new Error("Number argument expected");
                 return n.value;
         },
+        mkret: function(pc) {
+                return new LispRet(this.code, pc, this.env, this.denv);
+        },
+        unret: function(ret) {
+                this.code = ret.code;
+                this.pc = ret.pc;
+                this.env = ret.env;
+                this.denv = ret.denv;
+        },
+        mkcont: function() {
+                return new LispCC(this.stack.slice(), this.denv);
+        },
+        uncont: function() {
+                var cont = this.top();
+                this.stack = cont.stack.slice();
+                this.denv = cont.denv;
+        },
         top: function() {
                 return this.stack[this.stack.length - 1];
-        },
-        run_threaded: function(code, onfinish) {
-                var self = this;
-                self.code = code;
-                self.env = null;
-                self.stack = [ [] ];
-                self.pc = 0;
-                var quota = 10000;
-                function runit() {
-                        for (var i = quota; --i > 0;) {
-                                if (self.pc == null) return onfinish(self.pop());
-                                self.code[self.pc++].run(self);
-                        }
-                        setTimeout(runit, 0);
-                };
-                runit();
         },
         run: function(code) {
                 this.code = code;
@@ -94,7 +127,6 @@ LispMachine.OPS = {};
 
 LispMachine.assemble = function assemble(code) {
         var ret = [];
-        if (!code) debugger;
         for (var i = 0; i < code.length; ++i) {
                 var el = code[i];
                 if (el instanceof LispLabel) el.index = ret.length;
@@ -133,10 +165,7 @@ LispMachine.serialize_const = function(val) {
         return val + "";
 };
 
-LispMachine.OP = function() {};
-LispMachine.OP.prototype = {
-        _init: function(){}
-};
+LispMachine.OP = DEFCLASS("NOP");
 
 LispMachine.defop = function(name, args, proto) {
         args = args ? args.split(" ") : [];
@@ -144,7 +173,7 @@ LispMachine.defop = function(name, args, proto) {
                 "return function " + name + "(" + args.join(", ") + "){ " +
                         args.map(function(arg){
                                 return "this." + arg + " = " + arg;
-                        }).join("; ") + "; this._init() };"
+                        }).join("; ") + "; this.INIT() };"
         )();
         ctor.prototype = new LispMachine.OP;
         ctor.make = new Function(
@@ -160,20 +189,20 @@ LispMachine.defop = function(name, args, proto) {
 };
 
 [
-        ["LVAR", "i j", {
+        ["LVAR", "i j name", {
                 run: function(m) {
                         m.push(m.lvar(this.i, this.j));
                 },
                 _disp: function() {
-                        return "LVAR(" + this.i + "," + this.j + ")";
+                        return "LVAR(" + this.i + "," + this.j + "," + this.name.serialize() + ")";
                 }
         }],
-        ["LSET", "i j", {
+        ["LSET", "i j name", {
                 run: function(m) {
                         m.lset(this.i, this.j, m.top());
                 },
                 _disp: function() {
-                        return "LSET(" + this.i + "," + this.j + ")";
+                        return "LSET(" + this.i + "," + this.j + "," + this.name.serialize() + ")";
                 }
         }],
         ["GVAR", "name", {
@@ -190,6 +219,14 @@ LispMachine.defop = function(name, args, proto) {
                 },
                 _disp: function() {
                         return "GSET(" + this.name.serialize() + ")";
+                }
+        }],
+        ["BIND", "name i", {
+                run: function(m) {
+                        m.bind(this.name, this.i);
+                },
+                _disp: function() {
+                        return "BIND(" + this.name.serialize() + "," + this.i + ")";
                 }
         }],
         ["POP", 0, {
@@ -234,7 +271,7 @@ LispMachine.defop = function(name, args, proto) {
         }],
         ["SETCC", 0, {
                 run: function(m) {
-                        m.stack = m.top().slice();
+                        m.uncont();
                 },
                 _disp: function() {
                         return "SETCC()"
@@ -242,7 +279,7 @@ LispMachine.defop = function(name, args, proto) {
         }],
         ["SAVE", "addr", {
                 run: function(m) {
-                        m.push(new LispRet(m.code, this.addr, m.env));
+                        m.push(m.mkret(this.addr));
                 },
                 _disp: function() {
                         return "SAVE(" + this.addr + ")";
@@ -250,8 +287,8 @@ LispMachine.defop = function(name, args, proto) {
         }],
         ["RET", 0, {
                 run: function(m) {
-                        var val = m.pop(), r = m.pop();
-                        m.code = r.code; m.pc = r.pc; m.env = r.env;
+                        var val = m.pop();
+                        m.unret(m.pop());
                         m.push(val);
                 },
                 _disp: function() {
@@ -261,8 +298,8 @@ LispMachine.defop = function(name, args, proto) {
         ["CALL", "count", {
                 run: function(m){
                         m.n_args = this.count;
-                        var a = m.pop();
-                        m.code = a.code; m.env = a.env; m.pc = 0;
+                        var closure = m.pop();
+                        m.code = closure.code; m.env = closure.env; m.pc = 0;
                 },
                 _disp: function() {
                         return "CALL(" + this.count + ")";
@@ -282,6 +319,7 @@ LispMachine.defop = function(name, args, proto) {
                             case 1: frame = [ m.pop() ]; break;
                             case 2: frame = m.pop(); frame = [ m.pop(), frame ]; break;
                             case 3: var c = m.pop(), b = m.pop(), a = m.pop(); frame = [ a, b, c ]; break;
+                            case 4: var d = m.pop(), c = m.pop(), b = m.pop(), a = m.pop(); frame = [ a, b, c, d ]; break;
                             default: frame = m.stack.splice(m.stack.length - count, count);
                         }
                         m.env = new LispCons(frame, m.env);
@@ -323,7 +361,7 @@ LispMachine.defop = function(name, args, proto) {
                 run: function(m) {
                         m.push(this.func(m, this.nargs));
                 },
-                _init: function() {
+                INIT: function() {
                         var prim = LispPrimitive(this.name);
                         this.func = prim.func;
                 },
@@ -339,7 +377,7 @@ LispMachine.defop = function(name, args, proto) {
 LispMachine.defop("CC", 0, {
         run: (function(cc){
                 return function(m) {
-                        m.push(new LispClosure(cc, new LispCons([ m.stack.slice() ], null)));
+                        m.push(new LispClosure(cc, new LispCons([ m.mkcont() ], null)));
                 }
         })(
                 LispMachine.assemble([

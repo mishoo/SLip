@@ -67,7 +67,10 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                 return this.plist[key];
         };
         P.macro = function() {
-                return this.get("macro");
+                return this.get("macro") || null;
+        };
+        P.special = function() {
+                return this.get("special") ? true : null;
         };
         D.get = function(name) {
                 name = name.toUpperCase();
