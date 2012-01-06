@@ -17,7 +17,7 @@
         function load_files(list) {
                 function dofile(code){
                         var ast = lisp_parse(code);
-                        //console.log(LispMachine.dump(ast));
+                        console.log(LispMachine.dump(ast));
 
                         LispCons.forEach(ast, function(ast){
                                 //console.log(LispMachine.dump(ast));
@@ -42,8 +42,9 @@
         };
 
         load_files([
-                "test.lisp",
-                "tmp/t1.lisp"
+                "tmp/t2.lisp"
+                //"test.lisp",
+                //"tmp/t1.lisp"
         ]);
 
 })();

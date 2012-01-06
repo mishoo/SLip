@@ -87,8 +87,10 @@ LispMachine.prototype = {
         },
         pop_number: function() {
                 var n = this.pop();
-                if (!LispNumber.is(n)) throw new Error("Number argument expected");
-                return n.value;
+                if (typeof n != "number") {
+                        throw new Error("Number argument expected");
+                }
+                return n;
         },
         mkret: function(pc) {
                 return new LispRet(this.code, pc, this.env, this.denv);
@@ -160,9 +162,8 @@ LispMachine.serialize_const = function(val) {
         if (val === null || val === true) return val + "";
         if (val instanceof Array) return "v(" + val.map(LispMachine.serialize_const).join(",") + ")";
         if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(LispMachine.serialize_const).join(",") + ")";
+        if (LispRegexp.is(val)) return val.value.toString();
         if (typeof val == "string") return JSON.stringify(val);
-        if (LispString.is(val)) return JSON.stringify(val.value);
-        if (LispNumber.is(val)) return val.value;
         return val + "";
 };
 
@@ -397,8 +398,7 @@ LispMachine.defop("CC", 0, {
 LispMachine.dump = function(thing) {
         if (thing === null) return "NIL";
         if (thing === true) return "T";
-        if (LispString.is(thing)) return JSON.stringify(thing.value);
-        if (LispNumber.is(thing)) return thing.value;
+        if (typeof thing == "string") return JSON.stringify(thing);
         if (LispPackage.is(thing)) return thing.name;
         if (LispSymbol.is(thing)) return thing.name;
         if (LispCons.is(thing)) {

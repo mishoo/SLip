@@ -51,8 +51,8 @@ var LispPrimitive = (function(){
         return get;
 })();
 
-LispPrimitive.def("=", false, function(a, b){ return a.value == b.value ? true : null });
-LispPrimitive.def("/=", false, function(a, b){ return a.value != b.value ? true : null });
+LispPrimitive.def("=", false, function(a, b){ return a == b ? true : null });
+LispPrimitive.def("/=", false, function(a, b){ return a != b ? true : null });
 LispPrimitive.def("eq", false, function(a, b){ return a === b ? true : null });
 
 LispPrimitive.def2("<", false, function(m, nargs){
@@ -117,7 +117,7 @@ LispPrimitive.def2("+", false, function(m, nargs){
         while (nargs-- > 0) {
                 ret += m.pop_number();
         }
-        return new LispNumber(ret);
+        return ret;
 });
 
 LispPrimitive.def2("*", false, function(m, nargs){
@@ -125,7 +125,7 @@ LispPrimitive.def2("*", false, function(m, nargs){
         while (nargs-- > 0) {
                 ret *= m.pop_number();
         }
-        return new LispNumber(ret);
+        return ret;
 });
 
 LispPrimitive.def2("-", false, function(m, nargs){
@@ -140,7 +140,7 @@ LispPrimitive.def2("-", false, function(m, nargs){
         while (++i < nargs) {
                 ret = ret - a[i];
         }
-        return new LispNumber(ret);
+        return ret;
 });
 
 LispPrimitive.def2("/", false, function(m, nargs){
@@ -155,7 +155,7 @@ LispPrimitive.def2("/", false, function(m, nargs){
         while (++i < nargs) {
                 ret = ret / a[i];
         }
-        return new LispNumber(ret);
+        return ret;
 });
 
 LispPrimitive.def("cons", false, function(a, b){ return new LispCons(a, b) });
@@ -164,16 +164,16 @@ LispPrimitive.def("consp", false, function(x){ return LispCons.is(x) ? true : nu
 LispPrimitive.def("nullp", false, function(x){ return x === null ? true : null });
 LispPrimitive.def("not", false, function(x){ return x === null ? true : null });
 LispPrimitive.def("length", false, function(x){
-        if (LispCons.isList(x)) return new LispNumber(LispCons.len(x));
-        if (LispString.is(x)) return new LispNumber(x.value.length);
-        if (LispArray.is(x)) return new LispNumber(x.length());
+        if (LispCons.isList(x)) return LispCons.len(x);
+        if (typeof x == "string") return x.length;
+        if (LispArray.is(x)) return x.length();
         throw new Error("Unrecognized sequence in LENGTH");
 });
 LispPrimitive.def("elt", false, function(x, i){
-        if (!LispNumber.is(i)) throw new Error("ELT expects a numeric index");
+        if (typeof i != "number") throw new Error("ELT expects a numeric index");
         if (LispCons.isList(x)) return LispCons.elt(x, i);
         if (LispArray.is(x)) return x.elt(i) || null;
-        if (LispString.is(x)) return x.value.charAt(i) || null;
+        if (typeof x == "string") return x.charAt(i) || null;
         throw new Error("Unrecognized sequence in ELT");
 });
 
@@ -237,23 +237,23 @@ LispPrimitive.def2("append", false, function(m, nargs) {
 ///// symbols and packages
 
 LispPrimitive.def("make-package", true, function(name){
-        if (!LispString.is(name)) throw new Error("MAKE-PACKAGE expects a string");
+        if (typeof name != "string") throw new Error("MAKE-PACKAGE expects a string");
         return LispPackage.get(name);
 });
 
 LispPrimitive.def("make-symbol", true, function(name){
-        if (!LispString.is(name)) throw new Error("MAKE-SYMBOL expects a string");
+        if (typeof name != "string") throw new Error("MAKE-SYMBOL expects a string");
         return new LispSymbol(name);
 });
 
 LispPrimitive.def("intern", true, function(name, pak){
-        if (!LispString.is(name)) throw new Error("INTERN expects a string name");
+        if (typeof name != "string") throw new Error("INTERN expects a string name");
         if (!LispPackage.is(pak)) throw new Error("PAK must be a package");
         return pak.find_or_intern(name);
 });
 
 LispPrimitive.def("find-symbol", false, function(name, pak){
-        if (!LispString.is(name)) throw new Error("FIND-SYMBOL expects a string name");
+        if (typeof name != "string") throw new Error("FIND-SYMBOL expects a string name");
         if (!LispPackage.is(pak)) throw new Error("PAK must be a package");
         return pak.find(name);
 });

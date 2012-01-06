@@ -63,20 +63,30 @@ function lisp_parse(code) {
                 if (next() != expected)
                         croak("Expecting " + expected);
         };
-        function read_string() {
-                skip("\"");
+        function read_escaped(start, end) {
+                skip(start);
                 var escaped = false;
-                var str = read_while(function(ch){
+                var str = "";
+                while (peek()) {
+                        var ch = next();
                         if (escaped) {
-                                return !(escaped = false);
+                                str += ch;
+                                escaped = false;
                         } else if (ch == "\\") {
-                                return escaped = true;
+                                escaped = true;
+                        } else if (ch == end) {
+                                break;
                         } else {
-                                return ch != "\"";
+                                str += ch;
                         }
-                });
-                skip("\"");
+                }
                 return str;
+        };
+        function read_string() {
+                return read_escaped("\"", "\"");
+        };
+        function read_regexp() {
+                return new LispRegexp(read_escaped("/", "/"));
         };
         function skip_comment() {
                 read_while(function(ch){ return ch != "\n"; });
@@ -99,7 +109,7 @@ function lisp_parse(code) {
                         }
                 });
                 if (str.length > 0 && /^[0-9]*\.?[0-9]*$/.test(str))
-                        return new LispNumber(parseFloat(str));
+                        return parseFloat(str);
                 return LispSymbol.get(str.toUpperCase());
         };
         function read_char() {
@@ -117,6 +127,7 @@ function lisp_parse(code) {
                 skip("#");
                 switch (peek()) {
                     case "\\": next(); return read_char();
+                    case "/": return read_regexp();
                     case "(": return new LispArray(LispCons.toArray(read_list()));
                     default:
                         croak("Unsupported sharp syntax: #" + peek());
@@ -156,7 +167,7 @@ function lisp_parse(code) {
                 skip_ws();
                 var ch = peek();
                 switch (ch) {
-                    case "\"": return new LispString(read_string());
+                    case "\"": return read_string();
                     case "(": return read_list();
                     case ";": skip_comment(); return COMMENT;
                     case "#": return read_sharp();
@@ -261,7 +272,7 @@ function lisp_parse(code) {
                     case null:
                         return true;
                 }
-                return LispNumber.is(x) || LispString.is(x);
+                return typeof x == "number" || typeof x == "string" || LispRegexp.is(x);
         };
 
         function nullp(x) {

@@ -1,25 +1,14 @@
-var LispValue = DEFCLASS("t", null, function(D, P){
-        P.type = "t";
-        P.INIT = function(val) {
-                this.value = val;
-        };
-        P.valueOf = P.toString = function() {
-                return this.value;
-        };
-});
-
 function DEFTYPE(name, func) {
-        return DEFCLASS(name.replace(/-/g, "_"), LispValue, function(D, P){
+        return DEFCLASS(name.replace(/-/g, "_"), null, function(D, P){
                 P.type = name;
                 if (func) return func(D, P);
         });
 };
 
-var LispNumber = DEFTYPE("number");
-
-var LispChar = DEFTYPE("char");
-
-var LispString = DEFTYPE("string");
+var LispChar = DEFTYPE("char", function(D, P){
+        P.INIT = function(val){ this.value = val };
+        P.valueOf = P.toString = function(){ return this.value };
+});
 
 var LispArray = DEFTYPE("array", function(D, P){
         P.INIT = function(val) {
@@ -33,6 +22,12 @@ var LispArray = DEFTYPE("array", function(D, P){
         };
         P.set = function(i, val) {
                 this.value[i] = val;
+        };
+});
+
+var LispRegexp = DEFTYPE("regexp", function(D, P){
+        P.INIT = function(val) {
+                this.value = new RegExp(val);
         };
 });
 
@@ -56,9 +51,6 @@ var LispNamespace = DEFTYPE("namespace", function(D, P){
                         p = p.parent;
                 }
                 return null;
-        };
-        P.valueOf = function() {
-                return this.data;
         };
 });
 
