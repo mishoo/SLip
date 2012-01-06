@@ -496,43 +496,4 @@ function lisp_parse(code) {
                 return comp_seq(x, [], true, false);
         };
 
-        var INDENT_LEVEL = 8;
-
-        function indent(level) {
-                return repeat_string(' ', level * INDENT_LEVEL);
-        };
-
-        function show_code(x, level) {
-                var ret = [];
-                var line = "";
-                var skip_indent = false;
-                for (var i = 0; i < x.length; ++i) {
-                        var el = x[i];
-                        if (el instanceof LispLabel) {
-                                line += pad_string(el.name + ":", level * INDENT_LEVEL);
-                                skip_indent = true;
-                                continue;
-                        }
-                        if (!skip_indent) line += indent(level);
-                        skip_indent = false;
-                        if (el[0] == "FN") {
-                                line += "FN\n";
-                                line += show_code(el[1], level + 1);
-                        }
-                        else {
-                                line += el.map(function(el, i){
-                                        if (i > 0) el = LispMachine.serialize_const(el);
-                                        return pad_string(el, 8);
-                                }).join("");
-                        }
-                        ret.push(line);
-                        line = "";
-                }
-                return ret.join("\n");
-        };
-
-        this.comp_show = function(x) {
-                return show_code(x, 1);
-        };
-
 })(LispCons);

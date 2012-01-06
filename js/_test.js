@@ -23,9 +23,9 @@
                                 //console.log(LispMachine.dump(ast));
                                 var bc = compile(new LispCons(ast, null));
                                 if (bc) {
-                                        //console.log(comp_show(bc));
                                         bc = LispMachine.assemble(bc);
                                         console.log(LispMachine.serialize(bc));
+                                        console.log(LispMachine.disassemble(bc));
                                         time_it("run", function(){
                                                 console.log(LispMachine.dump(m.run(bc)));
                                         });
@@ -44,6 +44,7 @@
         load_files([
                 //"../lisp/compiler.lisp"
                 "test.lisp"
+                //"tmp/t2.lisp"
         ]);
 
 })();
@@ -51,5 +52,5 @@
 function time_it(name, f) {
         var start = Date.now();
         f();
-        console.log(name + ": " + ((Date.now() - start) / 1000).toFixed(2) + "s");
+        console.log(name + ": " + ((Date.now() - start) / 1000).toFixed(3) + "s");
 }

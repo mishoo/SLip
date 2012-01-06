@@ -108,7 +108,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
         var OPS = {};
 
-        D.assemble = function assemble(code) {
+        function assemble(code) {
                 var ret = [];
                 for (var i = 0; i < code.length; ++i) {
                         var el = code[i];
@@ -132,6 +132,62 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }
                 return ret;
         };
+        D.assemble = assemble;
+
+        ////// <disassemble>
+
+        var INDENT_LEVEL = 8;
+
+        function indent(level) {
+                return repeat_string(' ', level * INDENT_LEVEL);
+        };
+
+        D.disassemble = function(code) {
+                var lab = 0;
+                function disassemble(code, level) {
+                        var labels = {};
+                        code.forEach(function(op, i){
+                                switch (op._name) {
+                                    case "JUMP":
+                                    case "TJUMP":
+                                    case "FJUMP":
+                                    case "SAVE":
+                                        labels[op.addr] = "L" + (++lab);
+                                }
+                        });
+                        return code.map(function(op, i){
+                                var l = labels[i] || "";
+                                if (l) l += ":";
+                                var data;
+                                switch (op._name) {
+                                    case "FN":
+                                        data = "\n" + disassemble(op.code, level + 1);
+                                        break;
+                                    case "JUMP":
+                                    case "TJUMP":
+                                    case "FJUMP":
+                                    case "SAVE":
+                                        data = labels[op.addr];
+                                        break;
+                                    default:
+                                        data = op._args.map(function(el){
+                                                return pad_string(
+                                                        LispMachine.serialize_const(op[el]),
+                                                        8
+                                                );
+                                        }).join("");
+                                }
+                                var line = pad_string(l, INDENT_LEVEL)
+                                        + indent(level)
+                                        + pad_string(op._name, INDENT_LEVEL)
+                                        + data;
+                                return line;
+                        }).join("\n");
+                };
+                return disassemble(code, 0);
+        };
+
+        ///// </disassemble>
 
         D.serialize = function(code) {
                 return "[" + code.map(function(op){
@@ -315,19 +371,17 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         ].map(function(_){ defop(_[0], _[1], _[2]) });
 
         defop("CC", 0, {
-                run: (function(cc){
+                run: function(cc){
                         return function(m) {
                                 m.push(new LispClosure(cc, new LispCons([ m.mkcont() ], null)));
                         }
-                })(
-                        D.assemble([
-                                ["ARGS", 1],
-                                ["LVAR", 1, 0],
-                                ["SETCC"],
-                                ["LVAR", 0, 0],
-                                ["RET"]
-                        ])
-                )
+                }(assemble([
+                        ["ARGS", 1],
+                        ["LVAR", 1, 0],
+                        ["SETCC"],
+                        ["LVAR", 0, 0],
+                        ["RET"]
+                ]))
         });
 
         D.dump = function(thing) {
