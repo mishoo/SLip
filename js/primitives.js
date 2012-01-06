@@ -234,6 +234,12 @@ LispPrimitive.def2("append", false, function(m, nargs) {
         return p;
 });
 
+LispPrimitive.def("set-function-name!", true, function(f, symbol){
+        if (!LispClosure.is(f)) throw new Error("SET-FUNCTION-NAME expects a function object");
+        f.name = symbol;
+        return f;
+});
+
 ///// symbols and packages
 
 LispPrimitive.def("make-package", true, function(name){
@@ -256,4 +262,15 @@ LispPrimitive.def("find-symbol", false, function(name, pak){
         if (typeof name != "string") throw new Error("FIND-SYMBOL expects a string name");
         if (!LispPackage.is(pak)) throw new Error("PAK must be a package");
         return pak.find(name);
+});
+
+LispPrimitive.def("export", true, function(symbol, pak){
+        if (!LispSymbol.is(symbol)) throw new Error("EXPORT expects a symbol");
+        if (!LispPackage.is(pak)) throw new Error("PAK must be a package");
+        return pak.export(symbol);
+});
+
+LispPrimitive.def("symbol-package", false, function(symbol){
+        if (!LispSymbol.is(symbol)) throw new Error("SYMBOL-PACKAGE expects a symbol");
+        return symbol.pak;
 });

@@ -17,13 +17,13 @@
         function load_files(list) {
                 function dofile(code){
                         var ast = lisp_parse(code);
-                        console.log(LispMachine.dump(ast));
+                        //console.log(LispMachine.dump(ast));
 
                         LispCons.forEach(ast, function(ast){
                                 //console.log(LispMachine.dump(ast));
                                 var bc = compile(new LispCons(ast, null));
                                 if (bc) {
-                                        console.log(comp_show(bc));
+                                        //console.log(comp_show(bc));
                                         bc = LispMachine.assemble(bc);
                                         console.log(LispMachine.serialize(bc));
                                         time_it("run", function(){
@@ -42,9 +42,8 @@
         };
 
         load_files([
-                "tmp/t2.lisp"
-                //"test.lisp",
-                //"tmp/t1.lisp"
+                //"../lisp/compiler.lisp"
+                "test.lisp"
         ]);
 
 })();

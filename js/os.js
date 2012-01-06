@@ -64,10 +64,10 @@ function pad_string(str, width) {
 };
 
 var DEFCLASS = (function(NOINIT){
-        return function(name, BASE, func) {
+        return function(name, BASE, func, skip_base) {
                 var code = "return function " + (name || "D") + " (a){\n\
 if (a !== NOINIT) {\n";
-                if (BASE) code += "BASE.apply(this, arguments);\n";
+                if (BASE && !skip_base) code += "BASE.apply(this, arguments);\n";
                 code += "this.INIT.apply(this, arguments); }}";
                 var D = new Function("NOINIT", "BASE", code)(NOINIT, BASE);
                 D.INIT = noop;

@@ -1,8 +1,15 @@
+var LispType = DEFCLASS("LispType", null, function(D, P){
+        P.print = function() {
+                return "<" + this.type + ">";
+        };
+});
+
 function DEFTYPE(name, func) {
-        return DEFCLASS(name.replace(/-/g, "_"), null, function(D, P){
+        return DEFCLASS(name.replace(/-/g, "_"), LispType, function(D, P){
                 P.type = name;
-                if (func) return func(D, P);
-        });
+                var ret = func ? func(D, P) : null;
+                return ret;
+        }, true);
 };
 
 var LispChar = DEFTYPE("char", function(D, P){
@@ -28,6 +35,17 @@ var LispArray = DEFTYPE("array", function(D, P){
 var LispRegexp = DEFTYPE("regexp", function(D, P){
         P.INIT = function(val) {
                 this.value = new RegExp(val);
+        };
+});
+
+var LispClosure = DEFTYPE("closure", function(D, P){
+        P.INIT = function(code, env) {
+                this.name = null;
+                this.code = code;
+                this.env = env;
+        };
+        P.print = function() {
+                return "<function" + (this.name ? " " + this.name : "") + ">";
         };
 });
 
@@ -74,7 +92,9 @@ var LispPackage = DEFTYPE("package", function(D, P){
                 sym = this.find(sym.name);
                 if (sym && this.exports.indexOf(sym) < 0) {
                         this.exports.push(sym);
+                        return true;
                 }
+                return null;
         };
         P.find_accessible = function(name) {
                 var a = this.exports;
@@ -104,6 +124,9 @@ var LispPackage = DEFTYPE("package", function(D, P){
         };
         P.external = function(sym) {
                 return this.exports.indexOf(sym) >= 0;
+        };
+        P.alias = function(nickname) {
+                PACKAGES[nickname] = this;
         };
         D.get = function(name) {
                 return HOP(PACKAGES, name) ? PACKAGES[name] : (
@@ -139,8 +162,16 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                 return this.get("special") ? true : null;
         };
         D.get = function(name) {
+                var pak = CL.intern("*PACKAGE*").value;
+                if (pak) return pak.intern(name);
                 return HOP(SYMBOLS, name) ? SYMBOLS[name] : (
                         SYMBOLS[name] = new D(name)
                 );
         };
+        var CL = LispPackage.get("COMMON-LISP");
 });
+
+(function(CL){
+        CL.alias("CL");
+        CL.intern("*PACKAGE*").value = CL;
+})(LispPackage.get("COMMON-LISP"))

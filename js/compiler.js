@@ -110,7 +110,15 @@ function lisp_parse(code) {
                 });
                 if (str.length > 0 && /^[0-9]*\.?[0-9]*$/.test(str))
                         return parseFloat(str);
-                return LispSymbol.get(str.toUpperCase());
+                str = str.toUpperCase();
+                var m = /(.*)::?(.*)/.exec(str);
+                if (m) {
+                        var pak = LispPackage.get(m[1] || "KEYWORD");
+                        return pak.intern(m[2]);
+                }
+                var pak = LispPackage.get("COMMON-LISP").intern("*PACKAGE*");
+                if (pak.value) return pak.value.intern(str);
+                return LispSymbol.get(str);
         };
         function read_char() {
                 var ch = next() + read_while(function(ch){
@@ -221,7 +229,6 @@ function lisp_parse(code) {
         , list = LC.fromArray;
 
         function find_var(name, env) {
-                //console.log("Looking for %o in %o", name, env);
                 for (var i = 0; i < env.length; ++i) {
                         var frame = env[i];
                         for (var j = 0; j < frame.length; ++j) {
@@ -243,6 +250,8 @@ function lisp_parse(code) {
         var S_NOT     = LispSymbol.get("NOT");
         var S_CC      = LispSymbol.get("C/C");
         var S_DEFMAC  = LispSymbol.get("DEFMACRO");
+
+        var PAK_KEYWORD = LispPackage.get("KEYWORD");
 
         function append() {
                 var ret = [];
@@ -297,6 +306,8 @@ function lisp_parse(code) {
                             case S_NIL: return comp_const(null, VAL, MORE);
                             case S_T: return comp_const(true, VAL, MORE);
                         }
+                        if (x.pak === PAK_KEYWORD)
+                                return comp_const(x, VAL, MORE);
                         return comp_var(x, env, VAL, MORE);
                 }
                 else if (constantp(x)) {
@@ -344,7 +355,6 @@ function lisp_parse(code) {
                         }), [])
                 ).concat(name.macro(), LispMachine.assemble(gen("CALL", length(args))));
                 var ast = m.run(code);
-                console.log(LispMachine.dump(ast));
                 var ret = comp(ast, env, VAL, MORE);
                 return ret;
         };
