@@ -79,7 +79,7 @@ if (a !== NOINIT) {\n";
                 var P = D.prototype;
                 if (name) P.$objectType = name;
                 P.constructor = D;
-                P.INIT = noop;
+                if (!P.INIT) P.INIT = noop;
                 if (func) return func(D, P, BASE) || D;
                 return D;
         };

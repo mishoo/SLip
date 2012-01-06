@@ -100,7 +100,7 @@ function lisp_parse(code) {
                 });
                 if (str.length > 0 && /^[0-9]*\.?[0-9]*$/.test(str))
                         return new LispNumber(parseFloat(str));
-                return LispSymbol.get(str);
+                return LispSymbol.get(str.toUpperCase());
         };
         function read_char() {
                 var ch = next() + read_while(function(ch){
@@ -117,23 +117,23 @@ function lisp_parse(code) {
                 skip("#");
                 switch (peek()) {
                     case "\\": next(); return read_char();
-                    case "(": return LispCons.toArray(read_list());
+                    case "(": return new LispArray(LispCons.toArray(read_list()));
                     default:
                         croak("Unsupported sharp syntax: #" + peek());
                 }
         };
         function read_quote() {
                 skip("'");
-                return list([ LispSymbol.get("quote"), read_token() ]);
+                return list([ LispSymbol.get("QUOTE"), read_token() ]);
         };
         var in_qq = 0;
         function read_quasiquote() {
                 skip("`");
                 skip_ws();
                 if (peek() != "(")
-                        return list([ LispSymbol.get("quote"), read_token() ]);
+                        return list([ LispSymbol.get("QUOTE"), read_token() ]);
                 ++in_qq;
-                var ret = list([ LispSymbol.get("quasiquote"), read_token() ]);
+                var ret = list([ LispSymbol.get("QUASIQUOTE"), read_token() ]);
                 --in_qq;
                 return ret;
         };
@@ -145,9 +145,9 @@ function lisp_parse(code) {
                 --in_qq;
                 if (peek() == "@") {
                         next();
-                        ret = list([ LispSymbol.get("qq-splice"), read_token() ]);
+                        ret = list([ LispSymbol.get("QQ-SPLICE"), read_token() ]);
                 }
-                else ret = list([ LispSymbol.get("qq-unquote"), read_token() ]);
+                else ret = list([ LispSymbol.get("QQ-UNQUOTE"), read_token() ]);
                 ++in_qq;
                 return ret;
         };
@@ -333,7 +333,7 @@ function lisp_parse(code) {
                         }), [])
                 ).concat(name.macro(), LispMachine.assemble(gen("CALL", length(args))));
                 var ast = m.run(code);
-                //console.log(LispMachine.dump(ast));
+                console.log(LispMachine.dump(ast));
                 var ret = comp(ast, env, VAL, MORE);
                 return ret;
         };
@@ -447,6 +447,7 @@ function lisp_parse(code) {
                 if (LispSymbol.is(args)) {
                         return gen("FN",
                                    seq(gen("ARG_", 0),
+                                       args.special() ? gen("BIND", args, 0) : [],
                                        comp_seq(body, [ [ args ] ].concat(env), true, false)));
                 } else {
                         var dot = LC.isDotted(args);

@@ -399,6 +399,8 @@ LispMachine.dump = function(thing) {
         if (thing === true) return "T";
         if (LispString.is(thing)) return JSON.stringify(thing.value);
         if (LispNumber.is(thing)) return thing.value;
+        if (LispPackage.is(thing)) return thing.name;
+        if (LispSymbol.is(thing)) return thing.name;
         if (LispCons.is(thing)) {
                 var ret = "(", first = true;
                 while (thing !== null) {

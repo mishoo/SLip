@@ -166,7 +166,7 @@
         (rec (list) n)))
     (clog (length solutions))))
 
-(sumis 14 1)
+;;(sumis 14 1)
 
 ;;;;;
 
@@ -268,5 +268,3 @@
     (add () 0)))
 
 (who-owns-the-fish)
-
-;;(special '*foo*)
