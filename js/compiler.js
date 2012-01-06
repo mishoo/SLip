@@ -353,19 +353,15 @@ function lisp_parse(code) {
 
         function comp_macroexpand(name, args, env, VAL, MORE) {
                 var m = new LispMachine();
-                var code = LispMachine.assemble(
-                        comp_list(LC.map(args, function(el){
-                                return list([ S_QUOTE, el ]);
-                        }), [])
-                ).concat(name.macro(), LispMachine.assemble(gen("CALL", length(args))));
-                var ast = m.run(code);
+                var ast = m.call(name.macro(), LispCons.toArray(args));
                 var ret = comp(ast, env, VAL, MORE);
                 return ret;
         };
 
         function comp_defmac(name, args, body, env, VAL, MORE) {
                 var func = comp_lambda(args, body, env);
-                func = LispMachine.assemble(func);
+                func = LispMachine.assemble(func).concat(LispMachine.assemble(gen("RET")));
+                func = new LispMachine().run(func);
                 name.set("macro", func);
                 return seq(
                         VAL ? gen("CONST", name) : "POP",

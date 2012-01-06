@@ -105,6 +105,17 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         this.code[this.pc++].run(this);
                 }
         };
+        P.call = function(closure, args) {
+                this.stack = [ [] ].concat(args);
+                this.code = closure.code;
+                this.env = closure.env;
+                this.n_args = args.length;
+                this.pc = 0;
+                while (true) {
+                        if (this.pc == null) return this.pop();
+                        this.code[this.pc++].run(this);
+                }
+        };
 
         var OPS = {};
 
