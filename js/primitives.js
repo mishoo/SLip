@@ -53,20 +53,22 @@
         });
 
         (function(defcmp){
-                defcmp("=", function(a, b){ return a == b });
+                defcmp("=", new Function("a", "b", "return a==b"));
                 defcmp("<=");
                 defcmp(">=");
                 defcmp("<");
                 defcmp(">");
         })(function(name, cmp){
-                if (!cmp) cmp = new Function("a", "b", "return a " + name + " b");
+                if (!cmp) cmp = new Function("a", "b", "return a" + name + "b");
                 defp(name, false, function(m, nargs){
                         checknargs(nargs, 1);
                         var prev = m.pop_number(error);
+                        var ret = true;
                         while (--nargs > 0) {
-                                if (!cmp(m.pop_number(error), prev)) return null;
+                                var el = m.pop_number(error);
+                                if (ret && !cmp(el, prev)) ret = null;
                         }
-                        return true;
+                        return ret;
                 });
         });
 
