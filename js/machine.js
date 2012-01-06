@@ -68,10 +68,10 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         P.pop = function() {
                 return this.stack.pop();
         };
-        P.pop_number = function() {
+        P.pop_number = function(error) {
                 var n = this.pop();
                 if (typeof n != "number") {
-                        throw new Error("Number argument expected");
+                        error();
                 }
                 return n;
         };
@@ -360,11 +360,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["PRIM", "name nargs", {
                         run: function(m) {
-                                m.push(this.func(m, this.nargs));
-                        },
-                        INIT: function() {
-                                var prim = LispPrimitive(this.name);
-                                this.func = prim.func;
+                                m.push(this.name.primitive()(m, this.nargs));
                         }
                 }]
 

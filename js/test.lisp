@@ -30,7 +30,7 @@
 ;;;; let the show begin
 
 (defmacro defun (name args . body)
-  `(set! ,name (lambda ,args ,@body)))
+  `(%set-function-name (set! ,name (lambda ,args ,@body)) ',name))
 
 (defmacro when (pred . body)
   `(if ,pred (progn ,@body)))
@@ -82,12 +82,12 @@
          (if ,x ,x (or ,@(cdr exps)))))))
 
 (defmacro and exprs
-  (when exprs
-    (let ((x (gensym "AND")))
-      `(let ((,x ,(car exprs)))
-         (when ,x
-           ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
-    t))
+  (if exprs
+      (let ((x (gensym "AND")))
+        `(let ((,x ,(car exprs)))
+           (when ,x
+             ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
+      t))
 
 (defmacro cond (cases)
   (if cases
@@ -166,7 +166,7 @@
         (rec (list) n)))
     (clog (length solutions))))
 
-;;(sumis 14 1)
+;; (sumis 14 1)
 
 ;;;;;
 

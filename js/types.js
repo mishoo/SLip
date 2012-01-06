@@ -6,7 +6,7 @@ var LispType = DEFCLASS("LispType", null, function(D, P){
 
 function DEFTYPE(name, func) {
         return DEFCLASS(name.replace(/-/g, "_"), LispType, function(D, P){
-                P.type = name;
+                P.type = D.type = name;
                 var ret = func ? func(D, P) : null;
                 return ret;
         }, true);
@@ -160,6 +160,9 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         };
         P.special = function() {
                 return this.get("special") ? true : null;
+        };
+        P.primitive = function() {
+                return this.get("primitive") || null;
         };
         D.get = function(name) {
                 var pak = CL.intern("*PACKAGE*").value;
