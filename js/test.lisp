@@ -1,31 +1,46 @@
-(set! qq-expand-list
-      (lambda (x)
-        (if (consp x)
-            (if (eq (car x) 'qq-unquote)
-                (list 'list (cadr x))
-                (if (eq (car x) 'qq-splice)
-                    (cadr x)
-                    (if (eq (car x) 'quasiquote)
-                        (qq-expand-list (qq-expand (cadr x)))
-                        (list 'list (list 'append
-                                          (qq-expand-list (car x))
-                                          (qq-expand (cdr x)))))))
-            (list 'quote (list x)))))
+;; (set! qq-expand-list
+;;       (lambda (x)
+;;         (if (consp x)
+;;             (if (eq (car x) 'qq-unquote)
+;;                 (list 'list (cadr x))
+;;                 (if (eq (car x) 'qq-splice)
+;;                     (cadr x)
+;;                     (if (eq (car x) 'quasiquote)
+;;                         (qq-expand-list (qq-expand (cadr x)))
+;;                         (list 'list (list 'append
+;;                                           (qq-expand-list (car x))
+;;                                           (qq-expand (cdr x)))))))
+;;             (list 'quote (list x)))))
 
-(set! qq-expand
+;; (set! qq-expand
+;;       (lambda (x)
+;;         (if (consp x)
+;;             (if (eq (car x) 'qq-unquote)
+;;                 (cadr x)
+;;                 (if (eq (car x) 'quasiquote)
+;;                     (qq-expand (qq-expand (cadr x)))
+;;                     (list 'append
+;;                           (qq-expand-list (car x))
+;;                           (qq-expand (cdr x)))))
+;;             (list 'quote x))))
+
+;; props to http://norstrulde.org/ilge10/
+(set! qq
       (lambda (x)
         (if (consp x)
-            (if (eq (car x) 'qq-unquote)
+            (if (eq 'qq-unquote (car x))
                 (cadr x)
-                (if (eq (car x) 'quasiquote)
-                    (qq-expand (qq-expand (cadr x)))
-                    (list 'append
-                          (qq-expand-list (car x))
-                          (qq-expand (cdr x)))))
+                (if (eq 'quasiquote (car x))
+                    (qq (qq (cadr x)))
+                    (if (consp (car x))
+                        (if (eq 'qq-splice (caar x))
+                            (list 'append (cadar x) (qq (cdr x)))
+                            (list 'cons (qq (car x)) (qq (cdr x))))
+                        (list 'cons (qq (car x)) (qq (cdr x))))))
             (list 'quote x))))
 
 (defmacro quasiquote (thing)
-  (qq-expand thing))
+  (qq thing))
 
 ;;;; let the show begin
 
@@ -89,7 +104,7 @@
              ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
       t))
 
-(defmacro cond (cases)
+(defmacro cond cases
   (if cases
       `(if ,(caar cases)
            (progn ,@(cdar cases))

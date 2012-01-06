@@ -90,3 +90,68 @@
            (when ,x
              ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
       t))
+
+(defmacro cond cases
+  (if cases
+      `(if ,(caar cases)
+           (progn ,@(cdar cases))
+           (cond ,@(cdr cases)))))
+
+(defun member (item list)
+  (if list
+      (if (eq item (car list))
+          list
+          (member item (cdr list)))))
+
+(defmacro case (expr . cases)
+  (let ((vexpr (gensym "CASE")))
+    `(let ((,vexpr ,expr))
+       ,(labels ((recur (cases)
+                        (when cases
+                          (if (listp (caar cases))
+                              `(if (member ,vexpr ',(caar cases))
+                                   (progn ,@(cdar cases))
+                                   ,(recur (cdr cases)))
+                              (if (and (not (cdr cases))
+                                       (or (eq (caar cases) 'otherwise)
+                                           (eq (caar cases) t)))
+                                  `(progn ,@(cdar cases))
+                                  `(if (eq ,vexpr ',(caar cases))
+                                       (progn ,@(cdar cases))
+                                       ,(recur (cdr cases))))))))
+                (recur cases)))))
+
+;;;;;;;;;;;;;;;;;;;;;
+
+(set! qq
+      (lambda (x)
+        (if (atom x)
+            (list 'quote x)
+            (if (eq 'qq-unquote (car x))
+                (cadr x)
+                (if (eq 'quasiquote (car x))
+                    (qq (qq (cadr x)))
+                    (if (consp (car x))
+                        (if (eq 'qq-splice (caar x))
+                            (list 'append (cadar x) (qq (cdr x)))
+                            (list 'cons (qq (car x)) (qq (cdr x))))
+                        (list 'cons (qq (car x)) (qq (cdr x)))))))))
+
+;; (qq '(list 1 (quote 2) ,@(list 'a 'b 'c) 3 ,(+ 10 20 30) 4 5))
+;; (qq-expand '(list 1 2 ,@(list 'a 'b 'c) 3 ,(+ 10 20 30) 4 5))
+
+(qq '(let ((,vexpr ,expr))
+      ,(labels ((recur (cases)
+                       (when cases
+                         (if (listp (caar cases))
+                             `(if (member ,vexpr ',(caar cases))
+                                  (progn ,@(cdar cases))
+                                  ,(recur (cdr cases)))
+                             (if (and (not (cdr cases))
+                                      (or (eq (caar cases) 'otherwise)
+                                          (eq (caar cases) t)))
+                                 `(progn ,@(cdar cases))
+                                 `(if (eq ,vexpr ',(caar cases))
+                                      (progn ,@(cdar cases))
+                                      ,(recur (cdr cases))))))))
+               (recur cases))))

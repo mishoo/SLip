@@ -148,6 +148,11 @@
                 return LispCons.is(m.pop()) ? true : null;
         });
 
+        defp("atom", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                return LispCons.is(m.pop()) ? null : true;
+        });
+
         defp("length", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var x = m.pop();
@@ -206,6 +211,14 @@
         defp("list", false, function(m, nargs) {
                 var p = null;
                 while (nargs-- > 0)
+                        p = new LispCons(m.pop(), p);
+                return p;
+        });
+
+        defp("list*", false, function(m, nargs) {
+                checknargs(nargs, 1);
+                var p = m.pop();
+                while (--nargs > 0)
                         p = new LispCons(m.pop(), p);
                 return p;
         });

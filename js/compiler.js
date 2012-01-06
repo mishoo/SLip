@@ -316,6 +316,10 @@ function lisp_parse(code) {
                 else switch (car(x)) {
                     case S_QUOTE:
                         arg_count(x, 1);
+                        switch (cadr(x)) {
+                            case S_NIL: return comp_const(null, VAL, MORE);
+                            case S_T: return comp_const(true, VAL, MORE);
+                        }
                         return comp_const(cadr(x), VAL, MORE);
                     case S_PROGN:
                         return comp_seq(cdr(x), env, VAL, MORE);
