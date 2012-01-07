@@ -37,7 +37,12 @@
 
         defp("eq", false, function(m, nargs){
                 checknargs(nargs, 2, 2);
-                return m.pop() === m.pop() ? true : null;
+                var b = m.pop(), a = m.pop();
+                // boxed basic types need special attention
+                if (LispChar.is(a)) {
+                        return (LispChar.is(b) && a.value === b.value) ? true : null;
+                }
+                return a === b ? true : null;
         });
 
         defp("/=", false, function(m, nargs){
@@ -173,7 +178,7 @@
                 checktype(i, "number");
                 if (LispCons.isList(x)) return LispCons.elt(x, i);
                 if (LispArray.is(x)) return x.elt(i) || null;
-                if (typeof x == "string") return x.charAt(i) || null;
+                if (typeof x == "string") return new LispChar(x.charAt(i)) || null;
                 error("Unrecognized sequence");
         });
 
@@ -371,4 +376,4 @@
                 return current.use(imported);
         });
 
-})(LispPackage.get("COMMON-LISP"));
+})(LispPackage.get("%"));

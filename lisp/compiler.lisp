@@ -48,6 +48,12 @@
                 (if (listp x)
                     (cadr x))) defs)))
 
+(defmacro prog1 (exp . body)
+  (let ((ret (gensym)))
+    `(let ((,ret ,exp))
+       ,@body
+       ,ret)))
+
 (defmacro let* (defs . body)
   (if defs
       `(let (,(car defs))
@@ -90,12 +96,6 @@
            (progn ,@(cdar cases))
            (cond ,(cdr cases)))))
 
-(defmacro call/cc (func)
-  `(,func (c/c)))
-
-(defmacro with-cc (name . body)
-  `((lambda (,name) ,@body) (c/c)))
-
 (defun member (item list)
   (if list
       (if (eq item (car list))
@@ -133,3 +133,42 @@
         (mapcar macroexpand-all form))
       form))
 
+;;;;
+
+(defmacro while (cond . body)
+  (let ((rec (gensym "while")))
+    `((lambda (,rec)
+        ((set! ,rec
+               (lambda ()
+                 (when ,cond
+                   ,@body
+                   (,rec))))))
+      nil)))
+
+(defun input-stream (text eof)
+  (let ((i 0)
+        (len (length text)))
+    (lambda (what)
+      (case what
+        (peek (if (< i len)
+                  (elt text i)
+                  eof))
+        (next (if (< i len)
+                  (prog1 (elt text i)
+                    (set! i (+ i 1)))
+                  eof))))))
+
+(let ((in (input-stream "check  this
+	a TAB before this
+out" 'EOF)))
+  (while (not (eq (in 'peek) 'EOF))
+    (let ((ch (in 'next)))
+      (clog ch)
+      (case ch
+        ((#\Space #\Page #\Tab #\Linefeed) (clog "Whitespace encountered!")))
+      )))
+
+;; (defun lisp-reader (text eof)
+;;   (let ((input (input-stream text eof)))
+;;     (labels ((peek () (input :peek))
+;;              (next () (input :next))))))

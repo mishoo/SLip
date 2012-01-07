@@ -118,7 +118,7 @@ function lisp_reader(code) {
                         var pak = LispPackage.get(m[1] || "KEYWORD");
                         return pak.find_or_intern(m[2]);
                 }
-                var pak = LispPackage.get("COMMON-LISP").intern("*PACKAGE*");
+                var pak = LispPackage.get("%").intern("*PACKAGE*");
                 if (pak.value) return pak.value.find_or_intern(str);
                 return LispSymbol.get(str);
         };
@@ -127,10 +127,14 @@ function lisp_reader(code) {
                         return (ch >= "a" && ch <= "z") ||
                                 (ch >= "A" && ch <= "z") ||
                                 (ch >= "0" && ch <= "9") ||
-                                ch == "_" || ch == "_";
+                                ch == "-" || ch == "_";
                 });
-                if (ch.length > 1)
-                        croak("Character names not supported: " + ch);
+                if (ch.length > 1) {
+                        ch = LispChar.fromName(ch);
+                        if (ch == null)
+                                croak("Unknown character name: " + ch);
+                        return ch;
+                }
                 return new LispChar(ch);
         };
         function read_sharp() {
@@ -283,7 +287,7 @@ function lisp_reader(code) {
                     case null:
                         return true;
                 }
-                return typeof x == "number" || typeof x == "string" || LispRegexp.is(x);
+                return typeof x == "number" || typeof x == "string" || LispRegexp.is(x) || LispChar.is(x);
         };
 
         function nullp(x) {
@@ -494,7 +498,7 @@ function lisp_reader(code) {
                 }
         };
 
-        this.compile = function(x) {
+        this.lisp_compile = function(x) {
                 return comp_seq(x, [], true, false);
         };
 

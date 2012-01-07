@@ -13,8 +13,39 @@ function DEFTYPE(name, func) {
 };
 
 var LispChar = DEFTYPE("char", function(D, P){
+        var NAMES_TO = {
+                " "    : "SPACE",
+                "\t"   : "TAB",
+                "\r"   : "RETURN",
+                "\n"   : "NEWLINE",
+                "\x0C" : "PAGE",
+                "\x08" : "BACKSPACE"
+        };
+        var NAMES_FROM = (function(h){
+                for (var i in NAMES_TO) {
+                        if (HOP(NAMES_TO, i)) {
+                                h[NAMES_TO[i]] = i;
+                        }
+                }
+                h.LINEFEED = "\n";
+                console.log(h);
+                return h;
+        })({});
         P.INIT = function(val){ this.value = val };
         P.valueOf = P.toString = function(){ return this.value };
+        P.name = function() {
+                return NAMES_TO[this.value] || this.value;
+        };
+        P.print = function() {
+                var ch = this.value;
+                return "#\\" + (HOP(NAMES_TO, ch) ? NAMES_TO[ch] : ch);
+        };
+        D.fromName = function(name) {
+                name = name.toUpperCase();
+                if (HOP(NAMES_FROM, name))
+                        return new LispChar(NAMES_FROM[name]);
+                return null;
+        };
 });
 
 var LispArray = DEFTYPE("array", function(D, P){
@@ -181,10 +212,9 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                         SYMBOLS[name] = new D(name)
                 );
         };
-        var CL = LispPackage.get("COMMON-LISP");
+        var CL = LispPackage.get("%");
 });
 
 (function(CL){
-        CL.alias("CL");
         CL.intern("*PACKAGE*").value = CL;
-})(LispPackage.get("COMMON-LISP"))
+})(LispPackage.get("%"))

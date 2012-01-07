@@ -228,6 +228,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(serialize_const).join(",") + ")";
                 if (LispRegexp.is(val)) return val.value.toString();
                 if (typeof val == "string") return JSON.stringify(val);
+                if (LispChar.is(val)) return "c(" + JSON.stringify(val.value) + ")";
                 return val + "";
         };
 
@@ -411,6 +412,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 if (thing === null) return "NIL";
                 if (thing === true) return "T";
                 if (typeof thing == "string") return JSON.stringify(thing);
+                if (LispChar.is(thing)) return thing.print();
                 if (LispPackage.is(thing)) return thing.name;
                 if (LispSymbol.is(thing)) return thing.name;
                 if (LispCons.is(thing)) {

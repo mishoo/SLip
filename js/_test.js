@@ -21,7 +21,7 @@
                                 ast = reader();
                                 if (ast === false) break;
                                 //console.log(LispMachine.dump(ast));
-                                var bc = compile(new LispCons(ast, null));
+                                var bc = lisp_compile(new LispCons(ast, null));
                                 if (bc) {
                                         bc = LispMachine.assemble(bc);
                                         //console.log(LispMachine.serialize(bc));
