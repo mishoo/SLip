@@ -131,6 +131,13 @@ var LispPackage = DEFTYPE("package", function(D, P){
         P.alias = function(nickname) {
                 PACKAGES[nickname] = this;
         };
+        P.use = function(pak) {
+                if (this.uses.indexOf(pak) < 0) {
+                        this.uses.push(pak);
+                        return pak;
+                }
+                return null;
+        };
         D.get = function(name) {
                 return HOP(PACKAGES, name) ? PACKAGES[name] : (
                         PACKAGES[name] = new D(name)

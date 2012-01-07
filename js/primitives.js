@@ -5,6 +5,7 @@
         function defp(name, seff, func) {
                 name = name.toUpperCase();
                 var sym = CL.intern(name);
+                CL.export(sym);
                 sym.set("primitive", function(m, nargs){
                         CURRENT = name;
                         return func(m, nargs);
@@ -340,6 +341,13 @@
                 return pak.find(name);
         });
 
+        defp("%find-package", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var name = m.pop();
+                checktype(name, "string");
+                return LispPackage.get(name);
+        });
+
         defp("%export", true, function(m, nargs){
                 checknargs(nargs, 2, 2);
                 var pak = m.pop(), symbol = m.pop();
@@ -353,6 +361,14 @@
                 var symbol = m.pop();
                 checktype(symbol, LispSymbol);
                 return symbol.pak;
+        });
+
+        defp("%use-package", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var current = m.pop(), imported = m.pop();
+                checktype(current, LispPackage);
+                checktype(imported, LispPackage);
+                return current.use(imported);
         });
 
 })(LispPackage.get("COMMON-LISP"));

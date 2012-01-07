@@ -1,3 +1,5 @@
+(%special '*package*)
+
 ;; props to http://norstrulde.org/ilge10/
 (set! qq
       (lambda (x)

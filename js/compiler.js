@@ -113,13 +113,13 @@ function lisp_reader(code) {
                 if (str.length > 0 && /^[0-9]*\.?[0-9]*$/.test(str))
                         return parseFloat(str);
                 str = str.toUpperCase();
-                var m = /(.*)::?(.*)/.exec(str);
+                var m = /^(.*?)::?(.*)$/.exec(str);
                 if (m) {
                         var pak = LispPackage.get(m[1] || "KEYWORD");
-                        return pak.intern(m[2]);
+                        return pak.find_or_intern(m[2]);
                 }
                 var pak = LispPackage.get("COMMON-LISP").intern("*PACKAGE*");
-                if (pak.value) return pak.value.intern(str);
+                if (pak.value) return pak.value.find_or_intern(str);
                 return LispSymbol.get(str);
         };
         function read_char() {
