@@ -1,5 +1,5 @@
-(special '*foo*)
-(special 'output)
+(%special '*foo*)
+(%special 'output)
 
 (defun output (x)
   (clog x))
@@ -41,9 +41,9 @@
 
 
 
-(let* ((pak (make-package "FOO"))
-       (sym (intern "CRAP" pak)))
-  (eq (find-symbol "CRAP" pak) sym))
+(let* ((pak (%make-package "FOO"))
+       (sym (%intern "CRAP" pak)))
+  (eq (%find-symbol "CRAP" pak) sym))
 
 
 (let ((str "abcdefgh"))

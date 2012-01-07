@@ -153,6 +153,11 @@
                 return LispCons.is(m.pop()) ? null : true;
         });
 
+        defp("symbolp", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                return LispSymbol.is(m.pop()) ? true : null;
+        });
+
         defp("length", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var x = m.pop();
@@ -242,6 +247,25 @@
                         }
                 }
                 return p;
+        });
+
+        /* -----[ macros ]----- */
+
+        defp("macroexpand-1", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var form = m.pop();
+                if (!LispCons.is(form)) return form;
+                var first = form.car;
+                if (!first.macro()) return form;
+                m._callnext(first.macro(), LispCons.cdr(form));
+                return false;
+        });
+
+        defp("%macrop", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var symbol = m.pop();
+                checktype(symbol, LispSymbol);
+                return symbol.macro();
         });
 
         /* -----[ symbols, packages ]----- */

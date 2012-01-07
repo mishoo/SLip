@@ -353,7 +353,7 @@ function lisp_parse(code) {
 
         function comp_macroexpand(name, args, env, VAL, MORE) {
                 var m = new LispMachine();
-                var ast = m.call(name.macro(), LispCons.toArray(args));
+                var ast = m.call(name.macro(), args);
                 var ret = comp(ast, env, VAL, MORE);
                 return ret;
         };

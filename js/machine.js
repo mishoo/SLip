@@ -95,26 +95,41 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         P.top = function() {
                 return this.stack[this.stack.length - 1];
         };
-        P.run = function(code) {
-                this.code = code;
-                this.env = new LispCons([], null);
-                this.stack = [ [] ];
-                this.pc = 0;
+        P.loop = function() {
                 while (true) {
                         if (this.pc == null) return this.pop();
                         this.code[this.pc++].run(this);
                 }
         };
+        P.run = function(code) {
+                this.code = code;
+                this.env = new LispCons([], null);
+                this.stack = [ [] ];
+                this.pc = 0;
+                return this.loop();
+        };
         P.call = function(closure, args) {
+                args = LispCons.toArray(args);
                 this.stack = [ [] ].concat(args);
                 this.code = closure.code;
                 this.env = closure.env;
                 this.n_args = args.length;
                 this.pc = 0;
-                while (true) {
-                        if (this.pc == null) return this.pop();
-                        this.code[this.pc++].run(this);
+                return this.loop();
+        };
+
+        P._callnext = function(closure, args) {
+                this.stack.push(this.mkret(this.pc));
+                this.code = closure.code;
+                this.env = closure.env;
+                var n = 0;
+                while (args != null) {
+                        this.stack.push(args.car);
+                        args = args.cdr;
+                        n++;
                 }
+                this.n_args = n;
+                this.pc = 0;
         };
 
         var OPS = {};
@@ -371,7 +386,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["PRIM", "name nargs", {
                         run: function(m) {
-                                m.push(this.name.primitive()(m, this.nargs));
+                                var ret = this.name.primitive()(m, this.nargs);
+                                if (ret !== false) m.push(ret);
                         }
                 }]
 

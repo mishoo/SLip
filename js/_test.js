@@ -43,8 +43,8 @@
 
         load_files([
                 //"../lisp/compiler.lisp"
-                "test.lisp"
-                //"tmp/t2.lisp"
+                "test.lisp",
+                //"tmp/t1.lisp"
         ]);
 
 })();

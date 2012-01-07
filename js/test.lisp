@@ -140,6 +140,19 @@
                                        ,(recur (cdr cases))))))))
                 (recur cases)))))
 
+(defun macroexpand (form)
+  (if (and (consp form)
+           (symbolp (car form))
+           (%macrop (car form)))
+      (macroexpand (macroexpand-1 form))
+      form))
+
+(defun macroexpand-all (form)
+  (if (consp form)
+      (let ((form (macroexpand form)))
+        (mapcar macroexpand-all form))
+      form))
+
 ;;;;;
 
 (set! *amb-fail* (lambda (arg)
@@ -283,3 +296,40 @@
     (add () 0)))
 
 (who-owns-the-fish)
+
+(macroexpand-all
+ '(defun who-owns-the-fish ()
+   (labels ((add (houses index)
+              (let ((nat (pick :nationality  'british  'swedish 'danish   'norwegian 'german))
+                    (col (pick :color        'red      'green   'white    'yellow    'blue))
+                    (bev (pick :beverage     'tea      'milk    'coffee   'beer      'water))
+                    (tob (pick :tobacco      'pallmall 'dunhill 'marlboro 'winfield  'rothmans))
+                    (pet (pick :pet          'dogs     'cats    'horses   'birds     'fish)))
+                (iff (eq nat 'british) (eq col 'red))
+                (iff (eq nat 'swedish) (eq pet 'dogs))
+                (iff (eq nat 'danish) (eq bev 'tea))
+                (iff (eq col 'white)
+                     (and (> index 0)
+                          (eq 'green
+                              (house-prop :color (elt houses (- index 1))))))
+                (iff (eq col 'green) (eq bev 'coffee))
+                (iff (eq tob 'pallmall) (eq pet 'birds))
+                (iff (eq col 'yellow) (eq tob 'dunhill))
+                (iff (= index 2) (eq bev 'milk))
+                (iff (= index 0) (eq nat 'norwegian))
+                (iff (eq tob 'winfield) (eq bev 'beer))
+                (iff (eq nat 'german) (eq tob 'rothmans))
+                (let* ((h (list nat bev tob pet col))
+                       (houses (append houses (list h))))
+                  ;;(clog houses) ; log something so we don't look like we're frozen.
+                  (if (= index 4)
+                      (progn
+                        (neighbors houses :tobacco 'marlboro :pet 'cats)
+                        (neighbors houses :pet 'horses :tobacco 'dunhill)
+                        (neighbors houses :nationality 'norwegian :color 'blue)
+                        (neighbors houses :tobacco 'marlboro :beverage 'water)
+                        (clog "*** SOLUTION!")
+                        ;; and return it
+                        houses)
+                      (add houses (+ index 1)))))))
+     (add () 0))))
