@@ -1,6 +1,6 @@
 // basic stream
 
-function Stream(text) {
+function InputStream(text) {
         this.pos = 0;
         this.line = 0;
         this.col = 0;
@@ -8,10 +8,11 @@ function Stream(text) {
         this.len = text.length;
 };
 
-Stream.prototype = {
+InputStream.prototype = {
         peek: function() {
                 if (this.pos < this.len)
                         return this.text.charAt(this.pos);
+                return null;
         },
         next: function() {
                 if (this.pos < this.len) {
@@ -24,13 +25,14 @@ Stream.prototype = {
                         }
                         return ch;
                 }
+                return null;
         }
 };
 
 ////////////////// basic parser
-function lisp_parse(code) {
+function lisp_reader(code) {
+        var input = new InputStream(code);
         var list = LispCons.fromArray;
-        var input = new Stream("(" + code + ")");
         function next() { return input.next(); };
         function peek() { return input.peek(); };
         function croak(msg) {
@@ -170,20 +172,22 @@ function lisp_parse(code) {
                 ++in_qq;
                 return ret;
         };
-        var COMMENT = {};
         function read_token() {
-                skip_ws();
-                var ch = peek();
-                switch (ch) {
-                    case "\"": return read_string();
-                    case "(": return read_list();
-                    case ";": skip_comment(); return COMMENT;
-                    case "#": return read_sharp();
-                    case "`": return read_quasiquote();
-                    case ",": return read_comma();
-                    case "'": return read_quote();
+                out: while (true) {
+                        skip_ws();
+                        var ch = peek();
+                        switch (ch) {
+                            case ";"  : skip_comment(); continue out;
+                            case "\"" : return read_string();
+                            case "("  : return read_list();
+                            case "#"  : return read_sharp();
+                            case "`"  : return read_quasiquote();
+                            case ","  : return read_comma();
+                            case "'"  : return read_quote();
+                            case null : return false;
+                        }
+                        return read_symbol();
                 }
-                return read_symbol();
         };
         function read_list() {
                 var ret = null, p;
@@ -200,18 +204,16 @@ function lisp_parse(code) {
                                 break out;
                             default:
                                 var tok = read_token();
-                                if (tok !== COMMENT) {
-                                        var cell = new LispCons(tok, null);
-                                        if (ret) p.cdr = cell;
-                                        else ret = cell;
-                                        p = cell;
-                                }
+                                var cell = new LispCons(tok, null);
+                                if (ret) p.cdr = cell;
+                                else ret = cell;
+                                p = cell;
                         }
                 }
                 skip(")");
                 return ret;
         };
-        return read_token();
+        return read_token;
 };
 
 ///////////////// compiler

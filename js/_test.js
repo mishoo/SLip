@@ -16,22 +16,22 @@
 
         function load_files(list) {
                 function dofile(code){
-                        var ast = lisp_parse(code);
-                        //console.log(LispMachine.dump(ast));
-
-                        LispCons.forEach(ast, function(ast){
+                        var reader = lisp_reader(code);
+                        while (true) {
+                                ast = reader();
+                                if (ast === false) break;
                                 //console.log(LispMachine.dump(ast));
                                 var bc = compile(new LispCons(ast, null));
                                 if (bc) {
                                         bc = LispMachine.assemble(bc);
                                         //console.log(LispMachine.serialize(bc));
-                                        //console.log(LispMachine.disassemble(bc));
+                                        console.log(LispMachine.disassemble(bc));
                                         time_it("run", function(){
                                                 console.log(LispMachine.dump(m.run(bc)));
                                         });
                                 }
                                 console.log("------------------------------------------------");
-                        });
+                        }
 
                         load_files(list.splice(1));
                 };

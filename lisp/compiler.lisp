@@ -131,9 +131,3 @@
         (mapcar macroexpand-all form))
       form))
 
-;;;;;
-
-(flet ((foo (x)
-         (+ x x)))
-  (clog #((foo 12)
-          (%function-name foo))))

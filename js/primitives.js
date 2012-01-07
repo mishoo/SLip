@@ -256,6 +256,13 @@
                 return new LispArray(a);
         });
 
+        defp("as-vector", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var list = m.pop();
+                checktype(list, LispList);
+                return new LispArray(LispCons.toArray(list));
+        });
+
         /* -----[ macros ]----- */
 
         defp("macroexpand-1", false, function(m, nargs){
