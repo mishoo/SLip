@@ -5,7 +5,6 @@
         function defp(name, seff, func) {
                 name = name.toUpperCase();
                 var sym = CL.intern(name);
-                CL.export(sym);
                 sym.set("primitive", function(m, nargs){
                         CURRENT = name;
                         return func(m, nargs);
@@ -249,6 +248,14 @@
                 return p;
         });
 
+        /* -----[ arrays ]----- */
+
+        defp("vector", false, function(m, nargs){
+                var a = [];
+                while (--nargs >= 0) a[nargs] = m.pop();
+                return new LispArray(a);
+        });
+
         /* -----[ macros ]----- */
 
         defp("macroexpand-1", false, function(m, nargs){
@@ -287,6 +294,13 @@
                 checktype(f, LispClosure);
                 f.name = symbol;
                 return f;
+        });
+
+        defp("%function-name", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var f = m.pop();
+                checktype(f, LispClosure);
+                return f.name;
         });
 
         defp("%make-package", true, function(m, nargs){

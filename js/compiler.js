@@ -136,7 +136,7 @@ function lisp_parse(code) {
                 switch (peek()) {
                     case "\\": next(); return read_char();
                     case "/": return read_regexp();
-                    case "(": return new LispArray(LispCons.toArray(read_list()));
+                    case "(": return new LispCons(LispSymbol.get("VECTOR"), read_list());
                     default:
                         croak("Unsupported sharp syntax: #" + peek());
                 }

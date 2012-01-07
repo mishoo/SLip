@@ -30,6 +30,9 @@ var LispArray = DEFTYPE("array", function(D, P){
         P.set = function(i, val) {
                 this.value[i] = val;
         };
+        P.print = function() {
+                return "#(" + this.value.map(LispMachine.dump).join(" ") + ")";
+        };
 });
 
 var LispRegexp = DEFTYPE("regexp", function(D, P){

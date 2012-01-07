@@ -71,7 +71,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         P.pop_number = function(error) {
                 var n = this.pop();
                 if (typeof n != "number") {
-                        error();
+                        error("Number expected");
                 }
                 return n;
         };

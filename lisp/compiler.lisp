@@ -1,29 +1,3 @@
-;; (set! qq-expand-list
-;;       (lambda (x)
-;;         (if (consp x)
-;;             (if (eq (car x) 'qq-unquote)
-;;                 (list 'list (cadr x))
-;;                 (if (eq (car x) 'qq-splice)
-;;                     (cadr x)
-;;                     (if (eq (car x) 'quasiquote)
-;;                         (qq-expand-list (qq-expand (cadr x)))
-;;                         (list 'list (list 'append
-;;                                           (qq-expand-list (car x))
-;;                                           (qq-expand (cdr x)))))))
-;;             (list 'quote (list x)))))
-
-;; (set! qq-expand
-;;       (lambda (x)
-;;         (if (consp x)
-;;             (if (eq (car x) 'qq-unquote)
-;;                 (cadr x)
-;;                 (if (eq (car x) 'quasiquote)
-;;                     (qq-expand (qq-expand (cadr x)))
-;;                     (list 'append
-;;                           (qq-expand-list (car x))
-;;                           (qq-expand (cdr x)))))
-;;             (list 'quote x))))
-
 ;; props to http://norstrulde.org/ilge10/
 (set! qq
       (lambda (x)
@@ -82,12 +56,16 @@
 (defmacro labels (defs . body)
   `(let ,(mapcar (lambda (x) (car x)) defs)
      ,@(mapcar (lambda (x)
-                 `(set! ,(car x) (lambda ,(cadr x) ,@(cddr x)))) defs)
+                 `(set! ,(car x) (%set-function-name
+                                  (lambda ,(cadr x) ,@(cddr x))
+                                  ',(car x)))) defs)
      ,@body))
 
 (defmacro flet (defs . body)
   `(let ,(mapcar (lambda (x)
-                   `(,(car x) (lambda ,(cadr x) ,@(cddr x)))) defs)
+                   `(,(car x) (%set-function-name
+                               (lambda ,(cadr x) ,@(cddr x))
+                               ',(car x)))) defs)
      ,@body))
 
 (defmacro or exps
@@ -155,43 +133,7 @@
 
 ;;;;;
 
-(set! *amb-fail* (lambda (arg)
-                   (clog "TOTAL FAILURE")))
-
-(defmacro amb alternatives
-  (if alternatives
-      `(let ((+prev-amb-fail *amb-fail*))
-         (with-cc +sk
-           ,@(mapcar (lambda (alt)
-                       `(with-cc +fk
-                          (set! *amb-fail* +fk)
-                          (+sk ,alt)))
-                     alternatives)
-           (set! *amb-fail* +prev-amb-fail)
-           (+prev-amb-fail nil)))
-      `(*amb-fail* nil)))
-
-(defun sumis (n sum)
-  (let (solutions)
-    (with-cc *amb-fail*
-      (labels ((add (numbers)
-                 (labels ((rec (sum numbers)
-                            (if numbers
-                                (rec (+ sum (car numbers)) (cdr numbers))
-                                sum)))
-                   (rec 0 numbers)))
-               (required-sum? (numbers)
-                 (= sum (add numbers)))
-               (rec (numbers next)
-                 (if (= next 0)
-                     (progn
-                       (when (required-sum? numbers)
-                         (set! solutions (cons numbers solutions)))
-                       (amb))
-                     (rec (cons (amb next (- next))
-                                numbers)
-                          (- next 1)))))
-        (rec (list) n)))
-    (clog (length solutions))))
-
-(sumis 14 1)
+(flet ((foo (x)
+         (+ x x)))
+  (clog #((foo 12)
+          (%function-name foo))))
