@@ -16,6 +16,7 @@
 
         function load_files(list) {
                 function dofile(code){
+                        window.CURRENT_FILE = code;
                         var reader = lisp_reader(code);
                         while (true) {
                                 ast = reader();
@@ -42,10 +43,10 @@
         };
 
         load_files([
-                "../lisp/compiler.lisp",
-                //"test.lisp",
-                "tmp/t1.lisp",
-                "tmp/wotf.lisp"
+                "../lisp/compiler.lisp"
+                //,"test.lisp"
+                //,"tmp/t1.lisp"
+                //,"tmp/wotf.lisp"
         ]);
 
 })();

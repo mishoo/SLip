@@ -65,7 +65,7 @@ function lisp_reader(code) {
                 if (next() != expected)
                         croak("Expecting " + expected);
         };
-        function read_escaped(start, end) {
+        function read_escaped(start, end, inces) {
                 skip(start);
                 var escaped = false;
                 var str = "";
@@ -75,6 +75,7 @@ function lisp_reader(code) {
                                 str += ch;
                                 escaped = false;
                         } else if (ch == "\\") {
+                                if (inces) str += ch;
                                 escaped = true;
                         } else if (ch == end) {
                                 break;
@@ -88,7 +89,17 @@ function lisp_reader(code) {
                 return read_escaped("\"", "\"");
         };
         function read_regexp() {
-                return new LispRegexp(read_escaped("/", "/"));
+                var str = read_escaped("/", "/", true);
+                var mods = read_while(function(ch){
+                        switch (ch.toLowerCase()) {
+                            case "y":
+                            case "m":
+                            case "g":
+                            case "i":
+                                return true;
+                        }
+                }).toLowerCase();
+                return new LispRegexp(new RegExp(str, mods));
         };
         function skip_comment() {
                 read_while(function(ch){ return ch != "\n"; });
@@ -130,9 +141,13 @@ function lisp_reader(code) {
                                 ch == "-" || ch == "_";
                 });
                 if (ch.length > 1) {
-                        ch = LispChar.fromName(ch);
-                        if (ch == null)
-                                croak("Unknown character name: " + ch);
+                        if (/^U[0-9a-f]{4}$/i.test(ch)) {
+                                ch = LispChar.fromCode(parseInt(ch.substr(1), 16));
+                        } else {
+                                ch = LispChar.fromName(ch);
+                                if (ch == null)
+                                        croak("Unknown character name: " + ch);
+                        }
                         return ch;
                 }
                 return new LispChar(ch);
@@ -179,8 +194,7 @@ function lisp_reader(code) {
         function read_token() {
                 out: while (true) {
                         skip_ws();
-                        var ch = peek();
-                        switch (ch) {
+                        switch (peek()) {
                             case ";"  : skip_comment(); continue out;
                             case "\"" : return read_string();
                             case "("  : return read_list();
@@ -201,6 +215,7 @@ function lisp_reader(code) {
                         switch (peek()) {
                             case ")": break out;
                             case null: break out;
+                            case ";": skip_comment(); continue out;
                             case ".":
                                 next();
                                 p.cdr = read_token();

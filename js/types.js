@@ -13,13 +13,16 @@ function DEFTYPE(name, func) {
 };
 
 var LispChar = DEFTYPE("char", function(D, P){
+        // TODO: this table should be really long.
         var NAMES_TO = {
-                " "    : "SPACE",
-                "\t"   : "TAB",
-                "\r"   : "RETURN",
-                "\n"   : "NEWLINE",
-                "\x0C" : "PAGE",
-                "\x08" : "BACKSPACE"
+                " "      : "SPACE",
+                "\t"     : "TAB",
+                "\r"     : "RETURN",
+                "\n"     : "NEWLINE",
+                "\x0C"   : "PAGE",
+                "\x08"   : "BACKSPACE",
+                "\u2028" : "LINE_SEPARATOR",
+                "\u2029" : "PARAGRAPH_SEPARATOR"
         };
         var NAMES_FROM = (function(h){
                 for (var i in NAMES_TO) {
@@ -28,13 +31,15 @@ var LispChar = DEFTYPE("char", function(D, P){
                         }
                 }
                 h.LINEFEED = "\n";
-                console.log(h);
                 return h;
         })({});
         P.INIT = function(val){ this.value = val };
         P.valueOf = P.toString = function(){ return this.value };
         P.name = function() {
                 return NAMES_TO[this.value] || this.value;
+        };
+        P.code = function() {
+                return this.value.charCodeAt(0);
         };
         P.print = function() {
                 var ch = this.value;
@@ -44,7 +49,12 @@ var LispChar = DEFTYPE("char", function(D, P){
                 name = name.toUpperCase();
                 if (HOP(NAMES_FROM, name))
                         return new LispChar(NAMES_FROM[name]);
+                else if (name.length == 1)
+                        return new LispChar(name); // hack
                 return null;
+        };
+        D.fromCode = function(code) {
+                return new D(String.fromCharCode(code));
         };
 });
 
@@ -68,7 +78,17 @@ var LispArray = DEFTYPE("array", function(D, P){
 
 var LispRegexp = DEFTYPE("regexp", function(D, P){
         P.INIT = function(val) {
-                this.value = new RegExp(val);
+                this.value = val;
+        };
+        P.print = function() {
+                return "<regexp " + this.value + ">";
+        };
+        P.test = function(str) {
+                return this.value.test(str) ? true : null;
+        };
+        P.exec = function(str) {
+                var m = this.value.exec(str);
+                return m ? new LispArray(m) : null;
         };
 });
 
@@ -80,6 +100,13 @@ var LispClosure = DEFTYPE("closure", function(D, P){
         };
         P.print = function() {
                 return "<function" + (this.name ? " " + this.name : "") + ">";
+        };
+});
+
+var LispCondition = DEFTYPE("condition", function(D, P){
+        P.INIT = function(message, cont) {
+                this.message = message;
+                this.cont = cont;
         };
 });
 

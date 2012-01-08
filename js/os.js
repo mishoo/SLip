@@ -65,13 +65,13 @@ function pad_string(str, width) {
 
 var DEFCLASS = (function(NOINIT){
         return function(name, BASE, func, skip_base) {
-                var code = "return function " + (name || "D") + " (a){\n\
-if (a !== NOINIT) {\n";
+                var code = "var D = function " + (name || "D")
+                        + " (a){ if (a !== NOINIT) {\n";
                 if (BASE && !skip_base) code += "BASE.apply(this, arguments);\n";
-                code += "this.INIT.apply(this, arguments); }}";
+                code += "this.INIT.apply(this, arguments); }};";
+                code += "D.is = function(thing){ return thing instanceof D };";
+                code += "return D;";
                 var D = new Function("NOINIT", "BASE", code)(NOINIT, BASE);
-                D.INIT = noop;
-                D.is = function(thing) { return thing instanceof D };
                 if (BASE) {
                         D.BASE = BASE;
                         D.prototype = new BASE(NOINIT);

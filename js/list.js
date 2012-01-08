@@ -36,6 +36,7 @@ var LispCons = DEFTYPE("cons", function(D, P){
         D.reverse = function(list) {
                 var a = null;
                 while (list != null) {
+                        if (!listp(list)) throw new Error("Improper list in REVERSE");
                         a = new LispCons(car(list), a);
                         list = cdr(list);
                 }
