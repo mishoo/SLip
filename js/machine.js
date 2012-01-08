@@ -404,10 +404,13 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 return "FN(" + D.serialize(this.code) + ")";
                         }
                 }],
-                ["PRIM", "name nargs", {
+                ["PRIM", "func nargs", {
                         run: function(m) {
-                                var ret = this.name.primitive()(m, this.nargs);
+                                var ret = this.func(m, this.nargs);
                                 if (ret !== false) m.push(ret);
+                        },
+                        INIT: function() {
+                                this.func = this.func.primitive();
                         }
                 }]
 
