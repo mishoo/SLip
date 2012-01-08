@@ -337,10 +337,6 @@ function lisp_reader(code) {
                 else switch (car(x)) {
                     case S_QUOTE:
                         arg_count(x, 1);
-                        switch (cadr(x)) {
-                            case S_NIL: return comp_const(null, VAL, MORE);
-                            case S_T: return comp_const(true, VAL, MORE);
-                        }
                         return comp_const(cadr(x), VAL, MORE);
                     case S_PROGN:
                         return comp_seq(cdr(x), env, VAL, MORE);
@@ -382,6 +378,7 @@ function lisp_reader(code) {
         function comp_defmac(name, args, body, env, VAL, MORE) {
                 var func = comp_lambda(args, body, env);
                 func = LispMachine.assemble(func).concat(LispMachine.assemble(gen("RET")));
+                //console.log(LispMachine.disassemble(func));
                 func = new LispMachine().run(func);
                 name.set("macro", func);
                 return seq(
