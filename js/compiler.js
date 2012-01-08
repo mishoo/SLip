@@ -268,9 +268,11 @@ function lisp_reader(code) {
         var S_SET     = LispSymbol.get("SET!");
         var S_T       = LispSymbol.get("T");
         var S_NIL     = LispSymbol.get("NIL");
-        var S_NOT     = LispSymbol.get("NOT");
         var S_CC      = LispSymbol.get("C/C");
         var S_DEFMAC  = LispSymbol.get("DEFMACRO");
+        var S_NOT     = LispSymbol.get("NOT");
+        var S_AND     = LispSymbol.get("AND");
+        var S_OR      = LispSymbol.get("OR");
 
         var PAK_KEYWORD = LispPackage.get("KEYWORD");
 
@@ -285,7 +287,7 @@ function lisp_reader(code) {
         };
 
         function gen_label() {
-                return new LispLabel("L" + (++LABEL_NUM));
+                return new LispLabel;
         };
 
         var seq = append;
@@ -347,6 +349,10 @@ function lisp_reader(code) {
                                    gen_set(cadr(x), env),
                                    VAL ? [] : gen("POP"),
                                    MORE ? [] : gen("RET"));
+                    case S_AND:
+                        return comp_and(cdr(x), env, VAL, MORE);
+                    case S_OR:
+                        return comp_or(cdr(x), env, VAL, MORE);
                     case S_IF:
                         arg_count(x, 2, 3);
                         return comp_if(cadr(x), caddr(x), cadddr(x), env, VAL, MORE);
@@ -432,6 +438,36 @@ function lisp_reader(code) {
                         comp_list(cdr(exps), env)
                 );
                 return [];
+        };
+
+        function comp_and(exps, env, VAL, MORE) {
+                if (nullp(exps)) return comp_const(true, VAL, MORE);
+                if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
+                var exit = gen_label();
+                function doit(exps, env, VAL, MORE) {
+                        if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
+                        return seq(comp(car(exps), env, true, true),
+                                   gen(VAL ? "FJUMPK" : "FJUMP", exit),
+                                   doit(cdr(exps), env, VAL, MORE));
+                };
+                return seq(doit(exps, env, VAL, MORE),
+                           [ exit ],
+                           VAL && !MORE ? gen("RET") : []);
+        };
+
+        function comp_or(exps, env, VAL, MORE) {
+                if (nullp(exps)) return comp_const(null, VAL, MORE);
+                if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
+                var exit = gen_label();
+                function doit(exps, env, VAL, MORE) {
+                        if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
+                        return seq(comp(car(exps), env, true, true),
+                                   gen(VAL ? "TJUMPK" : "TJUMP", exit),
+                                   doit(cdr(exps), env, VAL, MORE));
+                };
+                return seq(doit(exps, env, VAL, MORE),
+                           [ exit ],
+                           VAL && !MORE ? gen("RET") : []);
         };
 
         function comp_if(pred, tthen, telse, env, VAL, MORE) {

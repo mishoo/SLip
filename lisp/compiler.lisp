@@ -81,19 +81,19 @@
                                ',(car x)))) defs)
      ,@body))
 
-(defmacro or exps
-  (when exps
-    (let ((x (gensym "OR")))
-      `(let ((,x ,(car exps)))
-         (if ,x ,x (or ,@(cdr exps)))))))
+;; (defmacro or exps
+;;   (when exps
+;;     (let ((x (gensym "OR")))
+;;       `(let ((,x ,(car exps)))
+;;          (if ,x ,x (or ,@(cdr exps)))))))
 
-(defmacro and exprs
-  (if exprs
-      (let ((x (gensym "AND")))
-        `(let ((,x ,(car exprs)))
-           (when ,x
-             ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
-      t))
+;; (defmacro and exprs
+;;   (if exprs
+;;       (let ((x (gensym "AND")))
+;;         `(let ((,x ,(car exprs)))
+;;            (when ,x
+;;              ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
+;;       t))
 
 (defmacro cond cases
   (if cases
@@ -226,9 +226,10 @@
            (input 'next))
 
          (read-while (pred)
-           (let ((out (output-stream)))
-             (while (and (not (eq (peek) eof))
-                         (pred (peek)))
+           (let ((out (output-stream))
+                 (ch))
+             (while (and (not (eq (set! ch (peek)) eof))
+                         (pred ch))
                (out 'put (next)))
              (out 'get)))
 
@@ -250,24 +251,22 @@
 
          (read-escaped (start end inces)
            (skip start)
-           (let ((escaped nil)
-                 (out (output-stream)))
-             (with-cc return            ; XXX: this seems wasteful
-               (while (not (eq (peek) eof))
-                 (let ((ch (next)))
-                   (cond
-                     (escaped
-                      (out 'put ch)
-                      (set! escaped nil))
-
-                     ((eq ch #\\)
-                      (if inces (out 'put #\\))
-                      (set! escaped t))
-
-                     ((eq ch end)
-                      (return (out 'get)))
-
-                     (t (out 'put ch))))))))
+           (let ((out (output-stream)))
+             (labels ((rec (ch escaped)
+                        (cond
+                          ((eq ch eof)
+                           (croak "Unterminated string or regexp"))
+                          ((eq ch end)
+                           (out 'get))
+                          (escaped
+                           (out 'put ch)
+                           (rec (next) nil))
+                          ((eq ch #\\)
+                           (if inces (out 'put #\\))
+                           (rec (next) t))
+                          (t (out 'put ch)
+                             (rec (next) nil)))))
+               (rec (next) nil))))
 
          (read-string ()
            (read-escaped #\" #\" nil))
