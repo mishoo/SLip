@@ -33,6 +33,7 @@ var LispChar = DEFTYPE("char", function(D, P){
                 h.LINEFEED = "\n";
                 return h;
         })({});
+        var OBJECTS = {};
         P.INIT = function(val){ this.value = val };
         P.valueOf = P.toString = function(){ return this.value };
         P.name = function() {
@@ -48,13 +49,18 @@ var LispChar = DEFTYPE("char", function(D, P){
         D.fromName = function(name) {
                 name = name.toUpperCase();
                 if (HOP(NAMES_FROM, name))
-                        return new LispChar(NAMES_FROM[name]);
+                        return D.get(NAMES_FROM[name]);
                 else if (name.length == 1)
-                        return new LispChar(name); // hack
+                        return D.get(name); // hack
                 return null;
         };
         D.fromCode = function(code) {
                 return new D(String.fromCharCode(code));
+        };
+        D.get = function(char) {
+                return OBJECTS[char] || (
+                        OBJECTS[char] = new LispChar(char)
+                );
         };
 });
 

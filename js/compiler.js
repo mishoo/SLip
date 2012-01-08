@@ -150,7 +150,7 @@ function lisp_reader(code) {
                         }
                         return ch;
                 }
-                return new LispChar(ch);
+                return LispChar.get(ch);
         };
         function read_sharp() {
                 skip("#");

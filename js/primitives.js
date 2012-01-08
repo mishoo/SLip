@@ -39,12 +39,7 @@
 
         defp("eq", false, function(m, nargs){
                 checknargs(nargs, 2, 2);
-                var b = m.pop(), a = m.pop();
-                // boxed basic types need special attention
-                if (LispChar.is(a)) {
-                        return (LispChar.is(b) && a.value === b.value) ? true : null;
-                }
-                return a === b ? true : null;
+                return m.pop() === m.pop() ? true : null;
         });
 
         defp("/=", false, function(m, nargs){
@@ -161,7 +156,7 @@
                 checktype(i, "number");
                 if (LispCons.isList(x)) return LispCons.elt(x, i);
                 if (LispArray.is(x)) return x.elt(i) || null;
-                if (typeof x == "string") return new LispChar(x.charAt(i)) || null;
+                if (typeof x == "string") return LispChar.get(x.charAt(i)) || null;
                 error("Unrecognized sequence");
         });
 
@@ -314,7 +309,7 @@
                 checknargs(nargs, 1, 1);
                 var x = m.pop();
                 if (typeof x == "string") return x.toLowerCase();
-                if (LispChar.is(x)) return new LispChar(x.value.toLowerCase());
+                if (LispChar.is(x)) return LispChar.get(x.value.toLowerCase());
                 error("Unsupported argument type");
         });
 
@@ -322,7 +317,7 @@
                 checknargs(nargs, 1, 1);
                 var x = m.pop();
                 if (typeof x == "string") return x.toUpperCase();
-                if (LispChar.is(x)) return new LispChar(x.value.toUpperCase());
+                if (LispChar.is(x)) return LispChar.get(x.value.toUpperCase());
                 error("Unsupported argument type");
         });
 
