@@ -33,6 +33,14 @@ var LispCons = DEFTYPE("cons", function(D, P){
                 });
                 return ret;
         };
+        D.reverse = function(list) {
+                var a = null;
+                while (list != null) {
+                        a = new LispCons(car(list), a);
+                        list = cdr(list);
+                }
+                return a;
+        };
         D.fromArray = function(a) {
                 var ret = null, dot = false;
                 a.forEach(function(el){

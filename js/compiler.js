@@ -188,7 +188,7 @@ function lisp_reader(code) {
                             case "`"  : return read_quasiquote();
                             case ","  : return read_comma();
                             case "'"  : return read_quote();
-                            case null : return false;
+                            case null : return false; // EOF
                         }
                         return read_symbol();
                 }

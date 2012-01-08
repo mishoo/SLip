@@ -42,9 +42,10 @@
         };
 
         load_files([
-                "../lisp/compiler.lisp"
+                "../lisp/compiler.lisp",
                 //"test.lisp",
-                //"tmp/t1.lisp"
+                "tmp/t1.lisp",
+                "tmp/wotf.lisp"
         ]);
 
 })();

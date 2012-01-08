@@ -1,5 +1,3 @@
-;;;;;
-
 ;; -----------------------------------------------------------------
 
 ;; Who owns the fish? -- See http://weitz.de/einstein.html for a
@@ -98,3 +96,28 @@
     (add () 0)))
 
 (who-owns-the-fish)
+
+(defun sumis (n sum)
+  (let (solutions)
+    (with-cc *amb-fail*
+      (labels ((add (numbers)
+                 (labels ((rec (sum numbers)
+                            (if numbers
+                                (rec (+ sum (car numbers)) (cdr numbers))
+                                sum)))
+                   (rec 0 numbers)))
+               (required-sum? (numbers)
+                 (= sum (add numbers)))
+               (rec (numbers next)
+                 (if (= next 0)
+                     (progn
+                       (when (required-sum? numbers)
+                         (set! solutions (cons numbers solutions)))
+                       (amb))
+                     (rec (cons (amb next (- next))
+                                numbers)
+                          (- next 1)))))
+        (rec (list) n)))
+    (clog (length solutions))))
+
+(sumis 14 1)

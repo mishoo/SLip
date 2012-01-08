@@ -120,6 +120,28 @@
                                        ,(recur (cdr cases))))))))
                 (recur cases)))))
 
+(defmacro call/cc (func)
+  `(,func (c/c)))
+
+(defmacro with-cc (name . body)
+  `((lambda (,name) ,@body) (c/c)))
+
+(set! *amb-fail* (lambda (arg)
+                   (clog "TOTAL FAILURE")))
+
+(defmacro amb alternatives
+  (if alternatives
+      `(let ((+prev-amb-fail *amb-fail*))
+         (with-cc +sk
+           ,@(mapcar (lambda (alt)
+                       `(with-cc +fk
+                          (set! *amb-fail* +fk)
+                          (+sk ,alt)))
+                     alternatives)
+           (set! *amb-fail* +prev-amb-fail)
+           (+prev-amb-fail nil)))
+      `(*amb-fail* nil)))
+
 (defun macroexpand (form)
   (if (and (consp form)
            (symbolp (car form))
@@ -158,17 +180,7 @@
                     (set! i (+ i 1)))
                   eof))))))
 
-(let ((in (input-stream "check  this
-	a TAB before this
-out" 'EOF)))
-  (while (not (eq (in 'peek) 'EOF))
-    (let ((ch (in 'next)))
-      (clog ch)
-      (case ch
-        ((#\Space #\Page #\Tab #\Linefeed) (clog "Whitespace encountered!")))
-      )))
-
-;; (defun lisp-reader (text eof)
-;;   (let ((input (input-stream text eof)))
-;;     (labels ((peek () (input :peek))
-;;              (next () (input :next))))))
+(defun lisp-reader (text eof)
+  (let ((input (input-stream text eof)))
+    (labels ((peek () (input 'peek))
+             (next () (input 'next))))))

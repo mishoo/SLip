@@ -213,8 +213,9 @@
         });
 
         defp("clog", true, function(m, nargs){
-                while (nargs-- > 0)
-                        console.log(LispMachine.dump(m.pop()));
+                var a = [];
+                while (nargs-- > 0) a.unshift(m.pop());
+                console.log(a.map(LispMachine.dump).join(" "));
                 return null;
         });
 
