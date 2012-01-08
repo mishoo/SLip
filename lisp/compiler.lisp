@@ -178,13 +178,11 @@
 
 (defmacro while (cond . body)
   (let ((rec (gensym "while")))
-    `((lambda (,rec)
-        ((set! ,rec
-               (lambda ()
-                 (when ,cond
-                   ,@body
-                   (,rec))))))
-      nil)))
+    `(labels ((,rec ()
+                (when ,cond
+                  ,@body
+                  (,rec))))
+       (,rec))))
 
 (defun input-stream (text eof)
   (let ((i 0)
