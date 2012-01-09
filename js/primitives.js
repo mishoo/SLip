@@ -12,6 +12,7 @@
                         MACHINE = name;
                         return func(m, nargs);
                 });
+                sym.set("primitive-side-effects", seff);
         };
 
         /// utilities

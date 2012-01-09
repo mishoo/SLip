@@ -1,3 +1,7 @@
+(progn
+  (+ 2 3 4)
+  'foo)
+
 (if (or (+ 1 2) 'foo 'baz)
     (clog "true")
     (clog "false"))
