@@ -8,10 +8,9 @@
                 (cadr x)
                 (if (eq 'quasiquote (car x))
                     (qq (qq (cadr x)))
-                    (if (consp (car x))
-                        (if (eq 'qq-splice (caar x))
-                            (list 'append (cadar x) (qq (cdr x)))
-                            (list 'cons (qq (car x)) (qq (cdr x))))
+                    (if (and (consp (car x))
+                             (eq 'qq-splice (caar x)))
+                        (list 'append (cadar x) (qq (cdr x)))
                         (list 'cons (qq (car x)) (qq (cdr x))))))
             (list 'quote x))))
 
