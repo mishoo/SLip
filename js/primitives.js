@@ -494,7 +494,8 @@
                 checktype(radix, "number");
                 var x = m.pop();
                 checktype(x, "string");
-                return parseInt(x, radix);
+                var ret = parseInt(x, radix);
+                return isNaN(ret) ? null : ret;
         });
 
         /* -----[ macros ]----- */
