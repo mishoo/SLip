@@ -440,34 +440,34 @@ function lisp_reader(code) {
                 return [];
         };
 
-        function comp_and(exps, env, VAL, MORE) {
-                if (nullp(exps)) return comp_const(true, VAL, MORE);
+        function comp_and_or(exps, type, env, VAL, MORE) {
+                if (nullp(exps)) return comp_const(type, VAL, MORE);
                 if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
                 var exit = gen_label();
-                function doit(exps, env, VAL, MORE) {
+                function doit(exps) {
                         if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
-                        return seq(comp(car(exps), env, true, true),
-                                   gen(VAL ? "FJUMPK" : "FJUMP", exit),
-                                   doit(cdr(exps), env, VAL, MORE));
+                        var rest = doit(cdr(exps));
+                        return seq(comp(car(exps), env,
+                                        rest.length > 0,
+                                        rest.length > 0 || MORE),
+                                   rest.length > 0
+                                   ? gen(VAL
+                                         ? type ? "FJUMPK" : "TJUMPK"
+                                         : type ? "FJUMP" : "TJUMP", exit)
+                                   : [],
+                                   rest);
                 };
                 return seq(doit(exps, env, VAL, MORE),
                            [ exit ],
                            VAL && !MORE ? gen("RET") : []);
         };
 
+        function comp_and(exps, env, VAL, MORE) {
+                return comp_and_or(exps, true, env, VAL, MORE);
+        };
+
         function comp_or(exps, env, VAL, MORE) {
-                if (nullp(exps)) return comp_const(null, VAL, MORE);
-                if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
-                var exit = gen_label();
-                function doit(exps, env, VAL, MORE) {
-                        if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
-                        return seq(comp(car(exps), env, true, true),
-                                   gen(VAL ? "TJUMPK" : "TJUMP", exit),
-                                   doit(cdr(exps), env, VAL, MORE));
-                };
-                return seq(doit(exps, env, VAL, MORE),
-                           [ exit ],
-                           VAL && !MORE ? gen("RET") : []);
+                return comp_and_or(exps, null, env, VAL, MORE);
         };
 
         function comp_if(pred, tthen, telse, env, VAL, MORE) {

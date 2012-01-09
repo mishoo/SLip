@@ -394,7 +394,7 @@
 
 (let ((reader (lisp-reader
                (%js-eval "window.CURRENT_FILE")
-               ;;"(a b c)"
+               ;;"(a b . c)"
                ;;"#\\Newline mak"
                'EOF)))
   (let ((tok))
