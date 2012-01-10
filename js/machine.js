@@ -87,8 +87,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         P.mkcont = function() {
                 return new LispCC(this.stack.slice(), this.denv);
         };
-        P.uncont = function() {
-                var cont = this.top();
+        P.uncont = function(cont) {
                 this.stack = cont.stack.slice();
                 this.denv = cont.denv;
         };
@@ -318,7 +317,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["SETCC", 0, {
                         run: function(m) {
-                                m.uncont();
+                                m.uncont(m.top());
                         }
                 }],
                 ["SAVE", "addr", {

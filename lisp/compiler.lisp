@@ -397,7 +397,9 @@
                ;;"(a b . c)"
                ;;"#\\Newline mak"
                'EOF)))
-  (let ((tok))
-    (while (not (eq 'EOF (set! tok (reader))))
-      (clog tok)
-      )))
+  (labels ((rec (q)
+             (let ((tok (reader)))
+               (if (eq tok 'EOF)
+                   q
+                   (rec (cons tok q))))))
+    (reverse (rec nil))))
