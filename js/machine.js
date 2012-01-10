@@ -149,9 +149,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 break;
                             case "JUMP":
                             case "TJUMP":
-                            case "TJUMPK":
                             case "FJUMP":
-                            case "FJUMPK":
                             case "SAVE":
                                 el[1] = el[1].index;
                             default:
@@ -178,9 +176,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 switch (op._name) {
                                     case "JUMP":
                                     case "TJUMP":
-                                    case "TJUMPK":
                                     case "FJUMP":
-                                    case "FJUMPK":
                                     case "SAVE":
                                         if (!HOP(labels, op.addr))
                                                 labels[op.addr] = "L" + (++lab);
@@ -196,9 +192,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         break;
                                     case "JUMP":
                                     case "TJUMP":
-                                    case "TJUMPK":
                                     case "FJUMP":
-                                    case "FJUMPK":
                                     case "SAVE":
                                         data = labels[op.addr];
                                         break;
@@ -317,21 +311,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 if (m.pop() !== null) m.pc = this.addr;
                         }
                 }],
-                ["TJUMPK", "addr", {
-                        run: function(m) {
-                                if (m.top() !== null) m.pc = this.addr;
-                                else m.pop();
-                        }
-                }],
                 ["FJUMP", "addr", {
                         run: function(m) {
                                 if (m.pop() === null) m.pc = this.addr;
-                        }
-                }],
-                ["FJUMPK", "addr", {
-                        run: function(m) {
-                                if (m.top() === null) m.pc = this.addr;
-                                else m.pop();
                         }
                 }],
                 ["SETCC", 0, {

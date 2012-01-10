@@ -8,9 +8,10 @@
                 (cadr x)
                 (if (eq 'quasiquote (car x))
                     (qq (qq (cadr x)))
-                    (if (and (consp (car x))
-                             (eq 'qq-splice (caar x)))
-                        (list 'append (cadar x) (qq (cdr x)))
+                    (if (consp (car x))
+                        (if (eq 'qq-splice (caar x))
+                            (list 'append (cadar x) (qq (cdr x)))
+                            (list 'cons (qq (car x)) (qq (cdr x))))
                         (list 'cons (qq (car x)) (qq (cdr x))))))
             (list 'quote x))))
 
@@ -80,19 +81,19 @@
                                ',(car x)))) defs)
      ,@body))
 
-;; (defmacro or exps
-;;   (when exps
-;;     (let ((x (gensym "OR")))
-;;       `(let ((,x ,(car exps)))
-;;          (if ,x ,x (or ,@(cdr exps)))))))
+(defmacro or exps
+  (when exps
+    (let ((x (gensym "OR")))
+      `(let ((,x ,(car exps)))
+         (if ,x ,x (or ,@(cdr exps)))))))
 
-;; (defmacro and exprs
-;;   (if exprs
-;;       (let ((x (gensym "AND")))
-;;         `(let ((,x ,(car exprs)))
-;;            (when ,x
-;;              ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
-;;       t))
+(defmacro and exprs
+  (if exprs
+      (let ((x (gensym "AND")))
+        `(let ((,x ,(car exprs)))
+           (when ,x
+             ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
+      t))
 
 (defmacro cond cases
   (if cases
@@ -138,10 +139,10 @@
   `(let ((it ,cond))
      (if it ,@rest)))
 
-(defmacro incf (var)
+(defmacro %incf (var)
   `(set! ,var (+ ,var 1)))
 
-(defmacro decf (var)
+(defmacro %decf (var)
   `(set! ,var (- ,var 1)))
 
 (set! *amb-fail* (lambda (arg)
@@ -333,9 +334,9 @@
            (skip-ws)
            (if (eq (peek) #\()
                (prog2
-                   (incf in-qq)
+                   (%incf in-qq)
                    (list 'quasiquote (read-token))
-                 (decf in-qq))
+                 (%decf in-qq))
                `(quote ,(read-token))))
 
          (read-comma ()
@@ -343,12 +344,12 @@
            (skip #\,)
            (skip-ws)
            (prog2
-               (decf in-qq)
+               (%decf in-qq)
                (if (eq (peek) #\@)
                    (progn (next)
                           (list 'qq-splice (read-token)))
                    (list 'qq-unquote (read-token)))
-             (incf in-qq)))
+             (%incf in-qq)))
 
          (read-list ()
            (let ((ret nil)

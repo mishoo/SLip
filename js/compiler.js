@@ -271,8 +271,6 @@ function lisp_reader(code) {
         var S_CC      = LispSymbol.get("C/C");
         var S_DEFMAC  = LispSymbol.get("DEFMACRO");
         var S_NOT     = LispSymbol.get("NOT");
-        var S_AND     = LispSymbol.get("AND");
-        var S_OR      = LispSymbol.get("OR");
 
         var PAK_KEYWORD = LispPackage.get("KEYWORD");
 
@@ -349,10 +347,6 @@ function lisp_reader(code) {
                                    gen_set(cadr(x), env),
                                    VAL ? [] : gen("POP"),
                                    MORE ? [] : gen("RET"));
-                    case S_AND:
-                        return comp_and(cdr(x), env, VAL, MORE);
-                    case S_OR:
-                        return comp_or(cdr(x), env, VAL, MORE);
                     case S_IF:
                         arg_count(x, 2, 3);
                         return comp_if(cadr(x), caddr(x), cadddr(x), env, VAL, MORE);
@@ -438,36 +432,6 @@ function lisp_reader(code) {
                         comp_list(cdr(exps), env)
                 );
                 return [];
-        };
-
-        function comp_and_or(exps, type, env, VAL, MORE) {
-                if (nullp(exps)) return comp_const(type, VAL, MORE);
-                if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
-                var exit = gen_label();
-                function doit(exps) {
-                        if (nullp(cdr(exps))) return comp(car(exps), env, VAL, MORE);
-                        var rest = doit(cdr(exps));
-                        return seq(comp(car(exps), env,
-                                        rest.length > 0,
-                                        rest.length > 0 || MORE),
-                                   rest.length > 0
-                                   ? gen(VAL
-                                         ? type ? "FJUMPK" : "TJUMPK"
-                                         : type ? "FJUMP" : "TJUMP", exit)
-                                   : [],
-                                   rest);
-                };
-                return seq(doit(exps, env, VAL, MORE),
-                           [ exit ],
-                           VAL && !MORE ? gen("RET") : []);
-        };
-
-        function comp_and(exps, env, VAL, MORE) {
-                return comp_and_or(exps, true, env, VAL, MORE);
-        };
-
-        function comp_or(exps, env, VAL, MORE) {
-                return comp_and_or(exps, null, env, VAL, MORE);
         };
 
         function comp_if(pred, tthen, telse, env, VAL, MORE) {
