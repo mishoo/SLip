@@ -194,10 +194,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 }
                                 break;
                             case "JUMP":
-                                if (i < code.length - 1 && el[1] === code[i + 1]) {
-                                        code.splice(i, 1);
-                                        return true;
-                                }
                             case "CALL":
                             case "CALLJ":
                             case "RET":
@@ -209,9 +205,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 if (j - i - 1 > 0) {
                                         code.splice(i + 1, j - i - 1);
                                         inc_stat("unreachable");
-                                        return true;
                                 }
                                 if (el[0] == "JUMP") {
+                                        if (i < code.length - 1 && el[1] === code[i + 1]) {
+                                                code.splice(i, 1);
+                                                return true;
+                                        }
                                         var idx = find_target(code, el[1]);
                                         if (idx >= 0 && idx < code.length - 1 &&
                                             (code[idx + 1][0] == "JUMP" || code[idx + 1][0] == "RET")) {
