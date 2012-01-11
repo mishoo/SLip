@@ -271,6 +271,7 @@ function lisp_reader(code) {
         var S_CC      = LispSymbol.get("C/C");
         var S_DEFMAC  = LispSymbol.get("DEFMACRO");
         var S_NOT     = LispSymbol.get("NOT");
+        var S_LET     = LispSymbol.get("LET");
 
         var PAK_KEYWORD = LispPackage.get("KEYWORD");
 
@@ -292,17 +293,6 @@ function lisp_reader(code) {
 
         function gen() {
                 return [ slice(arguments) ];
-        };
-
-        function constantp(x) {
-                switch (x) {
-                    case S_T:
-                    case S_NIL:
-                    case true:
-                    case null:
-                        return true;
-                }
-                return typeof x == "number" || typeof x == "string" || LispRegexp.is(x) || LispChar.is(x);
         };
 
         function nullp(x) {
@@ -331,7 +321,7 @@ function lisp_reader(code) {
                                 return comp_const(x, VAL, MORE);
                         return comp_var(x, env, VAL, MORE);
                 }
-                else if (constantp(x)) {
+                else if (LispMachine.constantp(x)) {
                         return comp_const(x, VAL, MORE);
                 }
                 else switch (car(x)) {
@@ -350,12 +340,21 @@ function lisp_reader(code) {
                     case S_IF:
                         arg_count(x, 2, 3);
                         return comp_if(cadr(x), caddr(x), cadddr(x), env, VAL, MORE);
+                    case S_NOT:
+                        arg_count(x, 1);
+                        return VAL ? seq(
+                                comp(cadr(x), env, true, true),
+                                gen("NOT"),
+                                MORE ? [] : gen("RET")
+                        ) : comp(cadr(x), env, VAL, MORE);
                     case S_CC:
                         arg_count(x, 0);
                         return VAL ? seq(gen("CC")) : [];
                     case S_DEFMAC:
                         assert(LispSymbol.is(cadr(x)), "DEFMACRO requires a symbol name for the macro");
                         return comp_defmac(cadr(x), caddr(x), cdddr(x), env, VAL, MORE);
+                    case S_LET:
+                        return comp_let(cadr(x), cddr(x), env, VAL, MORE);
                     case S_LAMBDA:
                         return VAL ? seq(
                                 comp_lambda(cadr(x), cddr(x), env),
@@ -448,6 +447,40 @@ function lisp_reader(code) {
                         ecode,
                         MORE ? [ l2 ] : []
                 );
+        };
+
+        function get_bindings(bindings) {
+                var names = [], vals = [], specials = [];
+                LispCons.forEach(bindings, function(el, i, dot){
+                        if (dot) throw new Error("Improper list in LET");
+                        if (LC.is(el)) {
+                                vals.push(cadr(el));
+                                names.push(el = car(el));
+                        } else {
+                                vals.push(S_NIL);
+                                names.push(el);
+                        }
+                        if (el.special()) specials.push(i);
+                });
+                return { names: names, vals: vals, specials: specials, len: names.length };
+        };
+
+        function comp_let(bindings, body, env, VAL, MORE) {
+                if (nullp(bindings)) return comp_seq(body, env, VAL, MORE);
+                var b = get_bindings(bindings);
+                var ret = seq(
+                        seq.apply(null, b.vals.map(function(x){
+                                return comp(x, env, true, true);
+                        })),
+                        gen("ARGS", b.len),
+                        b.specials.map(function(i){
+                                return gen("BIND", b.names[i], i)[0];
+                        }),
+                        comp_seq(body, [ b.names ].concat(env), VAL, true),
+                        gen("UNFR", 1, b.specials.length),
+                        MORE ? [] : gen("RET")
+                );
+                return ret;
         };
 
         function comp_funcall(f, args, env, VAL, MORE) {

@@ -11,12 +11,10 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.denv = denv;
         };
 
-        var LispBinding = DEFCLASS("LispBinding", null, function(D, P){
-                P.INIT = function(symbol, value) {
-                        this.symbol = symbol;
-                        this.value = value;
-                };
-        });
+        function LispBinding(symbol, value) {
+                this.symbol = symbol;
+                this.value = value;
+        };
 
         /// constructor
         P.INIT = function() {
@@ -43,7 +41,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         var p = this.denv;
                         while (p != null) {
                                 var el = p.car;
-                                if (LispBinding.is(el) && el.symbol === symbol)
+                                if (el.symbol === symbol)
                                         return el;
                                 p = p.cdr;
                         }
@@ -133,7 +131,162 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
         var OPS = {};
 
+        D.optimizer_stats = {
+        };
+
+        function inc_stat(name) {
+                if (!D.optimizer_stats[name]) D.optimizer_stats[name] = 0;
+                ++D.optimizer_stats[name];
+        };
+
+        var optimize = (function(){
+                function find_target(code, label) {
+                        return code.indexOf(label);
+                };
+                function used_label(code, label) {
+                        for (var i = code.length; --i >= 0;) {
+                                if (!(code[i] instanceof LispLabel) && code[i][1] === label)
+                                        return true;
+                        }
+                };
+                function optimize1(code, i) {
+                        var el = code[i];
+                        if (el instanceof LispLabel) {
+                                if (!used_label(code, el)) {
+                                        code.splice(i, 1);
+                                        inc_stat("drop_label");
+                                        return true;
+                                }
+                        }
+                        else switch (el[0]) {
+                            case "GSET":
+                            case "GVAR":
+                                if (i < code.length - 2 &&
+                                    code[i+1][0] == "POP" &&
+                                    code[i+2][0] == "GVAR" &&
+                                    code[i+2][1] == el[1]) {
+                                        code.splice(i + 1, 2);
+                                        inc_stat("gvar");
+                                        return true;
+                                }
+                                break;
+                            case "LSET":
+                            case "LVAR":
+                                if (i < code.length - 2 &&
+                                    code[i+1][0] == "POP" &&
+                                    code[i+2][0] == "LVAR" &&
+                                    code[i+2][1] == el[1] &&
+                                    code[i+2][2] == el[2]) {
+                                        code.splice(i + 1, 2);
+                                        inc_stat("lvar");
+                                        return true;
+                                }
+                                break;
+                            case "SAVE":
+                            case "FJUMP":
+                            case "TJUMP":
+                                // SAVE L1; ... L1: JUMP L2 --> SAVE L2
+                                var idx = find_target(code, el[1]);
+                                if (idx >= 0 && idx < code.length - 1 && code[idx + 1][0] == "JUMP") {
+                                        el[1] = code[idx + 1][1];
+                                        inc_stat("save_jump");
+                                        return true;
+                                }
+                                break;
+                            case "JUMP":
+                                if (i < code.length - 1 && el[1] === code[i + 1]) {
+                                        code.splice(i, 1);
+                                        return true;
+                                }
+                            case "CALL":
+                            case "CALLJ":
+                            case "RET":
+                                for (var j = i; ++j < code.length;) {
+                                        if (code[j] instanceof LispLabel) {
+                                                break;
+                                        }
+                                }
+                                if (j - i - 1 > 0) {
+                                        code.splice(i + 1, j - i - 1);
+                                        inc_stat("unreachable");
+                                        return true;
+                                }
+                                if (el[0] == "JUMP") {
+                                        var idx = find_target(code, el[1]);
+                                        if (idx >= 0 && idx < code.length - 1 &&
+                                            (code[idx + 1][0] == "JUMP" || code[idx + 1][0] == "RET")) {
+                                                el[0] = code[idx + 1][0];
+                                                el[1] = code[idx + 1][1];
+                                                inc_stat("jumps");
+                                                return true;
+                                        }
+                                }
+                                break;
+                            case "UNFR":
+                                if (i < code.length - 1 && code[i+1][0] == "UNFR") {
+                                        code[i][1] += code[i+1][1];
+                                        code[i][2] += code[i+1][2];
+                                        code.splice(i + 1, 1);
+                                        inc_stat("join_unfr");
+                                        return true;
+                                }
+                                break;
+                            case "CONST":
+                                if (i < code.length - 1) {
+                                        if (el[1] === null) switch (code[i+1][0]) {
+                                            case "FJUMP":
+                                                code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                                                inc_stat("const");
+                                                return true;
+                                            case "TJUMP":
+                                                code.splice(i, 2);
+                                                inc_stat("const");
+                                                return true;
+                                            case "NOT":
+                                                inc_stat("const");
+                                                code.splice(i, 2, [ "CONST", true ]);
+                                                return true;
+                                        }
+                                        else if (constantp(el[1])) switch (code[i+1][0]) {
+                                            case "FJUMP":
+                                                code.splice(i, 2);
+                                                inc_stat("const");
+                                                return true;
+                                            case "TJUMP":
+                                                code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                                                inc_stat("const");
+                                                return true;
+                                            case "NOT":
+                                                inc_stat("const");
+                                                code.splice(i, 2, [ "CONST", null ]);
+                                                return true;
+                                        }
+                                }
+                                break;
+                        }
+                };
+                return function optimize(code) {
+                        while (true) {
+                                var changed = false;
+                                for (var i = 0; i < code.length; ++i)
+                                        changed = optimize1(code, i) || changed;
+                                if (!changed) break;
+                        }
+                };
+        })();
+
+        function constantp(x) {
+                return x === true ||
+                        x === null ||
+                        typeof x == "number" ||
+                        typeof x == "string" ||
+                        LispRegexp.is(x) ||
+                        LispChar.is(x) ||
+                        LispSymbol.is(x);
+        };
+
         function assemble(code) {
+                optimize(code);
                 var ret = [];
                 for (var i = 0; i < code.length; ++i) {
                         var el = code[i];
@@ -158,6 +311,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 return ret;
         };
         D.assemble = assemble;
+        D.constantp = constantp;
 
         ////// <disassemble>
 
@@ -315,6 +469,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 if (m.pop() === null) m.pc = this.addr;
                         }
                 }],
+                ["NOT", 0, {
+                        run: function(m) {
+                                m.push(m.pop() === null ? true : null);
+                        }
+                }],
                 ["SETCC", 0, {
                         run: function(m) {
                                 m.uncont(m.top());
@@ -342,19 +501,21 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["ARGS", "count", {
                         run: function(m){
                                 var count = this.count;
-                                if (m.n_args != count) {
-                                        throw new Error("Wrong number of arguments");
-                                }
+                                // if (m.n_args != count) {
+                                //         throw new Error("Wrong number of arguments");
+                                // }
                                 var frame;
                                 // for a small count, pop is *much* more
                                 // efficient than splice; in FF the difference is enormous.
+                                var s = m.stack;
                                 switch (count) {
                                     case 0: frame = []; break;
-                                    case 1: frame = [ m.pop() ]; break;
-                                    case 2: frame = m.pop(); frame = [ m.pop(), frame ]; break;
-                                    case 3: var c = m.pop(), b = m.pop(), a = m.pop(); frame = [ a, b, c ]; break;
-                                    case 4: var d = m.pop(), c = m.pop(), b = m.pop(), a = m.pop(); frame = [ a, b, c, d ]; break;
-                                    default: frame = m.stack.splice(m.stack.length - count, count);
+                                    case 1: frame = [ s.pop() ]; break;
+                                    case 2: frame = s.pop(); frame = [ s.pop(), frame ]; break;
+                                    case 3: var c = s.pop(), b = s.pop(), a = s.pop(); frame = [ a, b, c ]; break;
+                                    case 4: var d = s.pop(), c = s.pop(), b = s.pop(), a = s.pop(); frame = [ a, b, c, d ]; break;
+                                    case 5: var e = s.pop(), d = s.pop(), c = s.pop(), b = s.pop(), a = s.pop(); frame = [ a, b, c, d, e ]; break;
+                                    default: frame = s.splice(s.length - count, count);
                                 }
                                 m.env = new LispCons(frame, m.env);
                         }
@@ -375,6 +536,14 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         frame[count] = m.pop();
                                 }
                                 m.env = new LispCons(frame, m.env);
+                        }
+                }],
+                ["UNFR", "lex spec", {
+                        run: function(m) {
+                                var n = this.lex;
+                                while (n-- > 0) m.env = m.env.cdr;
+                                n = this.spec;
+                                while (n-- > 0) m.denv = m.denv.cdr;
                         }
                 }],
                 ["FN", "code", {
@@ -411,7 +580,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         D.dump = function(thing) {
                 if (thing === null) return "NIL";
                 if (thing === true) return "T";
-                if (typeof thing == "string") return JSON.stringify(thing);
+                if (typeof thing == "string") return thing;
                 if (LispChar.is(thing)) return thing.print();
                 if (LispPackage.is(thing)) return thing.name;
                 if (LispSymbol.is(thing)) return thing.name;

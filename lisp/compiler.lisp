@@ -48,6 +48,13 @@
                 (if (listp x)
                     (cadr x))) defs)))
 
+(defmacro let* (defs . body)
+  (if defs
+      `(let (,(car defs))
+         (let* ,(cdr defs)
+           ,@body))
+      `(progn ,@body)))
+
 (defmacro prog1 (exp . body)
   (let ((ret (gensym)))
     `(let ((,ret ,exp))
@@ -58,13 +65,6 @@
   `(progn
      ,exp1
      (prog1 ,exp2 ,@body)))
-
-(defmacro let* (defs . body)
-  (if defs
-      `(let (,(car defs))
-         (let* ,(cdr defs)
-           ,@body))
-      `(progn ,@body)))
 
 (defmacro labels (defs . body)
   `(let ,(mapcar (lambda (x) (car x)) defs)

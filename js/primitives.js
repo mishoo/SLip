@@ -81,11 +81,6 @@
                 return m.pop() === null ? true : null;
         });
 
-        defp("not", false, function(m, nargs){
-                checknargs(nargs, 1, 1);
-                return m.pop() === null ? true : null;
-        });
-
         /* -----[ arithmetic ]----- */
 
         defp("+", false, function(m, nargs){
@@ -357,6 +352,7 @@
                 defcmp(">=");
                 defcmp("<");
                 defcmp(">");
+                defcmp("-equal", new Function("a", "b", "return a.toLowerCase()==b.toLowerCase()"));
         })(function(name, cmp){
                 if (!cmp) cmp = new Function("a", "b", "return a" + name + "b");
                 defp("char" + name, false, function(m, nargs){
@@ -515,6 +511,13 @@
                 var symbol = m.pop();
                 checktype(symbol, LispSymbol);
                 return symbol.macro();
+        });
+
+        defp("%disassemble", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var func = m.pop();
+                checktype(func, LispClosure);
+                return LispMachine.disassemble(func.code);
         });
 
         /* -----[ symbols, packages ]----- */
