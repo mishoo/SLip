@@ -25,7 +25,7 @@
                                 var bc = lisp_compile(new LispCons(ast, null));
                                 if (bc) {
                                         bc = LispMachine.assemble(bc);
-                                        console.log(LispMachine.serialize(bc));
+                                        //console.log(LispMachine.serialize(bc));
                                         console.log(LispMachine.disassemble(bc));
                                         time_it("run", function(){
                                                 console.log(LispMachine.dump(m.run(bc)));

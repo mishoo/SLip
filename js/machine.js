@@ -194,6 +194,21 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 }
                                 break;
                             case "JUMP":
+                                for (var j = i + 1; j < code.length && code[j] instanceof LispLabel; ++j) {
+                                        if (el[1] === code[j]) {
+                                                code.splice(i, 1);
+                                                inc_stat("jumps");
+                                                return true;
+                                        }
+                                }
+                                var idx = find_target(code, el[1]);
+                                if (idx >= 0 && idx < code.length - 1 &&
+                                    (code[idx + 1][0] == "JUMP" || code[idx + 1][0] == "RET")) {
+                                        el[0] = code[idx + 1][0];
+                                        el[1] = code[idx + 1][1];
+                                        inc_stat("jumps");
+                                        return true;
+                                }
                             case "CALL":
                             case "CALLJ":
                             case "RET":
@@ -205,20 +220,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 if (j - i - 1 > 0) {
                                         code.splice(i + 1, j - i - 1);
                                         inc_stat("unreachable");
-                                }
-                                if (el[0] == "JUMP") {
-                                        if (i < code.length - 1 && el[1] === code[i + 1]) {
-                                                code.splice(i, 1);
-                                                return true;
-                                        }
-                                        var idx = find_target(code, el[1]);
-                                        if (idx >= 0 && idx < code.length - 1 &&
-                                            (code[idx + 1][0] == "JUMP" || code[idx + 1][0] == "RET")) {
-                                                el[0] = code[idx + 1][0];
-                                                el[1] = code[idx + 1][1];
-                                                inc_stat("jumps");
-                                                return true;
-                                        }
+                                        return true;
                                 }
                                 break;
                             case "UNFR":
@@ -268,7 +270,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         while (true) {
                                 var changed = false;
                                 for (var i = 0; i < code.length; ++i)
-                                        changed = optimize1(code, i) || changed;
+                                        if (optimize1(code, i)) changed = true;
                                 if (!changed) break;
                         }
                 };

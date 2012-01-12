@@ -402,4 +402,7 @@
                (if (eq tok 'EOF)
                    q
                    (rec (cons tok q))))))
-    (reverse (rec nil))))
+    (rec nil)
+    nil
+    ;; (reverse (rec nil))
+    ))
