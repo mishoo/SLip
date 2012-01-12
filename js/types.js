@@ -116,6 +116,41 @@ var LispCondition = DEFTYPE("condition", function(D, P){
         };
 });
 
+var LispInputStream = DEFTYPE("input_stream", function(D, P){
+        P.INIT = function(text) {
+                this.text = text;
+                this.line = 1;
+                this.col = 0;
+                this.pos = 0;
+        };
+        P.peek = function() {
+                return this.pos < this.text.length
+                        ? LispChar.get(this.text.charAt(this.pos))
+                        : null;
+        };
+        P.next = function() {
+                if (this.pos < this.text.length) {
+                        var ch = this.text.charAt(this.pos++);
+                        if (ch == "\n") ++this.line, this.col = 0;
+                        else ++this.col;
+                        return LispChar.get(ch);
+                }
+                return null;
+        };
+});
+
+var LispOutputStream = DEFTYPE("output_stream", function(D, P){
+        P.INIT = function() {
+                this.text = "";
+        };
+        P.put = function(str) {
+                return this.text += str;
+        };
+        P.get = function() {
+                return this.text;
+        };
+});
+
 var LispNamespace = DEFTYPE("namespace", function(D, P){
         P.INIT = function(parent) {
                 function ctor(){};

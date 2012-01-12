@@ -272,9 +272,9 @@
 
         /* -----[ strings ]----- */
 
-        defp("strcat", false, function(m, nargs){
+        function strcat(m, n) {
                 var ret = "";
-                while (nargs-- > 0) {
+                while (n-- > 0) {
                         var arg = m.pop();
                         switch (typeof arg) {
                             case "string":
@@ -287,6 +287,10 @@
                         }
                 }
                 return ret;
+        };
+
+        defp("strcat", false, function(m, nargs){
+                return strcat(m, nargs);
         });
 
         defp("substr", false, function(m, nargs){
@@ -492,6 +496,70 @@
                 checktype(x, "string");
                 var ret = parseInt(x, radix);
                 return isNaN(ret) ? null : ret;
+        });
+
+        /* -----[ simple streams ]----- */
+
+        defp("%make-input-stream", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var text = m.pop();
+                checktype(text, "string");
+                return new LispInputStream(text);
+        });
+
+        defp("%stream-peek", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispInputStream);
+                return stream.peek();
+        });
+
+        defp("%stream-next", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispInputStream);
+                return stream.next();
+        });
+
+        defp("%stream-line", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispInputStream);
+                return stream.line;
+        });
+
+        defp("%stream-col", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispInputStream);
+                return stream.col;
+        });
+
+        defp("%stream-pos", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispInputStream);
+                return stream.pos;
+        });
+
+        defp("%make-output-stream", false, function(m, nargs){
+                checknargs(nargs, 0, 0);
+                return new LispOutputStream();
+        });
+
+        defp("%stream-put", true, function(m, nargs){
+                checknargs(nargs, 1);
+                var text = strcat(m, nargs - 1);
+                var stream = m.pop();
+                checktype(stream, LispOutputStream);
+                return stream.put(text);
+        });
+
+        defp("%stream-get", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispOutputStream);
+                return stream.get();
         });
 
         /* -----[ macros ]----- */
