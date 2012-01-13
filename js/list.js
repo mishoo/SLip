@@ -94,6 +94,11 @@ var LispCons = DEFTYPE("cons", function(D, P){
                 }
                 return car(p);
         };
+        D.find = function(list, item) {
+                while (list !== null && list.car !== item)
+                        list = list.cdr;
+                return list;
+        };
 
         function car(cell) {
                 return cell === null ? null : cell.car;

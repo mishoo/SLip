@@ -170,8 +170,8 @@ function lisp_reader(code) {
         function read_quasiquote() {
                 skip("`");
                 skip_ws();
-                if (peek() != "(")
-                        return list([ LispSymbol.get("QUOTE"), read_token() ]);
+                // if (peek() != "(")
+                //         return list([ LispSymbol.get("QUOTE"), read_token() ]);
                 ++in_qq;
                 var ret = list([ LispSymbol.get("QUASIQUOTE"), read_token() ]);
                 --in_qq;
@@ -286,7 +286,7 @@ function lisp_reader(code) {
         };
 
         function gen_label() {
-                return new LispLabel;
+                return new LispSymbol;
         };
 
         var seq = append;
@@ -406,7 +406,7 @@ function lisp_reader(code) {
 
         function comp_const(x, VAL, MORE) {
                 return VAL ? seq(
-                        gen("CONST", x),
+                        gen("CONST", x === S_NIL ? null : x === S_T ? true : x),
                         MORE ? [] : gen("RET")
                 ) : [];
         };

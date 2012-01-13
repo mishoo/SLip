@@ -1,4 +1,4 @@
-(function(CL){
+(function(CL, KW){
 
         var CURRENT = null;
         var MACHINE = null;
@@ -40,7 +40,8 @@
 
         defp("eq", false, function(m, nargs){
                 checknargs(nargs, 2, 2);
-                return m.pop() === m.pop() ? true : null;
+                var a = m.pop(), b = m.pop();
+                return a === b ? true : null;
         });
 
         defp("/=", false, function(m, nargs){
@@ -182,6 +183,13 @@
                 error("Unrecognized sequence");
         });
 
+        defp("%memq", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var list = m.pop();
+                checktype(list, LispList);
+                return LispCons.find(list, m.pop());
+        });
+
         (function(N){
                 defp("gensym", false, function(m, nargs) {
                         checknargs(nargs, 0, 1);
@@ -270,6 +278,23 @@
                 return new LispArray(LispCons.toArray(list));
         });
 
+        defp("%seq", false, function(m, nargs){
+                var ret = [];
+                while (nargs-- > 0) {
+                        var x = m.pop();
+                        if (x !== null) {
+                                if (LispCons.is(x)) {
+                                        ret.unshift.apply(ret, LispCons.toArray(x));
+                                }
+                                else if (LispArray.is(x)) {
+                                        ret.unshift.apply(ret, x.value);
+                                }
+                                else ret.unshift(x);
+                        }
+                }
+                return new LispArray(ret);
+        });
+
         /* -----[ strings ]----- */
 
         function strcat(m, n) {
@@ -283,6 +308,7 @@
                                 break;
                             default:
                                 if (LispChar.is(arg)) ret = arg.value + ret;
+                                else if (LispSymbol.is(arg)) ret = arg.name + ret;
                                 else error("Unrecognized argument type");
                         }
                 }
@@ -470,7 +496,14 @@
 
         defp("symbolp", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
-                return LispSymbol.is(m.pop()) ? true : null;
+                var x = m.pop();
+                return x === true || x === null || LispSymbol.is(x) ? true : null;
+        });
+
+        defp("keywordp", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var x = m.pop();
+                return LispSymbol.is(x) && x.pak === KW ? true : null;
         });
 
         defp("zerop", false, function(m, nargs){
@@ -699,4 +732,4 @@
                 return ret;
         });
 
-})(LispPackage.get("%"));
+})(LispPackage.get("%"), LispPackage.get("KEYWORD"));

@@ -145,13 +145,13 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 };
                 function used_label(code, label) {
                         for (var i = code.length; --i >= 0;) {
-                                if (!(code[i] instanceof LispLabel) && code[i][1] === label)
+                                if (!LispSymbol.is(code[i]) && code[i][1] === label)
                                         return true;
                         }
                 };
                 function optimize1(code, i) {
                         var el = code[i];
-                        if (el instanceof LispLabel) {
+                        if (LispSymbol.is(el)) {
                                 if (!used_label(code, el)) {
                                         code.splice(i, 1);
                                         inc_stat("drop_label");
@@ -194,7 +194,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 }
                                 break;
                             case "JUMP":
-                                for (var j = i + 1; j < code.length && code[j] instanceof LispLabel; ++j) {
+                                for (var j = i + 1; j < code.length && LispSymbol.is(code[j]); ++j) {
                                         if (el[1] === code[j]) {
                                                 code.splice(i, 1);
                                                 inc_stat("jumps");
@@ -213,7 +213,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                             case "CALLJ":
                             case "RET":
                                 for (var j = i; ++j < code.length;) {
-                                        if (code[j] instanceof LispLabel) {
+                                        if (LispSymbol.is(code[j])) {
                                                 break;
                                         }
                                 }
@@ -291,7 +291,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 var ret = [];
                 for (var i = 0; i < code.length; ++i) {
                         var el = code[i];
-                        if (el instanceof LispLabel) el.index = ret.length;
+                        if (LispSymbol.is(el)) el.index = ret.length;
                         else ret.push(el);
                 }
                 for (var i = ret.length; --i >= 0;) {
@@ -604,7 +604,3 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         };
 
 });
-
-function LispLabel(name) {
-        this.index = null;
-};

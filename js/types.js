@@ -247,9 +247,11 @@ var LispPackage = DEFTYPE("package", function(D, P){
 var LispSymbol = DEFTYPE("symbol", function(D, P){
         var SYMBOLS = {};
         P.INIT = function(name, pak) {
-                this.name = name + "";
-                this.pak = pak || null;
-                this.plist = {};
+                if (name) {
+                        this.name = name + "";
+                        this.pak = pak || null;
+                        this.plist = {};
+                }
         };
         P.toString = function() { return this.name };
         P.serialize = function() {
