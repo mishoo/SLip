@@ -192,8 +192,6 @@
            (+prev-amb-fail nil)))
       `(*amb-fail* nil)))
 
-;;;;
-
 (defmacro while (cond . body)
   (let ((rec (gensym "while")))
     `(labels ((,rec ()
@@ -201,6 +199,112 @@
                   ,@body
                   (,rec))))
        (,rec))))
+
+;;;; destructuring-bind
+
+(defmacro %next (lst)
+  `(prog1 (car ,lst)
+     (set! ,lst (cdr ,lst))))
+
+(defun %fn-destruct (args values body)
+  (let (optional? rest? key? aux? names chunks decls)
+    (labels ((rec (args values i)
+               (when args
+                 (let ((thisarg (car args)))
+                   (cond
+                     ((symbolp thisarg)
+                      (case thisarg
+                        (&whole
+                         (when (> i 0) (error "Misplaced &WHOLE"))
+                         (let ((thisarg (cadr args)))
+                           (unless (and thisarg (symbolp thisarg))
+                             (error "Missing variable name for &WHOLE"))
+                           (push `(,thisarg ,values) decls))
+                         (rec (cddr args) values i))
+
+                        (&optional
+                         (when (or optional? rest? key? aux?)
+                           (error "Invalid &OPTIONAL"))
+                         (set! optional? t)
+                         (rec (cdr args) values i))
+
+                        ((&rest &body)
+                         (when (or rest? key? aux?)
+                           (error "Invalid &REST/&BODY"))
+                         (set! rest? t)
+                         (set! optional? nil)
+                         (let ((thisarg (cadr args)))
+                           (unless (and thisarg (symbolp thisarg))
+                             (error "Missing variable name for &REST"))
+                           (push `(,thisarg ,values) decls))
+                         (rec (cddr args) values i))
+
+                        (&key
+                         (when (or key? aux?)
+                           (error "Invalid &KEY"))
+                         (set! key? t)
+                         (set! optional? nil)
+                         (set! rest? nil)
+                         (rec (cdr args) values i))
+
+                        (&aux
+                         (when aux?
+                           (error "Invalid &AUX"))
+                         (set! aux? t)
+                         (set! optional? nil)
+                         (set! rest? nil)
+                         (set! key? nil)
+                         (rec (cdr args) values i))
+                        (t
+                         (when (member thisarg names)
+                           (error (strcat "Argument seen twice: " thisarg)))
+                         (push thisarg names)
+                         (cond
+                           (optional?
+                            (push `(,thisarg (%next ,values)) decls))
+                           (aux?
+                            (push thisarg decls))
+                           (key?
+                            (push `(,thisarg (%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")))) decls))
+                           (t
+                            (push `(,thisarg (if ,values
+                                                 (%next ,values)
+                                                 (error ,(strcat "Missing required argument: " thisarg))))
+                                  decls)))
+                         (rec (cdr args) values (+ i 1)))))
+                     ((consp thisarg)
+                      (cond
+                        ((or optional? key?)
+                         (let ((thisarg (car thisarg))
+                               (default (cadr thisarg))
+                               (thisarg-p (caddr thisarg)))
+                           (when thisarg-p
+                             (push `(,thisarg-p (if ,values t nil)) decls))
+                           (push `(,thisarg ,(if key?
+                                                 (let ((val (gensym)))
+                                                   `(let ((,val (%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")) 'not-found)))
+                                                      (if (eq ,val 'not-found) ,default ,val)))
+                                                 `(if ,values (%next ,values) ,default)))
+                                 decls)))
+                        ((or rest? aux?) (error "Invalid argument list following &REST/&BODY or &AUX"))
+                        (t
+                         (let ((sublist (gensym)))
+                           (push `(,sublist (elt ,values ,i)) chunks)
+                           (rec thisarg sublist 0)
+                           (let* ((last (car decls))
+                                  (code (cdr last)))
+                             (rplacd last `((progn (set! ,values (cdr ,values)) ,@code)))))))
+                      (rec (cdr args) values (+ i 1))))))))
+      (let ((topv (gensym)))
+        (rec args topv 0)
+        `(let* ((,topv ,values) ,@(reverse chunks))
+           (let* ,(reverse decls)
+             ,@body))))))
+
+(defmacro destructuring-bind (args values . body)
+  (%fn-destruct args values body))
+
+;;;; parser/compiler
 
 (defun lisp-reader (text eof)
   (let ((input (%make-input-stream text))
@@ -375,128 +479,17 @@
 
       read-token)))
 
-;;; destructuring-bind
-
-;; (defmacro λ (args . body) `(lambda ,args ,@body))
-;; (macroexpand-1 '(λ (x y) (+ x y)))
-
-(defmacro %next (lst)
-  `(prog1 (car ,lst)
-     (set! ,lst (cdr ,lst))))
-
-(defun %fn-destruct (args values body)
-  (let (optional? rest? key? aux? names chunks decls)
-    (labels ((rec (args values i)
-               (when args
-                 (let ((thisarg (car args)))
-                   (cond
-                     ((symbolp thisarg)
-                      (case thisarg
-                        (&optional
-                         (when (or optional? rest? key? aux?)
-                           (error "Invalid &OPTIONAL"))
-                         (set! optional? t)
-                         (rec (cdr args) values i))
-                        ((&rest &body)
-                         (when (or rest? key? aux?)
-                           (error "Invalid &REST/&BODY"))
-                         (set! rest? t)
-                         (set! optional? nil)
-                         (rec (cdr args) values i))
-                        (&key
-                         (when (or key? aux?)
-                           (error "Invalid &KEY"))
-                         (set! key? t)
-                         (set! optional? nil)
-                         (set! rest? nil)
-                         (rec (cdr args) values i))
-                        (&aux
-                         (when aux?
-                           (error "Invalid &AUX"))
-                         (set! aux? t)
-                         (set! optional? nil)
-                         (set! rest? nil)
-                         (set! key? nil)
-                         (rec (cdr args) values i))
-                        (t
-                         (when (member thisarg names)
-                           (error (strcat "Argument seen twice: " thisarg)))
-                         (push thisarg names)
-                         (cond
-                           (optional?
-                            (push `(,thisarg (%next ,values)) decls))
-                           ((and rest? (not (eq rest? 'done)))
-                            (push `(,thisarg ,values) decls)
-                            (set! rest? 'done))
-                           (aux?
-                            (push thisarg decls))
-                           (key?
-                            (push `(,thisarg (%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")))) decls))
-                           (t
-                            (push `(,thisarg (if ,values
-                                                 (%next ,values)
-                                                 (error ,(strcat "Missing required argument: " thisarg))))
-                                  decls)))
-                         (rec (cdr args) values (+ i 1)))))
-                     ((consp thisarg)
-                      (cond
-                        ((or optional? key?)
-                         (let ((thisarg (car thisarg))
-                               (default (cadr thisarg))
-                               (thisarg-p (caddr thisarg)))
-                           (when thisarg-p
-                             (push `(,thisarg-p (if ,values t nil)) decls))
-                           (push `(,thisarg (if ,values ,(if key?
-                                                             `(%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")))
-                                                             `(%next ,values)) ,default)) decls)))
-                        ((or rest? aux?) (error "Invalid argument list following &REST/&BODY or &AUX"))
-                        (t
-                         (let ((sublist (gensym)))
-                           (push `(,sublist (elt ,values ,i)) chunks)
-                           (rec thisarg sublist 0))))
-                      (rec (cdr args) values (+ i 1))))))))
-      (let ((topv (gensym)))
-        (rec args topv 0)
-        `(let* ((,topv ,values) ,@(reverse chunks))
-           (let* ,(reverse decls)
-             ,@body))))))
-
-(defmacro destructuring-bind (args values . body)
-  (%fn-destruct args values body))
-
-(macroexpand-all '(destructuring-bind (a b &optional c (d (default-for-d) d-given) &key (foo (default-for-foo)) bar (baz default-for-baz baz-p)) list))
-
-;;(macroexpand-1 '(destructuring-bind (a (b q w) c) list (crap)))
-;;(macroexpand-all '(destructuring-bind (a (b c) d &optional (c (+ 3 4) c-p) d e) '(1 2 3) (list a b c d e)))
-;;(macroexpand-1 '(destructuring-bind (a (b c d) e) '(1 (2 3 4) 5) (list a b c d e)))
-;;(macroexpand-1 '(destructuring-bind (a b c) '(1 2 3) (list a b c)))
-
-;;; compiler
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+(destructuring-bind (&whole all a (b c) &optional (d (* a b c)) &key foo (bar (* d d))) `(1 (2 3) 7 :foo ,(+ 2 3 4))
+  (clog all)
+  (clog (list a b c d))
+  (clog "foo" foo)
+  (clog "bar" bar))
 
 
 

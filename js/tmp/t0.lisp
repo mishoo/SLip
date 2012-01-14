@@ -1,13 +1,5 @@
-(%special 'b)
-
-(set! stuff (lambda ()
-              (clog "in stuff" b)))
-
-(let ((a 10))
-  (let* ((b a)
-         (a 3)
-         (c (+ b b)))
-    (stuff)
-    (clog (* a b c)))
-  (clog a)
-  (stuff))
+(let ((foo 10))
+  (clog foo)
+  (let* ((mak 5))
+    (clog mak)
+    (clog foo)))

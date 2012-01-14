@@ -191,7 +191,8 @@
         });
 
         defp("%getf", false, function(m, nargs){
-                checknargs(nargs, 2, 2);
+                checknargs(nargs, 2, 3);
+                var not_found = nargs == 3 ? m.pop() : null;
                 var item = m.pop(), list = m.pop();
                 while (list !== null) {
                         checktype(list, LispList);
@@ -202,7 +203,7 @@
                         if (!list.cdr) error("Malformed plist");
                         list = LispCons.cddr(list);
                 }
-                return null;
+                return not_found;
         });
 
         (function(N){
