@@ -207,8 +207,10 @@
      (set! ,lst (cdr ,lst))))
 
 (defun %fn-destruct (args values body)
-  (let (optional? rest? key? aux? names chunks decls)
-    (labels ((rec (args values i)
+  (let (optional? rest? key? aux? names decls)
+    (let ((topv (gensym)) rec)
+      ((set! rec
+             (lambda (args values i)
                (when args
                  (let ((thisarg (car args)))
                    (cond
@@ -289,17 +291,12 @@
                         ((or rest? aux?) (error "Invalid argument list following &REST/&BODY or &AUX"))
                         (t
                          (let ((sublist (gensym)))
-                           (push `(,sublist (elt ,values ,i)) chunks)
-                           (rec thisarg sublist 0)
-                           (let* ((last (car decls))
-                                  (code (cdr last)))
-                             (rplacd last `((progn (set! ,values (cdr ,values)) ,@code)))))))
+                           (push `(,sublist (if ,values (%next ,values) (error "Missing sublist"))) decls)
+                           (rec thisarg sublist 0))))
                       (rec (cdr args) values (+ i 1))))))))
-      (let ((topv (gensym)))
-        (rec args topv 0)
-        `(let* ((,topv ,values) ,@(reverse chunks))
-           (let* ,(reverse decls)
-             ,@body))))))
+       args topv 0)
+      `(let* ((,topv ,values) ,@(reverse decls))
+         ,@body))))
 
 (defmacro destructuring-bind (args values . body)
   (%fn-destruct args values body))
@@ -491,9 +488,30 @@
   (clog "foo" foo)
   (clog "bar" bar))
 
+(macroexpand-1 '(destructuring-bind (n &optional (ret 0)) list))
 
+;; (defmacro fn (args . body)
+;;   (let ((sym (gensym)))
+;;     `(lambda ,sym
+;;        (destructuring-bind ,args ,sym
+;;          ,@body))))
 
+;; (set! sss (fn (n &optional (ret 0))
+;;               (if (= n 0)
+;;                   ret
+;;                   (sss (- n 1) (+ ret n)))))
 
+;; (set! sss2 (lambda (n ret)
+;;              (if (= n 0)
+;;                  ret
+;;                  (sss2 (- n 1) (+ ret n)))))
+
+;; (sss 100000)
+;; (sss2 100000 0)
+;; (sss 100000)
+;; (sss2 100000 0)
+;; (sss 100000)
+;; (sss2 100000 0)
 
 
 
