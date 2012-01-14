@@ -539,12 +539,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.env = new LispCons(frame, m.env);
                         }
                 }],
-                ["FR", 0, {
+                ["FRV1", 0, {
                         run: function(m) {
-                                m.env = new LispCons([], m.env);
+                                m.env = new LispCons([ m.pop() ], m.env);
                         }
                 }],
-                ["FRVAR", 0, {
+                ["FRV2", 0, {
                         run: function(m) {
                                 m.env.car.push(m.pop());
                         }

@@ -492,20 +492,21 @@ function lisp_reader(code) {
                 if (nullp(bindings)) return comp_seq(body, env, VAL, MORE);
                 var b = get_bindings(bindings);
                 var newargs = [];
-                env = [ newargs ].concat(env);
                 var ret = seq(
-                        gen("FR"),
                         seq.apply(null, b.vals.map(function(x, i){
                                 var name = b.names[i];
                                 x = seq(
                                         comp(x, env, true, true),
-                                        gen("FRVAR"),
-                                        name.special() ? gen("BIND", name, newargs.length) : []
+                                        i > 0 ? gen("FRV2") : gen("FRV1"),
+                                        name.special() ? gen("BIND", name, i) : []
                                 );
+                                if (i == 0) {
+                                        env = [ newargs ].concat(env);
+                                }
                                 newargs.push(name);
                                 return x;
                         })),
-                        comp_seq(body, [ b.names ].concat(env), VAL, true),
+                        comp_seq(body, env, VAL, true),
                         gen("UNFR", 1, b.specials.length),
                         MORE ? [] : gen("RET")
                 );
