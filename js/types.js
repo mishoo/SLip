@@ -282,6 +282,10 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                         SYMBOLS[name] = new D(name)
                 );
         };
+        P.dump = function() {
+                if (this.pak && this.pak.name == "KEYWORD") return ":" + this.name;
+                return this.name;
+        };
         var CL = LispPackage.get("%");
 });
 

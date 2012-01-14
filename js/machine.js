@@ -581,10 +581,10 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         D.dump = function(thing) {
                 if (thing === null) return "NIL";
                 if (thing === true) return "T";
-                if (typeof thing == "string") return thing;
+                if (typeof thing == "string") return JSON.stringify(thing);
                 if (LispChar.is(thing)) return thing.print();
                 if (LispPackage.is(thing)) return thing.name;
-                if (LispSymbol.is(thing)) return thing.name;
+                if (LispSymbol.is(thing)) return thing.dump();
                 if (LispCons.is(thing)) {
                         var ret = "(", first = true;
                         while (thing !== null) {

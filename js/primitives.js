@@ -190,6 +190,21 @@
                 return LispCons.find(list, m.pop());
         });
 
+        defp("%getf", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var item = m.pop(), list = m.pop();
+                while (list !== null) {
+                        checktype(list, LispList);
+                        if (list.car === item) {
+                                if (!list.cdr) error("Malformed plist");
+                                return list.cdr.car;
+                        }
+                        if (!list.cdr) error("Malformed plist");
+                        list = LispCons.cddr(list);
+                }
+                return null;
+        });
+
         (function(N){
                 defp("gensym", false, function(m, nargs) {
                         checknargs(nargs, 0, 1);
@@ -692,6 +707,13 @@
                 checktype(pak, LispPackage);
                 checktype(symbol, LispSymbol);
                 return pak.export(symbol);
+        });
+
+        defp("%symbol-name", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var symbol = m.pop();
+                checktype(symbol, LispSymbol);
+                return symbol.name;
         });
 
         defp("%symbol-package", false, function(m, nargs){
