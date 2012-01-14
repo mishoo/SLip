@@ -185,9 +185,19 @@
 
         defp("%memq", false, function(m, nargs){
                 checknargs(nargs, 2, 2);
-                var list = m.pop();
-                checktype(list, LispList);
-                return LispCons.find(list, m.pop());
+                var seq = m.pop(), item = m.pop();
+                if (LispList.is(seq))
+                        return LispCons.find(seq, item);
+                if (LispArray.is(seq)) {
+                        var pos = seq.value.indexOf(item);
+                        return pos >= 0 ? pos : null;
+                }
+                if (typeof seq == "string") {
+                        checktype(item, LispChar);
+                        var pos = seq.indexOf(item.value);
+                        return pos >= 0 ? pos : null;
+                }
+                error("Unrecognized sequence");
         });
 
         defp("%getf", false, function(m, nargs){
