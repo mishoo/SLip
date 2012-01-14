@@ -539,6 +539,16 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.env = new LispCons(frame, m.env);
                         }
                 }],
+                ["FR", 0, {
+                        run: function(m) {
+                                m.env = new LispCons([], m.env);
+                        }
+                }],
+                ["FRVAR", 0, {
+                        run: function(m) {
+                                m.env.car.push(m.pop());
+                        }
+                }],
                 ["UNFR", "lex spec", {
                         run: function(m) {
                                 var n = this.lex;

@@ -46,23 +46,6 @@
     (func (car lst))
     (foreach (cdr lst) func)))
 
-;; (defmacro let (defs . body)
-;;   `((lambda ,(map (lambda (x)
-;;                     (if (listp x)
-;;                         (car x)
-;;                         x)) defs)
-;;       ,@body)
-;;     ,@(map (lambda (x)
-;;              (if (listp x)
-;;                  (cadr x))) defs)))
-
-(defmacro let* (defs . body)
-  (if defs
-      `(let (,(car defs))
-         (let* ,(cdr defs)
-           ,@body))
-      `(progn ,@body)))
-
 (defmacro prog1 (exp . body)
   (let ((ret (gensym)))
     `(let ((,ret ,exp))

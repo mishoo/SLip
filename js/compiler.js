@@ -272,6 +272,7 @@ function lisp_reader(code) {
         var S_DEFMAC  = LispSymbol.get("DEFMACRO");
         var S_NOT     = LispSymbol.get("NOT");
         var S_LET     = LispSymbol.get("LET");
+        var S_LET$    = LispSymbol.get("LET*");
 
         var PAK_KEYWORD = LispPackage.get("KEYWORD");
 
@@ -355,6 +356,8 @@ function lisp_reader(code) {
                         return comp_defmac(cadr(x), caddr(x), cdddr(x), env, VAL, MORE);
                     case S_LET:
                         return comp_let(cadr(x), cddr(x), env, VAL, MORE);
+                    case S_LET$:
+                        return comp_let$(cadr(x), cddr(x), env, VAL, MORE);
                     case S_LAMBDA:
                         return VAL ? seq(
                                 comp_lambda(cadr(x), cddr(x), env),
@@ -455,11 +458,13 @@ function lisp_reader(code) {
                         if (dot) throw new Error("Improper list in LET");
                         if (LC.is(el)) {
                                 vals.push(cadr(el));
-                                names.push(el = car(el));
+                                el = car(el);
                         } else {
                                 vals.push(S_NIL);
-                                names.push(el);
                         }
+                        if (names.indexOf(el) >= 0)
+                                throw new Error("Duplicate name in LET");
+                        names.push(el);
                         if (el.special()) specials.push(i);
                 });
                 return { names: names, vals: vals, specials: specials, len: names.length };
@@ -476,6 +481,30 @@ function lisp_reader(code) {
                         b.specials.map(function(i){
                                 return gen("BIND", b.names[i], i)[0];
                         }),
+                        comp_seq(body, [ b.names ].concat(env), VAL, true),
+                        gen("UNFR", 1, b.specials.length),
+                        MORE ? [] : gen("RET")
+                );
+                return ret;
+        };
+
+        function comp_let$(bindings, body, env, VAL, MORE) {
+                if (nullp(bindings)) return comp_seq(body, env, VAL, MORE);
+                var b = get_bindings(bindings);
+                var newargs = [];
+                env = [ newargs ].concat(env);
+                var ret = seq(
+                        gen("FR"),
+                        seq.apply(null, b.vals.map(function(x, i){
+                                var name = b.names[i];
+                                x = seq(
+                                        comp(x, env, true, true),
+                                        gen("FRVAR"),
+                                        name.special() ? gen("BIND", name, newargs.length) : []
+                                );
+                                newargs.push(name);
+                                return x;
+                        })),
                         comp_seq(body, [ b.names ].concat(env), VAL, true),
                         gen("UNFR", 1, b.specials.length),
                         MORE ? [] : gen("RET")
