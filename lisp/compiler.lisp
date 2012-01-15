@@ -478,86 +478,6 @@
 
       read-token)))
 
-
-
-;; (destructuring-bind (&whole all a (b c) &optional (d (* a b c)) &key foo (bar (* d d))) `(1 (2 3) 7 :foo ,(+ 2 3 4))
-;;   (clog all)
-;;   (clog (list a b c d))
-;;   (clog "foo" foo)
-;;   (clog "bar" bar))
-
-;; (macroexpand-1 '(destructuring-bind (a b c) list (crap)))
-
-;; (macroexpand-1 '(destructuring-bind (a b (c d e) f g) list))
-
-;; (error "stop")
-
-
-
-
-;; (defun %do-loop (stuff)
-;;   (let (vars init body next conds final)
-;;     (labels
-;;         ((parse-for (stuff)
-;;            (let ((var (car stuff)))
-;;              (pushnew var vars)
-;;              (case (cadr stuff)
-;;                ((in :in) (let ((lst-sym (gensym)))
-;;                            (push `(,lst-sym ,(caddr stuff)) vars)
-;;                            (pushnew var conds)
-;;                            (push `(set! ,var (cdr ,var)) next)
-;;                            (cdddr stuff)))
-;;                ((from :from) (let ((from-sym (gensym))
-;;                                    (to-sym (gensym)))
-;;                                (let ((from (caddr stuff))
-;;                                      (to (cadddr stuff)))
-;;                                  (push `(,from-sym ,from) vars)
-;;                                  (push `(,to-sym ,to) vars))
-;;                                (cddddr stuff)))
-;;                (t (%error "Unsupported FOR LOOP syntax")))))
-;;          (rec (stuff)
-;;            (when stuff
-;;              (case (car stuff)
-;;                ((for :for) (rec (parse-for (cdr stuff))))
-;;                (t (push (car stuff) body)
-;;                   (rec (cdr stuff)))))))
-;;       (rec stuff))
-;;     (let ((loopsym (gensym)))
-;;       `(with-cc return
-;;          (let ,vars
-;;            ,@init
-;;            (labels ((,loopsym ()
-;;                       (when (and ,@conds)
-;;                         ,@body
-;;                         ,@next)
-;;                       (,loopsym)))
-;;              (,loopsym))
-;;            ,@final)))))
-
-;; (defmacro loop stuff
-;;   (%do-loop stuff))
-
-;; (macroexpand-1 '(loop :for i :in '(a b c) (crap)))
-
-
-
-
-
-;; (let ((reader (lisp-reader
-;;                (%js-eval "window.CURRENT_FILE")
-;;                ;;"(a b . c)"
-;;                ;;"#\\Newline mak"
-;;                'EOF)))
-;;   (labels ((rec (q)
-;;              (let ((tok (reader)))
-;;                (if (eq tok 'EOF)
-;;                    q
-;;                    (rec (cons tok q))))))
-;;     (reverse (rec nil))))
-
-
-
-
 (labels
     ((assert (p msg)
        (unless p (%error msg)))
@@ -752,32 +672,47 @@
 
      (comp-let* (bindings body env val? more?)
        (if bindings
-           (destructuring-bind (names vals specials len
-                                      &aux newargs (i 0)) (get-bindings bindings)
-             (%seq (%prim-apply '%seq (mapcar (lambda (name x)
-                                                (prog1
-                                                    (%seq (comp x env t t)
-                                                          (gen (if newargs "FRV2" "FRV1"))
-                                                          (when (%specialp name) (gen "BIND" name i)))
-                                                  (%incf i)
-                                                  (let ((cell (cons name nil)))
-                                                    (if newargs
-                                                        (rplacd newargs cell)
-                                                        (set! env (cons cell env)))
-                                                    (set! newargs cell))))
-                                              names vals))
+           (destructuring-bind (names vals specials len &aux newargs (i 0))
+               (get-bindings bindings)
+             (%seq (%prim-apply
+                    '%seq (mapcar (lambda (name x)
+                                    (prog1
+                                        (%seq (comp x env t t)
+                                              (gen (if newargs "FRV2" "FRV1"))
+                                              (when (%specialp name)
+                                                (gen "BIND" name i)))
+                                      (%incf i)
+                                      (let ((cell (cons name nil)))
+                                        (if newargs
+                                            (rplacd newargs cell)
+                                            (set! env (cons cell env)))
+                                        (set! newargs cell))))
+                                  names vals))
                    (comp-seq body env val? true)
                    (gen "UNFR" 1 (length specials))
-                   (if more? nil (gen "RET")))))))
+                   (if more? nil (gen "RET"))))
+           (comp-seq body env val? more?))))
 
-  (defun compile _
-    (destructuring-bind (exp &key environment) _
+  (defun compile args
+    (destructuring-bind (exp &key environment) args
       (assert (and (consp exp)
                    (eq (car exp) 'lambda))
               "Expecting (LAMBDA (...) ...) in COMPILE")
       (%assemble-closure (comp exp environment t nil)))))
 
-;;;
+;;;;;;
+
+(let ((reader (lisp-reader
+               (%js-eval "window.CURRENT_FILE")
+               ;;"(a b . c)"
+               ;;"#\\Newline mak"
+               'EOF)))
+  (labels ((rec (q)
+             (let ((tok (reader)))
+               (if (eq tok 'EOF)
+                   q
+                   (rec (cons tok q))))))
+    (reverse (rec nil))))
 
 (let ((f (compile '(lambda (a b)
                      (let* ((a (* a a))
@@ -786,29 +721,3 @@
                        (list a b c))))))
   (clog (%disassemble f))
   (f 3 4))
-
-
-
-;; (macroexpand-all '(destructuring-bind (names vals specials len
-;;                                        &aux newargs (i 0)) (get-bindings bindings)
-;;                    (%seq (%prim-apply '%seq (mapcar (lambda (name x)
-;;                                                       (prog1
-;;                                                           (%seq (comp x env t t)
-;;                                                                 (gen (if newargs "FRV2" "FRV1"))
-;;                                                                 (when (%specialp name) (gen "BIND" name i)))
-;;                                                         (%incf i)
-;;                                                         (let ((cell (cons name nil)))
-;;                                                           (if newargs
-;;                                                               (rplacd newargs cell)
-;;                                                               (set! env (cons cell env)))
-;;                                                           (set! newargs cell))))
-;;                                                     names vals))
-;;                     (comp-seq body env val? true)
-;;                     (gen "UNFR" 1 (length specials))
-;;                     (if more? nil (gen "RET")))))
-
-
-;; (mapcar (lambda (a b)
-;;            (cons a b))
-;;   '(1 2 3 4 5)
-;;   '(a b c d e))
