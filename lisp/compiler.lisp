@@ -194,11 +194,11 @@
 
 (defmacro while (cond . body)
   (let ((rec (gensym "while")))
-    `(labels ((,rec ()
-                (when ,cond
-                  ,@body
-                  (,rec))))
-       (,rec))))
+    `(let (,rec)
+       ((set! ,rec (lambda ()
+                     (when ,cond
+                       ,@body
+                       (,rec))))))))
 
 ;;;; destructuring-bind
 
@@ -257,6 +257,7 @@
                          (set! rest? nil)
                          (set! key? nil)
                          (rec (cdr args) values i))
+
                         (t
                          (when (member thisarg names)
                            (error (strcat "Argument seen twice: " thisarg)))
@@ -274,6 +275,7 @@
                                                  (error ,(strcat "Missing required argument: " thisarg))))
                                   decls)))
                          (rec (cdr args) values (+ i 1)))))
+
                      ((consp thisarg)
                       (cond
                         ((or optional? key?)
@@ -478,40 +480,18 @@
 
 
 
+;; (destructuring-bind (&whole all a (b c) &optional (d (* a b c)) &key foo (bar (* d d))) `(1 (2 3) 7 :foo ,(+ 2 3 4))
+;;   (clog all)
+;;   (clog (list a b c d))
+;;   (clog "foo" foo)
+;;   (clog "bar" bar))
 
+;; (macroexpand-1 '(destructuring-bind (a b c) list (crap)))
 
+;; (macroexpand-1 '(destructuring-bind (a b (c d e) f g) list))
 
+;; (error "stop")
 
-(destructuring-bind (&whole all a (b c) &optional (d (* a b c)) &key foo (bar (* d d))) `(1 (2 3) 7 :foo ,(+ 2 3 4))
-  (clog all)
-  (clog (list a b c d))
-  (clog "foo" foo)
-  (clog "bar" bar))
-
-(macroexpand-1 '(destructuring-bind (n &optional (ret 0)) list))
-
-;; (defmacro fn (args . body)
-;;   (let ((sym (gensym)))
-;;     `(lambda ,sym
-;;        (destructuring-bind ,args ,sym
-;;          ,@body))))
-
-;; (set! sss (fn (n &optional (ret 0))
-;;               (if (= n 0)
-;;                   ret
-;;                   (sss (- n 1) (+ ret n)))))
-
-;; (set! sss2 (lambda (n ret)
-;;              (if (= n 0)
-;;                  ret
-;;                  (sss2 (- n 1) (+ ret n)))))
-
-;; (sss 100000)
-;; (sss2 100000 0)
-;; (sss 100000)
-;; (sss2 100000 0)
-;; (sss 100000)
-;; (sss2 100000 0)
 
 
 
@@ -578,44 +558,174 @@
 
 
 
+(labels
+    ((assert (p msg)
+       (unless p (%error msg)))
 
+     (arg-count (x min max)
+       (assert (<= min (- (length x) 1) max) "Wrong number of arguments"))
 
-;; (labels
-;;     ((assert (p msg)
-;;        (unless p (%error msg)))
+     (gen cmd
+       #( (as-vector cmd) ))
 
-;;      (arg-count (x min max)
-;;        (unless max (set! max min))
-;;        (let ((len (length x)))
-;;          (assert (<= min len max) "Wrong number of arguments")))
+     (find-var (name env)
+       (with-cc return
+         (labels ((position (lst i j)
+                    (when lst
+                      (if (eq name (car lst)) (return (cons i j))
+                          (position (cdr lst) i (+ j 1)))))
+                  (frame (env i)
+                    (when env
+                      (position (car env) i 0)
+                      (frame (cdr env) (+ i 1)))))
+           (frame env 0))))
 
-;;      (gen cmd
-;;        #( (as-vector cmd) ))
+     (gen-var (name env)
+       (if (%specialp name)
+           (gen "GVAR" name)
+           (aif (find-var name env)
+                (gen "LVAR" (car it) (cdr it))
+                (gen "GVAR" name))))
 
-;;      (find-var (name env)
-;;        )
+     (gen-set (name env)
+       (if (%specialp name)
+           (gen "GSET" name)
+           (aif (find-var name env)
+                (gen "LSET" (car it) (cdr it))
+                (gen "GSET" name))))
 
-;;      (comp (x env val? more?)
-;;        (cond
-;;          ((symbolp x) (cond
-;;                         ((eq x nil) (comp-const nil val? more?))
-;;                         ((eq x t) (comp-const t val? more?))
-;;                         ((keywordp x) (comp-const x val? more?))
-;;                         (t (comp-var x env val? more?))))
-;;          ((atom x) (comp-const x val? more?))
-;;          (t (case (car x)
-;;               (quote (arg-count x 1)
-;;                      (comp-const (cadr x) val? more?))
-;;               (progn (comp-seq (cdr x) env val? more?))
-;;               (set! (arg-count x 2)
-;;                     (assert (symbolp (cadr x)) "Only symbols can be SET!")
-;;                     (%seq (comp (caddr x) env t t)
-;;                           (gen-set (cadr x) env)
-;;                           (unless val? (gen "POP"))
-;;                           (unless more? (gen "RET"))))))))
-;;      )
-;;   (defun compile (func)
-;;     (assert (and (consp func)
-;;                  (eq (car func) 'lambda)
-;;                  (cadr func))
-;;             "Expecting (LAMBDA (...) ...) in COMPILE")))
+     (mklabel ()
+       (gensym "label"))
+
+     (comp (x env val? more?)
+       (cond
+         ((symbolp x) (cond
+                        ((eq x nil) (comp-const nil val? more?))
+                        ((eq x t) (comp-const t val? more?))
+                        ((keywordp x) (comp-const x val? more?))
+                        (t (comp-var x env val? more?))))
+         ((atom x) (comp-const x val? more?))
+         (t (case (car x)
+              (quote (arg-count x 1 1)
+                     (comp-const (cadr x) val? more?))
+              (progn (comp-seq (cdr x) env val? more?))
+              (set! (arg-count x 2 2)
+                    (assert (symbolp (cadr x)) "Only symbols can be SET!")
+                    (%seq (comp (caddr x) env t t)
+                          (gen-set (cadr x) env)
+                          (unless val? (gen "POP"))
+                          (unless more? (gen "RET"))))
+              (if (arg-count x 2 3)
+                  (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
+              (not (arg-count x 1 1)
+                   (if val?
+                       (%seq (comp (cadr x) env t t)
+                             (gen "NOT")
+                             (if more? nil (gen "RET")))
+                       (comp (cadr x) env val? more?)))
+              (c/c (arg-count x 0 0)
+                   (if val? (%seq (gen "CC"))))
+              (defmacro
+                  (assert (symbolp (cadr x)) "DEFMACRO requires a symbol name")
+                  (comp-defmac (cadr x) (caddr x) (cdddr x) env val? more?))
+              ;; (let (comp-let (cadr x) (cddr x) env val? more?))
+              ;; (let* (comp-let* (cadr x) (cddr x) env val? more?))
+              (lambda (if val?
+                          (%seq (comp-lambda (cadr x) (cddr x) env)
+                                (if more? nil (gen "RET")))))
+              (t (if (and (symbolp (car x))
+                          (%macrop (car x)))
+                     (comp-macroexpand (car x) (cdr x) env val? more?)
+                     (comp-funcall (car x) (cdr x) env val? more?)))))))
+
+     (comp-const (x val? more?)
+       (if val? (%seq (gen "CONST" x)
+                      (if more? nil (gen "RET")))))
+
+     (comp-var (x env val? more?)
+       (if val? (%seq (gen-var x env)
+                      (if more? nil (gen "RET")))))
+
+     (comp-seq (exps env val? more?)
+       (cond
+         ((not exps) (comp-const nil val? more?))
+         ((not (cdr exps)) (comp (car exps) env val? more?))
+         (t (%seq (comp (car exps) env nil t)
+                  (comp-seq (cdr exps) env val? more?)))))
+
+     (comp-list (exps env)
+       (when exps
+         (%seq (comp (car exps) env t t)
+               (comp-list (cdr exps) env))))
+
+     (comp-if (pred then else env val? more?)
+       (let ((l1 (mklabel))
+             (l2 (mklabel)))
+         (%seq (comp pred env t t)
+               (gen "FJUMP" l1)
+               (comp then env val? more?)
+               (if more? (gen "JUMP" l2))
+               #( l1 )
+               (comp else env val? more?)
+               (if more? #( l2 )))))
+
+     (comp-funcall (f args env val? more?)
+       (cond
+         ((and (symbolp f)
+               (%primitivep f)
+               (not (find-var f env)))
+          (%seq (comp-list args env)
+                (gen "PRIM" f (length args))
+                (if more? nil (gen "RET"))))
+
+         ((and (consp f)
+               (eq (car f) 'lambda)
+               (not (cadr f)))
+          (assert (not args) "Too many arguments")
+          (comp-seq (cddr f) env val? more?))
+
+         (more? (let ((k (mklabel)))
+                  (%seq (gen "SAVE" k)
+                        (comp-list args env)
+                        (comp f env t t)
+                        (gen "CALL" (length args))
+                        #( k )
+                        (if val? nil (gen "POP")))))
+
+         (t (%seq (comp-list args env)
+                  (comp f env t t)
+                  (gen "CALL" (length args))))))
+
+     (gen-args (args n)
+       (cond
+         ((not args) (gen "ARGS" n))
+         ((symbolp args) (gen "ARG_" n))
+         ((and (consp args) (symbolp (car args)))
+          (gen-args (cdr args) (+ n 1)))
+         (t (error "Illegal argument list"))))
+
+     (make-true-list (l)
+       (when l
+         (if (atom l)
+             (list l)
+             (cons (car l) (make-true-list (cdr l))))))
+
+     (comp-lambda (args body env)
+       (gen "FN"
+            (%seq (gen-args args 0)
+                  (comp-seq body (cons (make-true-list args) env) t nil)))))
+
+  (defun compile _
+    (destructuring-bind (exp &key environment) _
+      (assert (and (consp exp)
+                   (eq (car exp) 'lambda))
+              "Expecting (LAMBDA (...) ...) in COMPILE")
+      (%assemble-closure (comp exp environment t nil)))))
+
+;;;
+
+(let ((f (compile `(lambda (a)
+                     (if (not (> a 0))
+                         (clog "big")
+                         (clog "small"))))))
+  (clog (%disassemble f)))

@@ -621,7 +621,7 @@
                 return stream.get();
         });
 
-        /* -----[ macros ]----- */
+        /* -----[ macros/primitives ]----- */
 
         defp("macroexpand-1", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
@@ -629,8 +629,7 @@
                 if (!LispCons.is(form)) return form;
                 var first = form.car;
                 if (!first.macro()) return form;
-                m._callnext(first.macro(), LispCons.cdr(form));
-                return false;
+                return m._callnext(first.macro(), LispCons.cdr(form));
         });
 
         defp("%macrop", false, function(m, nargs){
@@ -647,6 +646,22 @@
                 return LispMachine.disassemble(func.code);
         });
 
+        defp("%apply", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var args = m.pop();
+                checktype(args, LispList);
+                var func = m.pop();
+                checktype(func, LispClosure);
+                return m._callnext(func, args);
+        });
+
+        defp("%primitivep", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var sym = m.pop();
+                checktype(sym, LispSymbol);
+                return sym.primitive();
+        });
+
         /* -----[ symbols, packages ]----- */
 
         defp("%special", false, function(m, nargs){
@@ -657,6 +672,13 @@
                         name.set("special", true);
                 }
                 return null;
+        });
+
+        defp("%specialp", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var sym = m.pop();
+                checktype(sym, LispSymbol);
+                return sym.special();
         });
 
         defp("%set-function-name", true, function(m, nargs){
@@ -753,6 +775,24 @@
         });
 
         /* -----[ other ]----- */
+
+        function unbox_arrays(x) {
+                x = x.value;
+                for (var i = x.length; --i >= 0;)
+                        if (LispArray.is(x[i]))
+                                x[i] = unbox_arrays(x[i]);
+                return x;
+        };
+
+        defp("%assemble-closure", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var code = m.pop();
+                checktype(code, LispArray);
+                code = unbox_arrays(code);
+                code = LispMachine.assemble(code);
+                var f = new LispClosure(code, new LispCons([], null));
+                return m._callnext(f, null);
+        });
 
         defp("%js-eval", true, function(m, nargs){
                 checknargs(nargs, 1, 1);

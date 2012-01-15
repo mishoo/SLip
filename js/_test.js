@@ -27,6 +27,7 @@
                                         bc = LispMachine.assemble(bc);
                                         //console.log(LispMachine.serialize(bc));
                                         console.log(LispMachine.disassemble(bc));
+                                        console.log("- - -");
                                         time_it("run", function(){
                                                 console.log(LispMachine.dump(m.run(bc)));
                                         });
