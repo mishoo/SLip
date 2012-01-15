@@ -107,18 +107,15 @@
 (defmacro mapcar (func . lists)
   (let ((rec (gensym))
         (fname (gensym))
-        (args (map (lambda (el) (gensym)) lists))
-        (val (gensym)))
+        (args (map (lambda (el) (gensym)) lists)))
     `(let ((,fname ,func))
-       (labels ((,rec (,val ,@args)
-                  (if (and ,@args)
-                      (,rec (cons (,fname ,@(map (lambda (l)
-                                                   `(car ,l)) args))
-                                  ,val)
-                            ,@(map (lambda (l)
-                                     `(cdr ,l)) args))
-                      ,val)))
-         (,rec nil ,@lists)))))
+       (labels ((,rec (,@args)
+                  (when (and ,@args)
+                    (cons (,fname ,@(map (lambda (l)
+                                           `(car ,l)) args))
+                          (,rec ,@(map (lambda (l)
+                                         `(cdr ,l)) args))))))
+         (,rec ,@lists)))))
 
 (defmacro call/cc (func)
   `(,func (c/c)))
@@ -290,7 +287,10 @@
                                                       (if (eq ,val 'not-found) ,default ,val)))
                                                  `(if ,values (%next ,values) ,default)))
                                  decls)))
-                        ((or rest? aux?) (error "Invalid argument list following &REST/&BODY or &AUX"))
+                        (aux? (let ((thisarg (car thisarg))
+                                    (value (cadr thisarg)))
+                                (push `(,thisarg ,value) decls)))
+                        (rest? (error "Invalid argument list following &REST/&BODY"))
                         (t
                          (let ((sublist (gensym)))
                            (push `(,sublist (if ,values (%next ,values) (error "Missing sublist"))) decls)
@@ -628,8 +628,8 @@
               (defmacro
                   (assert (symbolp (cadr x)) "DEFMACRO requires a symbol name")
                   (comp-defmac (cadr x) (caddr x) (cdddr x) env val? more?))
-              ;; (let (comp-let (cadr x) (cddr x) env val? more?))
-              ;; (let* (comp-let* (cadr x) (cddr x) env val? more?))
+              (let (comp-let (cadr x) (cddr x) env val? more?))
+              (let* (comp-let* (cadr x) (cddr x) env val? more?))
               (lambda (if val?
                           (%seq (comp-lambda (cadr x) (cddr x) env)
                                 (if more? nil (gen "RET")))))
@@ -713,7 +713,62 @@
      (comp-lambda (args body env)
        (gen "FN"
             (%seq (gen-args args 0)
-                  (comp-seq body (cons (make-true-list args) env) t nil)))))
+                  (let (dyn (i 0) (args (make-true-list args)))
+                    (foreach args (lambda (x)
+                                    (when (%specialp x)
+                                      (push #("BIND" x i) dyn))
+                                    (%incf i)))
+                    (%seq dyn
+                          (comp-seq body (cons args env) t nil))))))
+
+     (get-bindings (bindings)
+       (let (names vals specials (i 0))
+         (foreach bindings (lambda (x)
+                             (if (consp x)
+                                 (progn (push (cadr x) vals)
+                                        (set! x (car x)))
+                                 (push nil vals))
+                             (when (member x names)
+                               (error "Duplicate name in LET"))
+                             (push x names)
+                             (when (%specialp x) (push (cons x i) specials))
+                             (%incf i)))
+         (list (reverse names) (reverse vals) (reverse specials) i)))
+
+     (comp-let (bindings body env val? more?)
+       (if bindings
+           (destructuring-bind (names vals specials len) (get-bindings bindings)
+             (%seq (%prim-apply '%seq (map (lambda (x)
+                                             (comp x env t t))
+                                           vals))
+                   (gen "ARGS" len)
+                   (%prim-apply '%seq (map (lambda (x)
+                                             (gen "BIND" (car x) (cdr x)))
+                                           specials))
+                   (comp-seq body (cons names env) val? t)
+                   (gen "UNFR" 1 (length specials))
+                   (if more? nil (gen "RET"))))
+           (comp-seq body env val? more?)))
+
+     (comp-let* (bindings body env val? more?)
+       (if bindings
+           (destructuring-bind (names vals specials len
+                                      &aux newargs (i 0)) (get-bindings bindings)
+             (%seq (%prim-apply '%seq (mapcar (lambda (name x)
+                                                (prog1
+                                                    (%seq (comp x env t t)
+                                                          (gen (if newargs "FRV2" "FRV1"))
+                                                          (when (%specialp name) (gen "BIND" name i)))
+                                                  (%incf i)
+                                                  (let ((cell (cons name nil)))
+                                                    (if newargs
+                                                        (rplacd newargs cell)
+                                                        (set! env (cons cell env)))
+                                                    (set! newargs cell))))
+                                              names vals))
+                   (comp-seq body env val? true)
+                   (gen "UNFR" 1 (length specials))
+                   (if more? nil (gen "RET")))))))
 
   (defun compile _
     (destructuring-bind (exp &key environment) _
@@ -724,8 +779,36 @@
 
 ;;;
 
-(let ((f (compile `(lambda (a)
-                     (if (not (> a 0))
-                         (clog "big")
-                         (clog "small"))))))
-  (clog (%disassemble f)))
+(let ((f (compile '(lambda (a b)
+                     (let* ((a (* a a))
+                            (b (* b b))
+                            (c (+ a b)))
+                       (list a b c))))))
+  (clog (%disassemble f))
+  (f 3 4))
+
+
+
+;; (macroexpand-all '(destructuring-bind (names vals specials len
+;;                                        &aux newargs (i 0)) (get-bindings bindings)
+;;                    (%seq (%prim-apply '%seq (mapcar (lambda (name x)
+;;                                                       (prog1
+;;                                                           (%seq (comp x env t t)
+;;                                                                 (gen (if newargs "FRV2" "FRV1"))
+;;                                                                 (when (%specialp name) (gen "BIND" name i)))
+;;                                                         (%incf i)
+;;                                                         (let ((cell (cons name nil)))
+;;                                                           (if newargs
+;;                                                               (rplacd newargs cell)
+;;                                                               (set! env (cons cell env)))
+;;                                                           (set! newargs cell))))
+;;                                                     names vals))
+;;                     (comp-seq body env val? true)
+;;                     (gen "UNFR" 1 (length specials))
+;;                     (if more? nil (gen "RET")))))
+
+
+;; (mapcar (lambda (a b)
+;;            (cons a b))
+;;   '(1 2 3 4 5)
+;;   '(a b c d e))

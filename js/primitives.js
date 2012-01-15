@@ -655,6 +655,20 @@
                 return m._callnext(func, args);
         });
 
+        defp("%prim-apply", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var args = m.pop(), name = m.pop();
+                checktype(name, LispSymbol);
+                nargs = 0;
+                while (args !== null) {
+                        checktype(args, LispCons);
+                        m.push(args.car);
+                        args = args.cdr;
+                        ++nargs;
+                }
+                return name.primitive()(m, nargs);
+        });
+
         defp("%primitivep", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var sym = m.pop();
