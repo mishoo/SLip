@@ -99,8 +99,8 @@ var LispRegexp = DEFTYPE("regexp", function(D, P){
 });
 
 var LispClosure = DEFTYPE("closure", function(D, P){
-        P.INIT = function(code, env) {
-                this.name = null;
+        P.INIT = function(code, env, name) {
+                this.name = name;
                 this.code = code;
                 this.env = env;
         };
@@ -246,6 +246,9 @@ var LispPackage = DEFTYPE("package", function(D, P){
 
 var LispSymbol = DEFTYPE("symbol", function(D, P){
         var SYMBOLS = {};
+        D.is = function(thing) {
+                return thing === true || thing === null || thing instanceof D;
+        };
         P.INIT = function(name, pak) {
                 if (name) {
                         this.name = name + "";
@@ -264,16 +267,16 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                 this.plist[key] = val;
         };
         P.get = function(key) {
-                return this.plist[key];
+                return HOP(this.plist, key) ? this.plist[key] : null;
         };
         P.macro = function() {
-                return this.get("macro") || null;
+                return this.get("macro");
         };
         P.special = function() {
-                return this.get("special") ? true : null;
+                return this.get("special");
         };
         P.primitive = function() {
-                return this.get("primitive") || null;
+                return this.get("primitive");
         };
         D.get = function(name) {
                 var pak = CL.intern("*PACKAGE*").value;
@@ -290,5 +293,7 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
 });
 
 (function(CL){
-        CL.intern("*PACKAGE*").value = CL;
+        var pak = CL.intern("*PACKAGE*");
+        pak.value = CL;
+        pak.set("special", true);
 })(LispPackage.get("%"))

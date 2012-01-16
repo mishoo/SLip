@@ -523,7 +523,7 @@
         defp("symbolp", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var x = m.pop();
-                return x === true || x === null || LispSymbol.is(x) ? true : null;
+                return LispSymbol.is(x) ? true : null;
         });
 
         defp("keywordp", false, function(m, nargs){
@@ -632,7 +632,7 @@
                 return m._callnext(first.macro(), LispCons.cdr(form));
         });
 
-        defp("%macrop", false, function(m, nargs){
+        defp("%macro", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var symbol = m.pop();
                 checktype(symbol, LispSymbol);
@@ -674,6 +674,15 @@
                 var sym = m.pop();
                 checktype(sym, LispSymbol);
                 return sym.primitive();
+        });
+
+        defp("%macro!", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var func = m.pop(), sym = m.pop();
+                checktype(func, LispClosure);
+                checktype(sym, LispSymbol);
+                sym.set("macro", func);
+                return sym;
         });
 
         /* -----[ symbols, packages ]----- */
@@ -798,7 +807,7 @@
                 return x;
         };
 
-        defp("%assemble-closure", true, function(m, nargs){
+        defp("%eval-bytecode", true, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var code = m.pop();
                 checktype(code, LispArray);

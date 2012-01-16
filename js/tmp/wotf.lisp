@@ -1,3 +1,21 @@
+;;; amb
+
+(set! *amb-fail* (lambda (arg)
+                   (clog "TOTAL FAILURE")))
+
+(defmacro amb alternatives
+  (if alternatives
+      `(let ((+prev-amb-fail *amb-fail*))
+         (with-cc +sk
+           ,@(map (lambda (alt)
+                    `(with-cc +fk
+                       (set! *amb-fail* +fk)
+                       (+sk ,alt)))
+                  alternatives)
+           (set! *amb-fail* +prev-amb-fail)
+           (+prev-amb-fail nil)))
+      `(*amb-fail* nil)))
+
 ;; -----------------------------------------------------------------
 
 ;; Who owns the fish? -- See http://weitz.de/einstein.html for a

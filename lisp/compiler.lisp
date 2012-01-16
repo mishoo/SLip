@@ -1,19 +1,24 @@
-(%special '*package*)
-
 ;; props to http://norstrulde.org/ilge10/
 (set! qq
-      (lambda (x)
-        (if (consp x)
-            (if (eq 'qq-unquote (car x))
-                (cadr x)
-                (if (eq 'quasiquote (car x))
-                    (qq (qq (cadr x)))
-                    (if (consp (car x))
-                        (if (eq 'qq-splice (caar x))
-                            (list 'append (cadar x) (qq (cdr x)))
-                            (list 'cons (qq (car x)) (qq (cdr x))))
-                        (list 'cons (qq (car x)) (qq (cdr x))))))
-            (list 'quote x))))
+      (%fn qq (x)
+           (if (consp x)
+               (if (eq 'qq-unquote (car x))
+                   (cadr x)
+                   (if (eq 'quasiquote (car x))
+                       (qq (qq (cadr x)))
+                       (if (consp (car x))
+                           (if (eq 'qq-splice (caar x))
+                               (list 'append (cadar x) (qq (cdr x)))
+                               (list 'cons (qq (car x)) (qq (cdr x))))
+                           (list 'cons (qq (car x)) (qq (cdr x))))))
+               (list 'quote x))))
+
+;; better to avoid quasiquote here:
+(%macro! 'defmacro
+         (%fn defmacro (name args . body)
+              (list '%macro!
+                    (list 'quote name)
+                    (list* '%fn name args body))))
 
 (defmacro quasiquote (thing)
   (qq thing))
@@ -21,7 +26,7 @@
 ;;;; let the show begin
 
 (defmacro defun (name args . body)
-  `(%set-function-name (set! ,name (lambda ,args ,@body)) ',name))
+  `(set! ,name (%fn ,name ,args ,@body)))
 
 (defmacro when (pred . body)
   `(if ,pred (progn ,@body)))
@@ -36,9 +41,7 @@
 (defmacro labels (defs . body)
   `(let ,(map (lambda (x) (car x)) defs)
      ,@(map (lambda (x)
-              `(set! ,(car x) (%set-function-name
-                               (lambda ,(cadr x) ,@(cddr x))
-                               ',(car x)))) defs)
+              `(set! ,(car x) (%fn ,(car x) ,(cadr x) ,@(cddr x)))) defs)
      ,@body))
 
 (defun foreach (lst func)
@@ -56,13 +59,6 @@
   `(progn
      ,exp1
      (prog1 ,exp2 ,@body)))
-
-(defmacro flet (defs . body)
-  `(let ,(map (lambda (x)
-                `(,(car x) (%set-function-name
-                            (lambda ,(cadr x) ,@(cddr x))
-                            ',(car x)))) defs)
-     ,@body))
 
 (defmacro or exps
   (when exps
@@ -117,15 +113,8 @@
                                          `(cdr ,l)) args))))))
          (,rec ,@lists)))))
 
-(defmacro call/cc (func)
-  `(,func (c/c)))
-
 (defmacro with-cc (name . body)
   `((lambda (,name) ,@body) (c/c)))
-
-(defmacro awhen (cond . body)
-  `(let ((it ,cond))
-     (when it ,@body)))
 
 (defmacro aif (cond . rest)
   `(let ((it ,cond))
@@ -137,171 +126,11 @@
 (defmacro %decf (var)
   `(set! ,var (- ,var 1)))
 
-
 (defmacro push (obj place)
   `(set! ,place (cons ,obj ,place)))
 
-(defmacro pushnew (obj place)
-  (let ((sym (gensym)))
-    `(let ((,sym ,obj))
-       (unless (member ,sym ,place)
-         (push ,sym ,place)))))
-
 (defmacro error (msg)
   `(%error ,msg))
-
-(defun macroexpand (form)
-  (if (and (consp form)
-           (symbolp (car form))
-           (%macrop (car form)))
-      (macroexpand (macroexpand-1 form))
-      form))
-
-(defun macroexpand-all (form)
-  (if (consp form)
-      (let ((form (macroexpand form)))
-        (map macroexpand-all form))
-      form))
-
-;; this is `once-only' from Practical Common Lisp
-(defmacro with-rebinds (names . body)
-  (let ((gensyms (mapcar (lambda (_) (gensym)) names)))
-    `(let (,@(mapcar (lambda (g) `(,g (gensym))) gensyms))
-       `(let (,,@(mapcar (lambda (g n) ``(,,g ,,n)) gensyms names))
-          ,(let (,@(mapcar (lambda (n g) `(,n ,g)) names gensyms))
-                ,@body)))))
-
-;;; amb
-
-(set! *amb-fail* (lambda (arg)
-                   (clog "TOTAL FAILURE")))
-
-(defmacro amb alternatives
-  (if alternatives
-      `(let ((+prev-amb-fail *amb-fail*))
-         (with-cc +sk
-           ,@(map (lambda (alt)
-                    `(with-cc +fk
-                       (set! *amb-fail* +fk)
-                       (+sk ,alt)))
-                  alternatives)
-           (set! *amb-fail* +prev-amb-fail)
-           (+prev-amb-fail nil)))
-      `(*amb-fail* nil)))
-
-(defmacro while (cond . body)
-  (let ((rec (gensym "while")))
-    `(let (,rec)
-       ((set! ,rec (lambda ()
-                     (when ,cond
-                       ,@body
-                       (,rec))))))))
-
-;;;; destructuring-bind
-
-(defmacro %next (lst)
-  `(prog1 (car ,lst)
-     (set! ,lst (cdr ,lst))))
-
-(defun %fn-destruct (args values body)
-  (let (optional? rest? key? aux? names decls)
-    (let ((topv (gensym)) rec)
-      ((set! rec
-             (lambda (args values i)
-               (when args
-                 (let ((thisarg (car args)))
-                   (cond
-                     ((symbolp thisarg)
-                      (case thisarg
-                        (&whole
-                         (when (> i 0) (error "Misplaced &WHOLE"))
-                         (let ((thisarg (cadr args)))
-                           (unless (and thisarg (symbolp thisarg))
-                             (error "Missing variable name for &WHOLE"))
-                           (push `(,thisarg ,values) decls))
-                         (rec (cddr args) values i))
-
-                        (&optional
-                         (when (or optional? rest? key? aux?)
-                           (error "Invalid &OPTIONAL"))
-                         (set! optional? t)
-                         (rec (cdr args) values i))
-
-                        ((&rest &body)
-                         (when (or rest? key? aux?)
-                           (error "Invalid &REST/&BODY"))
-                         (set! rest? t)
-                         (set! optional? nil)
-                         (let ((thisarg (cadr args)))
-                           (unless (and thisarg (symbolp thisarg))
-                             (error "Missing variable name for &REST"))
-                           (push `(,thisarg ,values) decls))
-                         (rec (cddr args) values i))
-
-                        (&key
-                         (when (or key? aux?)
-                           (error "Invalid &KEY"))
-                         (set! key? t)
-                         (set! optional? nil)
-                         (set! rest? nil)
-                         (rec (cdr args) values i))
-
-                        (&aux
-                         (when aux?
-                           (error "Invalid &AUX"))
-                         (set! aux? t)
-                         (set! optional? nil)
-                         (set! rest? nil)
-                         (set! key? nil)
-                         (rec (cdr args) values i))
-
-                        (t
-                         (when (member thisarg names)
-                           (error (strcat "Argument seen twice: " thisarg)))
-                         (push thisarg names)
-                         (cond
-                           (optional?
-                            (push `(,thisarg (%next ,values)) decls))
-                           (aux?
-                            (push thisarg decls))
-                           (key?
-                            (push `(,thisarg (%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")))) decls))
-                           (t
-                            (push `(,thisarg (if ,values
-                                                 (%next ,values)
-                                                 (error ,(strcat "Missing required argument: " thisarg))))
-                                  decls)))
-                         (rec (cdr args) values (+ i 1)))))
-
-                     ((consp thisarg)
-                      (cond
-                        ((or optional? key?)
-                         (let ((thisarg (car thisarg))
-                               (default (cadr thisarg))
-                               (thisarg-p (caddr thisarg)))
-                           (when thisarg-p
-                             (push `(,thisarg-p (if ,values t nil)) decls))
-                           (push `(,thisarg ,(if key?
-                                                 (let ((val (gensym)))
-                                                   `(let ((,val (%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")) 'not-found)))
-                                                      (if (eq ,val 'not-found) ,default ,val)))
-                                                 `(if ,values (%next ,values) ,default)))
-                                 decls)))
-                        (aux? (let ((thisarg (car thisarg))
-                                    (value (cadr thisarg)))
-                                (push `(,thisarg ,value) decls)))
-                        (rest? (error "Invalid argument list following &REST/&BODY"))
-                        (t
-                         (let ((sublist (gensym)))
-                           (push `(,sublist (if ,values (%next ,values) (error "Missing sublist"))) decls)
-                           (rec thisarg sublist 0))))
-                      (rec (cdr args) values (+ i 1))))))))
-       args topv 0)
-      `(let* ((,topv ,values) ,@(reverse decls))
-         ,@body))))
-
-(defmacro destructuring-bind (args values . body)
-  (%fn-destruct args values body))
 
 ;;;; parser/compiler
 
@@ -316,11 +145,12 @@
            (%stream-next input))
 
          (read-while (pred)
-           (let ((out (%make-output-stream))
-                 (ch))
-             (while (and (set! ch (peek))
-                         (pred ch))
-               (%stream-put out (next)))
+           (let ((out (%make-output-stream)) rec)
+             ((set! rec (lambda (ch)
+                          (when (and ch (pred ch))
+                            (%stream-put out (next))
+                            (rec (peek)))))
+              (peek))
              (%stream-get out)))
 
          (croak (msg)
@@ -476,7 +306,12 @@
              (nil eof)
              (otherwise (read-symbol)))))
 
-      read-token)))
+      (lambda (what)
+        (case what
+          (next (read-token))
+          (pos (%stream-pos input))
+          (col (%stream-col input))
+          (line (%stream-line input)))))))
 
 (labels
     ((assert (p msg)
@@ -545,16 +380,19 @@
                        (comp (cadr x) env val? more?)))
               (c/c (arg-count x 0 0)
                    (if val? (%seq (gen "CC"))))
-              (defmacro
-                  (assert (symbolp (cadr x)) "DEFMACRO requires a symbol name")
-                  (comp-defmac (cadr x) (caddr x) (cdddr x) env val? more?))
+              ;; (defmacro
+              ;;     (assert (symbolp (cadr x)) "DEFMACRO requires a symbol name")
+              ;;     (comp-defmac (cadr x) (caddr x) (cdddr x) env val? more?))
               (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
               (lambda (if val?
-                          (%seq (comp-lambda (cadr x) (cddr x) env)
+                          (%seq (comp-lambda nil (cadr x) (cddr x) env)
                                 (if more? nil (gen "RET")))))
+              (%fn (if val?
+                       (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
+                             (if more? nil (gen "RET")))))
               (t (if (and (symbolp (car x))
-                          (%macrop (car x)))
+                          (%macro (car x)))
                      (comp-macroexpand (car x) (cdr x) env val? more?)
                      (comp-funcall (car x) (cdr x) env val? more?)))))))
 
@@ -630,7 +468,7 @@
              (list l)
              (cons (car l) (make-true-list (cdr l))))))
 
-     (comp-lambda (args body env)
+     (comp-lambda (name args body env)
        (gen "FN"
             (%seq (gen-args args 0)
                   (let (dyn (i 0) (args (make-true-list args)))
@@ -639,7 +477,14 @@
                                       (push #("BIND" x i) dyn))
                                     (%incf i)))
                     (%seq dyn
-                          (comp-seq body (cons args env) t nil))))))
+                          (comp-seq body (cons args env) t nil))))
+            name))
+
+     ;; (comp-defmac (sym args body env val? more?)
+     ;;   (comp `(%macro! ',sym (%fn ,sym ,args ,@body)) env val? more?))
+
+     (comp-macroexpand (sym args env val? more?)
+       (comp (%apply (%macro sym) args) env val? more?))
 
      (get-bindings (bindings)
        (let (names vals specials (i 0))
@@ -657,7 +502,11 @@
 
      (comp-let (bindings body env val? more?)
        (if bindings
-           (destructuring-bind (names vals specials len) (get-bindings bindings)
+           (let* ((bindings (get-bindings bindings))
+                  (names (car bindings))
+                  (vals (cadr bindings))
+                  (specials (caddr bindings))
+                  (len (cadddr bindings)))
              (%seq (%prim-apply '%seq (map (lambda (x)
                                              (comp x env t t))
                                            vals))
@@ -672,13 +521,17 @@
 
      (comp-let* (bindings body env val? more?)
        (if bindings
-           (destructuring-bind (names vals specials len &aux newargs (i 0))
-               (get-bindings bindings)
+           (let* ((bindings (get-bindings bindings))
+                  (names (car bindings))
+                  (vals (cadr bindings))
+                  (specials (caddr bindings))
+                  (i 0)
+                  newargs)
              (%seq (%prim-apply
                     '%seq (mapcar (lambda (name x)
                                     (prog1
                                         (%seq (comp x env t t)
-                                              (gen (if newargs "FRV2" "FRV1"))
+                                              (gen (if newargs "VAR" "FRAME"))
                                               (when (%specialp name)
                                                 (gen "BIND" name i)))
                                       (%incf i)
@@ -693,12 +546,11 @@
                    (if more? nil (gen "RET"))))
            (comp-seq body env val? more?))))
 
-  (defun compile args
-    (destructuring-bind (exp &key environment) args
-      (assert (and (consp exp)
-                   (eq (car exp) 'lambda))
-              "Expecting (LAMBDA (...) ...) in COMPILE")
-      (%assemble-closure (comp exp environment t nil)))))
+  (defun compile (exp)
+    (assert (and (consp exp)
+                 (eq (car exp) 'lambda))
+            "Expecting (LAMBDA (...) ...) in COMPILE")
+    (%eval-bytecode (comp exp nil t nil))))
 
 ;;;;;;
 
@@ -708,16 +560,16 @@
                ;;"#\\Newline mak"
                'EOF)))
   (labels ((rec (q)
-             (let ((tok (reader)))
+             (let ((tok (reader 'next)))
                (if (eq tok 'EOF)
                    q
                    (rec (cons tok q))))))
     (reverse (rec nil))))
 
-(let ((f (compile '(lambda (a b)
-                     (let* ((a (* a a))
-                            (b (* b b))
-                            (c (+ a b)))
-                       (list a b c))))))
+(let ((f (compile '(lambda (a b . q)
+                    (let* ((a (* a a))
+                           (b (* b b))
+                           (c (+ a b)))
+                      `(,a ,b ,c ,@q))))))
   (clog (%disassemble f))
-  (f 3 4))
+  (f 3 4 'a 'b 'c 'd))

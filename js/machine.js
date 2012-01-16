@@ -299,7 +299,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         var el = ret[i];
                         switch (el[0]) {
                             case "FN":
-                                ret[i] = OPS.FN.make(assemble(el[1]));
+                                ret[i] = OPS.FN.make(assemble(el[1]), el[2]);
                                 break;
                             case "JUMP":
                             case "TJUMP":
@@ -343,7 +343,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 var data;
                                 switch (op._name) {
                                     case "FN":
-                                        data = "\n" + disassemble(op.code, level + 1);
+                                        data = op.name + "\n" + disassemble(op.code, level + 1);
                                         break;
                                     case "JUMP":
                                     case "TJUMP":
@@ -378,8 +378,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         };
 
         function serialize_const(val) {
-                if (LispSymbol.is(val)) return val.serialize();
                 if (val === null || val === true) return val + "";
+                if (LispSymbol.is(val)) return val.serialize();
                 if (val instanceof Array) return "v(" + val.map(serialize_const).join(",") + ")";
                 if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(serialize_const).join(",") + ")";
                 if (LispRegexp.is(val)) return val.value.toString();
@@ -540,12 +540,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.env = new LispCons(frame, m.env);
                         }
                 }],
-                ["FRV1", 0, {
+                ["FRAME", 0, {
                         run: function(m) {
                                 m.env = new LispCons([ m.pop() ], m.env);
                         }
                 }],
-                ["FRV2", 0, {
+                ["VAR", 0, {
                         run: function(m) {
                                 m.env.car.push(m.pop());
                         }
@@ -558,12 +558,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 while (n-- > 0) m.denv = m.denv.cdr;
                         }
                 }],
-                ["FN", "code", {
+                ["FN", "code name", {
                         run: function(m) {
-                                m.push(new LispClosure(this.code, m.env));
+                                m.push(new LispClosure(this.code, m.env, this.name));
                         },
                         _disp: function() {
-                                return "FN(" + D.serialize(this.code) + ")";
+                                return "FN(" + D.serialize(this.code) + (this.name ? "," + LispMachine.serialize_const(this.name) : "") + ")";
                         }
                 }],
                 ["PRIM", "name nargs", {

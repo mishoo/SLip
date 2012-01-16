@@ -262,6 +262,7 @@ function lisp_reader(code) {
         var LABEL_NUM = 0;
 
         var S_LAMBDA  = LispSymbol.get("LAMBDA");
+        var S_FN      = LispSymbol.get("%FN");
         var S_IF      = LispSymbol.get("IF");
         var S_PROGN   = LispSymbol.get("PROGN");
         var S_QUOTE   = LispSymbol.get("QUOTE");
@@ -269,7 +270,6 @@ function lisp_reader(code) {
         var S_T       = LispSymbol.get("T");
         var S_NIL     = LispSymbol.get("NIL");
         var S_CC      = LispSymbol.get("C/C");
-        var S_DEFMAC  = LispSymbol.get("DEFMACRO");
         var S_NOT     = LispSymbol.get("NOT");
         var S_LET     = LispSymbol.get("LET");
         var S_LET$    = LispSymbol.get("LET*");
@@ -351,16 +351,19 @@ function lisp_reader(code) {
                     case S_CC:
                         arg_count(x, 0);
                         return VAL ? seq(gen("CC")) : [];
-                    case S_DEFMAC:
-                        assert(LispSymbol.is(cadr(x)), "DEFMACRO requires a symbol name for the macro");
-                        return comp_defmac(cadr(x), caddr(x), cdddr(x), env, VAL, MORE);
                     case S_LET:
                         return comp_let(cadr(x), cddr(x), env, VAL, MORE);
                     case S_LET$:
                         return comp_let$(cadr(x), cddr(x), env, VAL, MORE);
+                    case S_FN:
+                        assert(LispSymbol.is(cadr(x)), "%FN requires a symbol name for the function");
+                        return VAL ? seq(
+                                comp_lambda(cadr(x), caddr(x), cdddr(x), env),
+                                MORE ? [] : gen("RET")
+                        ) : [];
                     case S_LAMBDA:
                         return VAL ? seq(
-                                comp_lambda(cadr(x), cddr(x), env),
+                                comp_lambda(null, cadr(x), cddr(x), env),
                                 MORE ? [] : gen("RET")
                         ) : [];
                     default:
@@ -369,27 +372,6 @@ function lisp_reader(code) {
                         return comp_funcall(car(x), cdr(x), env, VAL, MORE);
                 }
         };
-
-        function comp_macroexpand(name, args, env, VAL, MORE) {
-                var m = new LispMachine();
-                var ast = m.call(name.macro(), args);
-                var ret = comp(ast, env, VAL, MORE);
-                return ret;
-        };
-
-        function comp_defmac(name, args, body, env, VAL, MORE) {
-                var func = comp_lambda(args, body, env);
-                func = LispMachine.assemble(func).concat(LispMachine.assemble(gen("RET")));
-                //console.log(LispMachine.disassemble(func));
-                func = new LispMachine().run(func);
-                name.set("macro", func);
-                return seq(
-                        VAL ? gen("CONST", name) : "POP",
-                        MORE ? [] : gen("RET")
-                );
-        };
-
-        /////
 
         function gen_set(name, env) {
                 if (!name.special()) {
@@ -497,7 +479,7 @@ function lisp_reader(code) {
                                 var name = b.names[i];
                                 x = seq(
                                         comp(x, env, true, true),
-                                        i > 0 ? gen("FRV2") : gen("FRV1"),
+                                        i > 0 ? gen("VAR") : gen("FRAME"),
                                         name.special() ? gen("BIND", name, i) : []
                                 );
                                 if (i == 0) {
@@ -545,13 +527,8 @@ function lisp_reader(code) {
                 );
         };
 
-        function comp_lambda(args, body, env) {
-                if (LispSymbol.is(args)) {
-                        return gen("FN",
-                                   seq(gen("ARG_", 0),
-                                       args.special() ? gen("BIND", args, 0) : [],
-                                       comp_seq(body, [ [ args ] ].concat(env), true, false)));
-                } else {
+        function comp_lambda(name, args, body, env) {
+                if (LC.isList(args)) {
                         var dot = LC.isDotted(args);
                         var a = LC.toArray(args);
                         if (dot) a.push([ a.pop(), a.pop() ][0]);
@@ -564,13 +541,28 @@ function lisp_reader(code) {
                                 return gen("FN",
                                            seq(gen("ARGS", a.length),
                                                dyn,
-                                               comp_seq(body, [ a ].concat(env), true, false)));
+                                               comp_seq(body, [ a ].concat(env), true, false)),
+                                           name);
                         }
                         return gen("FN",
                                    seq(gen("ARG_", dot),
                                        dyn,
-                                       comp_seq(body, [ a ].concat(env), true, false)));
+                                       comp_seq(body, [ a ].concat(env), true, false)),
+                                   name);
+                } else {
+                        return gen("FN",
+                                   seq(gen("ARG_", 0),
+                                       args.special() ? gen("BIND", args, 0) : [],
+                                       comp_seq(body, [ [ args ] ].concat(env), true, false)),
+                                   name);
                 }
+        };
+
+        function comp_macroexpand(name, args, env, VAL, MORE) {
+                var m = new LispMachine();
+                var ast = m.call(name.macro(), args);
+                var ret = comp(ast, env, VAL, MORE);
+                return ret;
         };
 
         this.lisp_compile = function(x) {
