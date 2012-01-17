@@ -371,20 +371,52 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
         ///// </disassemble>
 
-        D.serialize = function(code) {
-                return "[" + code.map(function(op){
+        D.serialize = function(code, strip) {
+                code = code.map(function(op){
                         return op._disp();
-                }).join(",") + "]";
+                }).join(",");
+                return strip ? code : "[" + code + "]";
+        };
+
+        D.unserialize = function(code) {
+                var names = [], values = [];
+                for (var i in OPS) if (HOP(OPS, i)) {
+                        var op = OPS[i];
+                        names.push(i);
+                        values.push(op.make);
+                }
+                names.push("s"); values.push(function(name, pak){
+                        if (pak != null) pak = LispPackage.get(pak);
+                        return LispSymbol.get(name, pak);
+                });
+                names.push("l"); values.push(function(){
+                        return LispCons.fromArray(slice(arguments));
+                });
+                names.push("v"); values.push(function(){
+                        return new LispArray(slice(arguments));
+                });
+                names.push("c"); values.push(function(char){
+                        return LispChar.get(char);
+                });
+                names.push("rx"); values.push(function(rx){
+                        return new LispRegexp(rx);
+                });
+                names.push("DOT"); values.push(LispCons.DOT);
+                if (code) code += ",";
+                code += "RET()";
+                var func = new Function("return function(" + names.join(",") + "){return[" + code + "]}")();
+                code = func.apply(null, values);
+                return code;
         };
 
         function serialize_const(val) {
                 if (val === null || val === true) return val + "";
                 if (LispSymbol.is(val)) return val.serialize();
-                if (val instanceof Array) return "v(" + val.map(serialize_const).join(",") + ")";
+                if (LispRegexp.is(val)) return val.serialize();
+                if (LispChar.is(val)) return val.serialize();
                 if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(serialize_const).join(",") + ")";
-                if (LispRegexp.is(val)) return val.value.toString();
-                if (typeof val == "string") return JSON.stringify(val);
-                if (LispChar.is(val)) return "c(" + JSON.stringify(val.value) + ")";
+                if (val instanceof Array) return "v(" + val.map(serialize_const).join(",") + ")";
+                if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
                 return val + "";
         };
 

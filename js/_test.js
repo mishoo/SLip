@@ -29,10 +29,11 @@
                                         console.log(LispMachine.disassemble(bc));
                                         console.log("- - -");
                                         time_it("run", function(){
-                                                console.log(LispMachine.dump(m.run(bc)));
+                                                var ret = LispMachine.dump(m.run(bc));
+                                                //console.log(ret);
                                         });
                                 }
-                                console.log("------------------------------------------------");
+                                //console.log("------------------------------------------------");
                         }
 
                         load_files(list.splice(1));

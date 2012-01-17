@@ -88,7 +88,7 @@
     `(let ((,vexpr ,expr))
        ,(labels ((recur (cases)
                         (when cases
-                          (if (listp (caar cases))
+                          (if (and (listp (caar cases)) (caar cases))
                               `(if (member ,vexpr ',(caar cases))
                                    (progn ,@(cdar cases))
                                    ,(recur (cdr cases)))
@@ -241,7 +241,7 @@
            (case (peek)
              (#\\ (next) (read-char))
              (#\/ (read-regexp))
-             (#\( `(vector ,(read-list)))
+             (#\( (list* 'vector (read-list)))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
 
          (read-quote ()
@@ -380,9 +380,6 @@
                        (comp (cadr x) env val? more?)))
               (c/c (arg-count x 0 0)
                    (if val? (%seq (gen "CC"))))
-              ;; (defmacro
-              ;;     (assert (symbolp (cadr x)) "DEFMACRO requires a symbol name")
-              ;;     (comp-defmac (cadr x) (caddr x) (cdddr x) env val? more?))
               (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
               (lambda (if val?
@@ -434,6 +431,7 @@
                (not (find-var f env)))
           (%seq (comp-list args env)
                 (gen "PRIM" f (length args))
+                (if val? nil (gen "POP"))
                 (if more? nil (gen "RET"))))
 
          ((and (consp f)
@@ -479,9 +477,6 @@
                     (%seq dyn
                           (comp-seq body (cons args env) t nil))))
             name))
-
-     ;; (comp-defmac (sym args body env val? more?)
-     ;;   (comp `(%macro! ',sym (%fn ,sym ,args ,@body)) env val? more?))
 
      (comp-macroexpand (sym args env val? more?)
        (comp (%apply (%macro sym) args) env val? more?))
@@ -552,24 +547,26 @@
             "Expecting (LAMBDA (...) ...) in COMPILE")
     (%eval-bytecode (comp exp nil t nil))))
 
-;;;;;;
+(defun compile-string (str)
+  (let ((reader (lisp-reader str 'EOF))
+        (out (%make-output-stream)))
+    (labels ((rec (is-first)
+               (let ((form (reader 'next)))
+                 (unless (eq form 'EOF)
+                   (let ((f (compile `(lambda () ,form))))
+                     (let ((code (%serialize-bytecode f t)))
+                       (unless is-first (%stream-put out #\,))
+                       (%stream-put out code #\Newline))
+                     (f))
+                   (rec nil)))))
+      (rec t)
+      (%stream-get out))))
 
-(let ((reader (lisp-reader
-               (%js-eval "window.CURRENT_FILE")
-               ;;"(a b . c)"
-               ;;"#\\Newline mak"
-               'EOF)))
-  (labels ((rec (q)
-             (let ((tok (reader 'next)))
-               (if (eq tok 'EOF)
-                   q
-                   (rec (cons tok q))))))
-    (reverse (rec nil))))
+(defun load-lisp-file (url)
+  (compile-string (%get-file-contents url)))
 
-(let ((f (compile '(lambda (a b . q)
-                    (let* ((a (* a a))
-                           (b (* b b))
-                           (c (+ a b)))
-                      `(,a ,b ,c ,@q))))))
-  (clog (%disassemble f))
-  (f 3 4 'a 'b 'c 'd))
+;;;
+
+EOF
+
+(clog (compile-string (%js-eval "window.CURRENT_FILE")))

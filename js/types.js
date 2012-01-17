@@ -34,6 +34,29 @@ var LispChar = DEFTYPE("char", function(D, P){
                 return h;
         })({});
         var OBJECTS = {};
+        D.fromName = function(name) {
+                if (name.length == 1)
+                        return D.get(name); // hack
+                name = name.toUpperCase();
+                if (HOP(NAMES_FROM, name))
+                        return D.get(NAMES_FROM[name]);
+                return null;
+        };
+        D.fromCode = function(code) {
+                return new D(String.fromCharCode(code));
+        };
+        D.get = function(char) {
+                return OBJECTS[char] || (
+                        OBJECTS[char] = new LispChar(char)
+                );
+        };
+        D.sanitize = function(val) {
+                return val.replace(/[\u0000\u00ad\u0600\u0604\u070f\u17b4\u17b5\u200c\u200f\u2028\u2029\u202f\u2060\u206f\ufeff\ufff0-\uffff]/g, function(s){
+                        var v = s.charCodeAt(0).toString(16);
+                        while (v.length < 4) v = "0" + v;
+                        return "\\u" + v;
+                });
+        };
         P.INIT = function(val){ this.value = val };
         P.valueOf = P.toString = function(){ return this.value };
         P.name = function() {
@@ -46,21 +69,9 @@ var LispChar = DEFTYPE("char", function(D, P){
                 var ch = this.value;
                 return "#\\" + (HOP(NAMES_TO, ch) ? NAMES_TO[ch] : ch);
         };
-        D.fromName = function(name) {
-                name = name.toUpperCase();
-                if (HOP(NAMES_FROM, name))
-                        return D.get(NAMES_FROM[name]);
-                else if (name.length == 1)
-                        return D.get(name); // hack
-                return null;
-        };
-        D.fromCode = function(code) {
-                return new D(String.fromCharCode(code));
-        };
-        D.get = function(char) {
-                return OBJECTS[char] || (
-                        OBJECTS[char] = new LispChar(char)
-                );
+        P.serialize = function() {
+                var ch = D.sanitize(JSON.stringify(this.value));
+                return "c(" + ch + ")";
         };
 });
 
@@ -95,6 +106,9 @@ var LispRegexp = DEFTYPE("regexp", function(D, P){
         P.exec = function(str) {
                 var m = this.value.exec(str);
                 return m ? new LispArray(m) : null;
+        };
+        P.serialize = function() {
+                return "rx(" + this.value + ")";
         };
 });
 
@@ -278,22 +292,22 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         P.primitive = function() {
                 return this.get("primitive");
         };
-        D.get = function(name) {
-                var pak = CL.intern("*PACKAGE*").value;
-                if (pak) return pak.intern(name);
-                return HOP(SYMBOLS, name) ? SYMBOLS[name] : (
+        D.get = function(name, pak) {
+                if (pak == null) pak = BASE_PACK.intern("*PACKAGE*").value;
+                var ret = pak ? pak.intern(name) : HOP(SYMBOLS, name) ? SYMBOLS[name] : (
                         SYMBOLS[name] = new D(name)
                 );
+                return ret;
         };
         P.dump = function() {
                 if (this.pak && this.pak.name == "KEYWORD") return ":" + this.name;
                 return this.name;
         };
-        var CL = LispPackage.get("%");
+        var BASE_PACK = LispPackage.get("%");
 });
 
-(function(CL){
-        var pak = CL.intern("*PACKAGE*");
-        pak.value = CL;
+(function(BASE_PACK){
+        var pak = BASE_PACK.intern("*PACKAGE*");
+        pak.value = BASE_PACK;
         pak.set("special", true);
 })(LispPackage.get("%"))

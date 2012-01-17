@@ -1,5 +1,2 @@
-(let ((foo 10))
-  (clog foo)
-  (let* ((mak 5))
-    (clog mak)
-    (clog foo)))
+(clog (eq nil (%intern "NIL" *package*)))
+(clog (eq t (%intern "T" *package*)))

@@ -3,6 +3,9 @@
         var CURRENT = null;
         var MACHINE = null;
 
+        var S_NIL = LispSymbol.get("NIL");
+        var S_T = LispSymbol.get("T");
+
         function defp(name, seff, func) {
                 name = name.toUpperCase();
                 var sym = CL.intern(name);
@@ -41,7 +44,11 @@
         defp("eq", false, function(m, nargs){
                 checknargs(nargs, 2, 2);
                 var a = m.pop(), b = m.pop();
-                return a === b ? true : null;
+                return (a === S_NIL && b === null) ||
+                        (a === null && b === S_NIL) ||
+                        (a === S_T && b === true) ||
+                        (a === true && b === S_T) ||
+                        a === b ? true : null;
         });
 
         defp("/=", false, function(m, nargs){
@@ -621,6 +628,22 @@
                 return stream.get();
         });
 
+        defp("%get-file-contents", false, function(m, nargs){
+                checknargs(nargs, 1, 2);
+                var cont = nargs == 2 ? m.pop() : null;
+                if (cont !== null) checktype(cont, LispClosure);
+                var url = m.pop();
+                checktype(url, "string");
+                var xhr = new XMLHttpRequest();
+                xhr.open("GET", url, cont ? true : false);
+                if (cont) xhr.onreadystatechange = function() {
+                        if (xhr.readyState == 4)
+                                m.call(cont, new LispCons(xhr.responseText, null));
+                };
+                xhr.send(null);
+                return cont ? null : xhr.responseText;
+        });
+
         /* -----[ macros/primitives ]----- */
 
         defp("macroexpand-1", false, function(m, nargs){
@@ -739,7 +762,8 @@
                 var pak = m.pop(), name = m.pop();
                 checktype(pak, LispPackage);
                 checktype(name, "string");
-                return pak.find_or_intern(name);
+                var sym = pak.find_or_intern(name);
+                return sym === S_NIL ? null : sym === S_T ? true : sym;
         });
 
         defp("%find-symbol", false, function(m, nargs){
@@ -815,6 +839,16 @@
                 code = LispMachine.assemble(code);
                 var f = new LispClosure(code, new LispCons([], null));
                 return m._callnext(f, null);
+        });
+
+        defp("%serialize-bytecode", false, function(m, nargs){
+                checknargs(nargs, 1, 2);
+                var strip = nargs == 2 ? m.pop() : null;
+                var func = m.pop();
+                checktype(func, LispClosure);
+                var code = strip ? func.code.slice(1, func.code.length - 1) : func.code;
+                var ret = LispMachine.serialize(code, strip);
+                return ret;
         });
 
         defp("%js-eval", true, function(m, nargs){
