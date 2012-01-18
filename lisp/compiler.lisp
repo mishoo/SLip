@@ -134,6 +134,8 @@
 
 ;;;; parser/compiler
 
+(%special! '*read-table* '*package*)
+
 (defun lisp-reader (text eof)
   (let ((input (%make-input-stream text))
         (in-qq 0))
@@ -414,25 +416,48 @@
                (comp-list (cdr exps) env))))
 
      (comp-if (pred then else env val? more?)
-       (let ((l1 (mklabel))
-             (l2 (mklabel)))
-         (%seq (comp pred env t t)
-               (gen "FJUMP" l1)
-               (comp then env val? more?)
-               (if more? (gen "JUMP" l2))
-               #( l1 )
-               (comp else env val? more?)
-               (if more? #( l2 )))))
+       (cond
+         ((not pred) (comp else env val? more?))
+         ((or (numberp pred)
+              (stringp pred)
+              (regexp pred)
+              (charp pred)
+              (vectorp pred)) (comp then env val? more?))
+         ((and (consp pred)
+               (eq (car pred) 'not))
+          (comp-if (cadr pred) else then env val? more?))
+         (t
+          (let ((pcode (comp pred env t t))
+                (tcode (comp then env val? more?))
+                (ecode (comp else env val? more?)))
+            (cond
+              ((equal tcode ecode)
+               (%seq (comp pcode env nil t) ecode))
+              ((zerop (length tcode)) (let ((l2 (mklabel)))
+                                        (%seq pcode (gen "TJUMP" l2) ecode
+                                              #( l2 )
+                                              (if more? nil (gen "RET")))))
+              ((zerop (length ecode)) (let ((l1 (mklabel)))
+                                        (%seq pcode (gen "FJUMP" l1) tcode
+                                              #( l1 )
+                                              (if more? nil (gen "RET")))))
+              (t (let ((l1 (mklabel))
+                       (l2 (if more? (mklabel))))
+                   (%seq pcode (gen "FJUMP" l1) tcode
+                         (if more? (gen "JUMP" l2))
+                         #( l1 ) ecode (if more? #( l2 ))))))))))
 
      (comp-funcall (f args env val? more?)
        (cond
          ((and (symbolp f)
                (%primitivep f)
                (not (find-var f env)))
-          (%seq (comp-list args env)
-                (gen "PRIM" f (length args))
-                (if val? nil (gen "POP"))
-                (if more? nil (gen "RET"))))
+          (if (and (not val?) (not (%prim-side-effects f)))
+              (comp-seq args env nil more?)
+              (%seq (comp-list args env)
+                    (gen "PRIM" f (length args))
+                    (if val? nil (gen "POP"))
+                    (if more? nil (gen "RET")))))
 
          ((and (consp f)
                (eq (car f) 'lambda)
@@ -570,3 +595,8 @@
 EOF
 
 (clog (compile-string (%js-eval "window.CURRENT_FILE")))
+
+;; (clog (%disassemble (compile '(lambda (p x y)
+;;                                (progn
+;;                                  (if (not p) (+ x y) (* x y))
+;;                                  z)))))

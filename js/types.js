@@ -77,12 +77,12 @@ var LispChar = DEFTYPE("char", function(D, P){
 
 var LispArray = DEFTYPE("array", function(D, P){
         P.INIT = function(val) {
-                this.value = val != null ? val : [];
+                this.value = val != null ? slice(val) : [];
         };
         P.length = function() {
                 return this.value.length;
         };
-        P.get = function(i) {
+        P.elt = function(i) {
                 return this.value[i];
         };
         P.set = function(i, val) {
@@ -165,7 +165,7 @@ var LispOutputStream = DEFTYPE("output_stream", function(D, P){
         };
 });
 
-var LispNamespace = DEFTYPE("namespace", function(D, P){
+var LispHash = DEFTYPE("namespace", function(D, P){
         P.INIT = function(parent) {
                 function ctor(){};
                 if (parent) ctor.prototype = parent.data;
@@ -186,13 +186,16 @@ var LispNamespace = DEFTYPE("namespace", function(D, P){
                 }
                 return null;
         };
+        P.serialize = function() {
+                return "h(" + LispChar.sanitize(JSON.stringify(this.data)) + ")";
+        };
 });
 
 var LispPackage = DEFTYPE("package", function(D, P){
         var PACKAGES = {};
         P.INIT = function(name) {
                 this.name = name + "";
-                this.symbols = new LispNamespace();
+                this.symbols = new LispHash();
                 this.exports = [];
                 this.uses = [];
         };
@@ -205,7 +208,7 @@ var LispPackage = DEFTYPE("package", function(D, P){
                         this.symbols.set(name, new LispSymbol(name, this));
         };
         P.export = function(sym) {
-                sym = this.find(sym.name);
+                sym = this.find(LispSymbol.symname(sym));
                 if (sym && this.exports.indexOf(sym) < 0) {
                         this.exports.push(sym);
                         return true;
@@ -216,7 +219,7 @@ var LispPackage = DEFTYPE("package", function(D, P){
                 var a = this.exports;
                 for (var i = a.length; --i >= 0;) {
                         var sym = a[i];
-                        if (sym.name == name)
+                        if (LispSymbol.symname(sym) == name)
                                 return sym;
                 }
                 a = this.uses;
@@ -260,6 +263,9 @@ var LispPackage = DEFTYPE("package", function(D, P){
 
 var LispSymbol = DEFTYPE("symbol", function(D, P){
         var SYMBOLS = {};
+        D.symname = function(sym) {
+                return sym === null ? "NIL" : sym === true ? "T" : sym.name;
+        };
         D.is = function(thing) {
                 return thing === true || thing === null || thing instanceof D;
         };

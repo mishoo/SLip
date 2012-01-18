@@ -1,21 +1,30 @@
-(function(CL, KW){
+(function(BASE_PACK, KW){
 
         var CURRENT = null;
         var MACHINE = null;
 
         var S_NIL = LispSymbol.get("NIL");
         var S_T = LispSymbol.get("T");
+        var ALL_PRIMITIVES = null;
 
         function defp(name, seff, func) {
                 name = name.toUpperCase();
-                var sym = CL.intern(name);
-                CL.export(sym);
+                var sym = BASE_PACK.intern(name);
+                BASE_PACK.export(sym);
                 sym.set("primitive", function(m, nargs){
                         CURRENT = name;
                         MACHINE = name;
                         return func(m, nargs);
                 });
                 sym.set("primitive-side-effects", seff);
+                sym.value = new LispClosure(LispMachine.assemble([
+                        [ "ARG_", 0 ],
+                        [ "CONST", sym ],
+                        [ "LVAR", 0, 0 ],
+                        [ "PRIM", LispSymbol.get("%PRIM-APPLY"), 2 ],
+                        [ "RET" ]
+                ]), null, sym);
+                ALL_PRIMITIVES = new LispCons(sym, ALL_PRIMITIVES);
         };
 
         /// utilities
@@ -41,14 +50,45 @@
 
         /* -----[ conditionals ]----- */
 
-        defp("eq", false, function(m, nargs){
-                checknargs(nargs, 2, 2);
-                var a = m.pop(), b = m.pop();
+        function eq(a, b) {
                 return (a === S_NIL && b === null) ||
                         (a === null && b === S_NIL) ||
                         (a === S_T && b === true) ||
                         (a === true && b === S_T) ||
                         a === b ? true : null;
+        };
+
+        function equal(a, b) {
+                if (LispList.is(a) && LispList.is(b)) {
+                        while (a !== null && b !== null) {
+                                if (!equal(a.car, b.car)) return null;
+                                a = a.cdr;
+                                b = b.cdr;
+                        }
+                        return eq(a, b);
+                } else if (LispArray.is(a) && LispArray.is(b)) {
+                        a = a.value; b = b.value;
+                        var i = a.length;
+                        if (i !== b.length) return null;
+                        while (--i >= 0) {
+                                if (!equal(a[i], b[i])) return null;
+                        }
+                        return true;
+                } else if (LispRegexp.is(a) && LispRegexp.is(b)) {
+                        return a.value.toString() == b.value.toString();
+                } else return eq(a, b);
+        };
+
+        defp("eq", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var a = m.pop(), b = m.pop();
+                return eq(a, b);
+        });
+
+        defp("equal", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var a = m.pop(), b = m.pop();
+                return equal(a, b);
         });
 
         defp("/=", false, function(m, nargs){
@@ -341,7 +381,7 @@
                                 break;
                             default:
                                 if (LispChar.is(arg)) ret = arg.value + ret;
-                                else if (LispSymbol.is(arg)) ret = arg.name + ret;
+                                else if (LispSymbol.is(arg)) ret = LispSymbol.symname(arg) + ret;
                                 else error("Unrecognized argument type");
                         }
                 }
@@ -564,6 +604,56 @@
                 return isNaN(ret) ? null : ret;
         });
 
+        /* -----[ simple hashes ]----- */
+
+        defp("make-hash", false, function(m, nargs){
+                if (nargs & 1) error("Odd number of arguments");
+                var keys = [], values = [];
+                while (nargs > 0) {
+                        values.push(m.pop());
+                        keys.push(m.pop());
+                        nargs -= 2;
+                }
+                var hash = new LispHash();
+                keys.forEach(function(key, i){
+                        if (LispSymbol.is(key)) key = LispSymbol.symname(key);
+                        hash.set(key, values[i]);
+                });
+                return hash;
+        });
+
+        defp("hash-get", false, function(m, nargs){
+                checknargs(nargs, 2, 3);
+                var def = (nargs == 3) ? m.pop() : null;
+                var key = m.pop(), hash = m.pop();
+                if (LispSymbol.is(key)) key = LispSymbol.symname(key);
+                checktype(key, "string");
+                checktype(hash, LispHash);
+                var h = hash.has(key);
+                if (h) return h.get(key);
+                return def;
+        });
+
+        defp("hash-add", true, function(m, nargs){
+                checknargs(nargs, 3, 3);
+                var val = m.pop(), key = m.pop(), hash = m.pop();
+                if (LispSymbol.is(key)) key = LispSymbol.symname(key);
+                checktype(key, "string");
+                checktype(hash, LispHash);
+                return hash.set(key, val);
+        });
+
+        defp("hash-set", true, function(m, nargs){
+                checknargs(nargs, 3, 3);
+                var val = m.pop(), key = m.pop(), hash = m.pop();
+                if (LispSymbol.is(key)) key = LispSymbol.symname(key);
+                checktype(key, "string");
+                checktype(hash, LispHash);
+                var h = hash.has(key);
+                if (h) return h.set(key, val);
+                return hash.set(key, val);
+        });
+
         /* -----[ simple streams ]----- */
 
         defp("%make-input-stream", false, function(m, nargs){
@@ -699,6 +789,13 @@
                 return sym.primitive();
         });
 
+        defp("%prim-side-effects", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var sym = m.pop();
+                checktype(sym, LispSymbol);
+                return sym.get("primitive-side-effects") ? true : null;
+        });
+
         defp("%macro!", true, function(m, nargs){
                 checknargs(nargs, 2, 2);
                 var func = m.pop(), sym = m.pop();
@@ -710,7 +807,7 @@
 
         /* -----[ symbols, packages ]----- */
 
-        defp("%special", false, function(m, nargs){
+        defp("%special!", true, function(m, nargs){
                 checknargs(nargs, 1);
                 while (nargs-- > 0) {
                         var name = m.pop();
@@ -724,16 +821,7 @@
                 checknargs(nargs, 1, 1);
                 var sym = m.pop();
                 checktype(sym, LispSymbol);
-                return sym.special();
-        });
-
-        defp("%set-function-name", true, function(m, nargs){
-                checknargs(nargs, 2, 2);
-                var symbol = m.pop(), f = m.pop();
-                checktype(symbol, LispSymbol);
-                checktype(f, LispClosure);
-                f.name = symbol;
-                return f;
+                return sym !== null && sym !== true && sym.special() ? true : null;
         });
 
         defp("%function-name", true, function(m, nargs){
@@ -793,7 +881,7 @@
                 checknargs(nargs, 1, 1);
                 var symbol = m.pop();
                 checktype(symbol, LispSymbol);
-                return symbol.name;
+                return LispSymbol.symname(symbol);
         });
 
         defp("%symbol-package", false, function(m, nargs){
@@ -809,6 +897,25 @@
                 checktype(current, LispPackage);
                 checktype(imported, LispPackage);
                 return current.use(imported);
+        });
+
+        defp("%all-primitives", false, function(m, nargs){
+                checknargs(nargs, 0, 0);
+                return ALL_PRIMITIVES;
+        });
+
+        defp("set", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var val = m.pop(), sym = m.pop();
+                checktype(sym, LispSymbol);
+                return sym.value = val;
+        });
+
+        defp("symbol-value", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var sym = m.pop();
+                checktype(sym, LispSymbol);
+                return HOP(sym, "value") ? sym.value : null;
         });
 
         /* -----[ conditions ]----- */

@@ -15,20 +15,25 @@
         this.machine = m;
 
         // load the compiler
-        load("../lisp/test.sslc", function(code){
+        load("test.sslc", function(code){
                 code = LispMachine.unserialize(code);
                 m.run(code);
                 step2();
         });
 
         var EOF = {};
-        function parse(str) {
+        function load_lisp(file) {
                 var func = LispSymbol.get("LOAD-LISP-FILE").value;
-                return m.call(func, LispCons.fromArray([ "../lisp/compiler.lisp" ]));
+                return m.call(func, LispCons.fromArray([ file ]));
         };
 
         function step2() {
-                console.log(LispMachine.dump(parse("(foo 'bar baz)")))
+                time_it("recompile-compiler", function(){
+                        load_lisp("../lisp/compiler.lisp");
+                });
+                time_it("init", function(){
+                        load_lisp("../lisp/init.lisp");
+                });
         };
 
 })();

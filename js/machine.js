@@ -158,8 +158,30 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         inc_stat("drop_label");
                                         return true;
                                 }
+                                return false;
                         }
-                        else switch (el[0]) {
+                        switch (el[0]) {
+                            case "JUMP":
+                            case "TJUMP":
+                            case "FJUMP":
+                                for (var j = i + 1; j < code.length && LispSymbol.is(code[j]); ++j) {
+                                        if (el[1] === code[j]) {
+                                                if (el[0] == "JUMP") code.splice(i, 1);
+                                                else code.splice(i, 1, [ "POP" ]);
+                                                inc_stat("jumps");
+                                                return true;
+                                        }
+                                }
+                                break;
+                            case "LVAR":
+                            case "GVAR":
+                                if (i < code.length - 1 && code[i+1][0] == "POP") {
+                                        code.splice(i, 2);
+                                        return true;
+                                }
+                                break;
+                        }
+                        switch (el[0]) {
                             case "GSET":
                             case "GVAR":
                                 if (i < code.length - 2 &&
@@ -195,13 +217,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 }
                                 break;
                             case "JUMP":
-                                for (var j = i + 1; j < code.length && LispSymbol.is(code[j]); ++j) {
-                                        if (el[1] === code[j]) {
-                                                code.splice(i, 1);
-                                                inc_stat("jumps");
-                                                return true;
-                                        }
-                                }
                                 var idx = find_target(code, el[1]);
                                 if (idx >= 0 && idx < code.length - 1 &&
                                     (code[idx + 1][0] == "JUMP" || code[idx + 1][0] == "RET")) {
@@ -624,7 +639,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         D.dump = function(thing) {
                 if (thing === null) return "NIL";
                 if (thing === true) return "T";
-                if (typeof thing == "string") return thing;
+                if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
                 if (LispChar.is(thing)) return thing.print();
                 if (LispPackage.is(thing)) return thing.name;
                 if (LispSymbol.is(thing)) return thing.dump();
