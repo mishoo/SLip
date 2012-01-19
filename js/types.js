@@ -269,28 +269,28 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                         ")";
         };
         P.set = function(key, val) {
-                this.plist[key] = val;
+                return this.plist[key] = val;
         };
         P.get = function(key) {
                 return HOP(this.plist, key) ? this.plist[key] : null;
         };
         P.setv = function(key, val) {
-                this.vlist[key] = val;
+                return this.vlist[key] = val;
         };
         P.getv = function(key) {
                 return HOP(this.vlist, key) ? this.vlist[key] : null;
         };
         P.macro = function() {
-                return this.getv("macro");
+                return this.getv("macro") || null;
         };
         P.special = function() {
-                return this.getv("special");
+                return this.getv("special") || null;
         };
         P.primitive = function() {
-                return this.getv("primitive");
+                return this.getv("primitive") || null;
         };
         P.func = function() {
-                return this.getv("function");
+                return this.getv("function") || null;
         };
         D.get = function(name, pak) {
                 if (pak == null) pak = BASE_PACK.intern("*PACKAGE*").value;

@@ -464,7 +464,7 @@ function lisp_reader(code) {
                                 return gen("BIND", b.names[i], i)[0];
                         }),
                         comp_seq(body, [ b.names ].concat(env), VAL, true),
-                        gen("UNFR", 1, b.specials.length),
+                        gen("UNFR", 1, b.specials.length, 0),
                         MORE ? [] : gen("RET")
                 );
                 return ret;
@@ -489,7 +489,7 @@ function lisp_reader(code) {
                                 return x;
                         })),
                         comp_seq(body, env, VAL, true),
-                        gen("UNFR", 1, b.specials.length),
+                        gen("UNFR", 1, b.specials.length, 0),
                         MORE ? [] : gen("RET")
                 );
                 return ret;

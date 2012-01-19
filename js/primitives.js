@@ -17,13 +17,13 @@
                         return func(m, nargs);
                 });
                 sym.setv("primitive-side-effects", seff);
-                sym.value = new LispClosure(LispMachine.assemble([
+                sym.setv("function", new LispClosure(LispMachine.assemble([
                         [ "ARG_", 0 ],
                         [ "CONST", sym ],
                         [ "LVAR", 0, 0 ],
                         [ "PRIM", LispSymbol.get("%PRIM-APPLY"), 2 ],
                         [ "RET" ]
-                ]), null, sym);
+                ]), null, null, sym));
                 ALL_PRIMITIVES = new LispCons(sym, ALL_PRIMITIVES);
         };
 
@@ -954,6 +954,21 @@
                 return HOP(sym, "value") ? sym.value : null;
         });
 
+        defp("symbol-function", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var sym = m.pop();
+                checktype(sym, LispSymbol);
+                return sym.func();
+        });
+
+        defp("set-symbol-function!", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var func = m.pop(), sym = m.pop();
+                checktype(sym, LispSymbol);
+                checktype(func, LispClosure);
+                return sym.setv("function", func);
+        });
+
         /* -----[ conditions ]----- */
 
         // pretty sucky, need to think how to do it properly
@@ -967,7 +982,7 @@
         defp("%warn", true, function(m, nargs){
                 var a = [];
                 while (nargs-- > 0) a.unshift(m.pop());
-                console.log(a.map(LispMachine.dump).join(" "));
+                console.warn(a.join(" "));
                 return null;
         });
 

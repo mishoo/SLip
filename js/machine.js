@@ -265,6 +265,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 if (i < code.length - 1 && code[i+1][0] == "UNFR") {
                                         code[i][1] += code[i+1][1];
                                         code[i][2] += code[i+1][2];
+                                        code[i][3] += code[i+1][3];
                                         code.splice(i + 1, 1);
                                         inc_stat("join_unfr");
                                         return true;
@@ -378,9 +379,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 var l = labels[i] || "";
                                 if (l) l += ":";
                                 var data;
-                                switch (op._name) {
+                                var opcode = op._name;
+                                switch (opcode) {
                                     case "FN":
-                                        data = op.name + "\n" + disassemble(op.code, level + 1);
+                                        opcode = "λ:" + op.name;
+                                        data = "\n" + disassemble(op.code, level + 1);
                                         break;
                                     case "JUMP":
                                     case "TJUMP":
@@ -398,7 +401,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 }
                                 var line = pad_string(l, INDENT_LEVEL)
                                         + indent(level)
-                                        + pad_string(op._name, INDENT_LEVEL)
+                                        + pad_string(opcode, INDENT_LEVEL)
                                         + data;
                                 return line;
                         }).join("\n");
@@ -530,7 +533,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 // LABELS) means that we just reserve
                                 // the space but not touch the stack.
                                 var count = this.count, frame = [];
-                                while (--count >= 0) frame[count] = m.pop();
+                                while (count > 0) frame[--count] = m.pop();
                                 m.fenv = new LispCons(frame, m.fenv);
                         }
                 }],
@@ -597,7 +600,10 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         run: function(m){
                                 m.n_args = this.count;
                                 var closure = m.pop();
-                                m.code = closure.code; m.env = closure.env; m.pc = 0;
+                                m.code = closure.code;
+                                m.env = closure.env;
+                                m.fenv = closure.fenv;
+                                m.pc = 0;
                         }
                 }],
                 ["ARGS", "count", {
@@ -650,12 +656,14 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.env.car.push(m.pop());
                         }
                 }],
-                ["UNFR", "lex spec", {
+                ["UNFR", "lex spec func", {
                         run: function(m) {
                                 var n = this.lex;
                                 while (n-- > 0) m.env = m.env.cdr;
                                 n = this.spec;
                                 while (n-- > 0) m.denv = m.denv.cdr;
+                                n = this.func;
+                                while (n-- > 0) m.fenv = m.fenv.cdr;
                         }
                 }],
                 ["FN", "code name", {

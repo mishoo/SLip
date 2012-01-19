@@ -315,6 +315,20 @@
           (col (%stream-col input))
           (line (%stream-line input)))))))
 
+(defun make-environment ()
+  (make-hash :vars nil :funcs nil))
+
+(defun environment-vars (env)
+  (hash-get env :vars))
+
+(defun environment-funcs (env)
+  (hash-get env :funcs))
+
+(defun environment-extend (env key val)
+  (let ((h (hash-copy env)))
+    (hash-add h key (cons val (hash-get h key)))
+    h))
+
 (labels
     ((assert (p msg)
        (unless p (%error msg)))
@@ -340,14 +354,14 @@
      (gen-var (name env)
        (if (%specialp name)
            (gen "GVAR" name)
-           (aif (find-var name env)
+           (aif (find-var name (environment-vars env))
                 (gen "LVAR" (car it) (cdr it))
                 (gen "GVAR" name))))
 
      (gen-set (name env)
        (if (%specialp name)
            (gen "GSET" name)
-           (aif (find-var name env)
+           (aif (find-var name (environment-vars env))
                 (gen "LSET" (car it) (cdr it))
                 (gen "GSET" name))))
 
@@ -384,6 +398,8 @@
                    (if val? (%seq (gen "CC"))))
               (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
+              (labels (comp-labels (cadr x) (cddr x) env val? more?))
+              (flet (comp-flet (cadr x) (cddr x) env val? more?))
               (lambda (if val?
                           (%seq (comp-lambda nil (cadr x) (cddr x) env)
                                 (if more? nil (gen "RET")))))
@@ -448,34 +464,42 @@
                          #( l1 ) ecode (if more? #( l2 ))))))))))
 
      (comp-funcall (f args env val? more?)
-       (cond
-         ((and (symbolp f)
-               (%primitivep f)
-               (not (find-var f env)))
-          (if (and (not val?) (not (%prim-side-effects f)))
-              (comp-seq args env nil more?)
-              (%seq (comp-list args env)
-                    (gen "PRIM" f (length args))
-                    (if val? nil (gen "POP"))
-                    (if more? nil (gen "RET")))))
+       (labels ((mkret (the-function)
+                  (cond
+                    (more? (let ((k (mklabel)))
+                             (%seq (gen "SAVE" k)
+                                   (comp-list args env)
+                                   the-function
+                                   (gen "CALL" (length args))
+                                   #( k )
+                                   (if val? nil (gen "POP")))))
 
-         ((and (consp f)
-               (eq (car f) 'lambda)
-               (not (cadr f)))
-          (assert (not args) "Too many arguments")
-          (comp-seq (cddr f) env val? more?))
-
-         (more? (let ((k (mklabel)))
-                  (%seq (gen "SAVE" k)
-                        (comp-list args env)
-                        (comp f env t t)
-                        (gen "CALL" (length args))
-                        #( k )
-                        (if val? nil (gen "POP")))))
-
-         (t (%seq (comp-list args env)
-                  (comp f env t t)
-                  (gen "CALL" (length args))))))
+                    (t (%seq (comp-list args env)
+                             the-function
+                             (gen "CALL" (length args)))))))
+         (cond
+           ((symbolp f)
+            (let ((localfun (find-var f (environment-funcs env))))
+              (cond
+                (localfun
+                 (mkret (gen "FVAR" (car localfun) (cdr localfun))))
+                ((%primitivep f)
+                 (if (and (not val?) (not (%prim-side-effects f)))
+                     (comp-seq args env nil more?)
+                     (%seq (comp-list args env)
+                           (gen "PRIM" f (length args))
+                           (if val? nil (gen "POP"))
+                           (if more? nil (gen "RET")))))
+                (t
+                 (unless (symbol-function f)
+                   (%warn "Undefined function" f))
+                 (mkret (gen "FGVAR" f))))))
+           ((and (consp f)
+                 (eq (car f) 'lambda)
+                 (not (cadr f)))
+            (assert (not args) "Too many arguments")
+            (comp-seq (cddr f) env val? more?))
+           (t (mkret (comp f env t t))))))
 
      (gen-args (args n)
        (cond
@@ -500,33 +524,71 @@
                                       (push #("BIND" x i) dyn))
                                     (%incf i)))
                     (%seq dyn
-                          (comp-seq body (cons args env) t nil))))
+                          (comp-seq body (environment-extend env :vars args) t nil))))
             name))
+
+     (get-bindings (bindings vars?)
+       (let (names vals specials (i 0))
+         (foreach bindings (lambda (x)
+                             (if (consp x)
+                                 (progn (push (if vars? (cadr x) (cdr x)) vals)
+                                        (set! x (car x)))
+                                 (if vars?
+                                     (push nil vals)
+                                     (%error "Malformed LABELS/FLET/MACROLET")))
+                             (when (member x names)
+                               (error "Duplicate name in LET/LABELS/FLET/MACROLET"))
+                             (push x names)
+                             (when (and vars? (%specialp x))
+                               (push (cons x i) specials))
+                             (%incf i)))
+         (list (reverse names) (reverse vals) i (reverse specials))))
+
+     (comp-labels (bindings body env val? more?)
+       (if bindings
+           (let* ((bindings (get-bindings bindings nil))
+                  (names (car bindings))
+                  (funcs (cadr bindings))
+                  (len (caddr bindings)))
+             (set! env (environment-extend env :funcs names))
+             (let ((i 0))
+               (%seq (gen "FUNCS" 0)
+                     (%prim-apply
+                      '%seq (mapcar (lambda (name func)
+                                      (%seq (comp-lambda name (car func) (cdr func) env)
+                                            (gen "FSET" 0 (prog1 i (%incf i)))))
+                                    names funcs))
+                     (comp-seq body env val? t)
+                     (gen "UNFR" 0 0 1)
+                     (if more? nil (gen "RET")))))
+           (comp-seq body env val? more?)))
+
+     (comp-flet (bindings body env val? more?)
+       (if bindings
+           (let* ((bindings (get-bindings bindings nil))
+                  (names (car bindings))
+                  (funcs (cadr bindings))
+                  (len (caddr bindings)))
+             (%seq (%prim-apply
+                    '%seq (mapcar (lambda (name func)
+                                    (comp-lambda name (car func) (cdr func) env))
+                                  names funcs))
+                   (gen "FUNCS" len)
+                   (comp-seq body (environment-extend env :funcs names) val? t)
+                   (gen "UNFR" 0 0 1)
+                   (if more? nil (gen "RET"))))
+           (comp-seq body env val? more?)))
 
      (comp-macroexpand (sym args env val? more?)
        (comp (%apply (%macro sym) args) env val? more?))
 
-     (get-bindings (bindings)
-       (let (names vals specials (i 0))
-         (foreach bindings (lambda (x)
-                             (if (consp x)
-                                 (progn (push (cadr x) vals)
-                                        (set! x (car x)))
-                                 (push nil vals))
-                             (when (member x names)
-                               (error "Duplicate name in LET"))
-                             (push x names)
-                             (when (%specialp x) (push (cons x i) specials))
-                             (%incf i)))
-         (list (reverse names) (reverse vals) (reverse specials) i)))
-
      (comp-let (bindings body env val? more?)
        (if bindings
-           (let* ((bindings (get-bindings bindings))
+           (let* ((bindings (get-bindings bindings t))
                   (names (car bindings))
                   (vals (cadr bindings))
-                  (specials (caddr bindings))
-                  (len (cadddr bindings)))
+                  (len (caddr bindings))
+                  (specials (cadddr bindings)))
              (%seq (%prim-apply '%seq (map (lambda (x)
                                              (comp x env t t))
                                            vals))
@@ -534,17 +596,17 @@
                    (%prim-apply '%seq (map (lambda (x)
                                              (gen "BIND" (car x) (cdr x)))
                                            specials))
-                   (comp-seq body (cons names env) val? t)
-                   (gen "UNFR" 1 (length specials))
+                   (comp-seq body (environment-extend env :vars names) val? t)
+                   (gen "UNFR" 1 (length specials) 0)
                    (if more? nil (gen "RET"))))
            (comp-seq body env val? more?)))
 
      (comp-let* (bindings body env val? more?)
        (if bindings
-           (let* ((bindings (get-bindings bindings))
+           (let* ((bindings (get-bindings bindings t))
                   (names (car bindings))
                   (vals (cadr bindings))
-                  (specials (caddr bindings))
+                  (specials (cadddr bindings))
                   (i 0)
                   newargs)
              (%seq (%prim-apply
@@ -558,11 +620,11 @@
                                       (let ((cell (cons name nil)))
                                         (if newargs
                                             (rplacd newargs cell)
-                                            (set! env (cons cell env)))
+                                            (set! env (environment-extend env :vars cell)))
                                         (set! newargs cell))))
                                   names vals))
-                   (comp-seq body env val? true)
-                   (gen "UNFR" 1 (length specials))
+                   (comp-seq body env val? t)
+                   (gen "UNFR" 1 (length specials) 0)
                    (if more? nil (gen "RET"))))
            (comp-seq body env val? more?))))
 
@@ -570,7 +632,7 @@
     (assert (and (consp exp)
                  (eq (car exp) 'lambda))
             "Expecting (LAMBDA (...) ...) in COMPILE")
-    (%eval-bytecode (comp exp nil t nil))))
+    (%eval-bytecode (comp exp (make-environment) t nil))))
 
 (defun compile-string (str)
   (let ((reader (lisp-reader str 'EOF))
@@ -594,7 +656,19 @@
 
 EOF
 
-(console.print (compile-string (%js-eval "window.CURRENT_FILE")))
+(let ((f (compile '(lambda ()
+                    (labels ((sqr (x) (* x x))
+                             (mul (x y) (* x y))
+                             (crap (x y) (mul (sqr x) (sqr y))))
+                      (flet ((foo (x)
+                               (* (sqr x) 2)))
+                        (console.log (crap (foo 2) (foo 2)))
+                        (bubulina 2 3)))))))
+  (console.print (%disassemble f))
+  ;; (f)
+  )
+
+;; (console.print (compile-string (%js-eval "window.CURRENT_FILE")))
 
 ;; (console.print (%disassemble (compile '(lambda (p x y)
 ;;                                (progn
