@@ -247,6 +247,7 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                         this.name = name + "";
                         this.pak = pak || null;
                         this.plist = {};
+                        this.vlist = {};
                 }
         };
         P.toString = function() { return this.name };
@@ -262,14 +263,20 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         P.get = function(key) {
                 return HOP(this.plist, key) ? this.plist[key] : null;
         };
+        P.setv = function(key, val) {
+                this.vlist[key] = val;
+        };
+        P.getv = function(key) {
+                return HOP(this.vlist, key) ? this.vlist[key] : null;
+        };
         P.macro = function() {
-                return this.get("macro");
+                return this.getv("macro");
         };
         P.special = function() {
-                return this.get("special");
+                return this.getv("special");
         };
         P.primitive = function() {
-                return this.get("primitive");
+                return this.getv("primitive");
         };
         D.get = function(name, pak) {
                 if (pak == null) pak = BASE_PACK.intern("*PACKAGE*").value;
@@ -288,5 +295,5 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
 (function(BASE_PACK){
         var pak = BASE_PACK.intern("*PACKAGE*");
         pak.value = BASE_PACK;
-        pak.set("special", true);
+        pak.setv("special", true);
 })(LispPackage.get("%"))

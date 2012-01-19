@@ -497,7 +497,7 @@ function lisp_reader(code) {
 
         function comp_funcall(f, args, env, VAL, MORE) {
                 if (LispSymbol.is(f) && f.primitive() && !find_var(f, env)) {
-                        if (!VAL && !f.get("primitive-side-effects")) {
+                        if (!VAL && !f.getv("primitive-side-effects")) {
                                 return comp_seq(args, env, false, MORE);
                         }
                         return seq(comp_list(args, env),

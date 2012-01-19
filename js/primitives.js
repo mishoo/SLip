@@ -11,12 +11,12 @@
                 name = name.toUpperCase();
                 var sym = BASE_PACK.intern(name);
                 BASE_PACK.export(sym);
-                sym.set("primitive", function(m, nargs){
+                sym.setv("primitive", function(m, nargs){
                         CURRENT = name;
                         MACHINE = name;
                         return func(m, nargs);
                 });
-                sym.set("primitive-side-effects", seff);
+                sym.setv("primitive-side-effects", seff);
                 sym.value = new LispClosure(LispMachine.assemble([
                         [ "ARG_", 0 ],
                         [ "CONST", sym ],
@@ -815,7 +815,7 @@
                 checknargs(nargs, 1, 1);
                 var sym = m.pop();
                 checktype(sym, LispSymbol);
-                return sym.get("primitive-side-effects") ? true : null;
+                return sym.getv("primitive-side-effects") ? true : null;
         });
 
         defp("%macro!", true, function(m, nargs){
@@ -823,7 +823,7 @@
                 var func = m.pop(), sym = m.pop();
                 checktype(func, LispClosure);
                 checktype(sym, LispSymbol);
-                sym.set("macro", func);
+                sym.setv("macro", func);
                 return sym;
         });
 
@@ -834,7 +834,7 @@
                 while (nargs-- > 0) {
                         var name = m.pop();
                         checktype(name, LispSymbol);
-                        name.set("special", true);
+                        name.setv("special", true);
                 }
                 return null;
         });
