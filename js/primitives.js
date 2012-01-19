@@ -676,6 +676,20 @@
                 return hash.set(key, val);
         });
 
+        defp("hash-copy", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var hash = m.pop();
+                checktype(hash, LispHash);
+                return hash.copy();
+        });
+
+        defp("hash-extend", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var hash = m.pop();
+                checktype(hash, LispHash);
+                return hash.extend();
+        });
+
         /* -----[ simple streams ]----- */
 
         defp("%make-input-stream", false, function(m, nargs){
@@ -948,6 +962,13 @@
                 var msg = m.pop();
                 checktype(msg, LispString);
                 error(msg);
+        });
+
+        defp("%warn", true, function(m, nargs){
+                var a = [];
+                while (nargs-- > 0) a.unshift(m.pop());
+                console.log(a.map(LispMachine.dump).join(" "));
+                return null;
         });
 
         /* -----[ other ]----- */

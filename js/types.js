@@ -139,7 +139,7 @@ var LispHash = DEFTYPE("namespace", function(D, P){
                         this.level = 0;
                 }
                 this.data = new ctor;
-                this.parent = parent;
+                this.parent = parent || null;
         };
         P.get = function(name) {
                 return HOP(this.data, name) ? this.data[name] : null;
@@ -162,6 +162,16 @@ var LispHash = DEFTYPE("namespace", function(D, P){
         };
         P.serialize = function() {
                 return "h(" + LispChar.sanitize(JSON.stringify(this.data)) + ")";
+        };
+        P.copy = function() {
+                var copy = new LispHash(this.parent);
+                for (var i in this.data) if (HOP(this.data, i)) {
+                        copy.data[i] = this.data[i];
+                }
+                return copy;
+        };
+        P.extend = function() {
+                return new LispHash(this);
         };
 });
 
