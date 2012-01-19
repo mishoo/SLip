@@ -75,43 +75,6 @@ var LispChar = DEFTYPE("char", function(D, P){
         };
 });
 
-var LispArray = DEFTYPE("array", function(D, P){
-        P.INIT = function(val) {
-                this.value = val != null ? slice(val) : [];
-        };
-        P.length = function() {
-                return this.value.length;
-        };
-        P.elt = function(i) {
-                return this.value[i];
-        };
-        P.set = function(i, val) {
-                this.value[i] = val;
-        };
-        P.print = function() {
-                return "#(" + this.value.map(LispMachine.dump).join(" ") + ")";
-        };
-});
-
-var LispRegexp = DEFTYPE("regexp", function(D, P){
-        P.INIT = function(val) {
-                this.value = val;
-        };
-        P.print = function() {
-                return "<regexp " + this.value + ">";
-        };
-        P.test = function(str) {
-                return this.value.test(str) ? true : null;
-        };
-        P.exec = function(str) {
-                var m = this.value.exec(str);
-                return m ? new LispArray(m) : null;
-        };
-        P.serialize = function() {
-                return "rx(" + this.value + ")";
-        };
-});
-
 var LispClosure = DEFTYPE("closure", function(D, P){
         P.INIT = function(code, env, name) {
                 this.name = name;
@@ -168,7 +131,12 @@ var LispOutputStream = DEFTYPE("output_stream", function(D, P){
 var LispHash = DEFTYPE("namespace", function(D, P){
         P.INIT = function(parent) {
                 function ctor(){};
-                if (parent) ctor.prototype = parent.data;
+                if (parent) {
+                        ctor.prototype = parent.data;
+                        this.level = parent.level + 1;
+                } else {
+                        this.level = 0;
+                }
                 this.data = new ctor;
                 this.parent = parent;
         };
@@ -185,6 +153,11 @@ var LispHash = DEFTYPE("namespace", function(D, P){
                         p = p.parent;
                 }
                 return null;
+        };
+        P.size = function() {
+                var count = 0;
+                for (var i in this.data) if (HOP(this.data, i)) ++count;
+                return count;
         };
         P.serialize = function() {
                 return "h(" + LispChar.sanitize(JSON.stringify(this.data)) + ")";

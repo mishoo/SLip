@@ -594,9 +594,9 @@
 
 EOF
 
-(clog (compile-string (%js-eval "window.CURRENT_FILE")))
+(console.print (compile-string (%js-eval "window.CURRENT_FILE")))
 
-;; (clog (%disassemble (compile '(lambda (p x y)
+;; (console.print (%disassemble (compile '(lambda (p x y)
 ;;                                (progn
 ;;                                  (if (not p) (+ x y) (* x y))
 ;;                                  z)))))

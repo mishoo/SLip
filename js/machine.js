@@ -297,7 +297,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         x === null ||
                         typeof x == "number" ||
                         typeof x == "string" ||
-                        LispRegexp.is(x) ||
+                        x instanceof RegExp ||
                         LispChar.is(x) ||
                         LispSymbol.is(x);
         };
@@ -407,14 +407,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 names.push("l"); values.push(function(){
                         return LispCons.fromArray(slice(arguments));
                 });
-                names.push("v"); values.push(function(){
-                        return new LispArray(slice(arguments));
-                });
                 names.push("c"); values.push(function(char){
                         return LispChar.get(char);
-                });
-                names.push("rx"); values.push(function(rx){
-                        return new LispRegexp(rx);
                 });
                 names.push("DOT"); values.push(LispCons.DOT);
                 if (code) code += ",";
@@ -427,10 +421,10 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         function serialize_const(val) {
                 if (val === null || val === true) return val + "";
                 if (LispSymbol.is(val)) return val.serialize();
-                if (LispRegexp.is(val)) return val.serialize();
+                if (val instanceof RegExp) return val.toString();
                 if (LispChar.is(val)) return val.serialize();
                 if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(serialize_const).join(",") + ")";
-                if (val instanceof Array) return "v(" + val.map(serialize_const).join(",") + ")";
+                if (val instanceof Array) return "[" + val.map(serialize_const).join(",") + "]";
                 if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
                 return val + "";
         };

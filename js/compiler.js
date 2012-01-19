@@ -99,7 +99,7 @@ function lisp_reader(code) {
                                 return true;
                         }
                 }).toLowerCase();
-                return new LispRegexp(new RegExp(str, mods));
+                return new RegExp(str, mods);
         };
         function skip_comment() {
                 read_while(function(ch){ return ch != "\n"; });
