@@ -76,10 +76,11 @@ var LispChar = DEFTYPE("char", function(D, P){
 });
 
 var LispClosure = DEFTYPE("closure", function(D, P){
-        P.INIT = function(code, env, name) {
-                this.name = name;
+        P.INIT = function(code, env, fenv, name) {
                 this.code = code;
-                this.env = env;
+                this.env = env || null;
+                this.fenv = fenv || null;
+                this.name = name || null;
         };
         P.print = function() {
                 return "<function" + (this.name ? " " + this.name : "") + ">";
@@ -277,6 +278,9 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         };
         P.primitive = function() {
                 return this.getv("primitive");
+        };
+        P.func = function() {
+                return this.getv("function");
         };
         D.get = function(name, pak) {
                 if (pak == null) pak = BASE_PACK.intern("*PACKAGE*").value;

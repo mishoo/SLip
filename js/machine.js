@@ -1,9 +1,10 @@
 var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
-        function LispRet(code, pc, env, denv) {
-                this.code = code;
+        function LispRet(m, pc) {
                 this.pc = pc;
-                this.env = env;
-                this.denv = denv;
+                this.code = m.code;
+                this.env = m.env;
+                this.fenv = m.fenv;
+                this.denv = m.denv;
         };
 
         function LispCC(stack, denv) {
@@ -23,6 +24,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.stack = null;
                 this.env = null;
                 this.denv = null;
+                this.fenv = null;
                 this.n_args = null;
         };
 
@@ -35,6 +37,22 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 var e = this.env;
                 while (i-- > 0) e = e.cdr;
                 e.car[j] = val;
+        };
+        P.fvar = function(i, j) {
+                var e = this.fenv;
+                while (i-- > 0) e = e.cdr;
+                return e.car[j];
+        };
+        P.fset = function(i, j, val) {
+                var e = this.fenv;
+                while (i-- > 0) e = e.cdr;
+                e.car[j] = val;
+        };
+        P.fgvar = function(symbol) {
+                return symbol.func();
+        };
+        P.fgset = function(symbol, val) {
+                symbol.setv("function", val);
         };
         P.find_dvar = function(symbol) {
                 if (symbol.special()) {
@@ -74,12 +92,13 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 return n;
         };
         P.mkret = function(pc) {
-                return new LispRet(this.code, pc, this.env, this.denv);
+                return new LispRet(this, pc);
         };
         P.unret = function(ret) {
                 this.code = ret.code;
                 this.pc = ret.pc;
                 this.env = ret.env;
+                this.fenv = ret.fenv;
                 this.denv = ret.denv;
         };
         P.mkcont = function() {
@@ -100,7 +119,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         };
         P.run = function(code) {
                 this.code = code;
-                this.env = new LispCons([], null);
+                this.env = null;
+                this.fenv = null;
                 this.stack = [ [] ];
                 this.pc = 0;
                 return this.loop();
@@ -110,6 +130,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.stack = [ [] ].concat(args);
                 this.code = closure.code;
                 this.env = closure.env;
+                this.fenv = closure.fenv;
                 this.n_args = args.length;
                 this.pc = 0;
                 return this.loop();
@@ -119,6 +140,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.stack.push(this.mkret(this.pc));
                 this.code = closure.code;
                 this.env = closure.env;
+                this.fenv = closure.fenv;
                 var n = 0;
                 while (args != null) {
                         this.stack.push(args.car);
@@ -462,6 +484,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         };
 
         [
+                //// local vars namespace
                 ["LVAR", "i j", {
                         run: function(m) {
                                 m.push(m.lvar(this.i, this.j));
@@ -472,6 +495,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.lset(this.i, this.j, m.top());
                         }
                 }],
+                //// global/dynamic vars namespace
                 ["GVAR", "name", {
                         run: function(m) {
                                 m.push(m.gvar(this.name));
@@ -487,6 +511,41 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.bind(this.name, this.i);
                         }
                 }],
+                //// local functions namespace
+                ["FVAR", "i j", {
+                        run: function(m) {
+                                m.push(m.fvar(this.i, this.j));
+                        }
+                }],
+                ["FSET", "i j", {
+                        run: function(m) {
+                                m.fset(this.i, this.j, m.top());
+                        }
+                }],
+                ["FUNCS", "count", {
+                        run: function(m) {
+                                // For FLET, count will be positive
+                                // meaning that we fetch closures from
+                                // the stack.  A negative count (for
+                                // LABELS) means that we just reserve
+                                // the space but not touch the stack.
+                                var count = this.count, frame = [];
+                                while (--count >= 0) frame[count] = m.pop();
+                                m.fenv = new LispCons(frame, m.fenv);
+                        }
+                }],
+                //// global functions namespace
+                ["FGVAR", "name", {
+                        run: function(m) {
+                                m.push(m.fgvar(this.name));
+                        }
+                }],
+                ["FGSET", "name", {
+                        run: function(m) {
+                                m.fgset(this.name, m.top());
+                        }
+                }],
+                ////
                 ["POP", 0, {
                         run: function(m) {
                                 m.pop();
@@ -601,7 +660,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["FN", "code name", {
                         run: function(m) {
-                                m.push(new LispClosure(this.code, m.env, this.name));
+                                m.push(new LispClosure(this.code, m.env, m.fenv, this.name));
                         },
                         _disp: function() {
                                 return "FN(" + D.serialize(this.code) + (this.name ? "," + LispMachine.serialize_const(this.name) : "") + ")";
@@ -619,7 +678,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         defop("CC", 0, {
                 run: function(cc){
                         return function(m) {
-                                m.push(new LispClosure(cc, new LispCons([ m.mkcont() ], null)));
+                                m.push(new LispClosure(cc, new LispCons([ m.mkcont() ])));
                         }
                 }(assemble([
                         ["ARGS", 1],
