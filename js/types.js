@@ -4,8 +4,8 @@ var LispType = DEFCLASS("LispType", null, function(D, P){
         };
 });
 
-function DEFTYPE(name, func) {
-        return DEFCLASS(name.replace(/-/g, "_"), LispType, function(D, P){
+function DEFTYPE(name, func, base) {
+        return DEFCLASS(name.replace(/-/g, "_"), base || LispType, function(D, P){
                 P.type = D.type = name;
                 var ret = func ? func(D, P) : null;
                 return ret;
@@ -94,13 +94,16 @@ var LispCondition = DEFTYPE("condition", function(D, P){
         };
 });
 
-var LispInputStream = DEFTYPE("input_stream", function(D, P){
+var LispStream = DEFTYPE("stream", function(D, P){
         P.INIT = function(text) {
-                this.text = text;
+                this.text = text || "";
                 this.line = 1;
                 this.col = 0;
                 this.pos = 0;
         };
+});
+
+var LispInputStream = DEFTYPE("input_stream", function(D, P){
         P.peek = function() {
                 return this.pos < this.text.length
                         ? LispChar.get(this.text.charAt(this.pos))
@@ -115,19 +118,22 @@ var LispInputStream = DEFTYPE("input_stream", function(D, P){
                 }
                 return null;
         };
-});
+}, LispStream);
 
 var LispOutputStream = DEFTYPE("output_stream", function(D, P){
-        P.INIT = function() {
-                this.text = "";
-        };
         P.put = function(str) {
+                var lines = str.split(/\r?\n/);
+                this.line += lines.length - 1;
+                this.col = lines.length > 1
+                        ? lines[lines.length - 1].length
+                        : this.col + lines[0].length;
+                this.pos += str.length;
                 return this.text += str;
         };
         P.get = function() {
                 return this.text;
         };
-});
+}, LispStream);
 
 var LispHash = DEFTYPE("namespace", function(D, P){
         P.INIT = function(parent) {

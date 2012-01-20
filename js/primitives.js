@@ -692,6 +692,27 @@
 
         /* -----[ simple streams ]----- */
 
+        defp("%stream-line", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispStream);
+                return stream.line;
+        });
+
+        defp("%stream-col", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispStream);
+                return stream.col;
+        });
+
+        defp("%stream-pos", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispStream);
+                return stream.pos;
+        });
+
         defp("%make-input-stream", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var text = m.pop();
@@ -711,27 +732,6 @@
                 var stream = m.pop();
                 checktype(stream, LispInputStream);
                 return stream.next();
-        });
-
-        defp("%stream-line", false, function(m, nargs){
-                checknargs(nargs, 1, 1);
-                var stream = m.pop();
-                checktype(stream, LispInputStream);
-                return stream.line;
-        });
-
-        defp("%stream-col", false, function(m, nargs){
-                checknargs(nargs, 1, 1);
-                var stream = m.pop();
-                checktype(stream, LispInputStream);
-                return stream.col;
-        });
-
-        defp("%stream-pos", false, function(m, nargs){
-                checknargs(nargs, 1, 1);
-                var stream = m.pop();
-                checktype(stream, LispInputStream);
-                return stream.pos;
         });
 
         defp("%make-output-stream", false, function(m, nargs){

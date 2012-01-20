@@ -1,3 +1,13 @@
+;;;; This file implements the compiler.  To bootstrap, it should be
+;;;; compiled using the JavaScript version (compiler.js).  That version
+;;;; will stall so to keep this working with compiler.js you should
+;;;; rely only on the following operators:
+;;;;
+;;;; IF, QUOTE, PROGN, SET!, NOT, C/C, LET, LET*, LABELS, FLET,
+;;;; LAMBDA, FUNCTION and %FN
+;;;;
+;;;; Don't customize the reader in this file.
+
 ;; props to http://norstrulde.org/ilge10/
 (set-symbol-function!
  'qq
@@ -327,7 +337,7 @@
   (hash-get env :funcs))
 
 (defun environment-extend (env key val)
-  (let ((h (hash-copy env)))
+  (let ((h (hash-extend env)))
     (hash-add h key (cons val (hash-get h key)))
     h))
 
