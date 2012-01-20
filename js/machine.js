@@ -49,7 +49,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 e.car[j] = val;
         };
         P.fgvar = function(symbol) {
-                return symbol.func();
+                var f = symbol.func();
+                if (!f) console.error("Undefined function", symbol);
+                return f;
         };
         P.fgset = function(symbol, val) {
                 symbol.setv("function", val);
@@ -522,7 +524,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["FSET", "i j", {
                         run: function(m) {
-                                m.fset(this.i, this.j, m.top());
+                                m.fset(this.i, this.j, m.pop());
                         }
                 }],
                 ["FUNCS", "count", {

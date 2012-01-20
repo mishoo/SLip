@@ -1,32 +1,39 @@
 ;; props to http://norstrulde.org/ilge10/
-(set! qq
-      (%fn qq (x)
-           (if (consp x)
-               (if (eq 'qq-unquote (car x))
-                   (cadr x)
-                   (if (eq 'quasiquote (car x))
-                       (qq (qq (cadr x)))
-                       (if (consp (car x))
-                           (if (eq 'qq-splice (caar x))
-                               (list 'append (cadar x) (qq (cdr x)))
-                               (list 'cons (qq (car x)) (qq (cdr x))))
-                           (list 'cons (qq (car x)) (qq (cdr x))))))
-               (list 'quote x))))
+(set-symbol-function!
+ 'qq
+ (labels ((qq (x)
+            (if (consp x)
+                (if (eq 'qq-unquote (car x))
+                    (cadr x)
+                    (if (eq 'quasiquote (car x))
+                        (qq (qq (cadr x)))
+                        (if (consp (car x))
+                            (if (eq 'qq-splice (caar x))
+                                (list 'append (cadar x) (qq (cdr x)))
+                                (list 'cons (qq (car x)) (qq (cdr x))))
+                            (list 'cons (qq (car x)) (qq (cdr x))))))
+                (list 'quote x))))
+   #'qq))
 
 ;; better to avoid quasiquote here:
 (%macro! 'defmacro
-         (%fn defmacro (name args . body)
-              (list '%macro!
-                    (list 'quote name)
-                    (list* '%fn name args body))))
+         (labels ((defmacro (name args . body)
+                      (list '%macro!
+                       (list 'quote name)
+                       (list* '%fn name args body))))
+           #'defmacro))
 
 (defmacro quasiquote (thing)
   (qq thing))
 
 ;;;; let the show begin
 
+(defmacro funcall (f . args)
+  `((progn ,f) ,@args))
+
 (defmacro defun (name args . body)
-  `(set! ,name (%fn ,name ,args ,@body)))
+  `(set-symbol-function! ',name (labels ((,name ,args ,@body))
+                                  #',name)))
 
 (defmacro when (pred . body)
   `(if ,pred (progn ,@body)))
@@ -36,17 +43,11 @@
 
 (defun map (func lst)
   (when lst
-    (cons (func (car lst)) (map func (cdr lst)))))
-
-(defmacro labels (defs . body)
-  `(let ,(map (lambda (x) (car x)) defs)
-     ,@(map (lambda (x)
-              `(set! ,(car x) (%fn ,(car x) ,(cadr x) ,@(cddr x)))) defs)
-     ,@body))
+    (cons (funcall func (car lst)) (map func (cdr lst)))))
 
 (defun foreach (lst func)
   (when lst
-    (func (car lst))
+    (funcall func (car lst))
     (foreach (cdr lst) func)))
 
 (defmacro prog1 (exp . body)
@@ -107,8 +108,8 @@
     `(let ((,fname ,func))
        (labels ((,rec (,@args)
                   (when (and ,@args)
-                    (cons (,fname ,@(map (lambda (l)
-                                           `(car ,l)) args))
+                    (cons (funcall ,fname ,@(map (lambda (l)
+                                                   `(car ,l)) args))
                           (,rec ,@(map (lambda (l)
                                          `(cdr ,l)) args))))))
          (,rec ,@lists)))))
@@ -148,11 +149,11 @@
 
          (read-while (pred)
            (let ((out (%make-output-stream)) rec)
-             ((set! rec (lambda (ch)
-                          (when (and ch (pred ch))
-                            (%stream-put out (next))
-                            (rec (peek)))))
-              (peek))
+             (labels ((rec (ch)
+                        (when (and ch (funcall pred ch))
+                          (%stream-put out (next))
+                          (rec (peek)))))
+               (rec (peek)))
              (%stream-get out)))
 
          (croak (msg)
@@ -244,6 +245,7 @@
              (#\\ (next) (read-char))
              (#\/ (read-regexp))
              (#\( (list* 'vector (read-list)))
+             (#\' (next) (list 'function (read-token)))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
 
          (read-quote ()
@@ -343,7 +345,7 @@
        (with-cc return
          (labels ((position (lst i j)
                     (when lst
-                      (if (eq name (car lst)) (return (cons i j))
+                      (if (eq name (car lst)) (funcall return (cons i j))
                           (position (cdr lst) i (+ j 1)))))
                   (frame (env i)
                     (when env
@@ -403,6 +405,13 @@
               (lambda (if val?
                           (%seq (comp-lambda nil (cadr x) (cddr x) env)
                                 (if more? nil (gen "RET")))))
+              (function (arg-count x 1 1)
+                        (let ((sym (cadr x)))
+                          (assert (symbolp sym) "FUNCTION requires a symbol")
+                          (let ((local (find-var sym (environment-funcs env))))
+                            (if local
+                                (gen "FVAR" (car local) (cdr local))
+                                (gen "FGVAR" sym)))))
               (%fn (if val?
                        (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
                              (if more? nil (gen "RET")))))
@@ -552,7 +561,7 @@
                   (len (caddr bindings)))
              (set! env (environment-extend env :funcs names))
              (let ((i 0))
-               (%seq (gen "FUNCS" 0)
+               (%seq (gen "FUNCS" (- len))
                      (%prim-apply
                       '%seq (mapcar (lambda (name func)
                                       (%seq (comp-lambda name (car func) (cdr func) env)
@@ -638,13 +647,13 @@
   (let ((reader (lisp-reader str 'EOF))
         (out (%make-output-stream)))
     (labels ((rec (is-first)
-               (let ((form (reader 'next)))
+               (let ((form (funcall reader 'next)))
                  (unless (eq form 'EOF)
                    (let ((f (compile `(lambda () ,form))))
                      (let ((code (%serialize-bytecode f t)))
                        (unless is-first (%stream-put out #\,))
                        (%stream-put out code #\Newline))
-                     (f))
+                     (funcall f))
                    (rec nil)))))
       (rec t)
       (%stream-get out))))
@@ -656,21 +665,4 @@
 
 EOF
 
-(let ((f (compile '(lambda ()
-                    (labels ((sqr (x) (* x x))
-                             (mul (x y) (* x y))
-                             (crap (x y) (mul (sqr x) (sqr y))))
-                      (flet ((foo (x)
-                               (* (sqr x) 2)))
-                        (console.log (crap (foo 2) (foo 2)))
-                        (bubulina 2 3)))))))
-  (console.print (%disassemble f))
-  ;; (f)
-  )
-
-;; (console.print (compile-string (%js-eval "window.CURRENT_FILE")))
-
-;; (console.print (%disassemble (compile '(lambda (p x y)
-;;                                (progn
-;;                                  (if (not p) (+ x y) (* x y))
-;;                                  z)))))
+(console.print (compile-string (%js-eval "window.CURRENT_FILE")))

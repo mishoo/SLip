@@ -158,6 +158,7 @@ function lisp_reader(code) {
                     case "\\": next(); return read_char();
                     case "/": return read_regexp();
                     case "(": return new LispCons(LispSymbol.get("VECTOR"), read_list());
+                    case "'": next(); return LispCons.fromArray([ LispSymbol.get("FUNCTION"), read_token() ]);
                     default:
                         croak("Unsupported sharp syntax: #" + peek());
                 }
@@ -261,18 +262,21 @@ function lisp_reader(code) {
 
         var LABEL_NUM = 0;
 
-        var S_LAMBDA  = LispSymbol.get("LAMBDA");
-        var S_FN      = LispSymbol.get("%FN");
-        var S_IF      = LispSymbol.get("IF");
-        var S_PROGN   = LispSymbol.get("PROGN");
-        var S_QUOTE   = LispSymbol.get("QUOTE");
-        var S_SET     = LispSymbol.get("SET!");
-        var S_T       = LispSymbol.get("T");
-        var S_NIL     = LispSymbol.get("NIL");
-        var S_CC      = LispSymbol.get("C/C");
-        var S_NOT     = LispSymbol.get("NOT");
-        var S_LET     = LispSymbol.get("LET");
-        var S_LET$    = LispSymbol.get("LET*");
+        var S_LAMBDA   = LispSymbol.get("LAMBDA");
+        var S_FN       = LispSymbol.get("%FN");
+        var S_FUNCTION = LispSymbol.get("FUNCTION");
+        var S_IF       = LispSymbol.get("IF");
+        var S_PROGN    = LispSymbol.get("PROGN");
+        var S_QUOTE    = LispSymbol.get("QUOTE");
+        var S_SET      = LispSymbol.get("SET!");
+        var S_T        = LispSymbol.get("T");
+        var S_NIL      = LispSymbol.get("NIL");
+        var S_CC       = LispSymbol.get("C/C");
+        var S_NOT      = LispSymbol.get("NOT");
+        var S_LET      = LispSymbol.get("LET");
+        var S_LET$     = LispSymbol.get("LET*");
+        var S_LABELS   = LispSymbol.get("LABELS");
+        var S_FLET     = LispSymbol.get("FLET");
 
         var PAK_KEYWORD = LispPackage.get("KEYWORD");
 
@@ -355,6 +359,10 @@ function lisp_reader(code) {
                         return comp_let(cadr(x), cddr(x), env, VAL, MORE);
                     case S_LET$:
                         return comp_let$(cadr(x), cddr(x), env, VAL, MORE);
+                    case S_LABELS:
+                        return comp_labels(cadr(x), cddr(x), env, VAL, MORE);
+                    case S_FLET:
+                        return comp_flet(cadr(x), cddr(x), env, VAL, MORE);
                     case S_FN:
                         assert(LispSymbol.is(cadr(x)), "%FN requires a symbol name for the function");
                         return VAL ? seq(
@@ -366,6 +374,15 @@ function lisp_reader(code) {
                                 comp_lambda(null, cadr(x), cddr(x), env),
                                 MORE ? [] : gen("RET")
                         ) : [];
+                    case S_FUNCTION:
+                        arg_count(x, 1);
+                        assert(LispSymbol.is(cadr(x)), "FUNCTION requires a symbol");
+                        if (VAL) {
+                                var localfunc = find_var(cadr(x), env.funcs);
+                                if (localfunc) return gen("FVAR", localfunc[0], localfunc[1]);
+                                return gen("FGVAR", cadr(x));
+                        }
+                        return [];
                     default:
                         if (LispSymbol.is(car(x)) && car(x).macro())
                                 return comp_macroexpand(car(x), cdr(x), env, VAL, MORE);
@@ -375,7 +392,7 @@ function lisp_reader(code) {
 
         function gen_set(name, env) {
                 if (!name.special()) {
-                        var p = find_var(name, env);
+                        var p = find_var(name, env.vars);
                         if (p) return gen("LSET", p[0], p[1]);
                 }
                 return gen("GSET", name);
@@ -383,7 +400,7 @@ function lisp_reader(code) {
 
         function gen_var(name, env) {
                 if (!name.special()) {
-                        var pos = find_var(name, env);
+                        var pos = find_var(name, env.vars);
                         if (pos) return gen("LVAR", pos[0], pos[1]);
                 }
                 return gen("GVAR", name);
@@ -434,12 +451,12 @@ function lisp_reader(code) {
                 );
         };
 
-        function get_bindings(bindings) {
+        function get_bindings(bindings, flet) {
                 var names = [], vals = [], specials = [];
                 LispCons.forEach(bindings, function(el, i, dot){
                         if (dot) throw new Error("Improper list in LET");
                         if (LC.is(el)) {
-                                vals.push(cadr(el));
+                                vals.push(flet ? cdr(el) : cadr(el));
                                 el = car(el);
                         } else {
                                 vals.push(S_NIL);
@@ -463,7 +480,7 @@ function lisp_reader(code) {
                         b.specials.map(function(i){
                                 return gen("BIND", b.names[i], i)[0];
                         }),
-                        comp_seq(body, [ b.names ].concat(env), VAL, true),
+                        comp_seq(body, env.extend("vars", b.names), VAL, true),
                         gen("UNFR", 1, b.specials.length, 0),
                         MORE ? [] : gen("RET")
                 );
@@ -483,7 +500,7 @@ function lisp_reader(code) {
                                         name.special() ? gen("BIND", name, i) : []
                                 );
                                 if (i == 0) {
-                                        env = [ newargs ].concat(env);
+                                        env = env.extend("vars", newargs);
                                 }
                                 newargs.push(name);
                                 return x;
@@ -495,36 +512,77 @@ function lisp_reader(code) {
                 return ret;
         };
 
+        function comp_labels(bindings, body, env, VAL, MORE) {
+                if (nullp(bindings)) return comp_seq(body, env, VAL, MORE);
+                var b = get_bindings(bindings, true);
+                env = env.extend("funcs", b.names);
+                return seq(
+                        gen("FUNCS", -b.len),
+                        seq.apply(null, b.names.map(function(name, i){
+                                return seq(
+                                        comp_lambda(name, car(b.vals[i]), cdr(b.vals[i]), env),
+                                        gen("FSET", 0, i)
+                                );
+                        })),
+                        comp_seq(body, env, VAL, true),
+                        gen("UNFR", 0, 0, 1),
+                        MORE ? [] : gen("RET")
+                );
+        };
+
+        function comp_flet(bindings, body, env, VAL, MORE) {
+                if (nullp(bindings)) return comp_seq(body, env, VAL, MORE);
+                var b = get_bindings(bindings, true);
+                return seq(
+                        seq.apply(null, b.names.map(function(name, i){
+                                return comp_lambda(name, car(b.vals[i]), cdr(b.vals[i]), env)
+                        })),
+                        gen("FUNCS", b.len),
+                        comp_seq(body, env.extend("funcs", b.names), VAL, true),
+                        gen("UNFR", 0, 0, 1),
+                        MORE ? [] : gen("RET")
+                );
+        };
+
         function comp_funcall(f, args, env, VAL, MORE) {
-                if (LispSymbol.is(f) && f.primitive() && !find_var(f, env)) {
-                        if (!VAL && !f.getv("primitive-side-effects")) {
-                                return comp_seq(args, env, false, MORE);
+                function mkret(the_function) {
+                        if (MORE) {
+                                var k = gen_label();
+                                return seq(
+                                        gen("SAVE", k),
+                                        comp_list(args, env),
+                                        the_function,
+                                        gen("CALL", length(args)),
+                                        [ k ],
+                                        VAL ? [] : gen("POP")
+                                );
                         }
-                        return seq(comp_list(args, env),
-                                   gen("PRIM", f, length(args)),
-                                   VAL ? [] : gen("POP"),
-                                   MORE ? [] : gen("RET"));
+                        return seq(
+                                comp_list(args, env),
+                                the_function,
+                                gen("CALL", length(args))
+                        );
+                };
+                if (LispSymbol.is(f)) {
+                        var localfun = find_var(f, env.funcs);
+                        if (localfun) return mkret(gen("FVAR", localfun[0], localfun[1]));
+                        if (f.primitive()) {
+                                if (!VAL && !f.getv("primitive-side-effects")) {
+                                        return comp_seq(args, env, false, MORE);
+                                }
+                                return seq(comp_list(args, env),
+                                           gen("PRIM", f, length(args)),
+                                           VAL ? [] : gen("POP"),
+                                           MORE ? [] : gen("RET"));
+                        }
+                        if (!f.func()) console.warn("Undefined function", f);
+                        return mkret(gen("FGVAR", f));
                 }
                 if (LC.is(f) && car(f) === S_LAMBDA && nullp(cadr(f))) {
                         assert(nullp(args), "Too many arguments");
                         return comp_seq(cddr(f), env, VAL, MORE);
                 }
-                if (MORE) {
-                        var k = gen_label();
-                        return seq(
-                                gen("SAVE", k),
-                                comp_list(args, env),
-                                comp(f, env, true, true),
-                                gen("CALL", length(args)),
-                                [ k ],
-                                VAL ? [] : gen("POP")
-                        );
-                }
-                return seq(
-                        comp_list(args, env),
-                        comp(f, env, true, true),
-                        gen("CALL", length(args))
-                );
+                return mkret(comp(f, env, true, true));
         };
 
         function comp_lambda(name, args, body, env) {
@@ -541,19 +599,19 @@ function lisp_reader(code) {
                                 return gen("FN",
                                            seq(gen("ARGS", a.length),
                                                dyn,
-                                               comp_seq(body, [ a ].concat(env), true, false)),
+                                               comp_seq(body, env.extend("vars", a), true, false)),
                                            name);
                         }
                         return gen("FN",
                                    seq(gen("ARG_", dot),
                                        dyn,
-                                       comp_seq(body, [ a ].concat(env), true, false)),
+                                       comp_seq(body, env.extend("vars", a), true, false)),
                                    name);
                 } else {
                         return gen("FN",
                                    seq(gen("ARG_", 0),
                                        args.special() ? gen("BIND", args, 0) : [],
-                                       comp_seq(body, [ [ args ] ].concat(env), true, false)),
+                                       comp_seq(body, env.extend("vars", [ args ]), true, false)),
                                    name);
                 }
         };
@@ -566,7 +624,21 @@ function lisp_reader(code) {
         };
 
         this.lisp_compile = function(x) {
-                return comp_seq(x, [], true, false);
+                return comp_seq(x, new Environment(), true, false);
         };
+
+        var Environment = DEFCLASS("Environment", null, function(D, P){
+                P.INIT = function() {
+                        this.vars = [];
+                        this.funcs = [];
+                };
+                P.extend = function(key, val) {
+                        var env = new Environment();
+                        env.vars = this.vars;
+                        env.funcs = this.funcs;
+                        env[key] = [ val ].concat(env[key]);
+                        return env;
+                };
+        });
 
 })(LispCons);

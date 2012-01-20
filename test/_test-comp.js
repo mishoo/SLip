@@ -23,13 +23,13 @@
 
         var EOF = {};
         function load_lisp(file) {
-                var func = LispSymbol.get("LOAD-LISP-FILE").value;
+                var func = LispSymbol.get("LOAD-LISP-FILE").func();
                 return m.call(func, LispCons.fromArray([ file ]));
         };
 
         function step2() {
                 time_it("recompile-compiler", function(){
-                        load_lisp("../lisp/compiler.lisp");
+                        console.log(load_lisp("../lisp/compiler.lisp"));
                 });
                 time_it("init", function(){
                         load_lisp("../lisp/init.lisp");
