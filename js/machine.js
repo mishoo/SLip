@@ -387,6 +387,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         opcode = "λ:" + op.name;
                                         data = "\n" + disassemble(op.code, level + 1);
                                         break;
+                                    case "PRIM":
+                                        data = op.name + " " + op.nargs;
+                                        break;
                                     case "JUMP":
                                     case "TJUMP":
                                     case "FJUMP":
