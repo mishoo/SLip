@@ -218,8 +218,7 @@
            (let ((str (read-while
                        (lambda (ch)
                          (or
-                          (char<= #\a ch #\z)
-                          (char<= #\A ch #\Z)
+                          (letterp ch)
                           (char<= #\0 ch #\9)
                           (member ch
                                   '(#\% #\$ #\_ #\- #\: #\. #\+ #\*

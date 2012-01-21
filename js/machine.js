@@ -1,4 +1,5 @@
 var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
+        var BASE_PACK = LispPackage.get("%");
         function LispRet(m, pc) {
                 this.pc = pc;
                 this.code = m.code;
@@ -204,6 +205,19 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         return true;
                                 }
                                 break;
+                            case "PRIM":
+                                if (el[1].pak === BASE_PACK) {
+                                        if (/^C[AD]{1,4}R$/.test(el[1].name)) {
+                                                inc_stat("primitives");
+                                                code.splice(i, 1, [ el[1].name ]);
+                                                return true;
+                                        }
+                                        if (el[1].name == "CONS") {
+                                                inc_stat("primitives");
+                                                code.splice(i, 1, [ "CONS" ]);
+                                                return true;
+                                        }
+                                }
                         }
                         switch (el[0]) {
                             case "GSET":
@@ -488,7 +502,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 for (var i in proto) if (HOP(proto, i)) {
                         ctor.prototype[i] = proto[i];
                 }
-                OPS[name] = ctor;
+                return OPS[name] = ctor;
         };
 
         [
@@ -701,6 +715,21 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         ["RET"]
                 ]))
         });
+
+        defop("CONS", 0, {
+                run: function(m) {
+                        var b = m.pop(), a = m.pop();
+                        m.push(new LispCons(a, b));
+                }
+        });
+
+        (function(i){
+                for (i in LispCons) if (HOP(LispCons, i) && /^c[ad]+r$/.test(i)) {
+                        defop(i.toUpperCase(), 0, {
+                                run: new Function("m", "m.push(LispCons." + i + "(m.pop()))")
+                        });
+                }
+        })();
 
         D.dump = function(thing) {
                 if (thing === null) return "NIL";
