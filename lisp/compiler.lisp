@@ -145,7 +145,7 @@
 
 ;;;; parser/compiler
 
-(%special! '*read-table* '*package*)
+(%special! '*read-table* '*package* '*standard-input*)
 
 (defun lisp-reader (text eof)
   (let ((input (%make-input-stream text))

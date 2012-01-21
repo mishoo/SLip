@@ -289,33 +289,45 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 break;
                             case "CONST":
                                 if (i < code.length - 1) {
-                                        if (el[1] === null) switch (code[i+1][0]) {
-                                            case "FJUMP":
-                                                code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                                        if (el[1] === null) {
+                                                switch (code[i+1][0]) {
+                                                    case "FJUMP":
+                                                        code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                                                        inc_stat("const");
+                                                        return true;
+                                                    case "TJUMP":
+                                                        code.splice(i, 2);
+                                                        inc_stat("const");
+                                                        return true;
+                                                    case "NOT":
+                                                        inc_stat("const");
+                                                        code.splice(i, 2, [ "CONST", true ]);
+                                                        return true;
+                                                }
                                                 inc_stat("const");
-                                                return true;
-                                            case "TJUMP":
-                                                code.splice(i, 2);
-                                                inc_stat("const");
-                                                return true;
-                                            case "NOT":
-                                                inc_stat("const");
-                                                code.splice(i, 2, [ "CONST", true ]);
+                                                code.splice(i, 1, [ "NIL" ]);
                                                 return true;
                                         }
-                                        else if (constantp(el[1])) switch (code[i+1][0]) {
-                                            case "FJUMP":
-                                                code.splice(i, 2);
-                                                inc_stat("const");
-                                                return true;
-                                            case "TJUMP":
-                                                code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
-                                                inc_stat("const");
-                                                return true;
-                                            case "NOT":
-                                                inc_stat("const");
-                                                code.splice(i, 2, [ "CONST", null ]);
-                                                return true;
+                                        if (constantp(el[1])) {
+                                                switch (code[i+1][0]) {
+                                                    case "FJUMP":
+                                                        code.splice(i, 2);
+                                                        inc_stat("const");
+                                                        return true;
+                                                    case "TJUMP":
+                                                        code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                                                        inc_stat("const");
+                                                        return true;
+                                                    case "NOT":
+                                                        inc_stat("const");
+                                                        code.splice(i, 2, [ "CONST", null ]);
+                                                        return true;
+                                                }
+                                                if (el[1] === true) {
+                                                        inc_stat("const");
+                                                        code.splice(i, 1, [ "T" ]);
+                                                        return true;
+                                                }
                                         }
                                 }
                                 break;
@@ -403,6 +415,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         break;
                                     case "PRIM":
                                         data = op.name + " " + op.nargs;
+                                        break;
+                                    case "CONST":
+                                        data = LispMachine.dump(op.val);
                                         break;
                                     case "JUMP":
                                     case "TJUMP":
@@ -698,7 +713,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 var ret = this.name.primitive()(m, this.nargs);
                                 if (ret !== false) m.push(ret);
                         }
-                }]
+                }],
+                ["NIL", 0, { run: function(m) { m.push(null) } }],
+                ["T", 0, { run: function(m) { m.push(true) } }]
 
         ].map(function(_){ defop(_[0], _[1], _[2]) });
 

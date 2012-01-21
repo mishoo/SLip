@@ -106,8 +106,7 @@ function lisp_reader(code) {
         };
         function read_symbol() {
                 var str = read_while(function(ch){
-                        if ((ch >= "a" && ch <= "z") ||
-                            (ch >= "A" && ch <= "Z") ||
+                        if (UNICODE.letter.test(ch) ||
                             (ch >= "0" && ch <= "9"))
                                 return true;
                         switch (ch) {

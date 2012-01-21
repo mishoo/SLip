@@ -29,7 +29,7 @@
 
         function step2() {
                 time_it("recompile-compiler", function(){
-                        console.log(load_lisp("../lisp/compiler.lisp"));
+                        load_lisp("../lisp/compiler.lisp");
                 });
                 time_it("init", function(){
                         load_lisp("../lisp/init.lisp");
