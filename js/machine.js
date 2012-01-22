@@ -28,35 +28,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.fenv = null;
                 this.n_args = null;
         };
-
-        P.lvar = function(i, j) {
-                var e = this.env;
-                while (i-- > 0) e = e.cdr;
-                return e.car[j];
-        };
-        P.lset = function(i, j, val) {
-                var e = this.env;
-                while (i-- > 0) e = e.cdr;
-                e.car[j] = val;
-        };
-        P.fvar = function(i, j) {
-                var e = this.fenv;
-                while (i-- > 0) e = e.cdr;
-                return e.car[j];
-        };
-        P.fset = function(i, j, val) {
-                var e = this.fenv;
-                while (i-- > 0) e = e.cdr;
-                e.car[j] = val;
-        };
-        P.fgvar = function(symbol) {
-                var f = symbol.func();
-                if (!f) console.error("Undefined function", symbol);
-                return f;
-        };
-        P.fgset = function(symbol, val) {
-                symbol.setv("function", val);
-        };
         P.find_dvar = function(symbol) {
                 if (symbol.special()) {
                         var p = this.denv;
@@ -564,16 +535,21 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 return OPS[name] = ctor;
         };
 
+        function frame(env, i) {
+                while (i-- > 0) env = env.cdr;
+                return env.car;
+        };
+
         [
                 //// local vars namespace
                 ["LVAR", "i j", {
                         run: function(m) {
-                                m.push(m.lvar(this.i, this.j));
+                                m.push(frame(m.env, this.i)[this.j]);
                         }
                 }],
                 ["LSET", "i j", {
                         run: function(m) {
-                                m.lset(this.i, this.j, m.top());
+                                frame(m.env, this.i)[this.j] = m.top();
                         }
                 }],
                 //// global/dynamic vars namespace
@@ -595,12 +571,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 //// local functions namespace
                 ["FVAR", "i j", {
                         run: function(m) {
-                                m.push(m.fvar(this.i, this.j));
+                                m.push(frame(m.fenv, this.i)[this.j]);
                         }
                 }],
                 ["FSET", "i j", {
                         run: function(m) {
-                                m.fset(this.i, this.j, m.pop());
+                                frame(m.fenv, this.i)[this.j] = m.pop();
                         }
                 }],
                 ["FUNCS", "count", {
@@ -618,12 +594,14 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 //// global functions namespace
                 ["FGVAR", "name", {
                         run: function(m) {
-                                m.push(m.fgvar(this.name));
+                                var f = this.name.func();
+                                if (!f) console.error("Undefined function", symbol);
+                                m.push(f);
                         }
                 }],
                 ["FGSET", "name", {
                         run: function(m) {
-                                m.fgset(this.name, m.top());
+                                this.name.setv("function", m.top());
                         }
                 }],
                 ////
