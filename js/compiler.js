@@ -120,8 +120,10 @@ function lisp_reader(code) {
                                 return true;
                         }
                 });
-                if (str.length > 0 && /^[0-9]*\.?[0-9]*$/.test(str))
-                        return parseFloat(str);
+                if (str.length > 0 && /^-?[0-9]*\.?[0-9]*$/.test(str)) {
+                        var ret = parseFloat(str);
+                        if (!isNaN(ret)) return ret;
+                }
                 str = str.toUpperCase();
                 var m = /^(.*?)::?(.*)$/.exec(str);
                 if (m) {

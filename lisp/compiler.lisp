@@ -38,6 +38,15 @@
 
 ;;;; let the show begin
 
+;; is there a good reason why CL doesn't allow this syntax?
+;;
+;;   ((progn foo) ...)  ==  (funcall foo ...)
+;;
+;; basically, if a list occurs in function position, then it's
+;; evaluated as an ordinary expression and the returned value is
+;; expected to be a closure, and it's then called.  Makes sense for
+;; (lambda) too, although our compiler intercepts that as a special
+;; case.
 (defmacro funcall (f . args)
   `((progn ,f) ,@args))
 
@@ -225,16 +234,17 @@
                                     #\@ #\! #\? #\& #\= #\< #\>
                                     #\[ #\] #\{ #\} #\/ #\^ #\# )))))))
              (set! str (upcase str))
-             (if (regexp-test #/^[0-9]*\.?[0-9]*$/ str)
-                 (parse-number str)
-                 (aif (regexp-exec #/^(.*?)::?(.*)$/ str)
-                      (let ((pak (elt it 1))
-                            (sym (elt it 2)))
-                        (set! pak (%find-package (if (zerop (length pak))
-                                                     "KEYWORD"
-                                                     pak)))
-                        (%intern sym pak))
-                      (%intern str *package*)))))
+             (aif (and (regexp-test #/^-?[0-9]*\.?[0-9]*$/ str)
+                       (parse-number str))
+                  it
+                  (aif (regexp-exec #/^(.*?)::?(.*)$/ str)
+                       (let ((pak (elt it 1))
+                             (sym (elt it 2)))
+                         (set! pak (%find-package (if (zerop (length pak))
+                                                      "KEYWORD"
+                                                      pak)))
+                         (%intern sym pak))
+                       (%intern str *package*)))))
 
          (read-char ()
            (let ((name (strcat (next)
