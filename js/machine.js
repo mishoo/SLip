@@ -296,50 +296,50 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         return true;
                                 }
                                 break;
-                            case "CONST":
-                                if (i < code.length - 1) {
-                                        if (el[1] === null) {
-                                                switch (code[i+1][0]) {
-                                                    case "FJUMP":
-                                                        code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
-                                                        inc_stat("const");
-                                                        return true;
-                                                    case "TJUMP":
-                                                        code.splice(i, 2);
-                                                        inc_stat("const");
-                                                        return true;
-                                                    case "NOT":
-                                                        inc_stat("const");
-                                                        code.splice(i, 2, [ "CONST", true ]);
-                                                        return true;
-                                                }
+                        }
+                        if (i < code.length - 1) {
+                                if ((el[0] == "CONST" && el[1] === null) || el[0] == "NIL") {
+                                        switch (code[i+1][0]) {
+                                            case "FJUMP":
+                                                code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                                                inc_stat("const");
+                                                return true;
+                                            case "TJUMP":
+                                                code.splice(i, 2);
+                                                inc_stat("const");
+                                                return true;
+                                            case "NOT":
+                                                inc_stat("const");
+                                                code.splice(i, 2, [ "T" ]);
+                                                return true;
+                                        }
+                                        if (el[0] == "CONST" && el[1] === null) {
                                                 inc_stat("const");
                                                 code.splice(i, 1, [ "NIL" ]);
                                                 return true;
                                         }
-                                        if (constantp(el[1])) {
-                                                switch (code[i+1][0]) {
-                                                    case "FJUMP":
-                                                        code.splice(i, 2);
-                                                        inc_stat("const");
-                                                        return true;
-                                                    case "TJUMP":
-                                                        code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
-                                                        inc_stat("const");
-                                                        return true;
-                                                    case "NOT":
-                                                        inc_stat("const");
-                                                        code.splice(i, 2, [ "CONST", null ]);
-                                                        return true;
-                                                }
-                                                if (el[1] === true) {
-                                                        inc_stat("const");
-                                                        code.splice(i, 1, [ "T" ]);
-                                                        return true;
-                                                }
+                                }
+                                if ((el[0] == "CONST" && constantp(el[1])) || el[0] == "T") {
+                                        switch (code[i+1][0]) {
+                                            case "FJUMP":
+                                                code.splice(i, 2);
+                                                inc_stat("const");
+                                                return true;
+                                            case "TJUMP":
+                                                code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                                                inc_stat("const");
+                                                return true;
+                                            case "NOT":
+                                                inc_stat("const");
+                                                code.splice(i, 2, [ "NIL" ]);
+                                                return true;
+                                        }
+                                        if (el[0] == "CONST" && el[1] === true) {
+                                                inc_stat("const");
+                                                code.splice(i, 1, [ "T" ]);
+                                                return true;
                                         }
                                 }
-                                break;
                         }
                         switch (el[0]) {
                             case "NIL":
