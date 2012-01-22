@@ -361,9 +361,9 @@ function lisp_reader(code) {
                     case S_LET$:
                         return comp_let$(cadr(x), cddr(x), env, VAL, MORE);
                     case S_LABELS:
-                        return comp_labels(cadr(x), cddr(x), env, VAL, MORE);
+                        return comp_flets(cadr(x), cddr(x), env, true, VAL, MORE);
                     case S_FLET:
-                        return comp_flet(cadr(x), cddr(x), env, VAL, MORE);
+                        return comp_flets(cadr(x), cddr(x), env, false, VAL, MORE);
                     case S_FN:
                         assert(LispSymbol.is(cadr(x)), "%FN requires a symbol name for the function");
                         return VAL ? seq(
@@ -497,7 +497,7 @@ function lisp_reader(code) {
                                 var name = b.names[i];
                                 x = seq(
                                         comp(x, env, true, true),
-                                        i > 0 ? gen("VAR") : gen("FRAME"),
+                                        i > 0 ? gen("VAR") : gen("VFRAME"),
                                         name.special() ? gen("BIND", name, i) : []
                                 );
                                 if (i == 0) {
@@ -513,33 +513,18 @@ function lisp_reader(code) {
                 return ret;
         };
 
-        function comp_labels(bindings, body, env, VAL, MORE) {
+        function comp_flets(bindings, body, env, is_labels, VAL, MORE) {
                 if (nullp(bindings)) return comp_seq(body, env, VAL, MORE);
                 var b = get_bindings(bindings, true);
-                env = env.extend("funcs", b.names);
+                if (is_labels) env = env.extend("funcs", b.names);
                 return seq(
-                        gen("FUNCS", -b.len),
-                        seq.apply(null, b.names.map(function(name, i){
-                                return seq(
-                                        comp_lambda(name, car(b.vals[i]), cdr(b.vals[i]), env),
-                                        gen("FSET", 0, i)
-                                );
-                        })),
-                        comp_seq(body, env, VAL, true),
-                        gen("UNFR", 0, 0, 1),
-                        MORE ? [] : gen("RET")
-                );
-        };
-
-        function comp_flet(bindings, body, env, VAL, MORE) {
-                if (nullp(bindings)) return comp_seq(body, env, VAL, MORE);
-                var b = get_bindings(bindings, true);
-                return seq(
+                        is_labels ? gen("FFRAME") : [],
                         seq.apply(null, b.names.map(function(name, i){
                                 return comp_lambda(name, car(b.vals[i]), cdr(b.vals[i]), env)
                         })),
+                        is_labels ? [] : gen("FFRAME"),
                         gen("FUNCS", b.len),
-                        comp_seq(body, env.extend("funcs", b.names), VAL, true),
+                        comp_seq(body, is_labels ? env : env.extend("funcs", b.names), VAL, true),
                         gen("UNFR", 0, 0, 1),
                         MORE ? [] : gen("RET")
                 );

@@ -574,21 +574,15 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.push(frame(m.fenv, this.i)[this.j]);
                         }
                 }],
-                ["FSET", "i j", {
+                ["FFRAME", 0, {
                         run: function(m) {
-                                frame(m.fenv, this.i)[this.j] = m.pop();
+                                m.fenv = new LispCons([], m.fenv);
                         }
                 }],
                 ["FUNCS", "count", {
                         run: function(m) {
-                                // For FLET, count will be positive
-                                // meaning that we fetch closures from
-                                // the stack.  A negative count (for
-                                // LABELS) means that we just reserve
-                                // the space but not touch the stack.
-                                var count = this.count, frame = [];
+                                var count = this.count, frame = m.fenv.car;
                                 while (count > 0) frame[--count] = m.pop();
-                                m.fenv = new LispCons(frame, m.fenv);
                         }
                 }],
                 //// global functions namespace
@@ -702,7 +696,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.env = new LispCons(frame, m.env);
                         }
                 }],
-                ["FRAME", 0, {
+                ["VFRAME", 0, {
                         run: function(m) {
                                 m.env = new LispCons([ m.pop() ], m.env);
                         }

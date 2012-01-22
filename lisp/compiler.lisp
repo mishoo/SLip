@@ -418,8 +418,8 @@
                    (if val? (%seq (gen "CC"))))
               (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
-              (labels (comp-labels (cadr x) (cddr x) env val? more?))
-              (flet (comp-flet (cadr x) (cddr x) env val? more?))
+              (labels (comp-flets (cadr x) (cddr x) env t val? more?))
+              (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
               (macrolet (comp-macrolet (cadr x) (cddr x) env val? more?))
               (lambda (if val?
                           (%seq (comp-lambda nil (cadr x) (cddr x) env)
@@ -574,37 +574,23 @@
                              (%incf i)))
          (list (reverse names) (reverse vals) i (reverse specials))))
 
-     (comp-labels (bindings body env val? more?)
+     (comp-flets (bindings body env labels? val? more?)
        (if bindings
            (let* ((bindings (get-bindings bindings nil))
                   (names (car bindings))
                   (funcs (cadr bindings))
                   (len (caddr bindings)))
-             (set! env (extenv env :funcs (map (lambda (name) (cons name nil)) names)))
-             (let ((i 0))
-               (%seq (gen "FUNCS" (- len))
-                     (%prim-apply
-                      '%seq (mapcar (lambda (name func)
-                                      (%seq (comp-lambda name (car func) (cdr func) env)
-                                            (gen "FSET" 0 (prog1 i (%incf i)))))
-                                    names funcs))
-                     (comp-seq body env val? t)
-                     (gen "UNFR" 0 0 1)
-                     (if more? nil (gen "RET")))))
-           (comp-seq body env val? more?)))
-
-     (comp-flet (bindings body env val? more?)
-       (if bindings
-           (let* ((bindings (get-bindings bindings nil))
-                  (names (car bindings))
-                  (funcs (cadr bindings))
-                  (len (caddr bindings)))
-             (%seq (%prim-apply
+             (if labels? (set! env (extenv env :funcs (map (lambda (name) (cons name nil)) names))))
+             (%seq (if labels? (gen "FFRAME"))
+                   (%prim-apply
                     '%seq (mapcar (lambda (name func)
                                     (comp-lambda name (car func) (cdr func) env))
                                   names funcs))
+                   (unless labels? (gen "FFRAME"))
                    (gen "FUNCS" len)
-                   (comp-seq body (extenv env :funcs (map (lambda (name) (cons name nil)) names)) val? t)
+                   (comp-seq body (if labels?
+                                      env
+                                      (extenv env :funcs (map (lambda (name) (cons name nil)) names))) val? t)
                    (gen "UNFR" 0 0 1)
                    (if more? nil (gen "RET"))))
            (comp-seq body env val? more?)))
@@ -650,7 +636,7 @@
                     '%seq (mapcar (lambda (name x)
                                     (prog1
                                         (%seq (comp x env t t)
-                                              (gen (if newargs "VAR" "FRAME"))
+                                              (gen (if newargs "VAR" "VFRAME"))
                                               (when (%specialp name)
                                                 (gen "BIND" name i)))
                                       (%incf i)
