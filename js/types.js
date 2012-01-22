@@ -76,11 +76,11 @@ var LispChar = DEFTYPE("char", function(D, P){
 });
 
 var LispClosure = DEFTYPE("closure", function(D, P){
-        P.INIT = function(code, env, fenv, name) {
+        P.INIT = function(code, name, env, fenv) {
                 this.code = code;
+                this.name = name || null;
                 this.env = env || null;
                 this.fenv = fenv || null;
-                this.name = name || null;
         };
         P.print = function() {
                 return "<function" + (this.name ? " " + this.name : "") + ">";

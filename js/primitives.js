@@ -48,7 +48,7 @@
                         [ "LVAR", 0, 0 ],
                         [ "PRIM", LispSymbol.get("%PRIM-APPLY"), 2 ],
                         [ "RET" ]
-                ]), null, null, sym));
+                ]), sym));
                 ALL_PRIMITIVES = new LispCons(sym, ALL_PRIMITIVES);
         };
 
@@ -1000,7 +1000,7 @@
                 var code = m.pop();
                 checktype(code, LispArray);
                 code = LispMachine.assemble(code);
-                var f = new LispClosure(code, new LispCons([], null));
+                var f = new LispClosure(code, null, new LispCons([], null));
                 return m._callnext(f, null);
         });
 

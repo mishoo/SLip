@@ -649,13 +649,15 @@
                    (comp-seq body env val? t)
                    (gen "UNFR" 1 (length specials) 0)
                    (if more? nil (gen "RET"))))
-           (comp-seq body env val? more?))))
+           (comp-seq body env val? more?)))
 
-  (defun compile (exp)
-    (assert (and (consp exp)
-                 (member (car exp) '(%fn lambda)))
-            "Expecting (LAMBDA (...) ...) in COMPILE")
-    (%eval-bytecode (comp exp (make-environment) t nil))))
+     (compile (exp)
+       (assert (and (consp exp)
+                    (member (car exp) '(%fn lambda)))
+               "Expecting (LAMBDA (...) ...) in COMPILE")
+       (%eval-bytecode (comp exp (make-environment) t nil))))
+
+  (set-symbol-function! 'compile #'compile))
 
 (defun compile-string (str)
   (let ((reader (lisp-reader str 'EOF))

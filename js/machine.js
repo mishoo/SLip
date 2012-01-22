@@ -128,12 +128,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
         var OPS = {};
 
-        D.optimizer_stats = {
+        D.stats = {
         };
 
         function inc_stat(name) {
-                if (!D.optimizer_stats[name]) D.optimizer_stats[name] = 0;
-                ++D.optimizer_stats[name];
+                if (!D.stats[name]) D.stats[name] = 0;
+                ++D.stats[name];
         };
 
         var optimize = (function(){
@@ -718,7 +718,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["FN", "code name", {
                         run: function(m) {
-                                m.push(new LispClosure(this.code, m.env, m.fenv, this.name));
+                                m.push(new LispClosure(this.code, this.name, m.env, m.fenv));
                         },
                         _disp: function() {
                                 return "FN(" + D.serialize(this.code) + (this.name ? "," + LispMachine.serialize_const(this.name) : "") + ")";
@@ -759,7 +759,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         defop("CC", 0, {
                 run: function(cc){
                         return function(m) {
-                                m.push(new LispClosure(cc, new LispCons([ m.mkcont() ])));
+                                m.push(new LispClosure(cc, null, new LispCons([ m.mkcont() ])));
                         }
                 }(assemble([
                         ["ARGS", 1],
