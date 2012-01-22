@@ -545,14 +545,16 @@
 
      (comp-lambda (name args body env)
        (gen "FN"
-            (%seq (gen-args args 0)
+            (%seq (when args (gen-args args 0))
                   (let (dyn (i 0) (args (make-true-list args)))
                     (foreach args (lambda (x)
                                     (when (%specialp x)
                                       (push #("BIND" x i) dyn))
                                     (%incf i)))
                     (%seq dyn
-                          (comp-seq body (extenv env :vars (map (lambda (name) (cons name nil)) args)) t nil))))
+                          (comp-seq body (if args
+                                             (extenv env :vars (map (lambda (name) (cons name nil)) args))
+                                             env) t nil))))
             name))
 
      (get-bindings (bindings vars?)

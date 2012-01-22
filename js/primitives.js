@@ -1009,7 +1009,7 @@
                 var strip = nargs == 2 ? m.pop() : null;
                 var func = m.pop();
                 checktype(func, LispClosure);
-                var code = strip ? func.code.slice(1, func.code.length - 1) : func.code;
+                var code = strip ? func.code.slice(0, func.code.length - 1) : func.code;
                 var ret = LispMachine.serialize(code, strip);
                 return ret;
         });

@@ -598,9 +598,9 @@ function lisp_reader(code) {
                         }
                         if (!dot) {
                                 return gen("FN",
-                                           seq(gen("ARGS", a.length),
+                                           seq(a.length > 0 ? gen("ARGS", a.length) : [],
                                                dyn,
-                                               comp_seq(body, env.extend("vars", a), true, false)),
+                                               comp_seq(body, a.length > 0 ? env.extend("vars", a) : env, true, false)),
                                            name);
                         }
                         return gen("FN",
