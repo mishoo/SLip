@@ -345,10 +345,10 @@
        #( (as-vector cmd) ))
 
      (find-var (name env)
-       (with-cc return
+       (with-cc ret
          (labels ((position (lst i j)
                     (when lst
-                      (if (eq name (caar lst)) (funcall return (list i j (cdar lst)))
+                      (if (eq name (caar lst)) (funcall ret (list i j (cdar lst)))
                           (position (cdr lst) i (+ j 1)))))
                   (frame (env i)
                     (when env

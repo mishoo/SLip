@@ -145,3 +145,7 @@
 (defmacro destructuring-bind (args values . body)
   (%fn-destruct args values body))
 
+
+(console.log (macroexpand-all '(destructuring-bind (a b (c d &key bar (foo (* bar bar))) &rest crap &key qwe asd)
+                                (list 1 2 (list 3 4 :bar 5) :asd 10 :qwe 20 :moo 50)
+                                (list a b c d bar foo crap qwe asd))))

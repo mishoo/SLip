@@ -212,9 +212,18 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                                 code.splice(i, 1, [ el[1].name ]);
                                                 return true;
                                         }
-                                        if (el[1].name == "CONS") {
+                                        switch (el[1].name) {
+                                            case "CONS":
                                                 inc_stat("primitives");
                                                 code.splice(i, 1, [ "CONS" ]);
+                                                return true;
+                                            case "LIST":
+                                                inc_stat("primitives");
+                                                code.splice(i, 1, [ "LIST", el[2] ]);
+                                                return true;
+                                            case "LIST*":
+                                                inc_stat("primitives");
+                                                code.splice(i, 1, [ "LIST_", el[2] ]);
                                                 return true;
                                         }
                                 }
@@ -328,6 +337,41 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                                         code.splice(i, 1, [ "T" ]);
                                                         return true;
                                                 }
+                                        }
+                                }
+                                break;
+                        }
+                        switch (el[0]) {
+                            case "NIL":
+                                if (i < code.length - 1) {
+                                        if (code[i+1][0] == "CONS") {
+                                                inc_stat("lists");
+                                                code.splice(i, 2, [ "LIST", 1 ]);
+                                                return true;
+                                        }
+                                }
+                                break;
+                            case "LIST":
+                            case "LIST_":
+                                if (i < code.length - 1) {
+                                        if (code[i+1][0] == "CONS") {
+                                                inc_stat("lists");
+                                                code.splice(i, 2, [ el[0], el[1] + 1 ]);
+                                                return true;
+                                        }
+                                        if (code[i+1][0] == "LIST_") {
+                                                inc_stat("lists");
+                                                code.splice(i, 2, [ el[0], el[1] + code[i+1][1] - 1 ]);
+                                                return true;
+                                        }
+                                }
+                                break;
+                            case "CONS":
+                                if (i < code.length - 1) {
+                                        if (code[i+1][0] == "CONS") {
+                                                inc_stat("lists");
+                                                code.splice(i, 2, [ "LIST_", 3 ]);
+                                                return true;
                                         }
                                 }
                                 break;
@@ -715,7 +759,28 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         }
                 }],
                 ["NIL", 0, { run: function(m) { m.push(null) } }],
-                ["T", 0, { run: function(m) { m.push(true) } }]
+                ["T", 0, { run: function(m) { m.push(true) } }],
+                ["CONS", 0, {
+                        run: function(m) {
+                                var b = m.pop(), a = m.pop();
+                                m.push(new LispCons(a, b));
+                        }
+                }],
+                ["LIST", "count", {
+                        run: function(m) {
+                                var p = null, n = this.count;
+                                while (n-- > 0) p = new LispCons(m.pop(), p);
+                                m.push(p);
+                        }
+                }],
+                ["LIST_", "count", {
+                        run: function(m) {
+                                var p = m.pop(), n = this.count;
+                                while (--n > 0)
+                                        p = new LispCons(m.pop(), p);
+                                m.push(p);
+                        }
+                }]
 
         ].map(function(_){ defop(_[0], _[1], _[2]) });
 
@@ -731,13 +796,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         ["LVAR", 0, 0],
                         ["RET"]
                 ]))
-        });
-
-        defop("CONS", 0, {
-                run: function(m) {
-                        var b = m.pop(), a = m.pop();
-                        m.push(new LispCons(a, b));
-                }
         });
 
         (function(i){
