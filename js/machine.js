@@ -51,6 +51,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         new LispBinding(symbol, this.env.car[i]),
                         this.denv
                 );
+                this.env.car[i] = null;
         };
         P.push = function(v) {
                 this.stack.push(v);
@@ -88,6 +89,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         P.loop = function() {
                 while (true) {
                         if (this.pc == null) return this.pop();
+                        //inc_stat("OP_" + this.code[this.pc]._name);
                         this.code[this.pc++].run(this);
                 }
         };
@@ -475,8 +477,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         values.push(op.make);
                 }
                 names.push("s"); values.push(function(name, pak){
-                        if (pak != null) pak = LispPackage.get(pak);
-                        return LispSymbol.get(name, pak);
+                        if (pak != null) {
+                                pak = LispPackage.get(pak);
+                                return LispSymbol.get(name, pak);
+                        }
+                        return new LispSymbol(name);
                 });
                 names.push("l"); values.push(function(){
                         return LispCons.fromArray(slice(arguments));
@@ -659,22 +664,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["ARGS", "count", {
                         run: function(m){
                                 var count = this.count;
-                                // if (m.n_args != count) {
-                                //         throw new Error("Wrong number of arguments");
-                                // }
-                                var frame;
-                                // for a small count, pop is *much* more
-                                // efficient than splice; in FF the difference is enormous.
-                                var s = m.stack;
-                                switch (count) {
-                                    case 0: frame = []; break;
-                                    case 1: frame = [ s.pop() ]; break;
-                                    case 2: frame = s.pop(); frame = [ s.pop(), frame ]; break;
-                                    case 3: var c = s.pop(), b = s.pop(), a = s.pop(); frame = [ a, b, c ]; break;
-                                    case 4: var d = s.pop(), c = s.pop(), b = s.pop(), a = s.pop(); frame = [ a, b, c, d ]; break;
-                                    case 5: var e = s.pop(), d = s.pop(), c = s.pop(), b = s.pop(), a = s.pop(); frame = [ a, b, c, d, e ]; break;
-                                    default: frame = s.splice(s.length - count, count);
-                                }
+                                var frame = new Array(count);
+                                while (--count >= 0) frame[count] = m.pop();
                                 m.env = new LispCons(frame, m.env);
                         }
                 }],
@@ -683,16 +674,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 var count = this.count;
                                 var passed = m.n_args;
                                 if (passed < count) throw new Error("Insufficient number of arguments");
-                                var frame = [];
+                                var frame = new Array(count + 1);
                                 var p = null;
-                                while (passed > count) {
-                                        p = new LispCons(m.pop(), p);
-                                        passed--;
-                                }
+                                while (passed-- > count) p = new LispCons(m.pop(), p);
                                 frame[count] = p;
-                                while (--count >= 0) {
-                                        frame[count] = m.pop();
-                                }
+                                while (--count >= 0) frame[count] = m.pop();
                                 m.env = new LispCons(frame, m.env);
                         }
                 }],
@@ -748,8 +734,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["LIST_", "count", {
                         run: function(m) {
                                 var p = m.pop(), n = this.count;
-                                while (--n > 0)
-                                        p = new LispCons(m.pop(), p);
+                                while (--n > 0) p = new LispCons(m.pop(), p);
                                 m.push(p);
                         }
                 }]

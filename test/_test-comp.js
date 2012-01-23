@@ -21,18 +21,24 @@
                 step2();
         });
 
-        var EOF = {};
-        function load_lisp(file) {
+        function load1_lisp(file) {
                 var func = LispSymbol.get("LOAD-LISP-FILE").func();
+                return m.call(func, LispCons.fromArray([ file ]));
+        };
+        function load2_lisp(file) {
+                var func = LispSymbol.get("LOAD", LispPackage.get("SS")).func();
                 return m.call(func, LispCons.fromArray([ file ]));
         };
 
         function step2() {
                 time_it("recompile-compiler", function(){
-                        load_lisp("../lisp/compiler.lisp");
+                        load1_lisp("../lisp/compiler.lisp");
                 });
                 time_it("init", function(){
-                        load_lisp("../lisp/init.lisp");
+                        load1_lisp("../lisp/init.lisp");
+                });
+                time_it("wotf", function(){
+                        load2_lisp("../tmp/wotf.lisp");
                 });
         };
 

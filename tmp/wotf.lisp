@@ -1,7 +1,7 @@
 ;;; amb
 
 (set! *amb-fail* (lambda (arg)
-                   (clog "TOTAL FAILURE")))
+                   (console.print "TOTAL FAILURE")))
 
 (defmacro amb alternatives
   (if alternatives
@@ -10,11 +10,11 @@
            ,@(map (lambda (alt)
                     `(with-cc +fk
                        (set! *amb-fail* +fk)
-                       (+sk ,alt)))
+                       (funcall +sk ,alt)))
                   alternatives)
            (set! *amb-fail* +prev-amb-fail)
-           (+prev-amb-fail nil)))
-      `(*amb-fail* nil)))
+           (funcall +prev-amb-fail nil)))
+      `(funcall *amb-fail* nil)))
 
 ;; -----------------------------------------------------------------
 
@@ -60,7 +60,7 @@
       (foreach houses
                (lambda (h)
                  (when (eq (house-prop type h) value)
-                   (return i))
+                   (funcall return i))
                  (set! i (+ i 1)))))))
 
 ;; asserts that houses having property `t1' = `v1' and `t2' = `v2' are
@@ -70,7 +70,7 @@
          (i2 (find-house houses t2 v2))
          (diff (- i1 i2)))
     (assert (or (= 1 diff)
-                (= (- 1) diff)))))
+                (= -1 diff)))))
 
 ;; main entry point into the problem.  using the `pick' macro, select
 ;; nationality, beverage, tobacco, pets and colors, such that the rest
@@ -107,13 +107,14 @@
                        (neighbors houses :pet 'horses :tobacco 'dunhill)
                        (neighbors houses :nationality 'norwegian :color 'blue)
                        (neighbors houses :tobacco 'marlboro :beverage 'water)
-                       (clog "*** SOLUTION!")
+                       (console.print "*** SOLUTION!")
                        ;; and return it
                        houses)
                      (add houses (+ index 1)))))))
     (add () 0)))
 
-(who-owns-the-fish)
+(time
+ (console.log (who-owns-the-fish)))
 
 (defun sumis (n sum)
   (let (solutions)
@@ -136,6 +137,7 @@
                                 numbers)
                           (- next 1)))))
         (rec (list) n)))
-    (clog (length solutions))))
+    (console.log (length solutions))))
 
-(sumis 14 1)
+(time
+ (sumis 14 1))

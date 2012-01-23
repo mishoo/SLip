@@ -118,6 +118,13 @@ var LispInputStream = DEFTYPE("input_stream", function(D, P){
                 }
                 return null;
         };
+        P.skip_to = function(ch) {
+                var pos = this.text.indexOf(ch, this.pos);
+                if (pos <= 0) pos = this.text.length;
+                var diff = pos - this.pos;
+                this.pos = pos;
+                return diff;
+        };
 }, LispStream);
 
 var LispOutputStream = DEFTYPE("output_stream", function(D, P){
@@ -205,6 +212,16 @@ var LispPackage = DEFTYPE("package", function(D, P){
                 }
                 return null;
         };
+        P.import = function(sym) {
+                this.symbols.set(LispSymbol.symname(sym), sym);
+        };
+        P.shadow = function(name) {
+                var sym = this.symbols.get(name);
+                if (sym && sym.pak === this) return sym;
+                sym = new LispSymbol(name, this);
+                this.symbols.set(name, sym);
+                return sym;
+        };
         P.find_accessible = function(name) {
                 var a = this.exports;
                 for (var i = a.length; --i >= 0;) {
@@ -248,6 +265,9 @@ var LispPackage = DEFTYPE("package", function(D, P){
                 return HOP(PACKAGES, name) ? PACKAGES[name] : (
                         PACKAGES[name] = new D(name)
                 );
+        };
+        D.get_existing = function(name) {
+                return PACKAGES[name] || null;
         };
 });
 
@@ -299,7 +319,7 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                 return this.getv("function") || null;
         };
         D.get = function(name, pak) {
-                if (pak == null) pak = BASE_PACK.intern("*PACKAGE*").value;
+                if (pak == null) pak = BASE_PACK;
                 var ret = pak ? pak.intern(name) : HOP(SYMBOLS, name) ? SYMBOLS[name] : (
                         SYMBOLS[name] = new D(name)
                 );

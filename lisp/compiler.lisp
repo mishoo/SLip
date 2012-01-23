@@ -220,10 +220,9 @@
              (make-regexp str mods)))
 
          (skip-comment ()
-           (read-while (lambda (ch)
-                         (not (eq ch #\Newline)))))
+           (%stream-skip-to input #\Newline))
 
-         (read-symbol ()
+         (read-symbol-name ()
            (let ((str (read-while
                        (lambda (ch)
                          (or
@@ -233,7 +232,10 @@
                                   '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
                                     #\@ #\! #\? #\& #\= #\< #\>
                                     #\[ #\] #\{ #\} #\/ #\^ #\# )))))))
-             (set! str (upcase str))
+             (upcase str)))
+
+         (read-symbol ()
+           (let ((str (read-symbol-name)))
              (aif (and (regexp-test #/^-?[0-9]*\.?[0-9]*$/ str)
                        (parse-number str))
                   it
@@ -265,6 +267,7 @@
              (#\/ (read-regexp))
              (#\( (list* 'vector (read-list)))
              (#\' (next) (list 'function (read-token)))
+             (#\: (next) (%make-symbol (read-symbol-name)))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
 
          (read-quote ()
@@ -336,20 +339,20 @@
           (col (%stream-col input))
           (line (%stream-line input)))))))
 
-(defun make-environment ()
-  (make-hash :vars nil :funcs nil :macros nil))
-
-(defun extenv (env key val)
-  (let ((h (hash-extend env)))
-    (hash-add h key (cons val (hash-get h key)))
-    h))
-
 (labels
     ((assert (p msg)
        (unless p (%error msg)))
 
      (arg-count (x min max)
        (assert (<= min (- (length x) 1) max) "Wrong number of arguments"))
+
+     (make-environment ()
+       (make-hash :vars nil :funcs nil :macros nil))
+
+     (extenv (env key val)
+       (let ((h (hash-extend env)))
+         (hash-add h key (cons val (hash-get h key)))
+         h))
 
      (gen cmd
        #( (as-vector cmd) ))
