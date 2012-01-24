@@ -545,6 +545,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 return env.car;
         };
 
+        function rewind(env, i) {
+                while (i-- > 0) env = env.cdr;
+                return env;
+        };
+
         [
                 //// local vars namespace
                 ["LVAR", "i j", {
@@ -694,12 +699,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["UNFR", "lex spec func", {
                         run: function(m) {
-                                var n = this.lex;
-                                while (n-- > 0) m.env = m.env.cdr;
-                                n = this.spec;
-                                while (n-- > 0) m.denv = m.denv.cdr;
-                                n = this.func;
-                                while (n-- > 0) m.fenv = m.fenv.cdr;
+                                if (this.lex) m.env = rewind(m.env, this.lex);
+                                if (this.spec) m.denv = rewind(m.denv, this.spec);
+                                if (this.func) m.fenv = rewind(m.fenv, this.func);
                         }
                 }],
                 ["FN", "code name", {

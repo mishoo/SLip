@@ -45,11 +45,11 @@
 ;; function retrieves the requested property of a house.
 (defun house-prop (prop house)
   (case prop
-    (:nationality (elt house 0))
-    (:beverage (elt house 1))
-    (:tobacco (elt house 2))
-    (:pet (elt house 3))
-    (:color (elt house 4))))
+    (:nationality (car house))
+    (:beverage (cadr house))
+    (:tobacco (caddr house))
+    (:pet (cadddr house))
+    (:color (cadddr (cdr house)))))
 
 ;; In a list of `houses', locate the one that has property `type'
 ;; equal to `value' and return its index (zero-based).  Return NIL if

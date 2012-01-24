@@ -201,6 +201,6 @@
 (defmacro export (symbols &optional (package *package*))
   `(%export ,symbols ,package))
 
-(export '(defpackage in-package time))
+(export '(defpackage in-package time destructuring-bind))
 
 ;; (in-package :ss-user)
