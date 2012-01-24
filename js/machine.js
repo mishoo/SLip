@@ -4,7 +4,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.pc = pc;
                 this.code = m.code;
                 this.env = m.env;
-                this.fenv = m.fenv;
                 this.denv = m.denv;
         };
 
@@ -25,7 +24,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.stack = null;
                 this.env = null;
                 this.denv = null;
-                this.fenv = null;
                 this.n_args = null;
         };
         P.find_dvar = function(symbol) {
@@ -73,7 +71,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.code = ret.code;
                 this.pc = ret.pc;
                 this.env = ret.env;
-                this.fenv = ret.fenv;
                 this.denv = ret.denv;
         };
         P.mkcont = function() {
@@ -96,7 +93,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         P.run = function(code) {
                 this.code = code;
                 this.env = null;
-                this.fenv = null;
                 this.stack = [ [] ];
                 this.pc = 0;
                 return this.loop();
@@ -106,7 +102,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.stack = [ [] ].concat(args);
                 this.code = closure.code;
                 this.env = closure.env;
-                this.fenv = closure.fenv;
                 this.n_args = args.length;
                 this.pc = 0;
                 return this.loop();
@@ -116,7 +111,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.stack.push(this.mkret(this.pc));
                 this.code = closure.code;
                 this.env = closure.env;
-                this.fenv = closure.fenv;
                 var n = 0;
                 while (args != null) {
                         this.stack.push(args.car);
@@ -136,6 +130,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         function inc_stat(name) {
                 if (!D.stats[name]) D.stats[name] = 0;
                 ++D.stats[name];
+        };
+
+        function max_stat(name, val) {
+                if (!HOP(D.stats, name) || D.stats[name] < val)
+                        D.stats[name] = val;
         };
 
         var optimize = (function(){
@@ -159,6 +158,13 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 return false;
                         }
                         switch (el[0]) {
+                            case "VARS":
+                                if (el[1] == 1) {
+                                        code.splice(i, 1, [ "VAR" ]);
+                                        inc_stat("vars");
+                                        return true;
+                                }
+                                break;
                             case "JUMP":
                             case "TJUMP":
                             case "FJUMP":
@@ -263,7 +269,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 if (i < code.length - 1 && code[i+1][0] == "UNFR") {
                                         code[i][1] += code[i+1][1];
                                         code[i][2] += code[i+1][2];
-                                        code[i][3] += code[i+1][3];
                                         code.splice(i + 1, 1);
                                         inc_stat("join_unfr");
                                         return true;
@@ -375,7 +380,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 var ret = [];
                 for (var i = 0; i < code.length; ++i) {
                         var el = code[i];
-                        if (LispSymbol.is(el)) el.index = ret.length;
+                        if (LispSymbol.is(el)) el.value = ret.length;
                         else ret.push(el);
                 }
                 for (var i = ret.length; --i >= 0;) {
@@ -388,7 +393,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                             case "TJUMP":
                             case "FJUMP":
                             case "SAVE":
-                                el[1] = el[1].index;
+                                el[1] = el[1].value;
                             default:
                                 ret[i] = OPS[el[0]].make.apply(null, el.slice(1));
                         }
@@ -554,6 +559,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 //// local vars namespace
                 ["LVAR", "i j", {
                         run: function(m) {
+                                //max_stat("lvar_frame", this.i);
+                                //max_stat("lvar_index", this.j);
                                 m.push(frame(m.env, this.i)[this.j]);
                         }
                 }],
@@ -576,23 +583,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["BIND", "name i", {
                         run: function(m) {
                                 m.bind(this.name, this.i);
-                        }
-                }],
-                //// local functions namespace
-                ["FVAR", "i j", {
-                        run: function(m) {
-                                m.push(frame(m.fenv, this.i)[this.j]);
-                        }
-                }],
-                ["FFRAME", 0, {
-                        run: function(m) {
-                                m.fenv = new LispCons([], m.fenv);
-                        }
-                }],
-                ["FUNCS", "count", {
-                        run: function(m) {
-                                var count = this.count, frame = m.fenv.car;
-                                while (count > 0) frame[--count] = m.pop();
                         }
                 }],
                 //// global functions namespace
@@ -662,7 +652,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 var closure = m.pop();
                                 m.code = closure.code;
                                 m.env = closure.env;
-                                m.fenv = closure.fenv;
                                 m.pc = 0;
                         }
                 }],
@@ -679,17 +668,17 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 var count = this.count;
                                 var passed = m.n_args;
                                 if (passed < count) throw new Error("Insufficient number of arguments");
-                                var frame = new Array(count + 1);
                                 var p = null;
                                 while (passed-- > count) p = new LispCons(m.pop(), p);
+                                var frame = new Array(count + 1);
                                 frame[count] = p;
                                 while (--count >= 0) frame[count] = m.pop();
                                 m.env = new LispCons(frame, m.env);
                         }
                 }],
-                ["VFRAME", 0, {
+                ["FRAME", 0, {
                         run: function(m) {
-                                m.env = new LispCons([ m.pop() ], m.env);
+                                m.env = new LispCons([], m.env);
                         }
                 }],
                 ["VAR", 0, {
@@ -697,16 +686,21 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.env.car.push(m.pop());
                         }
                 }],
-                ["UNFR", "lex spec func", {
+                ["VARS", "count", {
+                        run: function(m) {
+                                var count = this.count, a = m.env.car, n = a.length;
+                                while (--count >= 0) a[n + count] = m.pop();
+                        }
+                }],
+                ["UNFR", "lex spec", {
                         run: function(m) {
                                 if (this.lex) m.env = rewind(m.env, this.lex);
                                 if (this.spec) m.denv = rewind(m.denv, this.spec);
-                                if (this.func) m.fenv = rewind(m.fenv, this.func);
                         }
                 }],
                 ["FN", "code name", {
                         run: function(m) {
-                                m.push(new LispClosure(this.code, this.name, m.env, m.fenv));
+                                m.push(new LispClosure(this.code, this.name, m.env));
                         },
                         _disp: function() {
                                 return "FN(" + D.serialize(this.code) + (this.name ? "," + LispMachine.serialize_const(this.name) : "") + ")";
@@ -760,7 +754,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         (function(i){
                 for (i in LispCons) if (HOP(LispCons, i) && /^c[ad]+r$/.test(i)) {
                         defop(i.toUpperCase(), 0, {
-                                run: new Function("m", "m.push(LispCons." + i + "(m.pop()))")
+                                run: new Function("f", "return function(m){ m.push(f(m.pop())) }")(LispCons[i])
                         });
                 }
         })();

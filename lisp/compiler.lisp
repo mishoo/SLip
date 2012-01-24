@@ -347,39 +347,51 @@
        (assert (<= min (- (length x) 1) max) "Wrong number of arguments"))
 
      (make-environment ()
-       (make-hash :vars nil :funcs nil :macros nil))
+       (make-hash :vars nil :macros nil))
 
      (extenv (env key val)
-       (let ((h (hash-extend env)))
+       (let ((h (hash-copy env)))
          (hash-add h key (cons val (hash-get h key)))
          h))
 
      (gen cmd
        #( (as-vector cmd) ))
 
-     (find-var (name env)
+     (find-in-env (name type env)
        (with-cc ret
          (labels ((position (lst i j)
                     (when lst
-                      (if (eq name (caar lst)) (funcall ret (list i j (cdar lst)))
-                          (position (cdr lst) i (+ j 1)))))
+                      (let ((x (car lst)))
+                        (if (and (eq name (car x))
+                                 (eq type (cadr x)))
+                            (funcall ret (list* i j (cddr x)))
+                            (position (cdr lst) i (+ j 1))))))
                   (frame (env i)
                     (when env
                       (position (car env) i 0)
                       (frame (cdr env) (+ i 1)))))
            (frame env 0))))
 
+     (find-var (name env)
+       (find-in-env name :var (hash-get env :vars)))
+
+     (find-func (name env)
+       (find-in-env name :func (hash-get env :vars)))
+
+     (find-macrolet (name env)
+       (find-in-env name :macro (hash-get env :macros)))
+
      (gen-var (name env)
        (if (%specialp name)
            (gen "GVAR" name)
-           (aif (find-var name (hash-get env :vars))
+           (aif (find-var name env)
                 (gen "LVAR" (car it) (cadr it))
                 (gen "GVAR" name))))
 
      (gen-set (name env)
        (if (%specialp name)
            (gen "GSET" name)
-           (aif (find-var name (hash-get env :vars))
+           (aif (find-var name env)
                 (gen "LSET" (car it) (cadr it))
                 (gen "GSET" name))))
 
@@ -387,7 +399,7 @@
        (gensym "label"))
 
      (macro (sym env)
-       (aif (find-var sym (hash-get env :macros))
+       (aif (find-macrolet sym env)
             (caddr it)
             (%macro sym)))
 
@@ -430,9 +442,9 @@
               (function (arg-count x 1 1)
                         (let ((sym (cadr x)))
                           (assert (symbolp sym) "FUNCTION requires a symbol")
-                          (let ((local (find-var sym (hash-get env :funcs))))
+                          (let ((local (find-func sym env)))
                             (if local
-                                (gen "FVAR" (car local) (cadr local))
+                                (gen "LVAR" (car local) (cadr local))
                                 (gen "FGVAR" sym)))))
               (%fn (if val?
                        (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
@@ -510,10 +522,10 @@
                              (gen "CALL" (length args)))))))
          (cond
            ((symbolp f)
-            (let ((localfun (find-var f (hash-get env :funcs))))
+            (let ((localfun (find-func f env)))
               (cond
                 (localfun
-                 (mkret (gen "FVAR" (car localfun) (cadr localfun))))
+                 (mkret (gen "LVAR" (car localfun) (cadr localfun))))
                 ((%primitivep f)
                  (if (and (not val?) (not (%prim-side-effects f)))
                      (comp-seq args env nil more?)
@@ -556,7 +568,7 @@
                                     (%incf i)))
                     (%seq dyn
                           (comp-seq body (if args
-                                             (extenv env :vars (map (lambda (name) (cons name nil)) args))
+                                             (extenv env :vars (map (lambda (name) (list name :var)) args))
                                              env) t nil))))
             name))
 
@@ -583,25 +595,25 @@
                   (names (car bindings))
                   (funcs (cadr bindings))
                   (len (caddr bindings)))
-             (if labels? (set! env (extenv env :funcs (map (lambda (name) (cons name nil)) names))))
-             (%seq (if labels? (gen "FFRAME"))
-                   (%prim-apply
-                    '%seq (mapcar (lambda (name func)
-                                    (comp-lambda name (car func) (cdr func) env))
-                                  names funcs))
-                   (unless labels? (gen "FFRAME"))
-                   (gen "FUNCS" len)
-                   (comp-seq body (if labels?
-                                      env
-                                      (extenv env :funcs (map (lambda (name) (cons name nil)) names))) val? t)
-                   (gen "UNFR" 0 0 1)
-                   (if more? nil (gen "RET"))))
+             (flet ((extenv ()
+                      (extenv env :vars (map (lambda (name) (list name :func)) names))))
+               (if labels? (set! env (extenv)))
+               (%seq (if labels? (gen "FRAME"))
+                     (%prim-apply
+                      '%seq (mapcar (lambda (name func)
+                                      (comp-lambda name (car func) (cdr func) env))
+                                    names funcs))
+                     (unless labels? (gen "FRAME"))
+                     (if (> len 1) (gen "VARS" len) (gen "VAR"))
+                     (comp-seq body (if labels? env (extenv)) val? t)
+                     (gen "UNFR" 1 0)
+                     (if more? nil (gen "RET")))))
            (comp-seq body env val? more?)))
 
      (comp-macrolet (bindings body env val? more?)
        (when bindings
          (set! env (extenv env :macros (map (lambda (def)
-                                              (cons (car def) (compile (list* '%fn def))))
+                                              (list (car def) :macro (compile (list* '%fn def))))
                                             bindings))))
        (comp-seq body env val? more?))
 
@@ -622,8 +634,8 @@
                    (%prim-apply '%seq (map (lambda (x)
                                              (gen "BIND" (car x) (cdr x)))
                                            specials))
-                   (comp-seq body (extenv env :vars (map (lambda (name) (cons name nil)) names)) val? t)
-                   (gen "UNFR" 1 (length specials) 0)
+                   (comp-seq body (extenv env :vars (map (lambda (name) (list name :var)) names)) val? t)
+                   (gen "UNFR" 1 (length specials))
                    (if more? nil (gen "RET"))))
            (comp-seq body env val? more?)))
 
@@ -639,18 +651,19 @@
                     '%seq (mapcar (lambda (name x)
                                     (prog1
                                         (%seq (comp x env t t)
-                                              (gen (if newargs "VAR" "VFRAME"))
+                                              (unless newargs (gen "FRAME"))
+                                              (gen "VAR")
                                               (when (%specialp name)
                                                 (gen "BIND" name i)))
                                       (%incf i)
-                                      (let ((cell (cons (cons name nil) nil)))
+                                      (let ((cell (list (list name :var))))
                                         (if newargs
                                             (rplacd newargs cell)
                                             (set! env (extenv env :vars cell)))
                                         (set! newargs cell))))
                                   names vals))
                    (comp-seq body env val? t)
-                   (gen "UNFR" 1 (length specials) 0)
+                   (gen "UNFR" 1 (length specials))
                    (if more? nil (gen "RET"))))
            (comp-seq body env val? more?)))
 
