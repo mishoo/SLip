@@ -28,18 +28,6 @@
 (defmacro assert (condition)
   `(unless ,condition (amb)))
 
-;; asserts that both conditions are either true or false
-(defmacro iff (c1 c2)
-  `(assert (eq ,c1 ,c2)))
-
-;; This is an *ugly* macro.  It assumes the existence of some
-;; variables in the scope where it is used.  Normally I would use
-;; macrolet for this, but JCLS doesn't yet have macrolet.
-(defmacro pick (type . choices)
-  `(let ((tmp (amb ,@choices)))
-     (assert (not (find-house houses ,type tmp)))
-     tmp))
-
 ;; a house is represented as a list of 5 elements -- nationality,
 ;; beverage, tobacco brand, pet and color (in this order).  This
 ;; function retrieves the requested property of a house.
@@ -55,12 +43,12 @@
 ;; equal to `value' and return its index (zero-based).  Return NIL if
 ;; not found.
 (defun find-house (houses type value)
-  (with-cc return
+  (block nil
     (let ((i 0))
       (foreach houses
                (lambda (h)
                  (when (eq (house-prop type h) value)
-                   (funcall return i))
+                   (return i))
                  (set! i (+ i 1)))))))
 
 ;; asserts that houses having property `t1' = `v1' and `t2' = `v2' are
@@ -78,40 +66,46 @@
 ;; asserts the problem conditions, using the helper functions and
 ;; macros defined above.
 (defun who-owns-the-fish ()
-  (labels ((add (houses index)
-             (let ((nat (pick :nationality  'british  'swedish 'danish   'norwegian 'german))
-                   (col (pick :color        'red      'green   'white    'yellow    'blue))
-                   (bev (pick :beverage     'tea      'milk    'coffee   'beer      'water))
-                   (tob (pick :tobacco      'pallmall 'dunhill 'marlboro 'winfield  'rothmans))
-                   (pet (pick :pet          'dogs     'cats    'horses   'birds     'fish)))
-               (iff (eq nat 'british) (eq col 'red))
-               (iff (eq nat 'swedish) (eq pet 'dogs))
-               (iff (eq nat 'danish) (eq bev 'tea))
-               (iff (eq col 'white)
-                    (and (> index 0)
-                         (eq 'green
-                             (house-prop :color (elt houses (- index 1))))))
-               (iff (eq col 'green) (eq bev 'coffee))
-               (iff (eq tob 'pallmall) (eq pet 'birds))
-               (iff (eq col 'yellow) (eq tob 'dunhill))
-               (iff (= index 2) (eq bev 'milk))
-               (iff (= index 0) (eq nat 'norwegian))
-               (iff (eq tob 'winfield) (eq bev 'beer))
-               (iff (eq nat 'german) (eq tob 'rothmans))
-               (let* ((h (list nat bev tob pet col))
-                      (houses (append houses (list h))))
-                 ;;(clog houses) ; log something so we don't look like we're frozen.
-                 (if (= index 4)
-                     (progn
-                       (neighbors houses :tobacco 'marlboro :pet 'cats)
-                       (neighbors houses :pet 'horses :tobacco 'dunhill)
-                       (neighbors houses :nationality 'norwegian :color 'blue)
-                       (neighbors houses :tobacco 'marlboro :beverage 'water)
-                       (console.print "*** SOLUTION!")
-                       ;; and return it
-                       houses)
-                     (add houses (+ index 1)))))))
-    (add () 0)))
+  (macrolet ((pick (type . choices)
+               `(let ((tmp (amb ,@choices)))
+                  (assert (not (find-house houses ,type tmp)))
+                  tmp))
+             (iff (c1 c2)
+               `(assert (eq ,c1 ,c2))))
+    (labels ((add (houses index)
+               (let ((nat (pick :nationality  'british  'swedish 'danish   'norwegian 'german))
+                     (col (pick :color        'red      'green   'white    'yellow    'blue))
+                     (bev (pick :beverage     'tea      'milk    'coffee   'beer      'water))
+                     (tob (pick :tobacco      'pallmall 'dunhill 'marlboro 'winfield  'rothmans))
+                     (pet (pick :pet          'dogs     'cats    'horses   'birds     'fish)))
+                 (iff (eq nat 'british) (eq col 'red))
+                 (iff (eq nat 'swedish) (eq pet 'dogs))
+                 (iff (eq nat 'danish) (eq bev 'tea))
+                 (iff (eq col 'white)
+                      (and (> index 0)
+                           (eq 'green
+                               (house-prop :color (elt houses (- index 1))))))
+                 (iff (eq col 'green) (eq bev 'coffee))
+                 (iff (eq tob 'pallmall) (eq pet 'birds))
+                 (iff (eq col 'yellow) (eq tob 'dunhill))
+                 (iff (= index 2) (eq bev 'milk))
+                 (iff (= index 0) (eq nat 'norwegian))
+                 (iff (eq tob 'winfield) (eq bev 'beer))
+                 (iff (eq nat 'german) (eq tob 'rothmans))
+                 (let* ((h (list nat bev tob pet col))
+                        (houses (append houses (list h))))
+                   ;;(clog houses) ; log something so we don't look like we're frozen.
+                   (if (= index 4)
+                       (progn
+                         (neighbors houses :tobacco 'marlboro :pet 'cats)
+                         (neighbors houses :pet 'horses :tobacco 'dunhill)
+                         (neighbors houses :nationality 'norwegian :color 'blue)
+                         (neighbors houses :tobacco 'marlboro :beverage 'water)
+                         (console.print "*** SOLUTION!")
+                         ;; and return it
+                         houses)
+                       (add houses (+ index 1)))))))
+      (add () 0))))
 
 (time
  (console.log (who-owns-the-fish)))

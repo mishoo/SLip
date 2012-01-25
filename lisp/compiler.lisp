@@ -25,6 +25,32 @@
                 (list 'quote x))))
    #'qq))
 
+;; (set-symbol-function!
+;;  'qq
+;;  (labels ((qq-expand-list (x)
+;;             (if (consp x)
+;;                 (if (eq (car x) 'qq-unquote)
+;;                     (list 'list (cadr x))
+;;                     (if (eq (car x) 'qq-splice)
+;;                         (cadr x)
+;;                         (if (eq (car x) 'quasiquote)
+;;                             (qq-expand-list (qq-expand (cadr x)))
+;;                             (list 'list (list 'append
+;;                                               (qq-expand-list (car x))
+;;                                               (qq-expand (cdr x)))))))
+;;                 (list 'quote (list x))))
+;;           (qq-expand (x)
+;;             (if (consp x)
+;;                 (if (eq (car x) 'qq-unquote)
+;;                     (cadr x)
+;;                     (if (eq (car x) 'quasiquote)
+;;                         (qq-expand (qq-expand (cadr x)))
+;;                         (list 'append
+;;                               (qq-expand-list (car x))
+;;                               (qq-expand (cdr x)))))
+;;                 (list 'quote x))))
+;;    #'qq-expand))
+
 ;; better to avoid quasiquote here:
 (%macro! 'defmacro
          (labels ((defmacro (name args . body)
@@ -63,6 +89,23 @@
 (defun map (func lst)
   (when lst
     (cons (funcall func (car lst)) (map func (cdr lst)))))
+
+;; (defmacro let (defs . body)
+;;   `((lambda ,(map (lambda (x)
+;;                     (if (listp x)
+;;                         (car x)
+;;                         x)) defs)
+;;       ,@body)
+;;     ,@(map (lambda (x)
+;;              (if (listp x)
+;;                  (cadr x))) defs)))
+
+;; (defmacro let* (defs . body)
+;;   (if defs
+;;       `(let (,(car defs))
+;;          (let* ,(cdr defs)
+;;            ,@body))
+;;       `(progn ,@body)))
 
 (defun foreach (lst func)
   (when lst
@@ -346,12 +389,25 @@
      (arg-count (x min max)
        (assert (<= min (- (length x) 1) max) "Wrong number of arguments"))
 
+     ;; :lex should match the runtime lexical environment; both
+     ;; variables and functions are stored there, but the compiler
+     ;; distinguiesh them and will emit different frame,index pairs.
+     ;;
+     ;; :macros and :tags are necessry only at compile-time.
      (make-environment ()
-       (make-hash :vars nil :macros nil))
+       (make-hash :lex nil
+                  :macros nil
+                  :tags nil))
 
-     (extenv (env key val)
+     (extenv (env . rest)
        (let ((h (hash-copy env)))
-         (hash-add h key (cons val (hash-get h key)))
+         (labels ((rec (stuff)
+                    (when stuff
+                      (let ((key (car stuff))
+                            (val (cadr stuff)))
+                        (hash-add h key (cons val (hash-get h key)))
+                        (rec (cddr stuff))))))
+           (rec rest))
          h))
 
      (gen cmd
@@ -373,10 +429,19 @@
            (frame env 0))))
 
      (find-var (name env)
-       (find-in-env name :var (hash-get env :vars)))
+       (find-in-env name :var (hash-get env :lex)))
 
      (find-func (name env)
-       (find-in-env name :func (hash-get env :vars)))
+       (find-in-env name :func (hash-get env :lex)))
+
+     (find-tag (name env)
+       (find-in-env name :tag (hash-get env :tags)))
+
+     (find-tagbody (name env)
+       (find-in-env name :tagbody (hash-get env :lex)))
+
+     (find-block (name env)
+       (find-in-env name :block (hash-get env :lex)))
 
      (find-macrolet (name env)
        (find-in-env name :macro (hash-get env :macros)))
@@ -449,6 +514,12 @@
               (%fn (if val?
                        (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
                              (if more? nil (gen "RET")))))
+              (tagbody (comp-tagbody (cdr x) env val? more?))
+              (go (arg-count x 1 1)
+                  (comp-go (cadr x) env))
+              (block (comp-block (cadr x) (cddr x) env val? more?))
+              (return (arg-count x 0 1) (comp-return nil (cadr x) env))
+              (return-from (arg-count x 1 2) (comp-return (cadr x) (caddr x) env))
               (t (if (and (symbolp (car x))
                           (macro (car x) env))
                      (comp-macroexpand (car x) (cdr x) env val? more?)
@@ -473,6 +544,72 @@
        (when exps
          (%seq (comp (car exps) env t t)
                (comp-list (cdr exps) env))))
+
+     (comp-block (name forms env val? more?)
+       (assert (symbolp name) "BLOCK expects a symbol")
+       (let ((label (gensym "block")))
+         (%seq (gen "BLOCK")
+               (comp-seq forms (extenv env :lex (list (list name :block label))) val? t)
+               (gen "UNFR" 1 0)
+               #( label )
+               (if more? nil (gen "RET")))))
+
+     (comp-return (name value env)
+       (assert (symbolp name) "RETURN-FROM expects a symbol")
+       (let ((block (find-block name env)))
+         (assert block (strcat "BLOCK " name " not found"))
+         (%seq (comp value env t t)
+               (gen "LVAR" (car block) (cadr block))
+               (gen "LRET" (caddr block)))))
+
+     (comp-tagbody (forms env val? more?)
+       ;; a TAGBODY introduces a single return point in the lexical
+       ;; environment; this is necessary because we can jump to a tag
+       ;; from a nested environment, so the runtime will need to save
+       ;; the stack length and current environment for each tagbody.
+       ;; a GO instruction will fetch the TAGBODY variable that it
+       ;; refers to, restore that environment and jump to the
+       ;; specified index.
+       (let ((tags nil)
+             (tbody (gensym "tagbody")))
+         ;; pass 1: fetch tags
+         (labels ((rec (forms p)
+                    (when forms
+                      (if (symbolp (car forms))
+                          (let ((cell (list (list (car forms)
+                                                  :tag
+                                                  tbody
+                                                  (gensym "tag")))))
+                            (if p
+                                (rplacd p cell)
+                                (set! tags cell))
+                            (rec (cdr forms) cell))
+                          (rec (cdr forms) p)))))
+           (rec forms nil))
+         (set! env (extenv env
+                           :lex (list (list tbody :tagbody))
+                           :tags tags))
+         (%seq (gen "BLOCK")            ; define the tagbody entry
+               (%prim-apply
+                '%seq (map (lambda (x)
+                             (if (symbolp x)
+                                 (prog1
+                                     #( (cadddr (car tags)) )
+                                   (set! tags (cdr tags))) ; label
+                                 (comp x env nil t)))
+                           forms))
+               (when val? (gen "NIL"))  ; tagbody returns NIL
+               (gen "UNFR" 1 0)         ; pop the tagbody from the env
+               (if more? nil (gen "RET")))))
+
+     (comp-go (tag env)
+       (let ((pos (find-tag tag env)))
+         (assert pos (strcat "TAG " tag " not found"))
+         (let* ((tbody (find-tagbody (caddr pos) env))
+                (i (car tbody))
+                (j (cadr tbody)))
+           (%seq (gen "LVAR" i j)
+                 (gen "LJUMP" (cadddr pos))))))
 
      (comp-if (pred then else env val? more?)
        (cond
@@ -568,7 +705,7 @@
                                     (%incf i)))
                     (%seq dyn
                           (comp-seq body (if args
-                                             (extenv env :vars (map (lambda (name) (list name :var)) args))
+                                             (extenv env :lex (map (lambda (name) (list name :var)) args))
                                              env) t nil))))
             name))
 
@@ -596,7 +733,7 @@
                   (funcs (cadr bindings))
                   (len (caddr bindings)))
              (flet ((extenv ()
-                      (extenv env :vars (map (lambda (name) (list name :func)) names))))
+                      (extenv env :lex (map (lambda (name) (list name :func)) names))))
                (if labels? (set! env (extenv)))
                (%seq (if labels? (gen "FRAME"))
                      (%prim-apply
@@ -634,7 +771,7 @@
                    (%prim-apply '%seq (map (lambda (x)
                                              (gen "BIND" (car x) (cdr x)))
                                            specials))
-                   (comp-seq body (extenv env :vars (map (lambda (name) (list name :var)) names)) val? t)
+                   (comp-seq body (extenv env :lex (map (lambda (name) (list name :var)) names)) val? t)
                    (gen "UNFR" 1 (length specials))
                    (if more? nil (gen "RET"))))
            (comp-seq body env val? more?)))
@@ -659,7 +796,7 @@
                                       (let ((cell (list (list name :var))))
                                         (if newargs
                                             (rplacd newargs cell)
-                                            (set! env (extenv env :vars cell)))
+                                            (set! env (extenv env :lex cell)))
                                         (set! newargs cell))))
                                   names vals))
                    (comp-seq body env val? t)

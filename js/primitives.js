@@ -98,7 +98,7 @@
                                 a = a.cdr;
                                 b = b.cdr;
                         }
-                        return eq(a, b);
+                        return a === b;
                 } else if (LispArray.is(a) && LispArray.is(b)) {
                         var i = a.length;
                         if (i !== b.length) return null;
@@ -624,7 +624,7 @@
         defp("keywordp", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var x = m.pop();
-                return LispSymbol.is(x) && x.pak === KW ? true : null;
+                return x !== null && x !== true && LispSymbol.is(x) && x.pak === KW ? true : null;
         });
 
         defp("zerop", false, function(m, nargs){

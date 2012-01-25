@@ -7,6 +7,13 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.denv = m.denv;
         };
 
+        function LispBlockRet(m) {
+                this.code = m.code;
+                this.env = m.env;
+                this.denv = m.denv;
+                this.slen = m.stack.length;
+        };
+
         function LispCC(stack, denv) {
                 this.stack = stack;
                 this.denv = denv;
@@ -143,8 +150,13 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 };
                 function used_label(code, label) {
                         for (var i = code.length; --i >= 0;) {
-                                if (!LispSymbol.is(code[i]) && code[i][1] === label)
-                                        return true;
+                                var el = code[i];
+                                if (!LispSymbol.is(el)) {
+                                        if (el[1] === label)
+                                                return true;
+                                        if (el[0] === "FN" && used_label(el[1], label))
+                                                return true;
+                                }
                         }
                 };
                 function optimize1(code, i) {
@@ -266,12 +278,18 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 }
                                 break;
                             case "UNFR":
-                                if (i < code.length - 1 && code[i+1][0] == "UNFR") {
-                                        code[i][1] += code[i+1][1];
-                                        code[i][2] += code[i+1][2];
-                                        code.splice(i + 1, 1);
-                                        inc_stat("join_unfr");
-                                        return true;
+                                if (i < code.length - 1) {
+                                        if (code[i+1][0] == "UNFR") {
+                                                code[i][1] += code[i+1][1];
+                                                code[i][2] += code[i+1][2];
+                                                code.splice(i + 1, 1);
+                                                inc_stat("join_unfr");
+                                                return true;
+                                        }
+                                        if (code[i+1][0] == "RET") {
+                                                code.splice(i, 1);
+                                                return true;
+                                        }
                                 }
                                 break;
                         }
@@ -392,6 +410,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                             case "JUMP":
                             case "TJUMP":
                             case "FJUMP":
+                            case "LJUMP":
+                            case "LRET":
                             case "SAVE":
                                 el[1] = el[1].value;
                             default:
@@ -624,6 +644,37 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 if (m.pop() === null) m.pc = this.addr;
                         }
                 }],
+                ["BLOCK", 0, {
+                        run: function(m) {
+                                // this is moderately tricky: we can't do
+                                //   m.env = new LispCons([ new LispBlockRet(m) ], m.env);
+                                // I'll let you figure out why.
+                                var frame = [];
+                                m.env = new LispCons(frame, m.env);
+                                frame[0] = new LispBlockRet(m);
+                        }
+                }],
+                ["LJUMP", "addr", {
+                        run: function(m) {
+                                var tbody = m.pop();
+                                m.code = tbody.code;
+                                m.env = tbody.env;
+                                m.denv = tbody.denv;
+                                m.stack.length = tbody.slen;
+                                m.pc = this.addr;
+                        }
+                }],
+                ["LRET", "addr", {
+                        run: function(m) {
+                                var tbody = m.pop(), val = m.pop();
+                                m.code = tbody.code;
+                                m.env = tbody.env;
+                                m.denv = tbody.denv;
+                                m.stack.length = tbody.slen;
+                                m.pc = this.addr;
+                                m.push(val);
+                        }
+                }],
                 ["NOT", 0, {
                         run: function(m) {
                                 m.push(m.pop() === null ? true : null);
@@ -759,6 +810,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }
         })();
 
+        var S_QUOTE = LispSymbol.get("QUOTE");
+
         D.dump = function(thing) {
                 if (thing === null) return "NIL";
                 if (thing === true) return "T";
@@ -767,6 +820,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 if (LispPackage.is(thing)) return thing.name;
                 if (LispSymbol.is(thing)) return thing.dump();
                 if (LispCons.is(thing)) {
+                        if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
+                                return "'" + D.dump(LispCons.cadr(thing));
                         var ret = "(", first = true;
                         while (thing !== null) {
                                 if (!first) ret += " ";

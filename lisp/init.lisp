@@ -3,8 +3,10 @@
       (user (%make-package "SS-USER")))
   (%export '(quasiquote defmacro defun when unless map labels foreach
              prog1 prog2 or and cond member case mapcar with-cc aif push error
-             lisp-reader compile compile-string funcall
+             lisp-reader compile compile-string
+             funcall macrolet
              quote lambda let let* if progn set! t nil not
+             tagbody go block return return-from
              *package* *read-table*
              &key &rest &body &whole &optional &aux)
            boot)
