@@ -337,3 +337,55 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         pak.value = BASE_PACK;
         pak.setv("special", true);
 })(LispPackage.get("%"))
+
+// ideas for implementing processes from http://norstrulde.org/ilge10/
+var LispProcess = DEFTYPE("process", function(D, P){
+        var PROCESSES = {};
+        var PID = 0;
+        P.INIT = function(closure) {
+                var pid = this.pid = ++PID;
+                PROCESSES[pid] = this;
+                var m = this.m = new LispMachine();
+                m.process = this;
+                m.set_closure(closure);
+                m.status = "running";
+                QUEUE.push(this);
+                start();
+        };
+
+        P.run = function(quota) {
+                var m = this.m, err;
+                if (m.status == "running") {
+                        err = m.run(quota);
+                        if (err) {
+                                console.error("Error in PID: ", this.pid, err);
+                        }
+                        else if (m.status == "running") {
+                                QUEUE.push(this);
+                        }
+                }
+        };
+
+        var TIMER = null;
+        var QUEUE = [];
+        function start() {
+                if (!TIMER) TIMER = setTimeout(run, 0);
+        };
+        function stop() {
+                if (TIMER) {
+                        clearInterval(TIMER);
+                        TIMER = null;
+                }
+        };
+        function run() {
+                var start_time = Date.now();
+                while (Date.now() - start_time < 20) {
+                        if (QUEUE.length == 0) break;
+                        var p = QUEUE.shift();
+                        if (D.is(p)) {
+                                p.run(100);
+                        } else throw "Not implemented";
+                }
+                TIMER = QUEUE.length > 0 ? setTimeout(run, 0) : NULL;
+        };
+});

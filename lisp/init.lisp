@@ -3,7 +3,7 @@
       (user (%make-package "SS-USER")))
   (%export '(quasiquote defmacro defun when unless map labels foreach
              prog1 prog2 or and cond member case mapcar with-cc aif push error
-             lisp-reader compile compile-string
+             lisp-reader compile compile-string load
              funcall macrolet
              quote lambda let let* if progn set! t nil not
              tagbody go block return return-from
@@ -13,11 +13,6 @@
   (%use-package boot main)
   (%use-package main user)
   (set! *package* main))
-
-(defun load (url)
-  (let ((*package* *package*)
-        (*read-table* *read-table*))
-    (%::load-lisp-file url)))
 
 ;; this is `once-only' from Practical Common Lisp
 (defmacro with-rebinds (names . body)
@@ -203,6 +198,9 @@
 (defmacro export (symbols &optional (package *package*))
   `(%export ,symbols ,package))
 
-(export '(defpackage in-package time destructuring-bind))
+(export '(pushnew awhen
+          macroexpand-all macroexpand
+          with-rebinds
+          intern defpackage in-package time destructuring-bind))
 
-;; (in-package :ss-user)
+(in-package :ss-user)

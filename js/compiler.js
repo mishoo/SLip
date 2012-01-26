@@ -479,7 +479,7 @@ function lisp_reader(code) {
                         seq.apply(null, b.vals.map(function(x){
                                 return comp(x, env, true, true);
                         })),
-                        gen("ARGS", b.len),
+                        gen("LET", b.len),
                         b.specials.map(function(i){
                                 return gen("BIND", b.names[i], i)[0];
                         }),
@@ -607,13 +607,13 @@ function lisp_reader(code) {
 
         function comp_macroexpand(name, args, env, VAL, MORE) {
                 var m = new LispMachine();
-                var ast = m.call(name.macro(), args);
+                var ast = m._call(name.macro(), args);
                 var ret = comp(ast, env, VAL, MORE);
                 return ret;
         };
 
         this.lisp_compile = function(x) {
-                return comp_seq(x, new Environment(), true, false);
+                return comp_seq(x, new Environment(), true, true);
         };
 
         var Environment = DEFCLASS("Environment", null, function(D, P){

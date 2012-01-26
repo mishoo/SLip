@@ -459,14 +459,18 @@
            (gen "GVAR" name)
            (aif (find-var name env)
                 (gen "LVAR" (car it) (cadr it))
-                (gen "GVAR" name))))
+                (progn
+                  (%warn (strcat "Undefined variable " name))
+                  (gen "GVAR" name)))))
 
      (gen-set (name env)
        (if (%specialp name)
            (gen "GSET" name)
            (aif (find-var name env)
                 (gen "LSET" (car it) (cadr it))
-                (gen "GSET" name))))
+                (progn
+                  (%warn (strcat "Undefined variable " name))
+                  (gen "GSET" name)))))
 
      (mklabel ()
        (gensym "label"))
@@ -688,12 +692,12 @@
             (comp-seq (cddr f) env val? more?))
            (t (mkret (comp f env t t))))))
 
-     (gen-args (args n)
+     (gen-simple-args (args n)
        (cond
          ((not args) (gen "ARGS" n))
          ((symbolp args) (gen "ARG_" n))
          ((and (consp args) (symbolp (car args)))
-          (gen-args (cdr args) (+ n 1)))
+          (gen-simple-args (cdr args) (+ n 1)))
          (t (error "Illegal argument list"))))
 
      (make-true-list (l)
@@ -704,7 +708,7 @@
 
      (comp-lambda (name args body env)
        (gen "FN"
-            (%seq (when args (gen-args args 0))
+            (%seq (when args (gen-simple-args args 0))
                   (let (dyn (i 0) (args (make-true-list args)))
                     (foreach args (lambda (x)
                                     (when (%specialp x)
@@ -775,7 +779,7 @@
                     (specials (cadddr bindings)))
                (foreach vals (lambda (x)
                                (<< (comp x env t t))))
-               (<< (gen "ARGS" len))
+               (<< (gen "LET" len))
                (foreach specials (lambda (x)
                                    (<< (gen "BIND" (car x) (cdr x)))))
                (<< (comp-seq body (extenv env :lex (map (lambda (name) (list name :var)) names)) val? t)
@@ -833,8 +837,13 @@
       (rec t)
       (%stream-get out))))
 
-(defun load-lisp-file (url)
+(defun %load (url)
   (compile-string (%get-file-contents url)))
+
+(defun load (url)
+  (let ((*package* *package*)
+        (*read-table* *read-table*))
+    (%load url)))
 
 ;;;
 

@@ -17,17 +17,17 @@
         // load the compiler
         load("test.sslc", function(code){
                 code = LispMachine.unserialize(code);
-                m.run(code);
+                m._exec(code);
                 step2();
         });
 
         function load1_lisp(file) {
-                var func = LispSymbol.get("LOAD-LISP-FILE").func();
-                return m.call(func, LispCons.fromArray([ file ]));
+                var func = LispSymbol.get("%LOAD").func();
+                return m._call(func, LispCons.fromArray([ file ]));
         };
         function load2_lisp(file) {
-                var func = LispSymbol.get("LOAD", LispPackage.get("SS")).func();
-                return m.call(func, LispCons.fromArray([ file ]));
+                var func = LispSymbol.get("LOAD").func();
+                return m._call(func, LispCons.fromArray([ file ]));
         };
 
         function step2() {

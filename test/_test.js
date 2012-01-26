@@ -29,7 +29,7 @@
                                         console.log(LispMachine.disassemble(bc));
                                         console.log("- - -");
                                         time_it("run", function(){
-                                                var ret = LispMachine.dump(m.run(bc));
+                                                var ret = LispMachine.dump(m._exec(bc));
                                                 //console.log(ret);
                                         });
                                 }

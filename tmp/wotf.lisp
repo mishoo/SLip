@@ -1,5 +1,9 @@
-;;; amb
+(defpackage :wotf
+  (:use :ss))
 
+(in-package :wotf)
+
+(%::%special! '*amb-fail*)
 (set! *amb-fail* (lambda (arg)
                    (console.print "TOTAL FAILURE")))
 

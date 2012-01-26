@@ -32,6 +32,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.env = null;
                 this.denv = null;
                 this.n_args = null;
+                this.status = null;
+                this.error = null;
+                this.process = null;
         };
         P.find_dvar = function(symbol) {
                 if (symbol.special()) {
@@ -91,27 +94,30 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 return this.stack[this.stack.length - 1];
         };
         P.loop = function() {
-                while (true) {
-                        if (this.pc == null) return this.pop();
+                while (this.pc < this.code.length) {
                         //inc_stat("OP_" + this.code[this.pc]._name);
                         this.code[this.pc++].run(this);
                 }
+                return this.pop();
         };
-        P.run = function(code) {
+        P._exec = function(code) {
                 this.code = code;
                 this.env = null;
-                this.stack = [ [] ];
+                this.stack = [];
                 this.pc = 0;
                 return this.loop();
         };
-        P.call = function(closure, args) {
+        P._call = function(closure, args) {
                 args = LispCons.toArray(args);
-                this.stack = [ [] ].concat(args);
+                this.stack = [ new LispRet(this, null) ].concat(args);
                 this.code = closure.code;
                 this.env = closure.env;
                 this.n_args = args.length;
                 this.pc = 0;
-                return this.loop();
+                while (true) {
+                        if (this.pc == null) return this.pop();
+                        this.code[this.pc++].run(this);
+                }
         };
 
         P._callnext = function(closure, args) {
@@ -127,6 +133,35 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.n_args = n;
                 this.pc = 0;
                 return false;
+        };
+
+        P.set_closure = function(closure) {
+                var args = slice(arguments, 1);
+                this.stack = [ new LispRet(this, null) ].concat(args);
+                this.code = closure.code;
+                this.env = closure.env;
+                this.n_args = args.length;
+                this.pc = 0;
+        };
+
+        P.run = function(quota) {
+                var err = null;
+                try {
+                        while (quota-- > 0) {
+                                if (this.pc == null) {
+                                        this.status = "finished";
+                                        this.pop();
+                                        break;
+                                }
+                                this.code[this.pc++].run(this);
+                                if (this.status != "running")
+                                        break;
+                        }
+                } catch(ex) {
+                        this.status = "halted";
+                        err = this.error = ex;
+                }
+                return err;
         };
 
         var OPS = {};
@@ -706,9 +741,19 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 m.pc = 0;
                         }
                 }],
+                ["LET", "count", {
+                        run: function(m){
+                                var count = this.count;
+                                var frame = new Array(count);
+                                while (--count >= 0) frame[count] = m.pop();
+                                m.env = new LispCons(frame, m.env);
+                        }
+                }],
                 ["ARGS", "count", {
                         run: function(m){
                                 var count = this.count;
+                                if (count != m.n_args)
+                                        throw new Error("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
                                 var frame = new Array(count);
                                 while (--count >= 0) frame[count] = m.pop();
                                 m.env = new LispCons(frame, m.env);
