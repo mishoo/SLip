@@ -382,6 +382,14 @@
           (col (%stream-col input))
           (line (%stream-line input)))))))
 
+(defmacro with-seq-output (out . body)
+  (let ((seq (gensym)))
+    `(let ((,seq #()))
+       (flet ((,out args
+                (%seq-cat ,seq args)))
+         ,@body)
+       ,seq)))
+
 (labels
     ((assert (p msg)
        (unless p (%error msg)))
@@ -495,7 +503,7 @@
                              (if more? nil (gen "RET")))
                        (comp (cadr x) env val? more?)))
               (c/c (arg-count x 0 0)
-                   (if val? (%seq (gen "CC"))))
+                   (if val? (gen "CC")))
               (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
@@ -570,37 +578,36 @@
        ;; a GO instruction will fetch the TAGBODY variable that it
        ;; refers to, restore that environment and jump to the
        ;; specified index.
-       (let ((tags nil)
-             (tbody (gensym "tagbody")))
-         ;; pass 1: fetch tags
-         (labels ((rec (forms p)
-                    (when forms
-                      (if (symbolp (car forms))
-                          (let ((cell (list (list (car forms)
-                                                  :tag
-                                                  tbody
-                                                  (gensym "tag")))))
-                            (if p
-                                (rplacd p cell)
-                                (set! tags cell))
-                            (rec (cdr forms) cell))
-                          (rec (cdr forms) p)))))
-           (rec forms nil))
-         (set! env (extenv env
-                           :lex (list (list tbody :tagbody))
-                           :tags tags))
-         (%seq (gen "BLOCK")            ; define the tagbody entry
-               (%prim-apply
-                '%seq (map (lambda (x)
-                             (if (symbolp x)
-                                 (prog1
-                                     #( (cadddr (car tags)) )
-                                   (set! tags (cdr tags))) ; label
-                                 (comp x env nil t)))
-                           forms))
-               (when val? (gen "NIL"))  ; tagbody returns NIL
-               (gen "UNFR" 1 0)         ; pop the tagbody from the env
-               (if more? nil (gen "RET")))))
+       (with-seq-output <<
+         (let ((tags nil)
+               (tbody (gensym "tagbody")))
+           ;; pass 1: fetch tags
+           (labels ((rec (forms p)
+                      (when forms
+                        (if (symbolp (car forms))
+                            (let ((cell (list (list (car forms)
+                                                    :tag
+                                                    tbody
+                                                    (gensym "tag")))))
+                              (if p
+                                  (rplacd p cell)
+                                  (set! tags cell))
+                              (rec (cdr forms) cell))
+                            (rec (cdr forms) p)))))
+             (rec forms nil))
+           (set! env (extenv env
+                             :lex (list (list tbody :tagbody))
+                             :tags tags))
+           (<< (gen "BLOCK"))           ; define the tagbody entry
+           (foreach forms (lambda (x)
+                            (if (symbolp x)
+                                (progn
+                                  (<< #( (cadddr (car tags)) ))
+                                  (set! tags (cdr tags))) ; label
+                                (<< (comp x env nil t)))))
+           (when val? (<< (gen "NIL"))) ; tagbody returns NIL
+           (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
+           (unless more? (<< (gen "RET"))))))
 
      (comp-go (tag env)
        (let ((pos (find-tag tag env)))
@@ -728,23 +735,24 @@
 
      (comp-flets (bindings body env labels? val? more?)
        (if bindings
-           (let* ((bindings (get-bindings bindings nil))
-                  (names (car bindings))
-                  (funcs (cadr bindings))
-                  (len (caddr bindings)))
-             (flet ((extenv ()
-                      (extenv env :lex (map (lambda (name) (list name :func)) names))))
-               (if labels? (set! env (extenv)))
-               (%seq (if labels? (gen "FRAME"))
-                     (%prim-apply
-                      '%seq (mapcar (lambda (name func)
-                                      (comp-lambda name (car func) (cdr func) env))
-                                    names funcs))
-                     (unless labels? (gen "FRAME"))
-                     (if (> len 1) (gen "VARS" len) (gen "VAR"))
+           (with-seq-output <<
+             (let* ((bindings (get-bindings bindings nil))
+                    (names (car bindings))
+                    (funcs (cadr bindings))
+                    (len (caddr bindings)))
+               (flet ((extenv ()
+                        (extenv env :lex (map (lambda (name) (list name :func)) names))))
+                 (when labels?
+                   (set! env (extenv))
+                   (<< (gen "FRAME")))
+                 (mapcar (lambda (name func)
+                           (<< (comp-lambda name (car func) (cdr func) env)))
+                         names funcs)
+                 (unless labels? (<< (gen "FRAME")))
+                 (<< (if (> len 1) (gen "VARS" len) (gen "VAR"))
                      (comp-seq body (if labels? env (extenv)) val? t)
                      (gen "UNFR" 1 0)
-                     (if more? nil (gen "RET")))))
+                     (if more? nil (gen "RET"))))))
            (comp-seq body env val? more?)))
 
      (comp-macrolet (bindings body env val? more?)
@@ -759,49 +767,47 @@
 
      (comp-let (bindings body env val? more?)
        (if bindings
-           (let* ((bindings (get-bindings bindings t))
-                  (names (car bindings))
-                  (vals (cadr bindings))
-                  (len (caddr bindings))
-                  (specials (cadddr bindings)))
-             (%seq (%prim-apply '%seq (map (lambda (x)
-                                             (comp x env t t))
-                                           vals))
-                   (gen "ARGS" len)
-                   (%prim-apply '%seq (map (lambda (x)
-                                             (gen "BIND" (car x) (cdr x)))
-                                           specials))
-                   (comp-seq body (extenv env :lex (map (lambda (name) (list name :var)) names)) val? t)
+           (with-seq-output <<
+             (let* ((bindings (get-bindings bindings t))
+                    (names (car bindings))
+                    (vals (cadr bindings))
+                    (len (caddr bindings))
+                    (specials (cadddr bindings)))
+               (foreach vals (lambda (x)
+                               (<< (comp x env t t))))
+               (<< (gen "ARGS" len))
+               (foreach specials (lambda (x)
+                                   (<< (gen "BIND" (car x) (cdr x)))))
+               (<< (comp-seq body (extenv env :lex (map (lambda (name) (list name :var)) names)) val? t)
                    (gen "UNFR" 1 (length specials))
-                   (if more? nil (gen "RET"))))
+                   (if more? nil (gen "RET")))))
            (comp-seq body env val? more?)))
 
      (comp-let* (bindings body env val? more?)
        (if bindings
-           (let* ((bindings (get-bindings bindings t))
-                  (names (car bindings))
-                  (vals (cadr bindings))
-                  (specials (cadddr bindings))
-                  (i 0)
-                  newargs)
-             (%seq (%prim-apply
-                    '%seq (mapcar (lambda (name x)
-                                    (prog1
-                                        (%seq (comp x env t t)
-                                              (unless newargs (gen "FRAME"))
-                                              (gen "VAR")
-                                              (when (%specialp name)
-                                                (gen "BIND" name i)))
-                                      (%incf i)
-                                      (let ((cell (list (list name :var))))
-                                        (if newargs
-                                            (rplacd newargs cell)
-                                            (set! env (extenv env :lex cell)))
-                                        (set! newargs cell))))
-                                  names vals))
-                   (comp-seq body env val? t)
+           (with-seq-output <<
+             (let* ((bindings (get-bindings bindings t))
+                    (names (car bindings))
+                    (vals (cadr bindings))
+                    (specials (cadddr bindings))
+                    (i 0)
+                    newargs)
+               (mapcar (lambda (name x)
+                         (<< (comp x env t t)
+                             (unless newargs (gen "FRAME"))
+                             (gen "VAR")
+                             (when (%specialp name)
+                               (gen "BIND" name i)))
+                         (%incf i)
+                         (let ((cell (list (list name :var))))
+                           (if newargs
+                               (rplacd newargs cell)
+                               (set! env (extenv env :lex cell)))
+                           (set! newargs cell)))
+                       names vals)
+               (<< (comp-seq body env val? t)
                    (gen "UNFR" 1 (length specials))
-                   (if more? nil (gen "RET"))))
+                   (if more? nil (gen "RET")))))
            (comp-seq body env val? more?)))
 
      (compile (exp)

@@ -392,7 +392,7 @@
                 return LispCons.toArray(list);
         });
 
-        defp("%seq", false, function(m, nargs){
+        function seq(m, nargs) {
                 var ret = [];
                 while (nargs-- > 0) {
                         var x = m.pop();
@@ -407,6 +407,29 @@
                         }
                 }
                 return ret;
+        };
+
+        defp("%seq", false, function(m, nargs){
+                return seq(m, nargs);
+        });
+
+        defp("%seq-cat", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var list = m.pop(), seq = m.pop();
+                checktype(list, LispList);
+                checktype(seq, LispArray);
+                LispCons.forEach(list, function(x){
+                        if (x !== null) {
+                                if (LispCons.is(x)) {
+                                        seq.push.apply(seq, LispCons.toArray(x));
+                                }
+                                else if (LispArray.is(x)) {
+                                        seq.push.apply(seq, x);
+                                }
+                                else seq.push(x);
+                        }
+                });
+                return seq;
         });
 
         /* -----[ strings ]----- */
