@@ -162,14 +162,14 @@
                 (destructuring-bind ,lambda-list ,args ,@body)))
        (%macro! ',name #',name))))
 
-(defmacro defun (name lambda-list &body body)
-  (let ((args (gensym "ARGS")))
-    `(labels ((,name ,args
-                (destructuring-bind ,lambda-list ,args ,@body)))
-       (set-symbol-function! ',name #',name))))
+;; (defmacro defun (name lambda-list &body body)
+;;   (let ((args (gensym "ARGS")))
+;;     `(labels ((,name ,args
+;;                 (destructuring-bind ,lambda-list ,args ,@body)))
+;;        (set-symbol-function! ',name #',name))))
 
-(defun intern (symbol-name &optional (package *package*))
-  (%intern symbol-name package))
+(defmacro intern (symbol-name &optional (package *package*))
+  `(%intern ,symbol-name ,package))
 
 (defmacro defpackage (name &rest options)
   (let ((nicknames nil)
