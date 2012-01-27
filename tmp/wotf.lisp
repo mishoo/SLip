@@ -111,8 +111,10 @@
                        (add houses (+ index 1)))))))
       (add () 0))))
 
-(time
- (console.log (who-owns-the-fish)))
+(make-thread (lambda ()
+               (console.print "STARTED W.O.T.F.")
+               (time
+                (console.log (who-owns-the-fish)))))
 
 (defun sumis (n sum)
   (let (solutions)
@@ -137,5 +139,7 @@
         (rec (list) n)))
     (console.log (length solutions))))
 
-(time
- (sumis 14 1))
+(make-thread (lambda ()
+               (console.print "STARTED SUMIS")
+               (time
+                (sumis 14 1))))

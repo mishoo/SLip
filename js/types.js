@@ -342,10 +342,10 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
 var LispProcess = DEFTYPE("process", function(D, P){
         var PROCESSES = {};
         var PID = 0;
-        P.INIT = function(closure) {
+        P.INIT = function(parent_machine, closure) {
                 var pid = this.pid = ++PID;
                 PROCESSES[pid] = this;
-                var m = this.m = new LispMachine();
+                var m = this.m = new LispMachine(parent_machine);
                 m.process = this;
                 m.set_closure(closure);
                 m.status = "running";
@@ -373,7 +373,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
         };
         function stop() {
                 if (TIMER) {
-                        clearInterval(TIMER);
+                        clearTimeout(TIMER);
                         TIMER = null;
                 }
         };
@@ -386,6 +386,6 @@ var LispProcess = DEFTYPE("process", function(D, P){
                                 p.run(100);
                         } else throw "Not implemented";
                 }
-                TIMER = QUEUE.length > 0 ? setTimeout(run, 0) : NULL;
+                TIMER = QUEUE.length > 0 ? setTimeout(run, 0) : null;
         };
 });

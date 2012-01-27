@@ -25,12 +25,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         };
 
         /// constructor
-        P.INIT = function() {
+        P.INIT = function(pm) {
                 this.code = null;
                 this.pc = null;
                 this.stack = null;
                 this.env = null;
-                this.denv = null;
+                this.denv = pm ? pm.denv : null;
                 this.n_args = null;
                 this.status = null;
                 this.error = null;

@@ -1064,6 +1064,16 @@
                 return sym.setv("function", func);
         });
 
+        /* -----[ processes ]----- */
+
+        defp("make-thread", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var func = m.pop();
+                checktype(func, LispClosure);
+                var p = new LispProcess(m, func);
+                return p;
+        });
+
         /* -----[ conditions ]----- */
 
         // pretty sucky, need to think how to do it properly
