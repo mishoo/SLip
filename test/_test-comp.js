@@ -72,5 +72,5 @@ function animate_something() {
                 div.style.top = y + "px";
                 q += Math.PI / 50;
                 if (Date.now() - start > 30000) clearInterval(timer);
-        }, 25);
+        }, 10);
 }

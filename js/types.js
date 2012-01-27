@@ -336,26 +336,66 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         var pak = BASE_PACK.intern("*PACKAGE*");
         pak.value = BASE_PACK;
         pak.setv("special", true);
-})(LispPackage.get("%"))
+})(LispPackage.get("%"));
+
+var LispMutex = DEFTYPE("mutex", function(D, P){
+        P.INIT = function(name) {
+                this.name = name || null;
+                this.waiters = [];
+                this.locked = null;
+        };
+});
 
 // ideas for implementing processes from http://norstrulde.org/ilge10/
 var LispProcess = DEFTYPE("process", function(D, P){
+
+        LispMutex.extend({
+                acquire: function(process) {
+                        if (!this.locked) {
+                                this.locked = process;
+                                return process;
+                        } else {
+                                this.waiters.push(process);
+                                process.m.status = "locked";
+                                return null;
+                        }
+                },
+                release: function() {
+                        if (!this.locked) return null;
+                        if (this.waiters.length > 0) {
+                                var process = this.waiters.shift();
+                                this.locked = process;
+                                process.resume();
+                                return process;
+                        } else {
+                                this.locked = null;
+                                return true;
+                        }
+                }
+        });
+
         var PROCESSES = {};
         var PID = 0;
+        var QUEUE = [];
         P.INIT = function(parent_machine, closure) {
                 var pid = this.pid = ++PID;
                 PROCESSES[pid] = this;
                 var m = this.m = new LispMachine(parent_machine);
                 m.process = this;
                 m.set_closure(closure);
-                m.status = "running";
+                this.resume();
+        };
+
+        P.resume = function() {
+                this.m.status = "running";
                 QUEUE.push(this);
                 start();
         };
 
         P.run = function(quota) {
                 var m = this.m, err;
-                if (m.status == "running") {
+                switch (m.status) {
+                    case "running":
                         err = m.run(quota);
                         if (err) {
                                 console.error("Error in PID: ", this.pid, err);
@@ -363,11 +403,17 @@ var LispProcess = DEFTYPE("process", function(D, P){
                         else if (m.status == "running") {
                                 QUEUE.push(this);
                         }
+                        else if (m.status == "finished") {
+                                delete PROCESSES[this.pid];
+                        }
+                        break;
+                    case "finished":
+                        delete PROCESSES[this.pid];
+                        break;
                 }
         };
 
         var TIMER = null;
-        var QUEUE = [];
         function start() {
                 if (!TIMER) TIMER = setTimeout(run, 0);
         };

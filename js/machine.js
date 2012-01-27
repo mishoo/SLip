@@ -150,7 +150,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         while (quota-- > 0) {
                                 if (this.pc == null) {
                                         this.status = "finished";
-                                        this.pop();
                                         break;
                                 }
                                 this.code[this.pc++].run(this);

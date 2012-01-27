@@ -3,7 +3,7 @@
 
 (in-package :wotf)
 
-(%::%special! '*amb-fail*)
+(%special! '*amb-fail*)
 (set! *amb-fail* (lambda (arg)
                    (console.print "TOTAL FAILURE")))
 

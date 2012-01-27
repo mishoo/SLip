@@ -76,6 +76,9 @@ var DEFCLASS = (function(NOINIT){
                         D.BASE = BASE;
                         D.prototype = new BASE(NOINIT);
                 }
+                D.extend = function(props) {
+                        defmerge(P, props, props);
+                };
                 var P = D.prototype;
                 if (name) P.$objectType = name;
                 P.constructor = D;

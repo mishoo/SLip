@@ -1074,6 +1074,31 @@
                 return p;
         });
 
+        defp("current-thread", false, function(m, nargs){
+                checknargs(nargs, 0, 0);
+                return m.process;
+        });
+
+        defp("make-mutex", true, function(m, nargs){
+                checknargs(nargs, 0, 1);
+                var name = nargs == 1 ? m.pop() : null;
+                return new LispMutex(name);
+        });
+
+        defp("mutex-acquire", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var mutex = m.pop();
+                checktype(mutex, LispMutex);
+                return mutex.acquire(m.process);
+        });
+
+        defp("mutex-release", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var mutex = m.pop();
+                checktype(mutex, LispMutex);
+                return mutex.release();
+        });
+
         /* -----[ conditions ]----- */
 
         // pretty sucky, need to think how to do it properly
