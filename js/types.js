@@ -346,8 +346,9 @@ var LispMutex = DEFTYPE("mutex", function(D, P){
         };
 });
 
-// ideas for implementing processes from http://norstrulde.org/ilge10/
 var LispProcess = DEFTYPE("process", function(D, P){
+
+        // many ideas from http://norstrulde.org/ilge10/ — Kudos Eric Bergstrome!
 
         LispMutex.extend({
                 acquire: function(process) {
@@ -381,6 +382,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 var pid = this.pid = ++PID;
                 PROCESSES[pid] = this;
                 var m = this.m = new LispMachine(parent_machine);
+                this.handlers = null;
                 m.process = this;
                 m.set_closure(closure);
                 this.resume();
@@ -411,6 +413,20 @@ var LispProcess = DEFTYPE("process", function(D, P){
                         delete PROCESSES[this.pid];
                         break;
                 }
+        };
+
+        P.handlemsg = function(sender, signal, datum) {
+                if (this.m.status != "waiting")
+                        throw new Error("Not waiting for message");
+                
+        };
+
+        P.receive = function(handlers) {
+                if (this.m.status != "running")
+                        throw new Error("Process not running");
+                this.m.status = "waiting";
+                this.handlers = handlers;
+                return false;
         };
 
         var TIMER = null;

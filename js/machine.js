@@ -803,7 +803,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["PRIM", "name nargs", {
                         run: function(m) {
-                                var ret = this.name.primitive()(m, this.nargs);
+                                var n = this.nargs;
+                                if (n == -1) n = m.n_args;
+                                var ret = this.name.primitive()(m, n);
                                 if (ret !== false) m.push(ret);
                         }
                 }],
@@ -818,6 +820,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["LIST", "count", {
                         run: function(m) {
                                 var p = null, n = this.count;
+                                if (n == -1) n = m.n_args;
                                 while (n-- > 0) p = new LispCons(m.pop(), p);
                                 m.push(p);
                         }
@@ -825,6 +828,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["LIST_", "count", {
                         run: function(m) {
                                 var p = m.pop(), n = this.count;
+                                if (n == -1) n = m.n_args;
                                 while (--n > 0) p = new LispCons(m.pop(), p);
                                 m.push(p);
                         }

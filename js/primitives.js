@@ -43,10 +43,7 @@
                 });
                 sym.setv("primitive-side-effects", seff);
                 sym.setv("function", new LispClosure(LispMachine.assemble([
-                        [ "ARG_", 0 ],
-                        [ "CONST", sym ],
-                        [ "LVAR", 0, 0 ],
-                        [ "PRIM", LispSymbol.get("%PRIM-APPLY"), 2 ],
+                        [ "PRIM", sym, -1 ],
                         [ "RET" ]
                 ]), sym));
                 ALL_PRIMITIVES = new LispCons(sym, ALL_PRIMITIVES);
@@ -1097,6 +1094,21 @@
                 var mutex = m.pop();
                 checktype(mutex, LispMutex);
                 return mutex.release();
+        });
+
+        defp("%sendmsg", true, function(m, nargs){
+                checknargs(nargs, 3, 3);
+                var datum = m.pop(), signal = as_string(m.pop()), process = m.pop();
+                checktype(process, LispProcess);
+                checktype(signal, LispString);
+                return process.handlemsg(m.process, signal, datum);
+        });
+
+        defp("%receive", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var handlers = m.pop();
+                checktype(handlers, LispHash);
+                return m.process.receive(handlers);
         });
 
         /* -----[ conditions ]----- */
