@@ -549,8 +549,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         return LispChar.get(char);
                 });
                 names.push("DOT"); values.push(LispCons.DOT);
-                if (code) code += ",";
-                code += "RET()";
                 var func = new Function("return function(" + names.join(",") + "){return[" + code + "]}")();
                 code = func.apply(null, values);
                 return code;
