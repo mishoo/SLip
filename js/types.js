@@ -350,6 +350,15 @@ var LispProcess = DEFTYPE("process", function(D, P){
 
         // many ideas from http://norstrulde.org/ilge10/ — Kudos Eric Bergstrome!
 
+        var Message = DEFCLASS("Message", null, function(D, P){
+                P.INIT = function(sender, target, signal, args) {
+                        this.sender = sender;
+                        this.target = target;
+                        this.signal = signal;
+                        this.args = args;
+                };
+        });
+
         LispMutex.extend({
                 acquire: function(process) {
                         if (!this.locked) {
@@ -382,13 +391,19 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 var pid = this.pid = ++PID;
                 PROCESSES[pid] = this;
                 var m = this.m = new LispMachine(parent_machine);
-                this.handlers = null;
+                this.receivers = null;
+                this.mailbox = [];
                 m.process = this;
                 m.set_closure(closure);
                 this.resume();
         };
 
+        P.print = function() {
+                return "<process " + this.pid + ">";
+        };
+
         P.resume = function() {
+                this.receivers = null;
                 this.m.status = "running";
                 QUEUE.push(this);
                 start();
@@ -408,6 +423,9 @@ var LispProcess = DEFTYPE("process", function(D, P){
                         else if (m.status == "finished") {
                                 delete PROCESSES[this.pid];
                         }
+                        else if (m.status == "waiting") {
+                                this.checkmail();
+                        }
                         break;
                     case "finished":
                         delete PROCESSES[this.pid];
@@ -415,18 +433,35 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 }
         };
 
-        P.handlemsg = function(sender, signal, datum) {
-                if (this.m.status != "waiting")
-                        throw new Error("Not waiting for message");
-                
+        P.sendmsg = function(target, signal, args) {
+                QUEUE.push(new Message(this, target, signal, args));
         };
 
-        P.receive = function(handlers) {
+        P.receive = function(receivers) {
                 if (this.m.status != "running")
                         throw new Error("Process not running");
+                this.receivers = receivers;
                 this.m.status = "waiting";
-                this.handlers = handlers;
                 return false;
+        };
+
+        P.handle = function(msg) {
+                this.mailbox.push(msg);
+                if (this.m.status == "waiting")
+                        this.checkmail();
+        };
+
+        P.checkmail = function() {
+                if (this.mailbox.length > 0) {
+                        var msg = this.mailbox.shift();
+                        var f = this.receivers.get(msg.signal);
+                        if (f) {
+                                this.m._callnext(f, msg.args);
+                                this.resume();
+                        } else {
+                                console.warn("No receiver for message ", msg, " in process ", this.pid);
+                        }
+                }
         };
 
         var TIMER = null;
@@ -446,7 +481,11 @@ var LispProcess = DEFTYPE("process", function(D, P){
                         var p = QUEUE.shift();
                         if (D.is(p)) {
                                 p.run(100);
-                        } else throw "Not implemented";
+                        }
+                        else if (Message.is(p)) {
+                                p.target.handle(p);
+                        }
+                        else throw new Error("Unknown object in scheduler queue");
                 }
                 TIMER = QUEUE.length > 0 ? setTimeout(run, 0) : null;
         };

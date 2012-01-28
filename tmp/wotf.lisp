@@ -119,14 +119,8 @@
 (defun sumis (n sum)
   (let (solutions)
     (with-cc *amb-fail*
-      (labels ((add (numbers)
-                 (labels ((rec (sum numbers)
-                            (if numbers
-                                (rec (+ sum (car numbers)) (cdr numbers))
-                                sum)))
-                   (rec 0 numbers)))
-               (required-sum? (numbers)
-                 (= sum (add numbers)))
+      (labels ((required-sum? (numbers)
+                 (= sum (%apply #'+ numbers)))
                (rec (numbers next)
                  (if (= next 0)
                      (progn

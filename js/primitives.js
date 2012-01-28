@@ -1097,11 +1097,13 @@
         });
 
         defp("%sendmsg", true, function(m, nargs){
-                checknargs(nargs, 3, 3);
-                var datum = m.pop(), signal = as_string(m.pop()), process = m.pop();
+                checknargs(nargs, 2);
+                var args = null;
+                while (nargs-- > 2) args = new LispCons(m.pop(), args);
+                var signal = as_string(m.pop()), process = m.pop();
                 checktype(process, LispProcess);
                 checktype(signal, LispString);
-                return process.handlemsg(m.process, signal, datum);
+                return m.process.sendmsg(process, signal, args);
         });
 
         defp("%receive", true, function(m, nargs){
