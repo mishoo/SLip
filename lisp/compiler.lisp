@@ -522,7 +522,10 @@
                           (let ((local (find-func sym env)))
                             (if local
                                 (gen "LVAR" (car local) (cadr local))
-                                (gen "FGVAR" sym)))))
+                                (progn
+                                  (unless (symbol-function sym)
+                                    (%warn "Undefined function" sym))
+                                  (gen "FGVAR" sym))))))
               (%fn (if val?
                        (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
                              (if more? nil (gen "RET")))))

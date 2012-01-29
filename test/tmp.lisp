@@ -1,6 +1,20 @@
+(defpackage :test
+  (:use :ss))
+
+(in-package :test)
+
 (let* ((t1 (make-thread (lambda ()
-                          (set-timeout 150 (lambda ()
-                                             (console.print "************************")))
+                          (let ((mak 0)
+                                (prev-time (%get-time)))
+                            (labels ((stuff ()
+                                       (console.print "************************" (%::%incf mak)
+                                                      (let* ((time (%get-time))
+                                                             (diff (- time prev-time)))
+                                                        (set! prev-time time)
+                                                        diff))
+                                       (when (< mak 20)
+                                         (set-timeout 100 #'stuff))))
+                              (set-timeout 100 #'stuff)))
                           (let ((receivers (make-hash :foo (lambda (a b)
                                                              (console.log "Got :FOO" a b)))))
                             (labels ((rec ()

@@ -1,7 +1,7 @@
 (let ((main (%make-package "SS"))
       (boot (%find-package "%"))
       (user (%make-package "SS-USER")))
-  (%export '(quasiquote defmacro defun when unless map labels foreach
+  (%export '(quasiquote defmacro defun when unless map labels flet foreach
              prog1 prog2 or and cond member case mapcar with-cc aif push error
              lisp-reader compile compile-string load
              funcall macrolet
