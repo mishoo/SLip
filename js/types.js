@@ -80,6 +80,10 @@ var LispClosure = DEFTYPE("closure", function(D, P){
                 this.code = code;
                 this.name = name || null;
                 this.env = env || null;
+                this.noval = false;
+        };
+        P.copy = function() {
+                return new D(this.code, this.name, this.env);
         };
         P.print = function() {
                 return "<function" + (this.name ? " " + this.name : "") + ">";
@@ -384,15 +388,14 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 }
         });
 
-        var PROCESSES = {};
         var PID = 0;
         var QUEUE = [];
         P.INIT = function(parent_machine, closure) {
                 var pid = this.pid = ++PID;
-                PROCESSES[pid] = this;
                 var m = this.m = new LispMachine(parent_machine);
                 this.receivers = null;
                 this.mailbox = [];
+                this.timeouts = {};
                 m.process = this;
                 m.set_closure(closure);
                 this.resume();
@@ -411,25 +414,19 @@ var LispProcess = DEFTYPE("process", function(D, P){
 
         P.run = function(quota) {
                 var m = this.m, err;
-                switch (m.status) {
-                    case "running":
+                if (m.status == "running") {
                         err = m.run(quota);
                         if (err) {
                                 console.error("Error in PID: ", this.pid, err);
                         }
-                        else if (m.status == "running") {
+                        else switch (m.status) {
+                            case "running":
                                 QUEUE.push(this);
-                        }
-                        else if (m.status == "finished") {
-                                delete PROCESSES[this.pid];
-                        }
-                        else if (m.status == "waiting") {
+                                break;
+                            case "waiting":
                                 this.checkmail();
+                                break;
                         }
-                        break;
-                    case "finished":
-                        delete PROCESSES[this.pid];
-                        break;
                 }
         };
 
@@ -462,6 +459,30 @@ var LispProcess = DEFTYPE("process", function(D, P){
                                 console.warn("No receiver for message ", msg, " in process ", this.pid);
                         }
                 }
+        };
+
+        P.has_timeouts = function() {
+                for (var i in this.timeouts) if (HOP(this.timeouts, i)) return true;
+                return null;
+        };
+
+        P.set_timeout = function(timeout, closure) {
+                var self = this;
+                closure = closure.copy();
+                closure.noval = true;
+                var tm = setTimeout(function(){
+                        delete self.timeouts[tm];
+                        self.m._callnext(closure, null);
+                        self.resume();
+                }, timeout);
+                self.timeouts[tm] = true;
+                return tm;
+        };
+
+        P.clear_timeout = function(tm) {
+                clearTimeout(tm);
+                delete self.timeouts[tm];
+                return null;
         };
 
         var TIMER = null;

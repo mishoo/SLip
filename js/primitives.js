@@ -1113,6 +1113,19 @@
                 return m.process.receive(handlers);
         });
 
+        defp("set-timeout", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var closure = m.pop(), timeout = m.pop();
+                checktype(closure, LispClosure);
+                checktype(timeout, LispNumber);
+                return m.process.set_timeout(timeout, closure);
+        });
+
+        defp("clear-timeout", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                return m.process.clear_timeout(m.pop());
+        });
+
         /* -----[ conditions ]----- */
 
         // pretty sucky, need to think how to do it properly

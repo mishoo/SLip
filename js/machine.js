@@ -1,24 +1,54 @@
 var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         var BASE_PACK = LispPackage.get("%");
+
+        // normal RET context
         function LispRet(m, pc) {
-                this.pc = pc;
+                this.f = m.f;
                 this.code = m.code;
+                this.pc = pc;
                 this.env = m.env;
                 this.denv = m.denv;
+                this.n_args = m.n_args;
+        };
+        LispRet.prototype.run = function(m) {
+                m.f = this.f;
+                m.code = this.code;
+                m.pc = this.pc;
+                m.env = this.env;
+                m.denv = this.denv;
+                m.n_args = this.n_args;
         };
 
+        // return context for TAGBODY and BLOCK
         function LispBlockRet(m) {
+                this.f = m.f;
                 this.code = m.code;
                 this.env = m.env;
                 this.denv = m.denv;
                 this.slen = m.stack.length;
+                this.n_args = m.n_args;
+        };
+        LispBlockRet.prototype.run = function(m, addr) {
+                m.f = this.f;
+                m.code = this.code;
+                m.env = this.env;
+                m.denv = this.denv;
+                m.stack.length = this.slen;
+                m.pc = addr;
+                m.n_args = this.n_args;
         };
 
-        function LispCC(stack, denv) {
-                this.stack = stack;
-                this.denv = denv;
+        // continuations
+        function LispCC(m) {
+                this.stack = m.stack.slice();
+                this.denv = m.denv;
+        };
+        LispCC.prototype.run = function(m) {
+                m.stack = this.stack.slice();
+                m.denv = this.denv;
         };
 
+        // dynamic bindings
         function LispBinding(symbol, value) {
                 this.symbol = symbol;
                 this.value = value;
@@ -35,6 +65,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.status = null;
                 this.error = null;
                 this.process = null;
+                this.f = null;
         };
         P.find_dvar = function(symbol) {
                 if (symbol.special()) {
@@ -78,17 +109,13 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 return new LispRet(this, pc);
         };
         P.unret = function(ret) {
-                this.code = ret.code;
-                this.pc = ret.pc;
-                this.env = ret.env;
-                this.denv = ret.denv;
+                ret.run(this);
         };
         P.mkcont = function() {
-                return new LispCC(this.stack.slice(), this.denv);
+                return new LispCC(this);
         };
         P.uncont = function(cont) {
-                this.stack = cont.stack.slice();
-                this.denv = cont.denv;
+                cont.run(this);
         };
         P.top = function() {
                 return this.stack[this.stack.length - 1];
@@ -105,6 +132,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.env = null;
                 this.stack = [];
                 this.pc = 0;
+                this.f = null;
                 return this.loop();
         };
         P._call = function(closure, args) {
@@ -114,6 +142,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.env = closure.env;
                 this.n_args = args.length;
                 this.pc = 0;
+                this.f = closure;
                 while (true) {
                         if (this.pc == null) return this.pop();
                         this.code[this.pc++].run(this);
@@ -132,6 +161,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }
                 this.n_args = n;
                 this.pc = 0;
+                this.f = closure;
                 return false;
         };
 
@@ -142,6 +172,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.env = closure.env;
                 this.n_args = args.length;
                 this.pc = 0;
+                this.f = closure;
         };
 
         P.run = function(quota) {
@@ -688,22 +719,13 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["LJUMP", "addr", {
                         run: function(m) {
-                                var tbody = m.pop();
-                                m.code = tbody.code;
-                                m.env = tbody.env;
-                                m.denv = tbody.denv;
-                                m.stack.length = tbody.slen;
-                                m.pc = this.addr;
+                                m.pop().run(m, this.addr);
                         }
                 }],
                 ["LRET", "addr", {
                         run: function(m) {
-                                var tbody = m.pop(), val = m.pop();
-                                m.code = tbody.code;
-                                m.env = tbody.env;
-                                m.denv = tbody.denv;
-                                m.stack.length = tbody.slen;
-                                m.pc = this.addr;
+                                var bret = m.pop(), val = m.pop();
+                                bret.run(m, this.addr);
                                 m.push(val);
                         }
                 }],
@@ -724,18 +746,20 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 }],
                 ["RET", 0, {
                         run: function(m) {
+                                var noval = m.f.noval;
                                 var val = m.pop();
                                 m.unret(m.pop());
-                                m.push(val);
+                                if (!noval) m.push(val);
                         }
                 }],
                 ["CALL", "count", {
                         run: function(m){
-                                m.n_args = this.count;
                                 var closure = m.pop();
+                                m.n_args = this.count;
                                 m.code = closure.code;
                                 m.env = closure.env;
                                 m.pc = 0;
+                                m.f = closure;
                         }
                 }],
                 ["LET", "count", {

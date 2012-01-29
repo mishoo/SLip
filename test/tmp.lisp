@@ -1,4 +1,6 @@
 (let* ((t1 (make-thread (lambda ()
+                          (set-timeout 150 (lambda ()
+                                             (console.print "************************")))
                           (let ((receivers (make-hash :foo (lambda (a b)
                                                              (console.log "Got :FOO" a b)))))
                             (labels ((rec ()
