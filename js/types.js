@@ -106,7 +106,7 @@ var LispStream = DEFTYPE("stream", function(D, P){
         };
 });
 
-var LispInputStream = DEFTYPE("input_stream", function(D, P){
+var LispInputStream = DEFTYPE("input-stream", function(D, P){
         P.peek = function() {
                 return this.pos < this.text.length
                         ? LispChar.get(this.text.charAt(this.pos))
@@ -130,7 +130,7 @@ var LispInputStream = DEFTYPE("input_stream", function(D, P){
         };
 }, LispStream);
 
-var LispOutputStream = DEFTYPE("output_stream", function(D, P){
+var LispOutputStream = DEFTYPE("output-stream", function(D, P){
         P.put = function(str) {
                 var lines = str.split(/\r?\n/);
                 this.line += lines.length - 1;
@@ -145,7 +145,12 @@ var LispOutputStream = DEFTYPE("output_stream", function(D, P){
         };
 }, LispStream);
 
-var LispHash = DEFTYPE("namespace", function(D, P){
+var LispHash = DEFTYPE("simple-hash", function(D, P){
+        D.fromObject = function(obj) {
+                var hash = new LispHash;
+                hash.data = obj;
+                return hash;
+        };
         P.INIT = function(parent) {
                 function ctor(){};
                 if (parent) {
@@ -405,10 +410,11 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 return "<process " + this.pid + ">";
         };
 
-        P.resume = function() {
+        P.resume = function(at_start) {
                 this.receivers = null;
                 this.m.status = "running";
-                QUEUE.push(this);
+                if (at_start) QUEUE.unshift(this);
+                else QUEUE.push(this);
                 start();
         };
 
@@ -432,6 +438,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
 
         P.sendmsg = function(target, signal, args) {
                 QUEUE.push(new Message(this, target, signal, args));
+                start();
         };
 
         P.receive = function(receivers) {
@@ -473,7 +480,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 var tm = setTimeout(function(){
                         delete self.timeouts[tm];
                         self.m._callnext(closure, null);
-                        self.resume();
+                        self.resume(true);
                 }, timeout);
                 self.timeouts[tm] = true;
                 return tm;

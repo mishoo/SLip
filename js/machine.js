@@ -672,7 +672,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["FGVAR", "name", {
                         run: function(m) {
                                 var f = this.name.func();
-                                if (!f) console.error("Undefined function", symbol);
+                                if (!f) console.error("Undefined function", this.name);
                                 m.push(f);
                         }
                 }],

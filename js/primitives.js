@@ -32,6 +32,16 @@
                 type: "regexp"
         };
 
+        var LispDomElement = {
+                is: function(x) { return x instanceof Element },
+                type: "dom-element"
+        };
+
+        var LispDomDocument = {
+                is: function(x) { return x instanceof Document },
+                type: "dom-document"
+        };
+
         function defp(name, seff, func) {
                 name = name.toUpperCase();
                 var sym = BASE_PACK.intern(name);
@@ -1124,6 +1134,74 @@
         defp("clear-timeout", true, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 return m.process.clear_timeout(m.pop());
+        });
+
+        /* -----[ DOM ]----- */
+
+        defp("dom.get-element-by-id", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var id = as_string(m.pop());
+                checktype(id, LispString);
+                return document.getElementById(id);
+        });
+
+        defp("dom.sizzle", false, function(m, nargs){
+                checknargs(nargs, 1, 2);
+                var ctx = null;
+                if (nargs == 2) {
+                        ctx = m.pop();
+                        checktype(ctx, LispDomElement);
+                }
+                var ctx = nargs == 2 ? m.pop() : document;
+                var selector = m.pop();
+                checktype(selector, LispString);
+                return LispCons.fromArray(Sizzle(selector, ctx));
+        });
+
+        var DOM_EVENTS = {
+                "CLICK"      : "click",
+                "MOUSE-MOVE" : "mousemove",
+                "MOUSE-DOWN" : "mousedown",
+                "MOUSE-UP"   : "mouseup",
+                "MOUSE-OVER" : "mouseover",
+                "MOUSE-OUT"  : "mouseout",
+                "KEY-PRESS"  : "keypress",
+                "KEY-DOWN"   : "keydown",
+                "KEY-UP"     : "keyup"
+        };
+
+        function dom_event(name) {
+                return DOM_EVENTS[name];
+        };
+
+        defp("dom.subscribe", true, function(m, nargs){
+                checknargs(nargs, 2, 3);
+                var process = nargs == 3 ? m.pop() : m.process;
+                var events = m.pop();
+                var element = m.pop();
+                checktype(process, LispProcess);
+                checktype(events, LispList);
+                checktype(element, LispDomElement);
+                LispCons.forEach(events, function(e){
+                        e = as_string(e);
+                        element.addEventListener(dom_event(e), function(ev){
+                                var args = LispHash.fromObject({
+                                        "SCREEN-X" : ev.screenX,
+                                        "SCREEN-Y" : ev.screenY,
+                                        "CLIENT-X" : ev.clientX,
+                                        "CLIENT-Y" : ev.clientY,
+                                        "CTRL"     : ev.ctrlKey,
+                                        "ALT"      : ev.altKey,
+                                        "META"     : ev.metaKey,
+                                        "BUTTON"   : ev.button,
+                                        "TARGET"   : ev.target,
+                                        "RELATED"  : ev.relatedTarget
+                                });
+                                args = new LispCons(args, null);
+                                m.process.sendmsg(process, e, args);
+                        }, true);
+                });
+                return null;
         });
 
         /* -----[ conditions ]----- */
