@@ -3,7 +3,7 @@
 ;;;; will stall so to keep this working with compiler.js you should
 ;;;; rely only on the following operators:
 ;;;;
-;;;; IF, QUOTE, PROGN, SET!, NOT, C/C, LET, LET*, LABELS, FLET,
+;;;; IF, QUOTE, PROGN, SETQ, NOT, C/C, LET, LET*, LABELS, FLET,
 ;;;; LAMBDA, FUNCTION and %FN
 ;;;;
 ;;;; Don't customize the reader in this file.
@@ -184,13 +184,13 @@
      (if it ,@rest)))
 
 (defmacro %incf (var)
-  `(set! ,var (+ ,var 1)))
+  `(setq ,var (+ ,var 1)))
 
 (defmacro %decf (var)
-  `(set! ,var (- ,var 1)))
+  `(setq ,var (- ,var 1)))
 
 (defmacro push (obj place)
-  `(set! ,place (cons ,obj ,place)))
+  `(setq ,place (cons ,obj ,place)))
 
 (defmacro error (msg)
   `(%error ,msg))
@@ -285,7 +285,7 @@
                   (aif (regexp-exec #/^(.*?)::?(.*)$/ str)
                        (let ((pak (elt it 1))
                              (sym (elt it 2)))
-                         (set! pak (%find-package (if (zerop (length pak))
+                         (setq pak (%find-package (if (zerop (length pak))
                                                       "KEYWORD"
                                                       pak)))
                          (%intern sym pak))
@@ -353,9 +353,9 @@
                                ret)
                           (nil (croak "Unterminated list"))
                           (otherwise (let ((cell (cons (read-token) nil)))
-                                       (set! p (if ret
+                                       (setq p (if ret
                                                    (rplacd p cell)
-                                                   (set! ret cell))))
+                                                   (setq ret cell))))
                                      (rec)))))
                (prog2
                    (skip #\()
@@ -392,7 +392,7 @@
 
 (labels
     ((assert (p msg)
-       (unless p (%error msg)))
+       (unless p (error msg)))
 
      (arg-count (x min max)
        (assert (<= min (- (length x) 1) max) "Wrong number of arguments"))
@@ -492,8 +492,8 @@
               (quote (arg-count x 1 1)
                      (comp-const (cadr x) val? more?))
               (progn (comp-seq (cdr x) env val? more?))
-              (set! (arg-count x 2 2)
-                    (assert (symbolp (cadr x)) "Only symbols can be SET!")
+              (setq (arg-count x 2 2)
+                    (assert (symbolp (cadr x)) "Only symbols can be SETQ")
                     (%seq (comp (caddr x) env t t)
                           (gen-set (cadr x) env)
                           (unless val? (gen "POP"))
@@ -598,11 +598,11 @@
                                                     (gensym "tag")))))
                               (if p
                                   (rplacd p cell)
-                                  (set! tags cell))
+                                  (setq tags cell))
                               (rec (cdr forms) cell))
                             (rec (cdr forms) p)))))
              (rec forms nil))
-           (set! env (extenv env
+           (setq env (extenv env
                              :lex (list (list tbody :tagbody))
                              :tags tags))
            (<< (gen "BLOCK"))           ; define the tagbody entry
@@ -610,7 +610,7 @@
                             (if (symbolp x)
                                 (progn
                                   (<< #( (cadddr (car tags)) ))
-                                  (set! tags (cdr tags))) ; label
+                                  (setq tags (cdr tags))) ; label
                                 (<< (comp x env nil t)))))
            (when val? (<< (gen "NIL"))) ; tagbody returns NIL
            (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
@@ -728,10 +728,10 @@
          (foreach bindings (lambda (x)
                              (if (consp x)
                                  (progn (push (if vars? (cadr x) (cdr x)) vals)
-                                        (set! x (car x)))
+                                        (setq x (car x)))
                                  (if vars?
                                      (push nil vals)
-                                     (%error "Malformed LABELS/FLET/MACROLET")))
+                                     (error "Malformed LABELS/FLET/MACROLET")))
                              (when (member x names)
                                (error "Duplicate name in LET/LABELS/FLET/MACROLET"))
                              (push x names)
@@ -750,7 +750,7 @@
                (flet ((extenv ()
                         (extenv env :lex (map (lambda (name) (list name :func)) names))))
                  (when labels?
-                   (set! env (extenv))
+                   (setq env (extenv))
                    (<< (gen "FRAME")))
                  (mapcar (lambda (name func)
                            (<< (comp-lambda name (car func) (cdr func) env)))
@@ -764,7 +764,7 @@
 
      (comp-macrolet (bindings body env val? more?)
        (when bindings
-         (set! env (extenv env :macros (map (lambda (def)
+         (setq env (extenv env :macros (map (lambda (def)
                                               (list (car def) :macro (compile (list* '%fn def))))
                                             bindings))))
        (comp-seq body env val? more?))
@@ -809,8 +809,8 @@
                          (let ((cell (list (list name :var))))
                            (if newargs
                                (rplacd newargs cell)
-                               (set! env (extenv env :lex cell)))
-                           (set! newargs cell)))
+                               (setq env (extenv env :lex cell)))
+                           (setq newargs cell)))
                        names vals)
                (<< (comp-seq body env val? t)
                    (gen "UNFR" 1 (length specials))

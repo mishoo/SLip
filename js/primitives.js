@@ -850,7 +850,7 @@
                 checknargs(nargs, 1, 1);
                 var symbol = m.pop();
                 checktype(symbol, LispSymbol);
-                return symbol.macro();
+                return symbol !== null && symbol !== true ? symbol.macro() : null;
         });
 
         defp("%disassemble", false, function(m, nargs){
@@ -1069,6 +1069,22 @@
                 checktype(sym, LispSymbol);
                 checktype(func, LispClosure);
                 return sym.setv("function", func);
+        });
+
+        defp("%set-symbol-prop", true, function(m, nargs){
+                checknargs(nargs, 3, 3);
+                var val = m.pop(), key = as_string(m.pop()), sym = m.pop();
+                checktype(key, LispString);
+                checktype(sym, LispSymbol);
+                return sym.setv(key, val);
+        });
+
+        defp("%get-symbol-prop", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var key = as_string(m.pop()), sym = m.pop();
+                checktype(key, LispString);
+                checktype(sym, LispSymbol);
+                return sym.getv(key);
         });
 
         /* -----[ processes ]----- */

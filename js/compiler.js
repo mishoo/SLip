@@ -271,7 +271,7 @@ function lisp_reader(code) {
         var S_IF       = LispSymbol.get("IF");
         var S_PROGN    = LispSymbol.get("PROGN");
         var S_QUOTE    = LispSymbol.get("QUOTE");
-        var S_SET      = LispSymbol.get("SET!");
+        var S_SET      = LispSymbol.get("SETQ");
         var S_T        = LispSymbol.get("T");
         var S_NIL      = LispSymbol.get("NIL");
         var S_CC       = LispSymbol.get("C/C");

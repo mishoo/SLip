@@ -9,7 +9,7 @@
 ;;                             (labels ((stuff ()
 ;;                                        (let* ((time (%get-time))
 ;;                                               (diff (- time prev-time)))
-;;                                          (set! prev-time time)
+;;                                          (setq prev-time time)
 ;;                                          (console.print "************************" (%::%incf mak) diff))
 ;;                                        (when (< mak 20)
 ;;                                          (set-timeout 10 #'stuff))))
@@ -52,3 +52,17 @@
                                                                                 (console.log "Got mouse-out" ev))))
                                                         (rec)))
                                                (rec)))))))
+
+
+
+(defsetf car (x) (val)
+  `(rplaca ,x ,val))
+
+(defsetf cdr (x) (val)
+  `(rplacd ,x ,val))
+
+(defsetf gethash (hash key) (val)
+  `(hash-set ,hash ,key ,val))
+
+(console.log (macroexpand-all '(setf (gethash x :foo) (maka (bar)))))
+(console.log (macroexpand-all '(setf (gethash x :foo) (maka (bar)) crap mak (gethash x :foo) (maka (bar)))))

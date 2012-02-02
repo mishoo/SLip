@@ -4,7 +4,7 @@
 (in-package :wotf)
 
 (%special! '*amb-fail*)
-(set! *amb-fail* (lambda (arg)
+(setq *amb-fail* (lambda (arg)
                    (console.print "TOTAL FAILURE")))
 
 (defmacro amb alternatives
@@ -13,10 +13,10 @@
          (with-cc +sk
            ,@(map (lambda (alt)
                     `(with-cc +fk
-                       (set! *amb-fail* +fk)
+                       (setq *amb-fail* +fk)
                        (funcall +sk ,alt)))
                   alternatives)
-           (set! *amb-fail* +prev-amb-fail)
+           (setq *amb-fail* +prev-amb-fail)
            (funcall +prev-amb-fail nil)))
       `(funcall *amb-fail* nil)))
 
@@ -53,7 +53,7 @@
                (lambda (h)
                  (when (eq (house-prop type h) value)
                    (return i))
-                 (set! i (+ i 1)))))))
+                 (setq i (+ i 1)))))))
 
 ;; asserts that houses having property `t1' = `v1' and `t2' = `v2' are
 ;; neighbors (distance between them is 1 or -1).
@@ -125,7 +125,7 @@
                  (if (= next 0)
                      (progn
                        (when (required-sum? numbers)
-                         (set! solutions (cons numbers solutions)))
+                         (setq solutions (cons numbers solutions)))
                        (amb))
                      (rec (cons (amb next (- next))
                                 numbers)
