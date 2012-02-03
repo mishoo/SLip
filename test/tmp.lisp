@@ -66,3 +66,11 @@
 
 (console.log (macroexpand-all '(setf (gethash x :foo) (maka (bar)))))
 (console.log (macroexpand-all '(setf (gethash x :foo) (maka (bar)) crap mak (gethash x :foo) (maka (bar)))))
+
+
+(defparameter foo #(1 2 3 4 5))
+(progn
+  (console.log (vector-splice foo 1 3 #('a 'b 'c 'd)))
+  (console.log foo)
+  (vector-push foo 'd 'e 'f)
+  (console.log foo))

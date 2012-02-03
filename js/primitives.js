@@ -399,6 +399,61 @@
                 return LispCons.toArray(list);
         });
 
+        defp("vector-push", true, function(m, nargs){
+                checknargs(nargs, 2);
+                var a = [];
+                while (nargs-- > 1) a[nargs - 1] = m.pop();
+                var vector = m.pop();
+                checktype(vector, LispArray);
+                vector.push.apply(vector, a);
+                return vector;
+        });
+
+        defp("vector-pop", true, function(m, nargs){
+                checknargs(nargs, 1);
+                var vector = m.pop();
+                checktype(vector, LispArray);
+                return vector.length > 0 ? vector.pop() : null;
+        });
+
+        defp("vector-splice", true, function(m, nargs){
+                checknargs(nargs, 3, 4);
+                var content = nargs == 4 ? m.pop() : null;
+                var len = m.pop();
+                var start = m.pop();
+                var vector = m.pop();
+                checktype(vector, LispArray);
+                checktype(start, LispNumber);
+                checktype(len, LispNumber);
+                var a = [ start, len ];
+                if (content) {
+                        checktype(content, LispArray);
+                        a.push.apply(a, content);
+                }
+                return vector.splice.apply(vector, a);
+        });
+
+        defp("vector-subseq", false, function(m, nargs){
+                checknargs(nargs, 1, 3);
+                var end = nargs == 3 ? m.pop() : null;
+                var start = nargs >= 2 ? m.pop() : null;
+                var vector = m.pop();
+                checktype(vector, LispArray);
+                if (start != null) checktype(start, LispNumber);
+                else start = 0;
+                if (end != null) checktype(end, LispNumber);
+                else end = vector.length;
+                return vector.slice(start, end);
+        });
+
+        defp("vector-set", true, function(m, nargs){
+                checknargs(nargs, 3, 3);
+                var val = m.pop(), index = m.pop(), vector = m.pop();
+                checktype(vector, LispArray);
+                checktype(index, LispNumber);
+                return vector[index] = val;
+        });
+
         function seq(m, nargs) {
                 var ret = [];
                 while (nargs-- > 0) {

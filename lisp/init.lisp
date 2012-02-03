@@ -192,8 +192,8 @@
   (setq *package* (%find-package name)) nil)
 
 (def-emac defparameter (name val)
+  (%special! name)
   `(progn
-     (%special! ,name)
      (setq ,name ,val)))
 
 ;; only the long form is supported
