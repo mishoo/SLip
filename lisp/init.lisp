@@ -134,6 +134,14 @@
      (defmacro ,name ,@rest)
      (export ',name)))
 
+(def-emac while (predicate . body)
+  (let ((label (gensym "WHILE")))
+    `(tagbody
+        ,label
+        (when ,predicate
+          ,@body
+          (go ,label)))))
+
 (def-efun macroexpand (form)
   (if (and (consp form)
            (symbolp (car form))
@@ -227,6 +235,18 @@
 (def-emac setf args
   `(progn ,@(%setf args)))
 
+(def-emac incf (place)
+  `(setf ,place (+ ,place 1)))
+
+(def-emac decf (place)
+  `(setf ,place (- ,place 1)))
+
+(defsetf car (x) (val)
+  `(rplaca ,x ,val))
+
+(defsetf cdr (x) (val)
+  `(rplacd ,x ,val))
+
 ;; this is `once-only' from Practical Common Lisp
 (def-emac with-rebinds (names . body)
   (let ((gensyms (mapcar (lambda (_) (gensym)) names)))
@@ -234,6 +254,65 @@
        `(let (,,@(mapcar (lambda (g n) ``(,,g ,,n)) gensyms names))
           ,(let (,@(mapcar (lambda (n g) `(,n ,g)) names gensyms))
                 ,@body)))))
+
+(def-efun collect-if (test list)
+  (cond ((not list) nil)
+        ((funcall test (car list)) (cons (car list) (collect-if test (cdr list))))
+        (t (collect-if test (cdr list)))))
+
+(def-efun every (test . lists)
+  (labels ((finished (tails)
+             (when tails
+               (if (car tails) (finished (cdr tails)) t)))
+           (scan (tails)
+             (if (finished tails) t
+                 (and (%apply test (map #'car tails))
+                      (scan (map #'cdr tails))))))
+    (scan lists)))
+
+(def-efun last (list)
+  (when list
+    (if (not (cdr list))
+        list
+        (last (cdr list)))))
+
+(def-efun merge (list1 list2 predicate)
+  (let (ret p)
+    (labels ((add (cell)
+               (if p
+                   (setf (cdr p) cell)
+                   (setf ret cell))
+               (setf p cell))
+             (rec (a b)
+               (cond ((and a b)
+                      (if (funcall predicate (car b) (car a))
+                          (progn
+                            (add (list (car b)))
+                            (rec a (cdr b)))
+                          (progn
+                            (add (list (car a)))
+                            (rec (cdr a) b))))
+                     (a (add a))
+                     (b (add b)))))
+      (rec list1 list2)
+      ret)))
+
+(def-efun stable-sort (list predicate)
+  (labels ((ss-list (list)
+             (cond ((not list) nil)
+                   ((not (cdr list)) list)
+                   (t (let* ((a list)
+                             (b (labels ((sub (list i)
+                                           (if (zerop (decf i))
+                                               (prog1 (cdr list)
+                                                 (setf (cdr list) nil))
+                                               (sub (cdr list) i))))
+                                  (sub list (floor (length list) 2)))))
+                        (merge (ss-list a) (ss-list b) predicate))))))
+    (ss-list list)))
+
+(set-symbol-function! 'sort #'stable-sort)
+(export 'sort)
 
 (export 'destructuring-bind)
 

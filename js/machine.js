@@ -773,8 +773,10 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["ARGS", "count", {
                         run: function(m){
                                 var count = this.count;
-                                if (count != m.n_args)
+                                if (count != m.n_args) {
+                                        console.error(m.f);
                                         throw new Error("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
+                                }
                                 var frame = new Array(count);
                                 while (--count >= 0) frame[count] = m.pop();
                                 m.env = new LispCons(frame, m.env);

@@ -55,22 +55,53 @@
 
 
 
-(defsetf car (x) (val)
-  `(rplaca ,x ,val))
-
-(defsetf cdr (x) (val)
-  `(rplacd ,x ,val))
-
 (defsetf gethash (hash key) (val)
   `(hash-set ,hash ,key ,val))
 
-(console.log (macroexpand-all '(setf (gethash x :foo) (maka (bar)))))
-(console.log (macroexpand-all '(setf (gethash x :foo) (maka (bar)) crap mak (gethash x :foo) (maka (bar)))))
+(make-thread
+ (lambda ()
+
+   (console.log (macroexpand-all '(setf (gethash x :foo) (maka (bar)))))
+   (console.log (macroexpand-all '(setf (gethash x :foo) (maka (bar)) crap mak (gethash x :foo) (maka (bar)))))
 
 
-(defparameter foo #(1 2 3 4 5))
-(progn
-  (console.log (vector-splice foo 1 3 #('a 'b 'c 'd)))
-  (console.log foo)
-  (vector-push foo 'd 'e 'f)
-  (console.log foo))
+   (defparameter foo #(1 2 3 4 5))
+   (progn
+     (console.log (vector-splice foo 1 3 #('a 'b 'c 'd)))
+     (console.log foo)
+     (vector-push foo 'd 'e 'f)
+     (console.log foo))
+
+   (console.log (%apply #'append (list '(1 2 3 4)
+                                       '(a b c d)
+                                       '(:foo :bar :baz))))
+
+   (let ((foo 1))
+     (incf foo)
+     (incf foo)
+     (decf foo)
+     (console.log foo))
+
+   (console.log (map #'list '(:foo :bar :baz)))
+
+   (console.log (every (lambda (x)
+                         (= x 2))
+                       '(2 2 2 2 2)))
+   (console.log (collect-if (lambda (x) (< x 5))
+                            '(2 10 6 3 5 1 6 0)))
+   (console.log (last '(1 2 3 4 5)))
+
+   (console.log (merge '(1 5 3 9) '(2 3 6 10) #'<))
+
+   (console.log (floor 5 2))
+
+   (let ((foo 10))
+     (while (> foo 0)
+       (console.log foo)
+       (decf foo)))
+
+   (let ((numbers (labels ((rec (n)
+                             (when (> n 0)
+                               (cons (random 100) (rec (- n 1))))))
+                    (time (rec 1000)))))
+     (console.log (time (sort numbers #'<))))))

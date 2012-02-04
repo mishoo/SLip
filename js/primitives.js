@@ -216,6 +216,32 @@
                 return ret;
         });
 
+        [
+                [ "floor", Math.floor ],
+                [ "ceiling", Math.ceil ],
+                [ "round", Math.round ]
+
+        ].forEach(function(f){
+                defp(f[0], false, function(m, nargs){
+                        checknargs(nargs, 1, 2);
+                        var divisor = nargs == 2 ? m.pop() : 1;
+                        var number = m.pop();
+                        checktype(number, LispNumber);
+                        checktype(divisor, LispNumber);
+                        return f[1](number / divisor);
+                });
+        });
+
+        defp("random", false, function(m, nargs){
+                checknargs(nargs, 0, 1);
+                if (nargs == 1) {
+                        var arg = m.pop();
+                        checktype(arg, LispNumber);
+                        return Math.floor(arg * Math.random());
+                }
+                return Math.random();
+        });
+
         /* -----[ list/sequence manipulation ]----- */
 
         defp("cons", false, function(m, nargs){
@@ -284,6 +310,18 @@
                         return pos >= 0 ? pos : null;
                 }
                 error("Unrecognized sequence");
+        });
+
+        defp("assq", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var list = m.pop(), item = m.pop();
+                checktype(list, LispList);
+                while (list !== null) {
+                        checktype(list.car, LispCons);
+                        if (eq(list.car.car, item)) return list.car;
+                        list = list.cdr;
+                }
+                return null;
         });
 
         defp("%getf", false, function(m, nargs){
@@ -392,6 +430,15 @@
                 return a;
         });
 
+        defp("make-vector", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var init = m.pop(), n = m.pop();
+                checktype(n, LispNumber);
+                var a = new Array(n);
+                while (--n >= 0) a[n] = init;
+                return a;
+        });
+
         defp("as-vector", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var list = m.pop();
@@ -444,6 +491,14 @@
                 if (end != null) checktype(end, LispNumber);
                 else end = vector.length;
                 return vector.slice(start, end);
+        });
+
+        defp("vector-ref", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var index = m.pop(), vector = m.pop();
+                checktype(vector, LispArray);
+                checktype(index, LispNumber);
+                return index >= 0 && index < vector.length ? vector[index] : null;
         });
 
         defp("vector-set", true, function(m, nargs){
@@ -888,6 +943,16 @@
                 };
                 xhr.send(null);
                 return cont ? null : xhr.responseText;
+        });
+
+        defp("%input-stream-p", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                return LispInputStream.is(m.pop()) ? true : null;
+        });
+
+        defp("%output-stream-p", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                return LispOutputStream.is(m.pop()) ? true : null;
         });
 
         /* -----[ macros/primitives ]----- */
