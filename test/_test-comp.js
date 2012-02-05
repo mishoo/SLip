@@ -45,9 +45,9 @@
                 // time_it("wotf", function(){
                 //         load2_lisp("../tmp/wotf.lisp");
                 // });
-                time_it("messaging", function(){
-                        load2_lisp("tmp.lisp");
-                });
+                // time_it("messaging", function(){
+                //         load2_lisp("tmp.lisp");
+                // });
         };
 
 })();

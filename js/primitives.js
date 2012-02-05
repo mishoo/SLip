@@ -737,6 +737,20 @@
                 return LispClosure.is(m.pop()) ? true : null;
         });
 
+        defp("%instance-vector", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var f = m.pop();
+                return LispClosure.is(f) && f.instance || null;
+        });
+
+        defp("%set-instance-vector", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var vector = m.pop(), closure = m.pop();
+                checktype(closure, LispClosure);
+                checktype(vector, LispArray);
+                return closure.instance = vector;
+        });
+
         defp("regexp", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 return LispRegexp.is(m.pop()) ? true : null;

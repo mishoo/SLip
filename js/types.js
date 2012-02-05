@@ -81,6 +81,7 @@ var LispClosure = DEFTYPE("closure", function(D, P){
                 this.name = name || null;
                 this.env = env || null;
                 this.noval = false;
+                this.instance = null;
         };
         P.copy = function() {
                 return new D(this.code, this.name, this.env);
