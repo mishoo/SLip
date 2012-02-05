@@ -9,6 +9,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.env = m.env;
                 this.denv = m.denv;
                 this.n_args = m.n_args;
+                if (m.trace) this.trace = m.trace.slice();
         };
         LispRet.prototype.run = function(m) {
                 m.f = this.f;
@@ -17,6 +18,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 m.env = this.env;
                 m.denv = this.denv;
                 m.n_args = this.n_args;
+                if (this.trace) m.trace = this.trace;
         };
 
         // return context for TAGBODY and BLOCK
@@ -27,6 +29,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.denv = m.denv;
                 this.slen = m.stack.length;
                 this.n_args = m.n_args;
+                if (m.trace) this.trace = m.trace.slice();
         };
         LispBlockRet.prototype.run = function(m, addr) {
                 m.f = this.f;
@@ -36,16 +39,19 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 m.stack.length = this.slen;
                 m.pc = addr;
                 m.n_args = this.n_args;
+                if (this.trace) m.trace = this.trace;
         };
 
         // continuations
         function LispCC(m) {
                 this.stack = m.stack.slice();
                 this.denv = m.denv;
+                if (m.trace) this.trace = m.trace.slice();
         };
         LispCC.prototype.run = function(m) {
                 m.stack = this.stack.slice();
                 m.denv = this.denv;
+                if (this.trace) m.trace = this.trace.slice();
         };
 
         // dynamic bindings
@@ -66,6 +72,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.error = null;
                 this.process = null;
                 this.f = null;
+                //this.trace = [];
         };
         P.find_dvar = function(symbol) {
                 if (symbol.special()) {
@@ -151,6 +158,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
         P._callnext = function(closure, args) {
                 this.stack.push(this.mkret(this.pc));
+                if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
                 this.code = closure.code;
                 this.env = closure.env;
                 var n = 0;
@@ -755,6 +763,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["CALL", "count", {
                         run: function(m){
                                 var closure = m.pop();
+                                if (m.trace) m.trace.push([ closure, m.stack.slice(-this.count) ]);
                                 m.n_args = this.count;
                                 m.code = closure.code;
                                 m.env = closure.env;
