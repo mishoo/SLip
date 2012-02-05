@@ -276,7 +276,7 @@ function lisp_reader(code) {
         var S_NIL      = LispSymbol.get("NIL");
         var S_CC       = LispSymbol.get("C/C");
         var S_NOT      = LispSymbol.get("NOT");
-        var S_LET      = LispSymbol.get("LET");
+        var S_LET      = LispSymbol.get("%LET");
         var S_LET$     = LispSymbol.get("LET*");
         var S_LABELS   = LispSymbol.get("LABELS");
         var S_FLET     = LispSymbol.get("FLET");

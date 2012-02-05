@@ -104,4 +104,14 @@
                              (when (> n 0)
                                (cons (random 100) (rec (- n 1))))))
                     (time (rec 1000)))))
-     (console.log (time (sort numbers #'<))))))
+     (console.log (time (sort numbers #'<))))
+
+   (let ((foo (lambda a1
+                (lambda a2
+                  (console.log "FOOOOOOOOOO got" a1 a2)))))
+     ((funcall foo 'foo 'bar) 'baz 'mak))
+
+   (let loop ((i 10))
+        (when (>= i 0)
+          (console.log i)
+          (loop (- i 1))))))

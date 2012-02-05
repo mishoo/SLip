@@ -86,9 +86,36 @@
 (defmacro unless (pred . body)
   `(if ,pred nil (progn ,@body)))
 
+(defmacro cond cases
+  (if cases
+      `(if ,(caar cases)
+           (progn ,@(cdar cases))
+           (cond ,@(cdr cases)))))
+
 (defun map (func lst)
   (when lst
     (cons (funcall func (car lst)) (map func (cdr lst)))))
+
+(defmacro let (bindings . body)
+  (cond ((symbolp bindings)
+         ;; Scheme-style named LET
+         (let* ((looop bindings)
+                (bindings (car body))
+                (body (cdr body))
+                (names (map (lambda (x)
+                              (if (consp x) (car x) x))
+                            bindings)))
+           `(labels ((,looop ,names
+                       ,@body))
+              (let* ,bindings
+                ;; doing it this way so that initializations are
+                ;; sequential and later args can refer to earlier
+                ;; ones.  not sure how Scheme actually handles it.
+                (,looop ,@names)))))
+        ((listp bindings)
+         ;; standard LET
+         `(%let ,bindings ,@body))
+        (t (%error "Invalid LET syntax"))))
 
 ;; (defmacro let (defs . body)
 ;;   `((lambda ,(map (lambda (x)
@@ -136,12 +163,6 @@
            (when ,x
              ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
       t))
-
-(defmacro cond cases
-  (if cases
-      `(if ,(caar cases)
-           (progn ,@(cdar cases))
-           (cond ,@(cdr cases)))))
 
 (defmacro member (item lst)
   `(%memq ,item ,lst))
@@ -508,7 +529,7 @@
                        (comp (cadr x) env val? more?)))
               (c/c (arg-count x 0 0)
                    (if val? (gen "CC")))
-              (let (comp-let (cadr x) (cddr x) env val? more?))
+              (%let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
               (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
