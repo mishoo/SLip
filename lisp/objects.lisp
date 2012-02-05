@@ -24,22 +24,33 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun find-class (sym)
+(export '(call-next-method
+          initialize
+          object))
+
+(def-efun find-class (sym)
   (%get-symbol-prop sym :class))
 
 (defsetf find-class (sym) (class)
   `(%set-symbol-prop ,sym :class ,class))
 
-(defmacro defclass (name direct-supers direct-slots)
+(def-emac defclass (name direct-supers direct-slots)
   `(setf (find-class ',name)
          (make-class (list ,@(mapcar (lambda (name)
                                        `(find-class ',name))
                                      direct-supers)) ',direct-slots)))
 
-(defmacro defgeneric (name)
+(def-emac defgeneric (name)
   `(set-symbol-function! ',name (make-generic)))
 
-(defmacro defmethod (name args &rest body)
+(def-emac make-instance (class &rest initargs)
+  (with-rebinds (class)
+    `(make (if (symbolp ,class)
+               (find-class ,class)
+               ,class)
+           ,@initargs)))
+
+(def-emac defmethod (name args &rest body)
   (let ((c-n-m (gensym "CALL-NEXT-METHOD")))
     `(add-method #',name
                  (make-method
@@ -176,12 +187,12 @@
            (slot-set new 'procedure (getl initargs 'procedure '()))
            new))))
 
-(defun slot-ref (object slot-name)
+(def-efun slot-ref (object slot-name)
   (let* ((info (lookup-slot-info (class-of object) slot-name))
          (getter (car info)))
     (funcall getter object)))
 
-(defun slot-set (object slot-name new-value)
+(def-efun slot-set (object slot-name new-value)
   (let* ((info (lookup-slot-info (class-of object) slot-name))
          (setter (cadr info)))
     (funcall setter object new-value)))
@@ -195,15 +206,15 @@
         (cdr entry)
         (error (strcat "No slot " slot-name)))))
 
-(defun class-direct-slots (class) (slot-ref class 'direct-slots))
-(defun class-direct-supers (class) (slot-ref class 'direct-supers))
-(defun class-slots (class) (slot-ref class 'slots))
-(defun class-cpl (class) (slot-ref class 'cpl))
+(def-efun class-direct-slots (class) (slot-ref class 'direct-slots))
+(def-efun class-direct-supers (class) (slot-ref class 'direct-supers))
+(def-efun class-slots (class) (slot-ref class 'slots))
+(def-efun class-cpl (class) (slot-ref class 'cpl))
 
-(defun generic-methods (generic) (slot-ref generic 'methods))
+(def-efun generic-methods (generic) (slot-ref generic 'methods))
 
-(defun method-specializers (method) (slot-ref method 'specializers))
-(defun method-procedure (method) (slot-ref method 'procedure))
+(def-efun method-specializers (method) (slot-ref method 'specializers))
+(def-efun method-procedure (method) (slot-ref method 'procedure))
 
 (defparameter *the-slots-of-a-class* '(direct-supers
                                        direct-slots
@@ -275,17 +286,17 @@
 ;;; API
 ;;;
 
-(defun make-class (direct-supers direct-slots)
+(def-efun make-class (direct-supers direct-slots)
   (make <class>
         'direct-supers direct-supers
         'direct-slots direct-slots))
-(defun make-generic () (make <generic>))
-(defun make-method (specializers procedure)
+(def-efun make-generic () (make <generic>))
+(def-efun make-method (specializers procedure)
   (make <method>
         'specializers specializers
         'procedure procedure))
 
-(defun is-a (obj class)
+(def-efun is-a (obj class)
   (let ((obj (%instance-class obj)))
     (some (lambda (x)
             (eq x class))
@@ -324,7 +335,7 @@
                                                   #'compute-method-more-specific?
                                                   #'compute-apply-methods))
 
-(defun add-method (generic method)
+(def-efun add-method (generic method)
   (slot-set generic
             'methods
             (cons method
@@ -567,7 +578,7 @@
 (defparameter <input-stream> (make-primitive-class))
 (defparameter <output-stream> (make-primitive-class))
 
-(defun class-of (x)
+(def-efun class-of (x)
   (cond ((%instance? x) (%instance-class x))
         ((consp x) <cons>)
         ((not x) <null>)
@@ -588,40 +599,3 @@
 (setf (find-class 'vector) <vector>)
 (setf (find-class 'input-stream) <input-stream>)
 (setf (find-class 'output-stream) <output-stream>)
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-;;; test
-
-(defclass person (object) (first-name last-name))
-(defclass student (person) (university code))
-
-(defmethod initialize ((p person) initargs)
-  (console.log "Initializing PERSON" initargs)
-  (call-next-method)
-  (console.log "Done PERSON"))
-
-(defmethod initialize ((p student) initargs)
-  (console.log "Initializing STUDENT" initargs)
-  (call-next-method)
-  (console.log "Done STUDENT"))
-
-(defgeneric full-name)
-(defmethod full-name ((p person))
-  (strcat (slot-ref p 'first-name)
-          " "
-          (slot-ref p 'last-name)))
-
-(let ((p (make (find-class 'student)
-               'first-name "John"
-               'last-name "Doe"
-               'university "Şmenozenia"
-               'code 12)))
-  (console.log (full-name p))
-  (console.log (class-slots (%instance-class p)))
-  (console.log (is-a p (find-class 'number)))
-  (console.log (is-a p (find-class 'person)))
-  (console.dir (%instance-vector p)))

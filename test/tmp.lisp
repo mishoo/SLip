@@ -53,8 +53,6 @@
                                                         (rec)))
                                                (rec)))))))
 
-
-
 (defsetf gethash (hash key) (val)
   `(hash-set ,hash ,key ,val))
 
@@ -116,4 +114,39 @@
           (console.log i)
           (loop (- i 1))))
 
-   (console.log (remove-duplicates '(1 2 3 4 5 6 2 3 1) :from-end t))))
+   (console.log (remove-duplicates '(1 2 3 4 5 6 2 3 1) :from-end t))
+
+   (progn
+     (defclass person (object) (first-name last-name))
+     (defclass student (person) (university code))
+
+     (defmethod initialize ((p person) initargs)
+       (console.log "Initializing PERSON" initargs)
+       (call-next-method)
+       (console.log "Done PERSON"))
+
+     (defmethod initialize ((p student) initargs)
+       (console.log "Initializing STUDENT" initargs)
+       (call-next-method)
+       (console.log "Done STUDENT"))
+
+     (defgeneric full-name)
+     (defmethod full-name ((p person))
+       (strcat (slot-ref p 'first-name)
+               " "
+               (slot-ref p 'last-name)))
+
+     (let ((p (make-instance 'student
+                             'first-name "John"
+                             'last-name "Doe"
+                             'university "Şmenozenia"
+                             'code 12)))
+       (console.log (full-name p))
+       (console.log (class-slots (class-of p)))
+       (console.log (is-a p (find-class 'number)))
+       (console.log (is-a p (find-class 'person)))
+       (console.dir (%instance-vector p))
+       (console.dir (class-cpl (class-of p))))
+     )
+
+   ))
