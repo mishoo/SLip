@@ -114,4 +114,6 @@
    (let loop ((i 10))
         (when (>= i 0)
           (console.log i)
-          (loop (- i 1))))))
+          (loop (- i 1))))
+
+   (console.log (remove-duplicates '(1 2 3 4 5 6 2 3 1) :from-end t))))

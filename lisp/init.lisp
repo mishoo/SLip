@@ -260,15 +260,66 @@
         ((funcall test (car list)) (cons (car list) (collect-if test (cdr list))))
         (t (collect-if test (cdr list)))))
 
-(def-efun every (test . lists)
-  (labels ((finished (tails)
-             (when tails
-               (if (car tails) (finished (cdr tails)) t)))
-           (scan (tails)
-             (if (finished tails) t
-                 (and (%apply test (map #'car tails))
-                      (scan (map #'cdr tails))))))
-    (scan lists)))
+(labels ((finished (tails)
+           (when tails
+             (if (car tails) (finished (cdr tails)) t))))
+
+  ;; every returns false as soon as any invocation of predicate
+  ;; returns false. If the end of a sequence is reached, every returns
+  ;; true. Thus, every returns true if and only if every invocation of
+  ;; predicate returns true.
+  (def-efun every (test . lists)
+    (let scan ((tails lists))
+         (if (finished tails) t
+             (and (%apply test (map #'car tails))
+                  (scan (map #'cdr tails))))))
+
+  ;; some returns the first non-nil value which is returned by an
+  ;; invocation of predicate. If the end of a sequence is reached
+  ;; without any invocation of the predicate returning true, some
+  ;; returns false. Thus, some returns true if and only if some
+  ;; invocation of predicate returns true.
+  (def-efun some (test . lists)
+    (let scan ((tails lists))
+         (if (finished tails) nil
+             (or (%apply test (map #'car tails))
+                 (scan (map #'cdr tails))))))
+
+  ;; notany returns false as soon as any invocation of predicate
+  ;; returns true. If the end of a sequence is reached, notany returns
+  ;; true. Thus, notany returns true if and only if it is not the case
+  ;; that any invocation of predicate returns true.
+  (def-efun notany (test . lists)
+    (let scan ((tails lists))
+         (if (finished tails) t
+             (if (%apply test (map #'car tails))
+                 nil
+                 (scan (map #'cdr tails))))))
+
+  ;; notevery returns true as soon as any invocation of predicate
+  ;; returns false. If the end of a sequence is reached, notevery
+  ;; returns false. Thus, notevery returns true if and only if it is
+  ;; not the case that every invocation of predicate returns true.
+  (def-efun notevery (test . lists)
+    (let scan ((tails lists))
+         (if (finished tails) nil
+             (if (%apply test (map #'car tails))
+                 (scan (map #'cdr tails))
+                 t)))))
+
+(def-efun remove-duplicates args
+  (destructuring-bind (list &key (test #'eq) from-end) args
+    (labels ((rmv (list ret)
+               (if list
+                   (let ((current (car list)))
+                     (rmv (collect-if (lambda (x)
+                                        (not (funcall test current x)))
+                                      (cdr list))
+                          (cons current ret)))
+                   ret)))
+      (if from-end
+          (reverse (rmv list nil))
+          (rmv (reverse list) nil)))))
 
 (def-efun last (list)
   (when list

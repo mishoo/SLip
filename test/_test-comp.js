@@ -39,9 +39,12 @@
                 time_it("init", function(){
                         load1_lisp("../lisp/init.lisp");
                 });
-                time_it("wotf", function(){
-                        load2_lisp("../tmp/wotf.lisp");
+                time_it("compile-objects", function(){
+                        load2_lisp("../lisp/objects.lisp");
                 });
+                // time_it("wotf", function(){
+                //         load2_lisp("../tmp/wotf.lisp");
+                // });
                 time_it("messaging", function(){
                         load2_lisp("tmp.lisp");
                 });

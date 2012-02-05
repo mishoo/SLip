@@ -375,7 +375,14 @@
         defp("console.dir", true, function(m, nargs){
                 var a = [];
                 while (nargs-- > 0) a.unshift(m.pop());
-                console.log(a);
+                console.log.apply(console, a);
+                return null;
+        });
+
+        defp("console.error", true, function(m, nargs){
+                var a = [];
+                while (nargs-- > 0) a.unshift(m.pop());
+                console.error.apply(console, a);
                 return null;
         });
 
