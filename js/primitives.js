@@ -299,7 +299,7 @@
                 checknargs(nargs, 2, 2);
                 var seq = m.pop(), item = m.pop();
                 if (LispList.is(seq))
-                        return LispCons.find(seq, item);
+                        return LispCons.find(seq, item, eq);
                 if (LispArray.is(seq)) {
                         var pos = seq.indexOf(item);
                         return pos >= 0 ? pos : null;
