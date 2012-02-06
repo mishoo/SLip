@@ -476,7 +476,7 @@
        (find-in-env name :macro (hash-get env :macros)))
 
      (gen-var (name env)
-       (if (%specialp name)
+       (if (%globalp name)
            (gen "GVAR" name)
            (aif (find-var name env)
                 (gen "LVAR" (car it) (cadr it))
@@ -485,7 +485,7 @@
                   (gen "GVAR" name)))))
 
      (gen-set (name env)
-       (if (%specialp name)
+       (if (%globalp name)
            (gen "GSET" name)
            (aif (find-var name env)
                 (gen "LSET" (car it) (cadr it))

@@ -737,20 +737,6 @@
                 return LispClosure.is(m.pop()) ? true : null;
         });
 
-        defp("%instance-vector", false, function(m, nargs){
-                checknargs(nargs, 1, 1);
-                var f = m.pop();
-                return LispClosure.is(f) && f.instance || null;
-        });
-
-        defp("%set-instance-vector", true, function(m, nargs){
-                checknargs(nargs, 2, 2);
-                var vector = m.pop(), closure = m.pop();
-                checktype(closure, LispClosure);
-                checktype(vector, LispArray);
-                return closure.instance = vector;
-        });
-
         defp("regexp", false, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 return LispRegexp.is(m.pop()) ? true : null;
@@ -786,6 +772,11 @@
                 checknargs(nargs, 1, 1);
                 var x = m.pop();
                 return x !== null && x !== true && LispSymbol.is(x) && x.pak === KW ? true : null;
+        });
+
+        defp("threadp", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                return LispProcess.is(m.pop()) ? true : null;
         });
 
         defp("zerop", false, function(m, nargs){
@@ -976,6 +967,27 @@
                 return LispOutputStream.is(m.pop()) ? true : null;
         });
 
+        /* -----[ object allocation utils ]----- */
+
+        defp("%objectp", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                return LispObject.is(m.pop()) ? true : null;
+        });
+
+        defp("%object-vector", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var obj = m.pop();
+                checktype(obj, LispObject);
+                return obj.vector;
+        });
+
+        defp("%make-object", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var size = m.pop();
+                checktype(size, LispNumber);
+                return new LispObject(size);
+        });
+
         /* -----[ macros/primitives ]----- */
 
         defp("macroexpand-1", false, function(m, nargs){
@@ -1035,7 +1047,7 @@
                 checknargs(nargs, 1, 1);
                 var sym = m.pop();
                 checktype(sym, LispSymbol);
-                return sym.getv("primitive-side-effects") ? true : null;
+                return sym.getv("primitive-side-effects");
         });
 
         defp("%macro!", true, function(m, nargs){
@@ -1055,6 +1067,17 @@
                         var name = m.pop();
                         checktype(name, LispSymbol);
                         name.setv("special", true);
+                        name.setv("global", true);
+                }
+                return null;
+        });
+
+        defp("%global!", true, function(m, nargs){
+                checknargs(nargs, 1);
+                while (nargs-- > 0) {
+                        var name = m.pop();
+                        checktype(name, LispSymbol);
+                        name.setv("global", true);
                 }
                 return null;
         });
@@ -1064,6 +1087,13 @@
                 var sym = m.pop();
                 checktype(sym, LispSymbol);
                 return sym !== null && sym !== true && sym.special() ? true : null;
+        });
+
+        defp("%globalp", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var sym = m.pop();
+                checktype(sym, LispSymbol);
+                return sym !== null && sym !== true && sym.global() ? true : null;
         });
 
         defp("%function-name", true, function(m, nargs){

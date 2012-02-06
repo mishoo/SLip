@@ -81,7 +81,6 @@ var LispClosure = DEFTYPE("closure", function(D, P){
                 this.name = name || null;
                 this.env = env || null;
                 this.noval = false;
-                this.instance = null;
         };
         P.copy = function() {
                 return new D(this.code, this.name, this.env);
@@ -194,6 +193,13 @@ var LispHash = DEFTYPE("simple-hash", function(D, P){
         };
         P.extend = function() {
                 return new LispHash(this);
+        };
+});
+
+var LispObject = DEFTYPE("object", function(D, P){
+        P.INIT = function(size) {
+                var a = this.vector = new Array(size);
+                while (--size >= 0) a[size] = null;
         };
 });
 
@@ -317,16 +323,19 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                 return HOP(this.vlist, key) ? this.vlist[key] : null;
         };
         P.macro = function() {
-                return this.getv("macro") || null;
+                return this.getv("macro");
         };
         P.special = function() {
-                return this.getv("special") || null;
+                return this.getv("special");
+        };
+        P.global = function() {
+                return this.getv("global");
         };
         P.primitive = function() {
-                return this.getv("primitive") || null;
+                return this.getv("primitive");
         };
         P.func = function() {
-                return this.getv("function") || null;
+                return this.getv("function");
         };
         D.get = function(name, pak) {
                 if (pak == null) pak = BASE_PACK;

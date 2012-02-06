@@ -201,8 +201,11 @@
 
 (def-emac defparameter (name val)
   (%special! name)
-  `(progn
-     (setq ,name ,val)))
+  `(setq ,name ,val))
+
+(def-emac defglobal (name val)
+  (%global! name)
+  `(setq ,name ,val))
 
 ;; only the long form is supported
 (def-emac defsetf (access-fn lambda-list store-vars &body body)
