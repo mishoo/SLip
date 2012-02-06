@@ -128,6 +128,9 @@
          (console.error x)
          (error "Classes for built-ins later!"))))
 
+;; this version of make is designed only for the basic internal
+;; classes; a new version is defined later in terms of the generic
+;; functions allocate-instance and initialize.
 (defun make (class . initargs)
   (cond ((or (eq class <class>)
              (eq class <entity-class>))
@@ -138,7 +141,7 @@
                 (dslots (map #'list (getl initargs 'direct-slots '())))
                 (cpl (labels ((rec (sups so-far)
                                 (if (not sups)
-                                    (reverse so-far)
+                                    (nreverse so-far)
                                     (rec (class-direct-supers (car sups))
                                          (cons (car sups) so-far)))))
                        (rec dsupers (list new))))
@@ -155,7 +158,7 @@
                                (list (lambda (o) (%instance-ref o f))
                                      (lambda (o n) (%instance-set o f n))))))
                 (getters-n-setters (map (lambda (s)
-                                          (cons (car s) (funcall allocator (lambda () '()))))
+                                          (cons (car s) (funcall allocator (lambda ()))))
                                         slots)))
 
            (slot-set new 'name (getl initargs 'name))
@@ -164,7 +167,7 @@
            (slot-set new 'cpl cpl)
            (slot-set new 'slots slots)
            (slot-set new 'nfields nfields)
-           (slot-set new 'field-initializers (reverse field-initializers))
+           (slot-set new 'field-initializers (nreverse field-initializers))
            (slot-set new 'getters-n-setters getters-n-setters)
            new))
 
@@ -249,7 +252,7 @@
 (slot-set <class> 'slots (map #'list *the-slots-of-a-class*))
 (slot-set <class> 'nfields (length *the-slots-of-a-class*))
 (slot-set <class> 'field-initializers (map (lambda (s)
-                                             (lambda () '()))
+                                             (lambda ()))
                                            *the-slots-of-a-class*))
 (slot-set <class> 'getters-n-setters '())
 
@@ -347,10 +350,6 @@
                   (lambda (generic)
                     (let ((method (car (generic-methods generic))))
                       ((method-procedure method) nil generic))))
-
-;;
-;; TODO: understand the following stuff :-\
-;;
 
 (add-method
  'compute-apply-generic
@@ -522,7 +521,7 @@
               (lambda (call-next-method class)
                 (labels ((collect (to-process result)
                            (if (not to-process)
-                               (reverse result)
+                               (nreverse result)
                                (let* ((current (car to-process))
                                       (name (car current))
                                       (others '())
@@ -544,7 +543,7 @@
  'compute-getter-and-setter
  (make-method (list <class>)
               (lambda (call-next-method class slot allocator)
-                (funcall allocator (lambda () '())))))
+                (funcall allocator (lambda ())))))
 
 
 

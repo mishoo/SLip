@@ -295,6 +295,14 @@
                 error("Unrecognized sequence");
         });
 
+        defp("nreverse", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var x = m.pop();
+                if (LispList.is(x)) return LispCons.nreverse(x);
+                if (LispArray.is(x)) return x.reverse();
+                error("Unrecognized sequence");
+        });
+
         defp("%memq", false, function(m, nargs){
                 checknargs(nargs, 2, 2);
                 var seq = m.pop(), item = m.pop();

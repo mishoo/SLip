@@ -109,7 +109,7 @@
                        (rec optional? rest? key? aux? (cdr args) values (+ i 1))))))
                  (t (error "Invalid lambda-list"))))))
         (rec nil nil nil nil args topv 0))
-      `(let* ((,topv ,values) ,@(reverse decls))
+      `(let* ((,topv ,values) ,@(nreverse decls))
          ,@body))))
 
 (defmacro destructuring-bind (args values . body)
@@ -321,7 +321,7 @@
                           (cons current ret)))
                    ret)))
       (if from-end
-          (reverse (rmv list nil))
+          (nreverse (rmv list nil))
           (rmv (reverse list) nil)))))
 
 (def-efun last (list)

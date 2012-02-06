@@ -93,8 +93,11 @@
            (cond ,@(cdr cases)))))
 
 (defun map (func lst)
-  (when lst
-    (cons (funcall func (car lst)) (map func (cdr lst)))))
+  (labels ((rec (lst ret)
+             (if lst
+                 (rec (cdr lst) (cons (funcall func (car lst)) ret))
+                 ret)))
+    (nreverse (rec lst nil))))
 
 (defmacro let (bindings . body)
   (cond ((symbolp bindings)
@@ -107,11 +110,9 @@
                             bindings)))
            `(labels ((,looop ,names
                        ,@body))
-              (let* ,bindings
-                ;; doing it this way so that initializations are
-                ;; sequential and later args can refer to earlier
-                ;; ones.  not sure how Scheme actually handles it.
-                (,looop ,@names)))))
+              (,looop ,@(map (lambda (x)
+                               (if (consp x) (cadr x)))
+                             bindings)))))
         ((listp bindings)
          ;; standard LET
          `(%let ,bindings ,@body))
@@ -759,7 +760,7 @@
                              (when (and vars? (%specialp x))
                                (push (cons x i) specials))
                              (%incf i)))
-         (list (reverse names) (reverse vals) i (reverse specials))))
+         (list (nreverse names) (nreverse vals) i (nreverse specials))))
 
      (comp-flets (bindings body env labels? val? more?)
        (if bindings
