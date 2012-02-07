@@ -1452,4 +1452,18 @@
                 return Date.now();
         });
 
+        var HASH_SEED = 0xdeadbeef;
+        defp("sxhash", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var x = m.pop();
+                if (!LispString.is(x)) {
+                        if (LispNumber.is(x)) x = x.toString(2);
+                        else if (LispChar.is(x)) x = x.value;
+                        else if (LispSymbol.is(x) || LispPackage.is(x)) x = x.name;
+                        else if (LispRegexp.is(x)) x = x.toString();
+                        else error("I don't know how to generate hash for this object type");
+                }
+                return murmurhash3_32_gc(x);
+        });
+
 })(LispPackage.get("%"), LispPackage.get("KEYWORD"));
