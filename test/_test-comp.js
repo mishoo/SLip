@@ -40,7 +40,7 @@
                         load1_lisp("../lisp/init.lisp");
                 });
                 time_it("compile-objects", function(){
-                        load2_lisp("../lisp/objects.lisp");
+                        load2_lisp("../lisp/tiny-clos.lisp");
                 });
                 // time_it("wotf", function(){
                 //         load2_lisp("../tmp/wotf.lisp");
