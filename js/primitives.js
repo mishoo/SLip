@@ -42,6 +42,11 @@
                 type: "dom-document"
         };
 
+        var LispNativeFunction = {
+                is: function(x) { return x instanceof Function },
+                type: "native-function"
+        };
+
         function defp(name, seff, func) {
                 name = name.toUpperCase();
                 var sym = BASE_PACK.intern(name);
@@ -1441,10 +1446,18 @@
                 checknargs(nargs, 1, 1);
                 var code = m.pop();
                 checktype(code, LispString);
-                var func = new Function("machine", "return(" + code + ")");
-                var ret = func(m);
-                if (typeof ret == "boolean") return ret ? true : null; // avoid false
-                return ret;
+                var func = new Function("$machine", "return(" + code + ")");
+                return func(m);
+        });
+
+        defp("%js-apply", true, function(m, nargs){
+                checknargs(nargs, 3, 3);
+                var args = m.pop(), instance = m.pop(), func = m.pop();
+                if (LispList.is(args))
+                        args = LispCons.toArray(args);
+                checktype(func, LispNativeFunction);
+                checktype(args, LispArray);
+                return func.apply(instance, args);
         });
 
         defp("%get-time", false, function(m, nargs){

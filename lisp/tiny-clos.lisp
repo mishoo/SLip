@@ -78,14 +78,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; TinyCLOS
 
-(defun getl (list item . default)
-  (let scan ((tail list))
-       (if tail
-           (if (eq (car tail) item)
-               (cadr tail)
-               (scan (cddr tail)))
-           (if default (car default)))))
-
 (defun %allocate-instance (class nfields)
   (%allocate-instance-internal class nfields nil))
 
@@ -137,8 +129,8 @@
          (let* ((new (%allocate-instance
                       class
                       (length *the-slots-of-a-class*)))
-                (dsupers (getl initargs 'direct-supers '()))
-                (dslots (map #'list (getl initargs 'direct-slots '())))
+                (dsupers (%getf initargs 'direct-supers '()))
+                (dslots (map #'list (%getf initargs 'direct-slots '())))
                 (cpl (labels ((rec (sups so-far)
                                 (if (not sups)
                                     (nreverse so-far)
@@ -161,7 +153,7 @@
                                           (cons (car s) (funcall allocator (lambda ()))))
                                         slots)))
 
-           (slot-set new 'name (getl initargs 'name))
+           (slot-set new 'name (%getf initargs 'name))
            (slot-set new 'direct-supers dsupers)
            (slot-set new 'direct-slots dslots)
            (slot-set new 'cpl cpl)
@@ -181,8 +173,8 @@
         ((eq class <method>)
          (let ((new (%allocate-instance class
                                         (length (class-slots class)))))
-           (slot-set new 'specializers (getl initargs 'specializers '()))
-           (slot-set new 'procedure (getl initargs 'procedure '()))
+           (slot-set new 'specializers (%getf initargs 'specializers '()))
+           (slot-set new 'procedure (%getf initargs 'procedure '()))
            new))))
 
 (def-efun slot-ref (object slot-name)
@@ -442,14 +434,14 @@
  (make-method (list <class>)
               (lambda (call-next-method class initargs)
                 (slot-set class 'direct-supers
-                          (getl initargs 'direct-supers '()))
+                          (%getf initargs 'direct-supers '()))
                 (slot-set class 'direct-slots
                           (map (lambda (s)
                                  (if (consp s) s (list s)))
-                               (getl initargs 'direct-slots '())))
+                               (%getf initargs 'direct-slots '())))
                 (slot-set class 'cpl (compute-cpl class))
                 (slot-set class 'slots (compute-slots class))
-                (slot-set class 'name (getl initargs 'name))
+                (slot-set class 'name (%getf initargs 'name))
                 (let* ((nfields 0)
                        (field-initializers '())
                        (allocator
@@ -478,8 +470,8 @@
  'initialize
  (make-method (list <method>)
               (lambda (call-next-method method initargs)
-                (slot-set method 'specializers (getl initargs 'specializers '()))
-                (slot-set method 'procedure (getl initargs 'procedure '())))))
+                (slot-set method 'specializers (%getf initargs 'specializers '()))
+                (slot-set method 'procedure (%getf initargs 'procedure '())))))
 
 (add-method
  'allocate-instance
