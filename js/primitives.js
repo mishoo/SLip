@@ -1069,6 +1069,7 @@
                 checktype(func, LispClosure);
                 checktype(sym, LispSymbol);
                 sym.setv("macro", func);
+                sym.setv("function", null);
                 return sym;
         });
 
@@ -1252,6 +1253,7 @@
                 var func = m.pop(), sym = m.pop();
                 checktype(sym, LispSymbol);
                 checktype(func, LispClosure);
+                sym.setv("macro", null);
                 return sym.setv("function", func);
         });
 
