@@ -64,6 +64,9 @@
 
 ;;;; let the show begin
 
+(defmacro error (msg)
+  `(%error ,msg))
+
 ;; is there a good reason why CL doesn't allow this syntax?
 ;;
 ;;   ((progn foo) ...)  ==  (funcall foo ...)
@@ -185,18 +188,16 @@
                                        ,(recur (cdr cases))))))))
                 (recur cases)))))
 
-(defmacro mapcar (func . lists)
-  (let ((rec (gensym))
-        (fname (gensym))
-        (args (map (lambda (el) (gensym)) lists)))
-    `(let ((,fname ,func))
-       (labels ((,rec (,@args)
-                  (when (and ,@args)
-                    (cons (funcall ,fname ,@(map (lambda (l)
-                                                   `(car ,l)) args))
-                          (,rec ,@(map (lambda (l)
-                                         `(cdr ,l)) args))))))
-         (,rec ,@lists)))))
+(labels ((finished (tails)
+           (when tails
+             (if (car tails) (finished (cdr tails)) t))))
+  (defun mapcar (f . lists)
+    (let looop ((ret nil)
+                (tails lists))
+         (if (finished tails)
+             (nreverse ret)
+             (looop (cons (%apply f (map #'car tails)) ret)
+                    (map #'cdr tails))))))
 
 (defmacro with-cc (name . body)
   `((lambda (,name) ,@body) (c/c)))
@@ -213,9 +214,6 @@
 
 (defmacro push (obj place)
   `(setq ,place (cons ,obj ,place)))
-
-(defmacro error (msg)
-  `(%error ,msg))
 
 ;;;; parser/compiler
 
@@ -853,7 +851,7 @@
     (labels ((rec (is-first)
                (let ((form (funcall reader 'next)))
                  (unless (eq form 'EOF)
-                   (let ((f (compile `(lambda () ,form))))
+                   (let ((f (compile (list 'lambda nil form))))
                      (let ((code (%serialize-bytecode f t)))
                        (unless is-first (%stream-put out #\,))
                        (%stream-put out code)
