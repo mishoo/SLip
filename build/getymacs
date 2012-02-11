@@ -1,0 +1,9 @@
+#! /bin/bash
+
+pushd ~/work/my/ymacs/build/
+./build.sh
+popd
+
+tar zxf /tmp/ymacs.tar.gz
+rm -rf ../ide/ymacs
+mv Ymacs ../ide/ymacs

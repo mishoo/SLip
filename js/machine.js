@@ -131,8 +131,40 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 while (this.pc < this.code.length) {
                         //inc_stat("OP_" + this.code[this.pc]._name);
                         this.code[this.pc++].run(this);
+                        if (this.pc == null) break;
                 }
                 return this.pop();
+        };
+        P.atomic_call = function(closure, args) {
+                if (!args) args = [];
+                // stop the world, call closure, resume the world
+                var save_code = this.code;
+                var save_env = this.env;
+                var save_denv = this.denv;
+                var save_stack = this.stack;
+                var save_nargs = this.n_args;
+                var save_pc = this.pc;
+                var save_f = this.f;
+                var save_trace = this.trace;
+                this.code = closure.code;
+                this.env = null;
+                this.stack = [ new LispRet(this, null) ].concat(args);
+                this.n_args = args.length;
+                this.pc = 0;
+                this.f = closure;
+                if (this.trace) this.trace = [ closure, args ];
+                try {
+                        return this.loop();
+                } finally {
+                        this.trace = save_trace;
+                        this.f = save_f;
+                        this.pc = save_pc;
+                        this.n_args = save_nargs;
+                        this.stack = save_stack;
+                        this.denv = save_denv;
+                        this.env = save_env;
+                        this.code = save_code;
+                }
         };
         P._exec = function(code) {
                 this.code = code;
@@ -181,6 +213,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.n_args = args.length;
                 this.pc = 0;
                 this.f = closure;
+                if (this.trace) this.trace = [ closure, args ];
         };
 
         P.run = function(quota) {
@@ -893,7 +926,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
         var S_QUOTE = LispSymbol.get("QUOTE");
 
-        D.dump = function(thing) {
+        P.dump = D.dump = function(thing) {
                 if (thing === null) return "NIL";
                 if (thing === true) return "T";
                 if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));

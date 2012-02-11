@@ -863,6 +863,21 @@
       (rec t)
       (%stream-get out))))
 
+(defun read1-from-string (str)
+  (let ((reader (lisp-reader str 'EOF)))
+    #( (funcall reader 'next) (funcall reader 'pos) )))
+
+(defun eval (expr)
+  ((compile (list 'lambda nil expr))))
+
+(defun eval-string (str)
+  (let ((reader (lisp-reader str 'EOF)))
+    (let rec ((last nil)
+              (expr (funcall reader 'next)))
+         (if (eq expr 'EOF) last
+             (rec ((compile (list 'lambda nil expr)))
+                  (funcall reader 'next))))))
+
 (defun %load (url)
   (compile-string (%get-file-contents url)))
 
