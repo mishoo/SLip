@@ -213,7 +213,7 @@ var LispPackage = DEFTYPE("package", function(D, P){
         };
         P.toString = function() { return this.name };
         P.serialize = function() {
-                return "p(" + this.name + ")";
+                return "p(" + JSON.stringify(this.name) + ")";
         };
         P.intern = function(name) {
                 return this.symbols.get(name) ||

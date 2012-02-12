@@ -12,3 +12,10 @@
                     (%stream-put out var)))
     (%stream-put out ") {" code "}")
     `(%js-eval ,(%stream-get out))))
+
+;; (let ((fun (js-function "fibonacci" ("n") "
+;; if (n < 2) return 1;
+;; return fibonacci(n - 2) + fibonacci(n - 1);
+;; ")))
+
+;;   (console.log (%js-apply fun nil '(10))))

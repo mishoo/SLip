@@ -28,12 +28,15 @@
                 xhr.send(null);
         };
 
+        var machine = init_machine();
+
         // load the compiler
         load("../fasl/compiler.fasl", function(code){
-                var machine = init_machine();
-                code = LispMachine.unserialize(code);
-                machine._exec(code);
-                window.open("ymacs.html", "_ss_lisp_");
+                machine._exec(LispMachine.unserialize(code));
+                load("../fasl/init.fasl", function(code){
+                        machine._exec(LispMachine.unserialize(code));
+                        window.open("ymacs.html", "_ss_lisp_");
+                });
         });
 
 })(this);

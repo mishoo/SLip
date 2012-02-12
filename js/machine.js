@@ -614,6 +614,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         }
                         return new LispSymbol(name);
                 });
+                names.push("p"); values.push(function(name){
+                        return LispPackage.get(name);
+                });
                 names.push("l"); values.push(function(){
                         return LispCons.fromArray(slice(arguments));
                 });
@@ -628,9 +631,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
         function serialize_const(val) {
                 if (val === null || val === true) return val + "";
-                if (LispSymbol.is(val)) return val.serialize();
+                if (LispSymbol.is(val) || LispPackage.is(val) || LispChar.is(val)) return val.serialize();
                 if (val instanceof RegExp) return val.toString();
-                if (LispChar.is(val)) return val.serialize();
                 if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(serialize_const).join(",") + ")";
                 if (val instanceof Array) return "[" + val.map(serialize_const).join(",") + "]";
                 if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));

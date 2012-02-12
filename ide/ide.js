@@ -158,24 +158,81 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 frame._redrawCaret(true);
                         });
                 },
-                ss_repl_eval: function() {
-                        var m = this.getq("ss_repl_marker");
-                        var code = this.cmd("buffer_substring", m.getPosition());
+                ss_repl_eval: Ymacs_Interactive(function() {
+                        var code = get_repl_input(this);
                         try {
                                 var tmp = MACHINE.read(code);
                                 var expr = tmp[0], pos = tmp[1];
+                                var m = this.getq("ss_repl_marker");
                                 flash_region(this, m.getPosition(), pos + m.getPosition());
                                 if (expr === WINDOW.LispSymbol.get("EOF"))
                                         return this.cmd("ss_repl_prompt");
+                                var code = code.substr(0, pos).trim();
+                                var h = this.getq("ss_repl_history");
+                                if (h[0] != code) h.unshift(code);
                         } catch(ex) {
                                 // XXX:
                                 return this.cmd("newline_and_indent");
                         }
                         var ret = MACHINE.eval(expr);
-                        ss_log("==> " + MACHINE.dump(ret));
+                        if (typeof ret != "string") ret = MACHINE.dump(ret);
+                        ss_log("==> " + ret);
                         this.cmd("ss_repl_prompt");
-                }
+                }),
+                ss_repl_history_back: Ymacs_Interactive(function(){
+                        var a = HISTORY_COMPLETIONS;
+                        if (!HISTORY_COMPLETIONS || !/^ss_repl_history/.test(this.previousCommand)) {
+                                a = HISTORY_COMPLETIONS = get_relevant_history(this);
+                        }
+                        if (a.length > 0) {
+                                var txt = a.shift();
+                                a.push(txt);
+                                set_repl_input(this, txt);
+                        }
+                }),
+                ss_repl_history_forward: Ymacs_Interactive(function(){
+                        var a = HISTORY_COMPLETIONS;
+                        if (!HISTORY_COMPLETIONS || !/^ss_repl_history/.test(this.previousCommand)) {
+                                a = HISTORY_COMPLETIONS = get_relevant_history(this);
+                        }
+                        if (a.length > 0) {
+                                var txt = a.pop();
+                                a.push(txt);
+                                set_repl_input(this, txt);
+                        }
+                }),
+                ss_repl_kill_input: Ymacs_Interactive(function(){
+                        var m = this.getq("ss_repl_marker");
+                        this._deleteText(m, this.getCodeSize());
+                        this.cmd("goto_char", m);
+                })
         });
+
+        var HISTORY_COMPLETIONS;
+
+        function get_relevant_history(buf) {
+                var h = buf.getq("ss_repl_history");
+                var m = buf.getq("ss_repl_marker");
+                var input = buf.cmd("buffer_substring", m, buf.point());
+                if (input) {
+                        h = h.grep(function(el){
+                                return el.toLowerCase().indexOf(input) >= 0;
+                        }).mergeSort(function(a, b){
+                                return a.indexOf(input) - b.indexOf(input);
+                        });
+                }
+                return h;
+        };
+
+        function get_repl_input(buf) {
+                var m = buf.getq("ss_repl_marker");
+                return buf.cmd("buffer_substring", m).trim();
+        };
+
+        function set_repl_input(buf, text) {
+                var m = buf.getq("ss_repl_marker");
+                buf._replaceText(m, buf.getCodeSize(), text);
+        };
 
         function eval(buf, expr, preamble) {
                 try {
@@ -202,8 +259,14 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
 
         DEFINE_SINGLETON("Ymacs_Keymap_SS_REPL", Ymacs_Keymap, function(D, P){
                 D.KEYS = {
-                        "ENTER" : Ymacs_Interactive(function(){
-                                this.cmd("ss_repl_eval");
+                        "ENTER" : "ss_repl_eval",
+                        "M-p && C-ARROW_UP" : "ss_repl_history_back",
+                        "M-n && C-ARROW_DOWN" : "ss_repl_history_forward",
+                        "C-DELETE" : "ss_repl_kill_input",
+                        "HOME && C-a" : Ymacs_Interactive("d", function(point){
+                                var m = this.getq("ss_repl_marker").getPosition();
+                                if (point >= m) this.cmd("goto_char", m);
+                                else this.cmd("beginning_of_line");
                         })
                 };
         });
@@ -243,6 +306,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 this.cmd("ss_mode");
                 this.pushKeymap(Ymacs_Keymap_SS_REPL());
                 this.setq("modeline_custom_handler", null);
+                this.setq("ss_repl_history", []);
                 return function() {
                         this.popKeymap(Ymacs_Keymap_SS_REPL());
                         this.cmd("ss_mode", false);
