@@ -1,3 +1,7 @@
+//----------------------------
+// This is a mess that works.
+//----------------------------
+
 Ymacs_Keymap_Emacs().defineKeys({
         "C-\\"    : "switch_to_buffer",
         "C-x C-s" : "save_file",
@@ -27,7 +31,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 });
                 (function(){
                         buffer.deleteOverlay("flash-code");
-                }).delayed(500);
+                }).delayed(400);
         };
 
         function find_toplevel_sexp(buffer, blink) {
@@ -92,11 +96,40 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
         };
 
         DEFINE_CLASS("Ymacs_SS", Ymacs, function(D, P){
+                var PENDING_COMMANDS = {};
+                var REQ_ID = 0;
+
+                D.DEFAULT_EVENTS = [ "onLispResponse" ];
+                D.CONSTRUCT = function() {
+                        this.addEventListener("onLispResponse", handle_lisp_response);
+                };
                 P.ss_log = function(thing) {
                         if (typeof thing != "string")
                                 thing = MACHINE.dump(thing);
                         ss_log(thing);
                         return null;
+                };
+                P.run_lisp = function(what) {
+                        var args = Array.$(arguments, 1);
+                        args.unshift(++REQ_ID);
+                        if (args.peek() instanceof Function) {
+                                var handler = args.pop();
+                                PENDING_COMMANDS[REQ_ID] = {
+                                        time: Date.now(),
+                                        args: args,
+                                        handler: handler
+                                };
+                        }
+                        var thread = MACHINE.eval_string("ymacs::*thread*");
+                        thread.sendmsg(thread, what, WINDOW.LispCons.fromArray(args));
+                };
+
+                function handle_lisp_response(req_id, what, value) {
+                        var v = PENDING_COMMANDS[req_id];
+                        delete PENDING_COMMANDS[req_id];
+                        if (v) {
+                                v.handler(value, what, req_id);
+                        }
                 };
         });
 
@@ -146,7 +179,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 this.cmd("newline");
                         var m = this.getq("ss_repl_marker");
                         if (m) m.destroy();
-                        var pak = MACHINE.eval(MACHINE.read("%::*package*")[0]);
+                        var pak = MACHINE.eval_string("%::*package*");
                         var name = pak.name;
                         this.cmd("insert", name + "> ");
                         this.cmd("end_of_line");
@@ -159,25 +192,27 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         });
                 },
                 ss_repl_eval: Ymacs_Interactive(function() {
-                        var code = get_repl_input(this);
+                        var self = this;
+                        var code = get_repl_input(self);
                         try {
                                 var tmp = MACHINE.read(code);
                                 var expr = tmp[0], pos = tmp[1];
-                                var m = this.getq("ss_repl_marker");
-                                flash_region(this, m.getPosition(), pos + m.getPosition());
+                                var m = self.getq("ss_repl_marker");
+                                flash_region(self, m.getPosition(), pos + m.getPosition());
                                 if (expr === WINDOW.LispSymbol.get("EOF"))
-                                        return this.cmd("ss_repl_prompt");
+                                        return self.cmd("ss_repl_prompt");
                                 var code = code.substr(0, pos).trim();
-                                var h = this.getq("ss_repl_history");
+                                var h = self.getq("ss_repl_history");
                                 if (h[0] != code) h.unshift(code);
                         } catch(ex) {
                                 // XXX:
-                                return this.cmd("newline_and_indent");
+                                return self.cmd("newline_and_indent");
                         }
-                        var ret = MACHINE.eval(expr);
-                        if (typeof ret != "string") ret = MACHINE.dump(ret);
-                        ss_log("==> " + ret);
-                        this.cmd("ss_repl_prompt");
+                        self.ymacs.run_lisp("EVAL", expr, function(ret){
+                                if (typeof ret != "string") ret = MACHINE.dump(ret);
+                                ss_log("==> " + ret);
+                                self.cmd("ss_repl_prompt");
+                        });
                 }),
                 ss_repl_history_back: Ymacs_Interactive(function(){
                         var a = HISTORY_COMPLETIONS;
@@ -235,17 +270,14 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
         };
 
         function eval(buf, expr, preamble) {
-                try {
-                        if (preamble)
-                                expr = preamble + expr;
-                        var start = new Date().getTime();
-                        var val = MACHINE.eval_string(expr);
+                if (preamble)
+                        expr = preamble + expr;
+                var start = new Date().getTime();
+                buf.ymacs.run_lisp("EVAL-STRING", expr, function(val){
                         ss_log("==> " + MACHINE.dump(val)
                                + " <== in " + ((new Date().getTime() - start) / 1000).toFixed(3) + "s");
                         get_output_buffer().cmd("ss_repl_prompt");
-                } catch(ex) {
-                        ss_log("**> " + MACHINE.dump(ex));
-                }
+                });
         };
 
         D.KEYS = {
@@ -375,7 +407,7 @@ function make_desktop() {
 
         var ymacs = THE_EDITOR = window.opener.YMACS = new Ymacs_SS({ buffers: [] });
         //ymacs.setColorTheme([ "light", "standard" ]);
-        ymacs.setColorTheme([ "dark", "mishoo" ]);
+        ymacs.setColorTheme([ "dark", "mishoo2" ]);
         ymacs.getActiveBuffer().cmd("ss_mode");
 
         layout.packWidget(toolbar, { pos: "top" });

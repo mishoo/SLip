@@ -212,6 +212,7 @@ var LispPackage = DEFTYPE("package", function(D, P){
                 this.uses = [];
         };
         P.toString = function() { return this.name };
+        P.print = function() { return "<package " + this.name + ">" };
         P.serialize = function() {
                 return "p(" + JSON.stringify(this.name) + ")";
         };
@@ -449,6 +450,13 @@ var LispProcess = DEFTYPE("process", function(D, P){
         P.sendmsg = function(target, signal, args) {
                 QUEUE.push(new Message(this, target, signal, args));
                 start();
+                return target;
+        };
+
+        D.sendmsg = function(target, signal, args) {
+                QUEUE.push(new Message(null, target, signal, args));
+                start();
+                return target;
         };
 
         P.receive = function(receivers) {

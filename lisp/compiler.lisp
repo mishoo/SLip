@@ -261,11 +261,11 @@
                         (cond
                           ((not ch)
                            (croak "Unterminated string or regexp"))
-                          ((eq ch end)
-                           (%stream-get out))
                           (escaped
                            (%stream-put out ch)
                            (rec (next) nil))
+                          ((eq ch end)
+                           (%stream-get out))
                           ((eq ch #\\)
                            (if inces (%stream-put out #\\))
                            (rec (next) t))

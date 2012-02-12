@@ -1315,7 +1315,8 @@
                 var signal = as_string(m.pop()), process = m.pop();
                 checktype(process, LispProcess);
                 checktype(signal, LispString);
-                return m.process.sendmsg(process, signal, args);
+                if (m.process) return m.process.sendmsg(process, signal, args);
+                return LispProcess.sendmsg(process, signal, args);
         });
 
         defp("%receive", true, function(m, nargs){

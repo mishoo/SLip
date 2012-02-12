@@ -2,6 +2,8 @@
 
         function init_machine() {
                 var m = global.machine = new LispMachine();
+
+                // sync functions: they evaluate without a process
                 m.read = function(str) {
                         var f = LispSymbol.get("READ1-FROM-STRING").func();
                         return this.atomic_call(f, [ str ]);
@@ -35,6 +37,7 @@
                 machine._exec(LispMachine.unserialize(code));
                 load("../fasl/init.fasl", function(code){
                         machine._exec(LispMachine.unserialize(code));
+                        machine.eval_string('(load "ide.lisp")');
                         window.open("ymacs.html", "_ss_lisp_");
                 });
         });
