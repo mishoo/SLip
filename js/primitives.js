@@ -881,6 +881,20 @@
                 return hash.extend();
         });
 
+        defp("hash-keys", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var hash = m.pop();
+                checktype(hash, LispHash);
+                return hash.keys();
+        });
+
+        defp("hash-values", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var hash = m.pop();
+                checktype(hash, LispHash);
+                return hash.values();
+        });
+
         /* -----[ simple streams ]----- */
 
         defp("%stream-line", false, function(m, nargs){
@@ -1149,6 +1163,14 @@
                 return sym === S_NIL ? null : sym === S_T ? true : sym;
         });
 
+        defp("%all-accessible-symbols", false, function(m, nargs){
+                checknargs(nargs, 1, 2);
+                var ext = nargs == 2 ? m.pop() : null;
+                var pak = m.pop();
+                checktype(pak, LispPackage);
+                return pak.all_accessible(ext);
+        });
+
         defp("%find-symbol", false, function(m, nargs){
                 checknargs(nargs, 2, 2);
                 var pak = m.pop(), name = m.pop();
@@ -1163,7 +1185,9 @@
         defp("%find-package", false, function(m, nargs){
                 checknargs(nargs, 1, 2);
                 var noerr = nargs == 2 ? m.pop() : null;
-                var name = as_string(m.pop());
+                var name = m.pop();
+                if (LispPackage.is(name)) return name;
+                name = as_string(name);
                 checktype(name, LispString);
                 var pak = LispPackage.get_existing(name);
                 if (!pak && !noerr) error("Package " + name + " not found");

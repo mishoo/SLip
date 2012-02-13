@@ -67,6 +67,9 @@
 (defmacro error (msg)
   `(%error ,msg))
 
+(defmacro warn (msg)
+  `(%warn ,msg))
+
 ;; is there a good reason why CL doesn't allow this syntax?
 ;;
 ;;   ((progn foo) ...)  ==  (funcall foo ...)
@@ -119,7 +122,7 @@
         ((listp bindings)
          ;; standard LET
          `(%let ,bindings ,@body))
-        (t (%error "Invalid LET syntax"))))
+        (t (error "Invalid LET syntax"))))
 
 ;; (defmacro let (defs . body)
 ;;   `((lambda ,(map (lambda (x)
@@ -480,7 +483,7 @@
            (aif (find-var name env)
                 (gen "LVAR" (car it) (cadr it))
                 (progn
-                  (%warn (strcat "Undefined variable " name))
+                  (warn (strcat "Undefined variable " name))
                   (gen "GVAR" name)))))
 
      (gen-set (name env)
@@ -489,7 +492,7 @@
            (aif (find-var name env)
                 (gen "LSET" (car it) (cadr it))
                 (progn
-                  (%warn (strcat "Undefined variable " name))
+                  (warn (strcat "Undefined variable " name))
                   (gen "GSET" name)))))
 
      (mklabel ()
@@ -544,7 +547,7 @@
                                 (gen "LVAR" (car local) (cadr local))
                                 (progn
                                   (unless (symbol-function sym)
-                                    (%warn "Undefined function" sym))
+                                    (warn (strcat "Undefined function" sym)))
                                   (gen "FGVAR" sym))))))
               (%fn (if val?
                        (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
@@ -706,7 +709,7 @@
                            (if more? nil (gen "RET")))))
                 (t
                  (unless (symbol-function f)
-                   (%warn "Undefined function" f))
+                   (warn (strcat "Undefined function" f)))
                  (mkret (gen "FGVAR" f))))))
            ((and (consp f)
                  (eq (car f) 'lambda)
@@ -864,14 +867,14 @@
       (%stream-get out))))
 
 (defun read1-from-string (str)
-  (let ((reader (lisp-reader str 'EOF)))
+  (let* ((reader (lisp-reader str 'EOF)))
     #( (funcall reader 'next) (funcall reader 'pos) )))
 
 (defun eval (expr)
   ((compile (list 'lambda nil expr))))
 
 (defun eval-string (str)
-  (let ((reader (lisp-reader str 'EOF)))
+  (let* ((reader (lisp-reader str 'EOF)))
     (let rec ((last nil)
               (expr (funcall reader 'next)))
          (if (eq expr 'EOF) last

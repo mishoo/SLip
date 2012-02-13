@@ -194,6 +194,20 @@ var LispHash = DEFTYPE("simple-hash", function(D, P){
         P.extend = function() {
                 return new LispHash(this);
         };
+        P.keys = function() {
+                var a = [];
+                for (var i in this.data)
+                        if (HOP(this.data, i))
+                                a.push(i);
+                return a;
+        };
+        P.values = function() {
+                var a = [];
+                for (var i in this.data)
+                        if (HOP(this.data, i))
+                                a.push(this.data[i]);
+                return a;
+        };
 });
 
 var LispObject = DEFTYPE("object", function(D, P){
@@ -251,6 +265,16 @@ var LispPackage = DEFTYPE("package", function(D, P){
                         if (sym) return sym;
                 }
                 return null;
+        };
+        P.all_accessible = function(external) {
+                var ret = external
+                        ? this.exports.slice()
+                        : this.symbols.values();
+                var a = this.uses;
+                for (var i = a.length; --i >= 0;) {
+                        ret.push.apply(ret, a[i].all_accessible(true));
+                }
+                return ret;
         };
         P.find = function(name) {
                 var sym = this.symbols.get(name);
