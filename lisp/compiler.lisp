@@ -547,7 +547,7 @@
                                 (gen "LVAR" (car local) (cadr local))
                                 (progn
                                   (unless (symbol-function sym)
-                                    (warn (strcat "Undefined function" sym)))
+                                    (warn (strcat "Undefined function " sym)))
                                   (gen "FGVAR" sym))))))
               (%fn (if val?
                        (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
@@ -709,7 +709,7 @@
                            (if more? nil (gen "RET")))))
                 (t
                  (unless (symbol-function f)
-                   (warn (strcat "Undefined function" f)))
+                   (warn (strcat "Undefined function " f)))
                  (mkret (gen "FGVAR" f))))))
            ((and (consp f)
                  (eq (car f) 'lambda)

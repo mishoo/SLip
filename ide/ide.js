@@ -10,7 +10,7 @@ Ymacs_Keymap_Emacs().defineKeys({
 
 DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
 
-        var WINDOW = window.opener;
+        var WINDOW = window.opener || window.parent;
         var MACHINE = WINDOW.MACHINE;
 
         function getPP(p) {
@@ -79,15 +79,20 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 });
         };
 
-        function find_package(buffer) {
-                var pak = find_in_package(buffer, buffer.point());
-                if (pak) try {
-                        var exp = MACHINE.read(pak)[0];
-                        pak = exp.cdr.car;
-                } catch(ex) {
-                        pak = null;
+        function find_package(buffer, start) {
+                if (buffer.getq("ss_repl_history")) {
+                        // for the REPL buffer, return null so that it
+                        // uses the current REPL package.
+                        return null;
                 }
-                return MACHINE.eval(pak);
+                if (start == null) start = buffer.point();
+                var pak = find_in_package(buffer, start);
+                if (pak) try {
+                        var exp = MACHINE.read(null, pak)[0];
+                        pak = exp.cdr.car;
+                        return MACHINE.eval(pak);
+                } catch(ex) {};
+                return null;
         };
 
         function ss_log(txt) {
@@ -131,7 +136,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                         handler: handler
                                 };
                         }
-                        var thread = MACHINE.eval_string("YMACS::*THREAD*");
+                        var thread = MACHINE.eval_string("YMACS", "*THREAD*");
                         thread.sendmsg(thread, what, WINDOW.LispCons.fromArray(args));
                 };
 
@@ -155,22 +160,22 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 ss_macroexpand_1: Ymacs_Interactive("d", function(point){
                         var code = this._bufferSubstring(point);
                         try {
-                                var tmp = MACHINE.read(code);
+                                var tmp = MACHINE.read(find_package(this), code);
                         } catch(ex) {
                                 throw new Ymacs_Exception("Couldn't read Lisp expression starting at point");
                         }
                         expr = this.cmd("buffer_substring", point, point + tmp[1]);
-                        eval(this, "(%::macroexpand-1 '" + expr + ")");
+                        eval(this, "(%::macroexpand-1 '" + expr + ")", find_package(this));
                 }),
                 ss_macroexpand_all: Ymacs_Interactive("d", function(point){
                         var code = this._bufferSubstring(point);
                         try {
-                                var tmp = MACHINE.read(code);
+                                var tmp = MACHINE.read(find_package(this), code);
                         } catch(ex) {
                                 throw new Ymacs_Exception("Couldn't read Lisp expression starting at point");
                         }
                         expr = this.cmd("buffer_substring", point, point + tmp[1]);
-                        eval(this, "(ss::macroexpand-all '" + expr + ")");
+                        eval(this, "(ss::macroexpand-all '" + expr + ")", find_package(this));
                 }),
                 ss_eval_buffer: Ymacs_Interactive(function(){
                         eval(this, this.getCode());
@@ -179,18 +184,18 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         var points = find_toplevel_sexp(this, true);
                         var expr = this.cmd("buffer_substring", points[0], points[1]);
                         (function(){
-                                eval(this, expr, find_in_package(this, points[0]));
+                                eval(this, expr, find_package(this, points[0]));
                         }).delayed(1, this);
                 }),
                 ss_eval_region: Ymacs_Interactive("r", function(begin, end){
-                        eval(this, this.cmd("buffer_substring", begin, end), find_in_package(this, begin));
+                        eval(this, this.cmd("buffer_substring", begin, end), find_package(this, begin));
                 }),
                 ss_repl_prompt: function(){
                         if (this._positionToRowCol(this.point()).col > 0)
                                 this.cmd("newline");
                         var m = this.getq("ss_repl_marker");
                         if (m) m.destroy();
-                        var pak = MACHINE.eval_string("%::*PACKAGE*");
+                        var pak = MACHINE.eval_string(null, "%::*PACKAGE*");
                         var name = pak.name;
                         this.cmd("insert", name + "> ");
                         this.cmd("end_of_line");
@@ -206,7 +211,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         var self = this;
                         var code = get_repl_input(self);
                         try {
-                                var tmp = MACHINE.read(code);
+                                var tmp = MACHINE.read(null, code);
                                 var expr = tmp[0], pos = tmp[1];
                                 var m = self.getq("ss_repl_marker");
                                 flash_region(self, m.getPosition(), pos + m.getPosition());
@@ -255,7 +260,39 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         var m = this.getq("ss_repl_marker");
                         this._deleteText(m, this.getCodeSize());
                         this.cmd("goto_char", m);
-                })
+                }),
+                ss_complete_symbol: Ymacs_Interactive("d", function(point){
+                        if (this.previousCommand != "ss_complete_symbol" && this.previousCommand != "undo")
+                                this.setq("ss_complete_symbol_context", null);
+                        var ctx = this.getq("ss_complete_symbol_context");
+                        if (!ctx) {
+                                var start = this.cmd("save_excursion", function(){
+                                        if (!this.cmd("search_backward_regexp", /[^-a-z0-9_*&^%$@!=+\/.<>?:]/ig))
+                                                this.cmd("beginning_of_buffer");
+                                        else
+                                                this.cmd("forward_char");
+                                        return this.point();
+                                });
+                                var text = this.cmd("buffer_substring", start, point).trim();
+                                var list = this.cmd("ss_get_symbol_completions", text);
+                                ctx = {
+                                        start: start,
+                                        list: list
+                                };
+                                this.setq("ss_complete_symbol_context", ctx);
+                        }
+                        if (ctx.list.length > 0) {
+                                var sym = ctx.list.shift();
+                                ctx.list.push(sym);
+                                this._replaceText(ctx.start, point, sym.toLowerCase());
+                        }
+                }),
+                ss_get_symbol_completions: function(query) {
+                        return WINDOW.LispCons.toArray(MACHINE.eval_string(
+                                find_package(this),
+                                "(ymacs::exec-list-symbol-completions " + DlJSON.encode(query) + ")"
+                        ));
+                }
         });
 
         var HISTORY_COMPLETIONS;
@@ -284,11 +321,10 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 buf._replaceText(m, buf.getCodeSize(), text);
         };
 
-        function eval(buf, expr, preamble) {
-                if (preamble)
-                        expr = preamble + expr;
+        function eval(buf, expr, pack) {
+                if (!pack) pack = null;
                 var start = new Date().getTime();
-                buf.ymacs.run_lisp("EVAL-STRING", expr, function(val){
+                buf.ymacs.run_lisp("EVAL-STRING", pack, expr, function(val){
                         if (typeof val != "string") val = MACHINE.dump(val);
                         ss_log(val + "\n<== in " + ((new Date().getTime() - start) / 1000).toFixed(3) + "s");
                         get_output_buffer().cmd("ss_repl_prompt");
@@ -301,7 +337,8 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 "C-c C-r"                               : "ss_eval_region",
                 "C-c M-o && C-c DELETE && C-c C-DELETE" : "ss_clear_output",
                 "C-c ENTER"                             : "ss_macroexpand_1",
-                "C-c M-m"                               : "ss_macroexpand_all"
+                "C-c M-m"                               : "ss_macroexpand_all",
+                "S-TAB"                                 : "ss_complete_symbol"
         };
 
         DEFINE_SINGLETON("Ymacs_Keymap_SS_REPL", Ymacs_Keymap, function(D, P){
@@ -310,6 +347,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         "M-p && C-ARROW_UP" : "ss_repl_history_back",
                         "M-n && C-ARROW_DOWN" : "ss_repl_history_forward",
                         "C-DELETE" : "ss_repl_kill_input",
+                        "TAB" : "ss_complete_symbol",
                         "HOME && C-a" : Ymacs_Interactive("d", function(point){
                                 var m = this.getq("ss_repl_marker").getPosition();
                                 if (point >= m) this.cmd("goto_char", m);
@@ -329,12 +367,12 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         if (pak) {
                                 pak = pak.replace(/^\(in-/, "(%::%find-").replace(/\)/, " t)"); // that's a pervert hack
                                 try {
-                                        pak = MACHINE.eval_string(pak);
+                                        pak = MACHINE.eval_string(null, pak);
                                 } catch(ex) {
                                         pak = null;
                                 }
                         } else {
-                                pak = MACHINE.eval_string("%::*PACKAGE*");
+                                pak = MACHINE.eval_string(null, "%::*PACKAGE*");
                         }
                         if (pak) pak = pak.name;
                         else pak = "<span style='color:red'>(package not defined)</span>";
@@ -386,6 +424,7 @@ function get_output_buffer() {
 };
 
 function make_desktop() {
+        var WINDOW = window.opener || window.parent;
         var desktop = new DlDesktop();
         desktop.fullScreen(true);
 
@@ -420,7 +459,7 @@ function make_desktop() {
         btn("Copy to system clipboard", function(){ buffer().cmd("copy_for_operating_system") });
         btn("Paste from system clipboard", function(){ buffer().cmd("yank_from_operating_system") });
 
-        var ymacs = THE_EDITOR = window.opener.YMACS = new Ymacs_SS({ buffers: [] });
+        var ymacs = THE_EDITOR = WINDOW.YMACS = new Ymacs_SS({ buffers: [] });
         //ymacs.setColorTheme([ "light", "standard" ]);
         ymacs.setColorTheme([ "dark", "mishoo2" ]);
         ymacs.getActiveBuffer().cmd("ss_mode");

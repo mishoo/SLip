@@ -1,17 +1,17 @@
 (function(global){
 
         LispMachine.extend({
-                read: function(str) {
-                        var f = LispSymbol.get("READ1-FROM-STRING").func();
-                        return this.atomic_call(f, [ str ]);
+                read: function(pak, str) {
+                        var f = LispSymbol.get("EXEC-READ", LispPackage.get("YMACS")).func();
+                        return this.atomic_call(f, [ pak, str ]);
                 },
                 eval: function(expr) {
-                        var f = LispSymbol.get("EVAL").func();
+                        var f = LispSymbol.get("EXEC-EVAL", LispPackage.get("YMACS")).func();
                         return this.atomic_call(f, [ expr ]);
                 },
-                eval_string: function(str) {
-                        var f = LispSymbol.get("EVAL-STRING").func();
-                        return this.atomic_call(f, [ str ]);
+                eval_string: function(pak, str) {
+                        var f = LispSymbol.get("EXEC-EVAL-STRING", LispPackage.get("YMACS")).func();
+                        return this.atomic_call(f, [ pak, str ]);
                 }
         });
 
@@ -32,7 +32,7 @@
                 machine._exec(LispMachine.unserialize(code));
                 load("../fasl/init.fasl", function(code){
                         machine._exec(LispMachine.unserialize(code));
-                        machine.eval_string('(load "ide.lisp")');
+                        machine.atomic_call(LispSymbol.get("LOAD").func(), [ "ide.lisp" ]);
                         global.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
                         window.open("ymacs.html", "_ss_lisp_");
                 });

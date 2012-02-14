@@ -276,6 +276,9 @@ var LispPackage = DEFTYPE("package", function(D, P){
                 }
                 return ret;
         };
+        P.all_interned = function() {
+                return this.symbols.values();
+        };
         P.find = function(name) {
                 var sym = this.symbols.get(name);
                 if (sym) return sym;

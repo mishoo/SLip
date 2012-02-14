@@ -227,13 +227,33 @@
                 [ "round", Math.round ]
 
         ].forEach(function(f){
+                var func = f[1];
                 defp(f[0], false, function(m, nargs){
                         checknargs(nargs, 1, 2);
                         var divisor = nargs == 2 ? m.pop() : 1;
                         var number = m.pop();
                         checktype(number, LispNumber);
                         checktype(divisor, LispNumber);
-                        return f[1](number / divisor);
+                        return func(number / divisor);
+                });
+        });
+
+        [
+                [ "abs", Math.abs ],
+                [ "sin", Math.sin ],
+                [ "asin", Math.asin ],
+                [ "cos", Math.cos ],
+                [ "acos", Math.acos ],
+                [ "tan", Math.cos ],
+                [ "atan", Math.acos ],
+                [ "exp", Math.exp ],
+                [ "sqrt", Math.sqrt ]
+
+        ].forEach(function(f){
+                var func = f[1];
+                defp(f[0], false, function(m, nargs){
+                        checknargs(nargs, 1, 1);
+                        return func(m.pop_number(error));
                 });
         });
 
@@ -464,6 +484,14 @@
                 var list = m.pop();
                 checktype(list, LispList);
                 return LispCons.toArray(list);
+        });
+
+        defp("as-list", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var vec = m.pop();
+                if (LispList.is(vec)) return vec;
+                if (LispArray.is(vec)) return LispCons.fromArray(vec);
+                error("Unsupported sequence");
         });
 
         defp("vector-push", true, function(m, nargs){
@@ -726,6 +754,22 @@
                 checktype(str, LispString);
                 checktype(rx, LispRegexp);
                 return rx.exec(str);
+        });
+
+        defp("replace-regexp", false, function(m, nargs){
+                checknargs(nargs, 3);
+                var replacement = as_string(m.pop()), string = as_string(m.pop()), rx = m.pop();
+                checktype(rx, LispRegexp);
+                checktype(string, LispString);
+                checktype(replacement, LispString);
+                return string.replace(rx, replacement);
+        });
+
+        defp("quote-regexp", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var str = as_string(m.pop());
+                checktype(str, LispString);
+                return str.replace(/([\[\]\(\)\{\}\.\*\+\?\|\\])/g, "\\$1");
         });
 
         /* -----[ types ]----- */
@@ -1163,12 +1207,27 @@
                 return sym === S_NIL ? null : sym === S_T ? true : sym;
         });
 
-        defp("%all-accessible-symbols", false, function(m, nargs){
+        defp("%externalp", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var pak = m.pop(), sym = m.pop();
+                checktype(sym, LispSymbol);
+                checktype(pak, LispPackage);
+                return pak.exports.indexOf(sym) >= 0 ? true : null;
+        });
+
+        defp("%accessible-symbols", false, function(m, nargs){
                 checknargs(nargs, 1, 2);
                 var ext = nargs == 2 ? m.pop() : null;
                 var pak = m.pop();
                 checktype(pak, LispPackage);
                 return pak.all_accessible(ext);
+        });
+
+        defp("%interned-symbols", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var pak = m.pop();
+                checktype(pak, LispPackage);
+                return pak.all_interned();
         });
 
         defp("%find-symbol", false, function(m, nargs){
@@ -1229,6 +1288,13 @@
                 var symbol = m.pop();
                 checktype(symbol, LispSymbol);
                 return LispSymbol.symname(symbol);
+        });
+
+        defp("%package-name", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var pak = m.pop();
+                checktype(pak, LispPackage);
+                return pak.name;
         });
 
         defp("%symbol-package", false, function(m, nargs){
@@ -1499,7 +1565,8 @@
                 if (!LispString.is(x)) {
                         if (LispNumber.is(x)) x = x.toString(2);
                         else if (LispChar.is(x)) x = x.value;
-                        else if (LispSymbol.is(x) || LispPackage.is(x)) x = x.name;
+                        else if (LispSymbol.is(x)) x = LispSymbol.symname(x);
+                        else if (LispPackage.is(x)) x = x.name;
                         else if (LispRegexp.is(x)) x = x.toString();
                         else error("I don't know how to generate hash for this object type");
                 }
