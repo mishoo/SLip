@@ -45,9 +45,9 @@ function send_ymacs_reply(req_id, what, value) {
     (%::eval-string str)))
 
 (labels ((symbol-completion (query all)
-           (let* ((rx (make-regexp (strcat "^" (replace-regexp #/[-.\/]/g
+           (let* ((rx (make-regexp (strcat "^" (replace-regexp #/[-_.\/]/g
                                                                (quote-regexp query)
-                                                               "[^_-]*[_-]"))
+                                                               "[^-_./]*[-_./]"))
                                    "i"))
                   (len (length query))
                   (matching (mapcar #'%symbol-name
