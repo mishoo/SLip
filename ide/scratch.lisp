@@ -31,3 +31,10 @@
 ;; - M-n or C-ARROW_DOWN -- next history item
 ;; - C-DELETE -- kill input, return to prompt
 ;; - TAB -- complete current symbol
+
+;; MUST DO:
+;;
+;; - lock primitives and some internal functions. we really don't want
+;;   them to be redefined
+;; - error handling: HANDLER-CASE and UNWIND-PROTECT for now
+;; - 

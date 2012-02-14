@@ -428,12 +428,7 @@ function make_desktop() {
         var desktop = new DlDesktop();
         desktop.fullScreen(true);
 
-        var dlg = new DlDialog({
-                title: "",
-                resizable: true
-        });
-
-        var layout = new DlLayout({ parent: dlg });
+        var layout = new DlLayout({ parent: desktop });
 
         var toolbar = new DlContainer({ className: "DlToolbar" });
         var menu = new DlHbox({ parent: toolbar });
@@ -467,9 +462,7 @@ function make_desktop() {
         layout.packWidget(toolbar, { pos: "top" });
         layout.packWidget(ymacs, { pos: "bottom", fill: "*" });
 
-        dlg.setSize({ x: 640, y: 480 });
-        dlg.show(true);
-        dlg.maximize(true);
+        desktop.callHooks("onResize");
 
         load("./scratch.lisp", function(code){
                 ymacs.getBuffer("*scratch*").setCode(code);

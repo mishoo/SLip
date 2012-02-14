@@ -1,2 +1,13 @@
 .Ymacs_Overlay .flash-code { opacity: 0.6; filter: alpha(opacity=60); }
 .Ymacs_Overlay .flash-code { background: #3f8; }
+
+.Ymacs_Frame {
+  font-family: "DejaVu Sans Mono","Lucida Sans Typewriter",monospace;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.Ymacs_Modeline {
+  font-family: "DejaVu Sans Mono","Lucida Sans Typewriter",monospace;
+  font-size: 12px;
+}
