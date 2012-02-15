@@ -1,3 +1,5 @@
+body { background-color: #888 }
+
 .Ymacs_Overlay .flash-code { opacity: 0.6; filter: alpha(opacity=60); }
 .Ymacs_Overlay .flash-code { background: #3f8; }
 
@@ -10,4 +12,11 @@
 .Ymacs_Modeline {
   font-family: "DejaVu Sans Mono","Lucida Sans Typewriter",monospace;
   font-size: 12px;
+}
+
+.Ymacs_Frame {
+  opacity: 0.9;
+}
+.Ymacs_Frame-active {
+  opacity: 1;
 }

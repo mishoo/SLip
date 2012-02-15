@@ -34,14 +34,16 @@ function send_ymacs_reply(req_id, what, value) {
                                                      ret))))))))
 
 (define-handler :read (pak str)
-  (let ((*package* (if pak (%find-package pak) *package*)))
+  (let ((*package* (or (and pak (%find-package pak t))
+                       *package*)))
     (%::read1-from-string str)))
 
 (define-handler :eval (expr)
   (%::eval expr))
 
 (define-handler :eval-string (pak str)
-  (let ((*package* (if pak (%find-package pak) *package*)))
+  (let ((*package* (or (and pak (%find-package pak t))
+                       *package*)))
     (%::eval-string str)))
 
 (labels ((symbol-completion (query all)

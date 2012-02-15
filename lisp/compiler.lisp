@@ -8,6 +8,9 @@
 ;;;;
 ;;;; Don't customize the reader in this file.
 
+(%special! '*read-table* '*package* '*standard-input*)
+(setq *package* (%find-package "%"))
+
 ;; props to http://norstrulde.org/ilge10/
 (set-symbol-function!
  'qq
@@ -220,8 +223,6 @@
 
 ;;;; parser/compiler
 
-(%special! '*read-table* '*package* '*standard-input*)
-
 (defun lisp-reader (text eof)
   (let ((input (%make-input-stream text))
         (in-qq 0))
@@ -308,6 +309,8 @@
                   (aif (regexp-exec #/^(.*?)::?(.*)$/ str)
                        (let ((pak (elt it 1))
                              (sym (elt it 2)))
+                         (when (zerop (length sym))
+                           (error "Bad symbol name"))
                          (setq pak (%find-package (if (zerop (length pak))
                                                       "KEYWORD"
                                                       pak)))
