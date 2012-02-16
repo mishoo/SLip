@@ -461,7 +461,8 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 if (m.status == "running") {
                         err = m.run(quota);
                         if (err) {
-                                console.error("Error in PID: ", this.pid, err);
+                                console.error("Error in PID: ", this.pid);
+                                console.log(err);
                         }
                         else switch (m.status) {
                             case "running":

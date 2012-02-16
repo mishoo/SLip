@@ -5,7 +5,7 @@
       (user (%make-package "SS-USER")))
   (%export '(quasiquote defmacro defun when unless map labels flet foreach
              prog1 prog2 or and cond member case mapcar with-cc aif push error
-             lisp-reader compile compile-string load function
+             lisp-reader compile compile-string load function unwind-protect
              funcall macrolet
              quote lambda let let* if progn setq t nil not
              tagbody go block return return-from

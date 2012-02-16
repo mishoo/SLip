@@ -561,6 +561,7 @@
               (block (comp-block (cadr x) (cddr x) env val? more?))
               (return (arg-count x 0 1) (comp-return nil (cadr x) env))
               (return-from (arg-count x 1 2) (comp-return (cadr x) (caddr x) env))
+              (unwind-protect (comp-unwind-protect (cadr x) (cddr x) env val? more?))
               (t (if (and (symbolp (car x))
                           (macro (car x) env))
                      (comp-macroexpand (car x) (cdr x) env val? more?)
@@ -842,6 +843,18 @@
                    (gen "UNFR" 1 (length specials))
                    (if more? nil (gen "RET")))))
            (comp-seq body env val? more?)))
+
+     (comp-unwind-protect (form cleanup env val? more?)
+       (if form
+           (let ((k (mklabel)))
+             (%seq (gen "UPOPEN" k)
+                   (comp form env val? t) ; if val? is T, this leaves it on the stack
+                   (gen "UPEXIT")
+                   #( k )
+                   (comp-seq cleanup env nil t) ; result of cleanup code not needed
+                   (gen "UPCLOSE")
+                   (if more? nil (gen "RET"))))
+           (comp-seq cleanup env val? more?)))
 
      (compile (exp)
        (assert (and (consp exp)

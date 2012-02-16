@@ -411,7 +411,7 @@ function get_output_buffer() {
                 out.setCode(";; Take this REPL, brother, and may it serve you well.")
                 out.cmd("end_of_buffer");
                 out.cmd("ss_repl_mode");
-                buf.cmd("split_frame_vertically", "70%");
+                buf.cmd("split_frame_horizontally", "50%");
                 buf.cmd("other_frame");
                 buf.cmd("switch_to_buffer", "*ss*");
                 ed.setActiveFrame(frame);
