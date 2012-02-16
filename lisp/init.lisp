@@ -1,3 +1,5 @@
+(setq *package* (%find-package "%"))
+
 (let ((main (%make-package "SS"))
       (boot (%find-package "%"))
       (user (%make-package "SS-USER")))
@@ -133,14 +135,6 @@
   `(progn
      (defmacro ,name ,@rest)
      (export ',name)))
-
-(def-emac while (predicate . body)
-  (let ((label (gensym "WHILE")))
-    `(tagbody
-        ,label
-        (when ,predicate
-          ,@body
-          (go ,label)))))
 
 (def-efun macroexpand (form)
   (if (and (consp form)
