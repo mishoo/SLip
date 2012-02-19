@@ -995,9 +995,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 if (thing === null) return "NIL";
                 if (thing === true) return "T";
                 if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
-                if (LispChar.is(thing)) return thing.print();
-                if (LispPackage.is(thing)) return thing.print();
-                if (LispSymbol.is(thing)) return thing.dump();
                 if (LispCons.is(thing)) {
                         if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
                                 return "'" + D.dump(LispCons.cadr(thing));

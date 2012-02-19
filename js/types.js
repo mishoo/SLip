@@ -211,6 +211,9 @@ var LispHash = DEFTYPE("simple-hash", function(D, P){
 });
 
 var LispObject = DEFTYPE("object", function(D, P){
+        P.print = function() {
+                return "<object " + this.vector[0].vector[2] + ">";
+        };
         P.INIT = function(size) {
                 var a = this.vector = new Array(size);
                 while (--size >= 0) a[size] = null;
@@ -372,7 +375,7 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
                 );
                 return ret;
         };
-        P.dump = function() {
+        P.print = function() {
                 if (this.pak && this.pak.name == "KEYWORD") return ":" + this.name;
                 return this.name;
         };

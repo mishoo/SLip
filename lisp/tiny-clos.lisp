@@ -41,6 +41,8 @@
   `(%set-symbol-prop ,sym :generic ,generic))
 
 (def-emac defclass (name direct-supers direct-slots)
+  (unless direct-supers
+    (setf direct-supers '(object)))
   `(setf (find-class ',name)
          (make-class ',name (list ,@(mapcar (lambda (name)
                                               `(find-class ',name))
@@ -228,16 +230,20 @@
         (rec *the-slots-of-a-class* 0))))
 
 (defglobal <class> (%allocate-instance nil (length *the-slots-of-a-class*)))
+(setf (find-class 'class) <class>)
 (%set-instance-class-to-self <class>)
 
 (defglobal <top> (make <class>
                        'direct-supers nil
                        'direct-slots nil))
+(setf (find-class 'top) <top>)
 
 (defglobal <object> (make <class>
                           'direct-supers (list <top>)
                           'direct-slots nil))
+(setf (find-class 'object) <object>)
 
+(slot-set <class> 'name 'class)
 (slot-set <class> 'direct-supers (list <object>))
 (slot-set <class> 'direct-slots (map #'list *the-slots-of-a-class*))
 (slot-set <class> 'cpl (list <class> <object> <top>))
@@ -251,15 +257,19 @@
 (defglobal <procedure-class> (make <class>
                                    'direct-supers (list <class>)
                                    'direct-slots nil))
+(setf (find-class 'procedure-class) <procedure-class>)
 (defglobal <entity-class> (make <class>
                                 'direct-supers (list <procedure-class>)
                                 'direct-slots nil))
+(setf (find-class 'entity-class) <entity-class>)
 (defglobal <generic> (make <entity-class>
                            'direct-supers (list <object>)
                            'direct-slots '(methods)))
+(setf (find-class 'generic) <generic>)
 (defglobal <method> (make <class>
                           'direct-supers (list <object>)
                           'direct-slots '(specializers procedure)))
+(setf (find-class 'method) <method>)
 
 ;;;
 ;;; Compute class precedence list
@@ -290,6 +300,8 @@
         'procedure procedure))
 
 (def-efun is-a (obj class)
+  (when (symbolp class)
+    (setf class (find-class class)))
   (%memq class (class-cpl (%instance-class obj))))
 
 ;;
@@ -545,26 +557,20 @@
     (initialize instance initargs)
     instance))
 
-(defglobal <primitive-class> (make <class>
-                                   'direct-supers (list <class>)
-                                   'direct-slots nil))
+(defglobal <primitive> (defclass primitive (class) ()))
 
-(defun make-primitive-class class
-  (make (if (not class) <primitive-class> (car class))
-        'direct-supers (list <top>)
-        'direct-slots nil))
-
-(defglobal <cons> (make-primitive-class))
-(defglobal <null> (make-primitive-class))
-(defglobal <symbol> (make-primitive-class))
-(defglobal <regexp> (make-primitive-class))
-(defglobal <function> (make-primitive-class <procedure-class>))
-(defglobal <number> (make-primitive-class))
-(defglobal <vector> (make-primitive-class))
-(defglobal <string> (make-primitive-class))
-(defglobal <thread> (make-primitive-class))
-(defglobal <input-stream> (make-primitive-class))
-(defglobal <output-stream> (make-primitive-class))
+(defglobal <cons> (defclass cons (primitive) ()))
+(defglobal <null> (defclass null (primitive) ()))
+(defglobal <symbol> (defclass symbol (primitive) ()))
+(defglobal <regexp> (defclass regexp (primitive) ()))
+(defglobal <function> (defclass function (procedure-class) ()))
+(defglobal <number> (defclass number (primitive) ()))
+(defglobal <vector> (defclass vector (primitive) ()))
+(defglobal <string> (defclass string (primitive) ()))
+(defglobal <thread> (defclass thread (primitive) ()))
+(defglobal <stream> (defclass stream (primitive) ()))
+(defglobal <input-stream> (defclass input-stream (stream) ()))
+(defglobal <output-stream> (defclass output-stream (stream) ()))
 
 (def-efun class-of (x)
   (cond ((%objectp x) (%instance-class x))
@@ -579,13 +585,19 @@
         ((%input-stream-p x) <input-stream>)
         ((%output-stream-p x) <output-stream>)))
 
-(setf (find-class 'object) <object>)
-(setf (find-class 'class) <class>)
-(setf (find-class 'cons) <cons>)
-(setf (find-class 'symbol) <symbol>)
-(setf (find-class 'function) <function>)
-(setf (find-class 'number) <number>)
-(setf (find-class 'vector) <vector>)
-(setf (find-class 'thread) <thread>)
-(setf (find-class 'input-stream) <input-stream>)
-(setf (find-class 'output-stream) <output-stream>)
+(export '(class
+          object
+          generic
+          method
+          cons
+          null
+          symbol
+          regexp
+          function
+          number
+          vector
+          string
+          thread
+          stream
+          input-stream
+          output-stream))
