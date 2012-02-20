@@ -561,6 +561,8 @@
               (block (comp-block (cadr x) (cddr x) env val? more?))
               (return (arg-count x 0 1) (comp-return nil (cadr x) env))
               (return-from (arg-count x 1 2) (comp-return (cadr x) (caddr x) env))
+              (catch (comp-catch (cadr x) (cddr x) env val? more?))
+              (throw (comp-throw (cadr x) (caddr x) env))
               (unwind-protect (comp-unwind-protect (cadr x) (cddr x) env val? more?))
               (t (if (and (symbolp (car x))
                           (macro (car x) env))
@@ -843,6 +845,22 @@
                    (gen "UNFR" 1 (length specials))
                    (if more? nil (gen "RET")))))
            (comp-seq body env val? more?)))
+
+     (comp-catch (tag body env val? more?)
+       (if body
+           (let ((k (mklabel)))
+             (%seq (comp tag env t t)
+                   (gen "CATCH" k)
+                   (comp-seq body env t t)
+                   #( k )
+                   (if val? nil (gen "POP"))
+                   (if more? nil (gen "RET"))))
+           (%seq (if more? nil (gen "RET")))))
+
+     (comp-throw (tag ret env)
+       (%seq (comp tag env t t)
+             (comp ret env t t)
+             (gen "THROW")))
 
      (comp-unwind-protect (form cleanup env val? more?)
        (if form

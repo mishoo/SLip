@@ -81,6 +81,15 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.value = value;
         };
 
+        function LispCatch(m, addr, tag) {
+                this.ret = new LispLongRet(m);
+                this.addr = addr;
+                this.tag = tag;
+        };
+        LispCatch.prototype.run = function(m) {
+                this.ret.run(m, this.addr);
+        };
+
         /// constructor
         P.INIT = function(pm) {
                 this.code = null;
@@ -544,6 +553,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                             case "LRET":
                             case "UPOPEN":
                             case "SAVE":
+                            case "CATCH":
                                 el[1] = el[1].value;
                             default:
                                 ret[i] = OPS[el[0]].make.apply(null, el.slice(1));
@@ -575,6 +585,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                     case "LJUMP":
                                     case "UPOPEN":
                                     case "SAVE":
+                                    case "CATCH":
                                         if (!HOP(labels, op.addr))
                                                 labels[op.addr] = "L" + (++lab);
                                 }
@@ -602,6 +613,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                     case "LJUMP":
                                     case "UPOPEN":
                                     case "SAVE":
+                                    case "CATCH":
                                         data = labels[op.addr];
                                         break;
                                     default:
@@ -710,6 +722,16 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         function rewind(env, i) {
                 while (i-- > 0) env = env.cdr;
                 return env;
+        };
+
+        var S_NIL = LispSymbol.get("NIL");
+        var S_T = LispSymbol.get("T");
+        function eq(a, b) {
+                return (a === S_NIL && b === null) ||
+                        (a === null && b === S_NIL) ||
+                        (a === S_T && b === true) ||
+                        (a === true && b === S_T) ||
+                        a === b ? true : null;
         };
 
         [
@@ -869,6 +891,31 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         }
                 }],
                 /// </unwind-protect>
+                /// <throw,catch>
+                ["CATCH", "addr", {
+                        run: function(m) {
+                                var c = new LispCatch(m, this.addr, m.pop());
+                                m.dynpush(c);
+                        }
+                }],
+                ["THROW", 0, {
+                        run: function(m) {
+                                var val = m.pop();
+                                var tag = m.pop();
+                                var p = m.denv;
+                                while (p) {
+                                        var el = p.car;
+                                        if (el instanceof LispCatch && eq(el.tag, tag)) {
+                                                el.run(m);
+                                                m.push(val);
+                                                return;
+                                        }
+                                        p = p.cdr;
+                                }
+                                throw new Error("CATCH tag not found " + LispMachine.dump(tag));
+                        }
+                }],
+                /// </throw,catch>
                 ["LET", "count", {
                         run: function(m){
                                 var count = this.count;
