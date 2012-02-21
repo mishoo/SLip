@@ -25,8 +25,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.ret = ret;
                 this.addr = addr;
         };
-        LispCleanup.prototype.run = function(m, inlongret) {
-                this.ret.run(m, this.addr, inlongret);
+        LispCleanup.prototype.run = function(m) {
+                this.ret.unwind(m, this.addr);
         };
 
         // return context for TAGBODY and BLOCK
@@ -39,20 +39,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.n_args = m.n_args;
                 if (m.trace) this.trace = m.trace.slice();
         };
-        LispLongRet.prototype.run = function(m, addr, inlongret) {
-                // figure out if we need to execute cleanup hooks
-                if (!inlongret) {
-                        var p = m.denv;
-                        while (p && p != this.denv) {
-                                var c = p.car;
-                                if (c instanceof LispCleanup) {
-                                        c.run(m, true);
-                                        m.push(new LispCleanup(this, addr));
-                                        return;
-                                }
-                                p = p.cdr;
-                        }
-                }
+        LispLongRet.prototype.unwind = function(m, addr) {
                 m.f = this.f;
                 m.code = this.code;
                 m.env = this.env;
@@ -61,6 +48,27 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 m.pc = addr;
                 m.n_args = this.n_args;
                 if (this.trace) m.trace = this.trace;
+        };
+
+        var NO_RET_VAL = {};
+        LispLongRet.prototype.run = function(m, addr) {
+                // figure out if we need to execute cleanup hooks
+                var self = this;
+                var val = arguments.length > 2 ? arguments[2] : NO_RET_VAL;
+                (function doit() {
+                        var p = m.denv;
+                        while (p && p != self.denv) {
+                                var c = p.car;
+                                if (c instanceof LispCleanup) {
+                                        m.after_cleanup = doit;
+                                        c.run(m);
+                                        return;
+                                }
+                                p = p.cdr;
+                        }
+                        self.unwind(m, addr);
+                        if (val !== NO_RET_VAL) m.push(val);
+                })();
         };
 
         // continuations
@@ -86,8 +94,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.addr = addr;
                 this.tag = tag;
         };
-        LispCatch.prototype.run = function(m) {
-                this.ret.run(m, this.addr);
+        LispCatch.prototype.run = function(m, retval) {
+                this.ret.run(m, this.addr, retval);
         };
 
         /// constructor
@@ -102,6 +110,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.error = null;
                 this.process = null;
                 this.f = null;
+                this.after_cleanup = null;
                 //this.trace = [];
         };
         P.find_dvar = function(symbol) {
@@ -874,6 +883,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 // no need to run it, we're already in
                                 // the right place.  just discard.
                                 m.denv = m.denv.cdr;
+                                m.after_cleanup = null;
                         }
                 }],
                 ["UPCLOSE", 0, {
@@ -883,11 +893,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         // will contain a LispCleanup object that
                         // resumes the jump.
                         run: function(m){
-                                var c = m.top();
-                                if (c instanceof LispCleanup) {
-                                        // moar to process?
-                                        c.run(m);
-                                }
+                                if (m.after_cleanup) m.after_cleanup(m);
                         }
                 }],
                 /// </unwind-protect>
@@ -906,8 +912,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 while (p) {
                                         var el = p.car;
                                         if (el instanceof LispCatch && eq(el.tag, tag)) {
-                                                el.run(m);
-                                                m.push(val);
+                                                el.run(m, val);
                                                 return;
                                         }
                                         p = p.cdr;

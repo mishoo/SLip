@@ -126,6 +126,7 @@ return return-from setq multiple-value-call".qw().toHash();
                 "macrolet"            : "1*",
                 "destructuring-bind"  : "2*",
                 "unwind-protect"      : "1*",
+                "catch"               : "1*",
                 "case"                : "1*",
                 "ecase"               : "1*"
         };
@@ -380,7 +381,7 @@ return return-from setq multiple-value-call".qw().toHash();
                                                         formArgs = "1*";
                                                 }
                                                 if (!formArgs && /^def/.test(currentForm)) {
-                                                        // "with" macros usually take one argument, then &body
+                                                        // definitions usually take two arguments, then &body
                                                         formArgs = "2*";
                                                 }
                                                 if (!formArgs) try {
