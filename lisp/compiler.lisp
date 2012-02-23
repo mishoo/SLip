@@ -8,8 +8,12 @@
 ;;;;
 ;;;; Don't customize the reader in this file.
 
+"
+(in-package :%)
+" ;; hack for Ymacs to get the right package
+
+(setq %::*package* (%find-package "%"))
 (%special! '*read-table* '*package* '*standard-input*)
-(setq *package* (%find-package "%"))
 
 ;; props to http://norstrulde.org/ilge10/
 (set-symbol-function!
@@ -57,21 +61,15 @@
 ;; better to avoid quasiquote here:
 (%macro! 'defmacro
          (labels ((defmacro (name args . body)
-                      (list '%macro!
-                       (list 'quote name)
-                       (list* '%fn name args body))))
+                            (list '%macro!
+                                  (list 'quote name)
+                                  (list* '%fn name args body))))
            #'defmacro))
 
 (defmacro quasiquote (thing)
   (qq thing))
 
 ;;;; let the show begin
-
-(defmacro error (msg)
-  `(%error ,msg))
-
-(defmacro warn (msg)
-  `(%warn ,msg))
 
 ;; is there a good reason why CL doesn't allow this syntax?
 ;;
@@ -88,6 +86,12 @@
 (defmacro defun (name args . body)
   `(set-symbol-function! ',name (labels ((,name ,args ,@body))
                                   #',name)))
+
+(defun error (msg)
+  (%error msg))
+
+(defun warn (msg)
+  (%warn msg))
 
 (defmacro when (pred . body)
   `(if ,pred (progn ,@body)))
@@ -107,42 +111,6 @@
                  (rec (cdr lst) (cons (funcall func (car lst)) ret))
                  ret)))
     (nreverse (rec lst nil))))
-
-(defmacro let (bindings . body)
-  (cond ((symbolp bindings)
-         ;; Scheme-style named LET
-         (let* ((looop bindings)
-                (bindings (car body))
-                (body (cdr body))
-                (names (map (lambda (x)
-                              (if (consp x) (car x) x))
-                            bindings)))
-           `(labels ((,looop ,names
-                       ,@body))
-              (,looop ,@(map (lambda (x)
-                               (if (consp x) (cadr x)))
-                             bindings)))))
-        ((listp bindings)
-         ;; standard LET
-         `(%let ,bindings ,@body))
-        (t (error "Invalid LET syntax"))))
-
-;; (defmacro let (defs . body)
-;;   `((lambda ,(map (lambda (x)
-;;                     (if (listp x)
-;;                         (car x)
-;;                         x)) defs)
-;;       ,@body)
-;;     ,@(map (lambda (x)
-;;              (if (listp x)
-;;                  (cadr x))) defs)))
-
-;; (defmacro let* (defs . body)
-;;   (if defs
-;;       `(let (,(car defs))
-;;          (let* ,(cdr defs)
-;;            ,@body))
-;;       `(progn ,@body)))
 
 (defun foreach (lst func)
   (when lst
@@ -181,32 +149,29 @@
   (let ((vexpr (gensym "CASE")))
     `(let ((,vexpr ,expr))
        ,(labels ((recur (cases)
-                        (when cases
-                          (if (and (listp (caar cases)) (caar cases))
-                              `(if (member ,vexpr ',(caar cases))
-                                   (progn ,@(cdar cases))
-                                   ,(recur (cdr cases)))
-                              (if (and (not (cdr cases))
-                                       (member (caar cases) '(otherwise t)))
-                                  `(progn ,@(cdar cases))
-                                  `(if (eq ,vexpr ',(caar cases))
-                                       (progn ,@(cdar cases))
-                                       ,(recur (cdr cases))))))))
-                (recur cases)))))
+                   (when cases
+                     (if (and (listp (caar cases)) (caar cases))
+                         `(if (member ,vexpr ',(caar cases))
+                              (progn ,@(cdar cases))
+                              ,(recur (cdr cases)))
+                         (if (and (not (cdr cases))
+                                  (member (caar cases) '(otherwise t)))
+                             `(progn ,@(cdar cases))
+                             `(if (eq ,vexpr ',(caar cases))
+                                  (progn ,@(cdar cases))
+                                  ,(recur (cdr cases))))))))
+          (recur cases)))))
 
 (labels ((finished (tails)
            (when tails
              (if (car tails) (finished (cdr tails)) t))))
   (defun mapcar (f . lists)
-    (let looop ((ret nil)
-                (tails lists))
-         (if (finished tails)
-             (nreverse ret)
-             (looop (cons (%apply f (map #'car tails)) ret)
-                    (map #'cdr tails))))))
-
-(defmacro with-cc (name . body)
-  `((lambda (,name) ,@body) (c/c)))
+    (labels ((looop (ret tails)
+               (if (finished tails)
+                   (nreverse ret)
+                   (looop (cons (%apply f (map #'car tails)) ret)
+                          (map #'cdr tails)))))
+      (looop nil lists))))
 
 (defmacro aif (cond . rest)
   `(let ((it ,cond))
@@ -252,7 +217,8 @@
                                       #\Tab
                                       #\Page
                                       #\Line_Separator
-                                      #\Paragraph_Separator)))))
+                                      #\Paragraph_Separator
+                                      #\NO-BREAK_SPACE)))))
 
          (skip (expected)
            (unless (eq (next) expected)
@@ -448,19 +414,18 @@
        #( (as-vector cmd) ))
 
      (find-in-env (name type env)
-       (with-cc ret
-         (labels ((position (lst i j)
-                    (when lst
-                      (let ((x (car lst)))
-                        (if (and (eq name (car x))
-                                 (eq type (cadr x)))
-                            (funcall ret (list* i j (cddr x)))
-                            (position (cdr lst) i (+ j 1))))))
-                  (frame (env i)
-                    (when env
-                      (position (car env) i 0)
-                      (frame (cdr env) (+ i 1)))))
-           (frame env 0))))
+       (labels ((position (lst i j)
+                  (when lst
+                    (let ((x (car lst)))
+                      (if (and (eq name (car x))
+                               (eq type (cadr x)))
+                          (list* i j (cddr x))
+                          (position (cdr lst) i (+ j 1))))))
+                (frame (env i)
+                  (when env
+                    (or (position (car env) i 0)
+                        (frame (cdr env) (+ i 1))))))
+         (frame env 0)))
 
      (find-var (name env)
        (find-in-env name :var (hash-get env :lex)))
@@ -534,7 +499,7 @@
                        (comp (cadr x) env val? more?)))
               (c/c (arg-count x 0 0)
                    (if val? (gen "CC")))
-              (%let (comp-let (cadr x) (cddr x) env val? more?))
+              (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
               (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
@@ -546,12 +511,13 @@
                         (let ((sym (cadr x)))
                           (assert (symbolp sym) "FUNCTION requires a symbol")
                           (let ((local (find-func sym env)))
-                            (if local
-                                (gen "LVAR" (car local) (cadr local))
-                                (progn
-                                  (unless (symbol-function sym)
-                                    (warn (strcat "Undefined function " sym)))
-                                  (gen "FGVAR" sym))))))
+                            (%seq (when val? (if local
+                                                 (gen "LVAR" (car local) (cadr local))
+                                                 (progn
+                                                   (unless (symbol-function sym)
+                                                     (warn (strcat "Undefined function " sym)))
+                                                   (gen "FGVAR" sym))))
+                                  (if more? nil (gen "RET"))))))
               (%fn (if val?
                        (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
                              (if more? nil (gen "RET")))))
@@ -803,20 +769,33 @@
 
      (comp-let (bindings body env val? more?)
        (if bindings
-           (with-seq-output <<
-             (let* ((bindings (get-bindings bindings t))
-                    (names (car bindings))
-                    (vals (cadr bindings))
-                    (len (caddr bindings))
-                    (specials (cadddr bindings)))
-               (foreach vals (lambda (x)
-                               (<< (comp x env t t))))
-               (<< (gen "LET" len))
-               (foreach specials (lambda (x)
-                                   (<< (gen "BIND" (car x) (cdr x)))))
-               (<< (comp-seq body (extenv env :lex (map (lambda (name) (list name :var)) names)) val? t)
-                   (gen "UNFR" 1 (length specials))
-                   (if more? nil (gen "RET")))))
+           (if (symbolp bindings)
+               (let* ((looop bindings)
+                      (bindings (car body))
+                      (body (cdr body))
+                      (names (map (lambda (x)
+                                    (if (consp x) (car x) x))
+                                  bindings)))
+                 (comp `(labels ((,looop ,names
+                                   ,@body))
+                          (,looop ,@(map (lambda (x)
+                                           (if (consp x) (cadr x)))
+                                         bindings)))
+                       env val? more?))
+               (with-seq-output <<
+                 (let* ((bindings (get-bindings bindings t))
+                        (names (car bindings))
+                        (vals (cadr bindings))
+                        (len (caddr bindings))
+                        (specials (cadddr bindings)))
+                   (foreach vals (lambda (x)
+                                   (<< (comp x env t t))))
+                   (<< (gen "LET" len))
+                   (foreach specials (lambda (x)
+                                       (<< (gen "BIND" (car x) (cdr x)))))
+                   (<< (comp-seq body (extenv env :lex (map (lambda (name) (list name :var)) names)) val? t)
+                       (gen "UNFR" 1 (length specials))
+                       (if more? nil (gen "RET"))))))
            (comp-seq body env val? more?)))
 
      (comp-let* (bindings body env val? more?)
@@ -889,9 +868,9 @@
                (let ((form (funcall reader 'next)))
                  (unless (eq form 'EOF)
                    (let ((f (compile (list 'lambda nil form))))
-                     (let ((code (%serialize-bytecode f t)))
+                     (let ((code (%serialize-bytecode f nil)))
                        (unless is-first (%stream-put out #\,))
-                       (%stream-put out code)
+                       (%stream-put out "FN(" code "),EXEC()")
                        (when (< 0 (length code))
                          (%stream-put out ",POP()"))
                        (%stream-put out #\Newline))

@@ -23,10 +23,18 @@ function send_ymacs_reply(req_id, what, value) {
   (defun send-ymacs-reply (req-id what value)
     (%js-apply send-reply nil #( req-id what value ))))
 
+(let ((send-notify (%js-eval "
+function send_ymacs_notify(what, value) {
+    YMACS.callHooks(\"onLispNotify\", what, value);
+}
+")))
+  (defun send-ymacs-notify (what value)
+    (%js-apply send-notify nil #( (strcat what) value ))))
+
 (defmacro define-handler (what (&rest args) &body body)
   (let ((name (intern (strcat "EXEC-" what))))
-    `(progn
-       (defun ,name ,args ,@body)
+    `(labels ((,name ,args ,@body))
+       (set-symbol-function! ',name #',name)
        (hash-set *handlers* ,what (lambda (req-id ,@args)
                                     (make-thread (lambda ()
                                                    (let ((ret (,name ,@args)))
@@ -39,7 +47,23 @@ function send_ymacs_reply(req_id, what, value) {
     (%::read1-from-string str)))
 
 (define-handler :eval (expr)
-  (%::eval expr))
+  (let ((ret (%::eval expr)))
+    ret))
+
+(define-handler :eval-print (expr)
+  (let ((ret (%::eval expr)))
+    (if (stringp ret)
+        ret
+        (print-object-to-string ret))))
+
+(define-handler :compile-file (filename)
+  (let ((t1 (%get-time)))
+    (prog1
+        (%::load filename)
+      (send-ymacs-notify :message
+                         (strcat "; " filename
+                                 " compiled in "
+                                 (number-fixed (/ (- (%get-time) t1) 1000) 3) " s")))))
 
 (define-handler :eval-string (pak str)
   (let ((*package* (or (and pak (%find-package pak t))
@@ -56,8 +80,11 @@ function send_ymacs_reply(req_id, what, value) {
                                     (grep all (lambda (sym)
                                                 (regexp-test rx (%symbol-name sym)))))))
              (sort matching (lambda (a b)
-                              (< (abs (- (length a) len))
-                                 (abs (- (length b) len))))))))
+                              (cond ((string-equal a query) nil)
+                                    ((string-equal b query) t)
+                                    (t
+                                     (< (abs (- (length a) len))
+                                        (abs (- (length b) len))))))))))
 
   (define-handler :list-symbol-completions (query)
     (let (m)

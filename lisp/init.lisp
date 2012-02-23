@@ -195,11 +195,13 @@
 
 (def-emac defparameter (name val)
   (%special! name)
-  `(setq ,name ,val))
+  `(progn (%special! ',name)
+          (setq ,name ,val)))
 
 (def-emac defglobal (name val)
   (%global! name)
-  `(setq ,name ,val))
+  `(progn (%global! ',name)
+          (setq ,name ,val)))
 
 ;; only the long form is supported
 (def-emac defsetf (access-fn lambda-list store-vars &body body)
@@ -244,6 +246,9 @@
 (defsetf cdr (x) (val)
   `(rplacd ,x ,val))
 
+(def-emac push (obj place)
+  `(setf ,place (cons ,obj ,place)))
+
 ;; this is `once-only' from Practical Common Lisp
 (def-emac with-rebinds (names . body)
   (let ((gensyms (mapcar (lambda (_) (gensym)) names)))
@@ -251,6 +256,12 @@
        `(let (,,@(mapcar (lambda (g n) ``(,,g ,,n)) gensyms names))
           ,(let (,@(mapcar (lambda (n g) `(,n ,g)) names gensyms))
                 ,@body)))))
+
+(def-emac pop (place)
+  (let ((v (gensym)))
+    `(let ((,v ,place))
+       (setf ,place (cdr ,v))
+       (car ,v))))
 
 (def-efun collect-if (test list)
   (cond ((not list) nil)
@@ -267,9 +278,9 @@
   ;; predicate returns true.
   (def-efun every (test . lists)
     (let scan ((tails lists))
-         (if (finished tails) t
-             (and (%apply test (map #'car tails))
-                  (scan (map #'cdr tails))))))
+      (if (finished tails) t
+          (and (%apply test (map #'car tails))
+               (scan (map #'cdr tails))))))
 
   ;; some returns the first non-nil value which is returned by an
   ;; invocation of predicate. If the end of a sequence is reached
@@ -278,9 +289,9 @@
   ;; invocation of predicate returns true.
   (def-efun some (test . lists)
     (let scan ((tails lists))
-         (if (finished tails) nil
-             (or (%apply test (map #'car tails))
-                 (scan (map #'cdr tails))))))
+      (if (finished tails) nil
+          (or (%apply test (map #'car tails))
+              (scan (map #'cdr tails))))))
 
   ;; notany returns false as soon as any invocation of predicate
   ;; returns true. If the end of a sequence is reached, notany returns
@@ -288,10 +299,10 @@
   ;; that any invocation of predicate returns true.
   (def-efun notany (test . lists)
     (let scan ((tails lists))
-         (if (finished tails) t
-             (if (%apply test (map #'car tails))
-                 nil
-                 (scan (map #'cdr tails))))))
+      (if (finished tails) t
+          (if (%apply test (map #'car tails))
+              nil
+              (scan (map #'cdr tails))))))
 
   ;; notevery returns true as soon as any invocation of predicate
   ;; returns false. If the end of a sequence is reached, notevery
@@ -299,10 +310,10 @@
   ;; not the case that every invocation of predicate returns true.
   (def-efun notevery (test . lists)
     (let scan ((tails lists))
-         (if (finished tails) nil
-             (if (%apply test (map #'car tails))
-                 (scan (map #'cdr tails))
-                 t)))))
+      (if (finished tails) nil
+          (if (%apply test (map #'car tails))
+              (scan (map #'cdr tails))
+              t)))))
 
 (def-efun remove-duplicates args
   (destructuring-bind (list &key (test #'eq) from-end) args
@@ -346,22 +357,20 @@
       ret)))
 
 (def-efun stable-sort (list predicate)
-  (labels ((ss-list (list)
-             (cond ((not list) nil)
-                   ((not (cdr list)) list)
-                   (t (let* ((a list)
-                             (b (labels ((sub (list i)
-                                           (if (zerop (decf i))
-                                               (prog1 (cdr list)
-                                                 (setf (cdr list) nil))
-                                               (sub (cdr list) i))))
-                                  (sub list (floor (length list) 2)))))
-                        (merge (ss-list a) (ss-list b) predicate))))))
-    (ss-list list)))
+  (let ss-list ((list list))
+    (cond ((not list) nil)
+          ((not (cdr list)) list)
+          (t (let* ((a list)
+                    (b (labels ((sub (list i)
+                                  (if (zerop (decf i))
+                                      (prog1 (cdr list)
+                                        (setf (cdr list) nil))
+                                      (sub (cdr list) i))))
+                         (sub list (floor (length list) 2)))))
+               (merge (ss-list a) (ss-list b) predicate))))))
 
 (set-symbol-function! 'sort #'stable-sort)
 (export 'sort)
 
 (export 'destructuring-bind)
 
-(in-package :ss-user)

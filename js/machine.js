@@ -411,7 +411,6 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         inc_stat("jumps");
                                         return true;
                                 }
-                            case "CALL":
                             case "CALLJ":
                             case "RET":
                                 for (var j = i; ++j < code.length;) {
@@ -862,6 +861,18 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 var closure = m.pop();
                                 if (m.trace) m.trace.push([ closure, m.stack.slice(-this.count) ]);
                                 m.n_args = this.count;
+                                m.code = closure.code;
+                                m.env = closure.env;
+                                m.pc = 0;
+                                m.f = closure;
+                        }
+                }],
+                ["EXEC", 0, {
+                        run: function(m){
+                                var closure = m.pop();
+                                if (m.trace) m.trace.push([ closure, [] ]);
+                                m.push(m.mkret(m.pc));
+                                m.n_args = 0;
                                 m.code = closure.code;
                                 m.env = closure.env;
                                 m.pc = 0;

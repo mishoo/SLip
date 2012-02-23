@@ -35,16 +35,6 @@ function curry(f, args) {
         return function() { return f.apply(this, args.concat($slice.apply(arguments))); };
 };
 
-function pushnew(a, el) {
-        if (a.indexOf(el) < 0)
-                a.push(el);
-        return a;
-};
-
-function member(a, el) {
-        return a.indexOf(el) >= 0;
-};
-
 function noop(){};
 
 function repeat_string(str, i) {
@@ -56,11 +46,12 @@ function repeat_string(str, i) {
         return d;
 };
 
-function pad_string(str, width) {
+function pad_string(str, width, ch) {
+        if (ch == null) ch = " ";
         str += "";
         var len = Math.ceil(str.length / width) * width;
         if (len == str.length) len += width;
-        return str + repeat_string(" ", len - str.length);
+        return str + repeat_string(ch, len - str.length);
 };
 
 var DEFCLASS = (function(NOINIT){

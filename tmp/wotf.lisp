@@ -3,6 +3,10 @@
 
 (in-package :wotf)
 
+(defmacro with-cc (name &rest body)
+  `((lambda (,name)
+      ,@body) (%::c/c)))
+
 (%special! '*amb-fail*)
 (setq *amb-fail* (lambda (arg)
                    (console.print "TOTAL FAILURE")))
@@ -47,13 +51,12 @@
 ;; equal to `value' and return its index (zero-based).  Return NIL if
 ;; not found.
 (defun find-house (houses type value)
-  (block nil
-    (let ((i 0))
-      (foreach houses
-               (lambda (h)
-                 (when (eq (house-prop type h) value)
-                   (return i))
-                 (setq i (+ i 1)))))))
+  (let rec ((houses houses)
+            (i 0))
+    (when houses
+      (if (eq (house-prop type (car houses)) value)
+          i
+          (rec (cdr houses) (1+ i))))))
 
 ;; asserts that houses having property `t1' = `v1' and `t2' = `v2' are
 ;; neighbors (distance between them is 1 or -1).
@@ -111,11 +114,6 @@
                        (add houses (+ index 1)))))))
       (add () 0))))
 
-(make-thread (lambda ()
-               (console.print "STARTED W.O.T.F.")
-               (time
-                (console.log (who-owns-the-fish)))))
-
 (defun sumis (n sum)
   (let (solutions)
     (with-cc *amb-fail*
@@ -131,9 +129,4 @@
                                 numbers)
                           (- next 1)))))
         (rec (list) n)))
-    (console.log (length solutions))))
-
-(make-thread (lambda ()
-               (console.print "STARTED SUMIS")
-               (time
-                (sumis 14 1))))
+    solutions))

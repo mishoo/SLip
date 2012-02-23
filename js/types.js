@@ -22,7 +22,8 @@ var LispChar = DEFTYPE("char", function(D, P){
                 "\x0C"   : "PAGE",
                 "\x08"   : "BACKSPACE",
                 "\u2028" : "LINE_SEPARATOR",
-                "\u2029" : "PARAGRAPH_SEPARATOR"
+                "\u2029" : "PARAGRAPH_SEPARATOR",
+                "\xA0"   : "NO-BREAK_SPACE"
         };
         var NAMES_FROM = (function(h){
                 for (var i in NAMES_TO) {
@@ -466,6 +467,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
                         if (err) {
                                 console.error("Error in PID: ", this.pid);
                                 console.log(err);
+                                console.log(this);
                         }
                         else switch (m.status) {
                             case "running":
@@ -557,7 +559,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
                         if (QUEUE.length == 0) break;
                         var p = QUEUE.shift();
                         if (D.is(p)) {
-                                p.run(100);
+                                p.run(5000);
                         }
                         else if (Message.is(p)) {
                                 p.target.handle(p);

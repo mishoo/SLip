@@ -1,11 +1,13 @@
-body { background-color: #888 }
+body {
+  background: #888 url("canvas.png");
+}
 
 .Ymacs_Overlay .flash-code { opacity: 0.6; filter: alpha(opacity=60); }
 .Ymacs_Overlay .flash-code { background: #3f8; }
 
 .Ymacs_Frame {
   font-family: "DejaVu Sans Mono","Lucida Sans Typewriter",monospace;
-  font-size: 12px;
+  font-size: 14px;
   overflow: hidden;
 }
 
@@ -15,8 +17,27 @@ body { background-color: #888 }
 }
 
 .Ymacs_Frame {
-  opacity: 0.9;
+  opacity: 0.95;
 }
 .Ymacs_Frame-active {
   opacity: 1;
+}
+
+.DlResizeBar {
+  background-color: rgba(200, 200, 200, 0.8);
+}
+
+.Ymacs-Theme-dark .Ymacs_Frame .ss-prompt {
+  color: #fc8; font-weight: bold;
+}
+
+.Ymacs-Theme-light .Ymacs_Frame .ss-prompt {
+  color: #000; font-weight: bold;
+}
+
+.Ymacs-Theme-light .Ymacs-line-numbers .Ymacs-frame-content div.line:before {
+  border-right: 1px solid #ccc;
+}
+
+.Ymacs-Theme-dark .Ymacs-line-numbers .Ymacs-frame-content div.line:before {
 }

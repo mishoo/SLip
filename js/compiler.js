@@ -57,6 +57,7 @@ function lisp_reader(code) {
                             case "\x0C":
                             case "\u2028":
                             case "\u2029":
+                            case "\xA0":
                                 return true;
                         }
                 });
@@ -276,7 +277,7 @@ function lisp_reader(code) {
         var S_NIL      = LispSymbol.get("NIL");
         var S_CC       = LispSymbol.get("C/C");
         var S_NOT      = LispSymbol.get("NOT");
-        var S_LET      = LispSymbol.get("%LET");
+        var S_LET      = LispSymbol.get("LET");
         var S_LET$     = LispSymbol.get("LET*");
         var S_LABELS   = LispSymbol.get("LABELS");
         var S_FLET     = LispSymbol.get("FLET");

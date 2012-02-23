@@ -218,16 +218,16 @@
                                     field-initializers
                                     getters-n-setters))
 
-(labels ((make-em (slot-name index)
-           (list slot-name
-                 (lambda (obj) (%instance-ref obj index))
-                 (lambda (obj new-value) (%instance-set obj index new-value)))))
-  (defglobal *getters-n-setters-for-class*
-      (labels ((rec (rest index)
-                 (when rest
-                   (cons (make-em (car rest) index)
-                         (rec (cdr rest) (+ index 1))))))
-        (rec *the-slots-of-a-class* 0))))
+(defglobal *getters-n-setters-for-class*
+    (labels ((make-em (slot-name index)
+               (list slot-name
+                     (lambda (obj) (%instance-ref obj index))
+                     (lambda (obj new-value) (%instance-set obj index new-value))))
+             (rec (rest index)
+               (when rest
+                 (cons (make-em (car rest) index)
+                       (rec (cdr rest) (+ index 1))))))
+      (rec *the-slots-of-a-class* 0)))
 
 (defglobal <class> (%allocate-instance nil (length *the-slots-of-a-class*)))
 (setf (find-class 'class) <class>)
@@ -302,7 +302,7 @@
 (def-efun is-a (obj class)
   (when (symbolp class)
     (setf class (find-class class)))
-  (%memq class (class-cpl (%instance-class obj))))
+  (%memq class (class-cpl (class-of obj))))
 
 ;;
 ;; Initialization protocol
@@ -562,7 +562,10 @@
 (defglobal <cons> (defclass cons (primitive) ()))
 (defglobal <null> (defclass null (primitive) ()))
 (defglobal <symbol> (defclass symbol (primitive) ()))
+(defglobal <package> (defclass package (primitive) ()))
 (defglobal <regexp> (defclass regexp (primitive) ()))
+(defglobal <hash> (defclass hash (primitive) ()))
+(defglobal <char> (defclass char (primitive) ()))
 (defglobal <function> (defclass function (procedure-class) ()))
 (defglobal <number> (defclass number (primitive) ()))
 (defglobal <vector> (defclass vector (primitive) ()))
@@ -577,21 +580,28 @@
         ((consp x) <cons>)
         ((not x) <null>)
         ((symbolp x) <symbol>)
+        ((hashp x) <hash>)
+        ((charp x) <char>)
+        ((packagep x) <package>)
         ((functionp x) <function>)
         ((numberp x) <number>)
         ((vectorp x) <vector>)
         ((stringp x) <string>)
+        ((regexpp x) <regexp>)
         ((threadp x) <thread>)
         ((%input-stream-p x) <input-stream>)
         ((%output-stream-p x) <output-stream>)))
 
 (export '(class
+          char
           object
+          hash
           generic
           method
           cons
           null
           symbol
+          package
           regexp
           function
           number

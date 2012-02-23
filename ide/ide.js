@@ -2,10 +2,151 @@
 // This is a mess that works.
 //----------------------------
 
-Ymacs_Keymap_Emacs().defineKeys({
-        "C-\\"    : "switch_to_buffer",
-        "C-x C-s" : "save_file",
-        "C-x C-f" : "load_file",
+(function(){
+
+        var WEBDAV_ROOT = "../lisp/";
+
+        function webdav_url(filename) {
+                return WEBDAV_ROOT + filename;
+        };
+
+        function automode(buf) {
+                if (/\.lisp$/i.test(buf.name)) return buf.cmd("ss_mode");
+                if (/\.js$/i.test(buf.name)) return buf.cmd("javascript_mode");
+                if (/\.css$/i.test(buf.name)) return buf.cmd("css_mode");
+                if (/\.(html?|xml)$/i.test(buf.name)) return buf.cmd("xml_mode");
+        };
+
+        Ymacs_Keymap_Emacs().defineKeys({
+                "C-\\"    : "switch_to_buffer",
+                "C-x C-s" : "webdav_save_file_buffer",
+                "C-x C-f" : "webdav_load_file_buffer"
+        });
+
+        function webdav_load(filename, cont) {
+                var xhr = new XMLHttpRequest();
+                xhr.open("GET", webdav_url(filename), true);
+                xhr.onreadystatechange = function() {
+                        if (xhr.readyState == 4) {
+                                if (xhr.status == 200) {
+                                        cont(false, xhr.responseText);
+                                } else {
+                                        cont(true);
+                                }
+                        }
+                };
+                xhr.send(null);
+        };
+
+        function webdav_save(filename, content, cont) {
+                var xhr = new XMLHttpRequest();
+                xhr.open("PUT", webdav_url(filename), true);
+                xhr.onreadystatechange = function() {
+                        if (xhr.readyState == 4) {
+                                if (xhr.status >= 200 && xhr.status < 300) {
+                                        cont(false);
+                                } else {
+                                        cont(true);
+                                }
+                        }
+                };
+                xhr.send(content);
+        };
+
+        Ymacs_Buffer.newCommands({
+                webdav_load: function(filename, cont) {
+                        return webdav_load(filename, cont);
+                },
+                webdav_save: function(filename, content, cont) {
+                        return webdav_save(filename, content, cont);
+                },
+                webdav_url: function(filename) {
+                        return webdav_url(filename);
+                },
+                webdav_load_file_buffer: Ymacs_Interactive("sFile name: ", function(filename){
+                        var self = this;
+                        var ymacs = self.ymacs;
+                        var buf = ymacs.getBuffer(filename);
+                        if (buf) {
+                                ymacs.switchToBuffer(buf);
+                        } else {
+                                webdav_load(filename, function(error, code){
+                                        if (error) {
+                                                self.signalInfo("New file: " + filename);
+                                                code = "";
+                                        }
+                                        var buf = ymacs.createBuffer({ name: filename });
+                                        buf.setq("webdav_filename", filename);
+                                        buf.setCode(code);
+                                        ymacs.switchToBuffer(buf);
+                                        automode(buf);
+                                });
+                        }
+                }),
+                webdav_save_file_buffer: Ymacs_Interactive(function(){
+                        var self = this;
+                        function doit(filename) {
+                                webdav_save(filename, self.getCode(), function(error){
+                                        if (error) {
+                                                self.signalError("Failed to save " + filename);
+                                        } else {
+                                                self.cmd("rename_buffer", filename);
+                                                self.setq("webdav_filename", filename);
+                                                self.signalInfo("File " + filename + " saved.", false, 1000);
+                                                return;
+                                        }
+                                });
+                        };
+                        var filename = self.getq("webdav_filename");
+                        if (filename == null) {
+                                self.cmd("minibuffer_prompt", "Write file: ");
+                                self.cmd("minibuffer_read_string", null, function(filename){
+                                        doit(filename);
+                                });
+                        } else doit(filename);
+                })
+        });
+
+})();
+
+// Ymacs tokenizer interface is EVIL.  Stupid me.
+Ymacs_Tokenizer.define("ss_lisp_repl", function(stream, tok){
+        // All this is necessary just to highlight the PACKAGE> prompt
+        // in the REPL.  I don't wanna modify the built-in Ymacs Lisp
+        // mode for that.
+        var $lisp = tok.getLanguage("lisp");
+        var $lisp_next = $lisp.next;
+        var $cont = [];
+        var PARSER = {
+                next: next,
+                copy: copy,
+                indentation: $lisp.indentation
+        };
+        function foundToken(c1, c2, type) {
+                tok.onToken(stream.line, c1, c2, type);
+        };
+        function next() {
+                if ($cont.length > 0)
+                        return $cont.peek()();
+                stream.checkStop();
+                var m;
+                if (stream.col == 0 && (m = stream.lookingAt(/^[^<\s,'`]+?>/))) {
+                        foundToken(stream.col, stream.col += m[0].length, "ss-prompt");
+                }
+                else return $lisp_next();
+        };
+        function copy() {
+                var _cont = $cont.slice();
+                var _lisp = $lisp.copy();
+                function resume() {
+                        $cont = _cont.slice();
+                        $lisp = _lisp();
+                        return PARSER;
+                };
+                resume.context = _lisp.context;
+                return resume;
+        };
+        return PARSER;
 });
 
 DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
@@ -34,7 +175,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 }).delayed(400);
         };
 
-        function find_toplevel_sexp(buffer, blink) {
+        function find_toplevel_sexp(buffer, blink, noerror) {
                 var rc = buffer._rowcol, parser = buffer.tokenizer.finishParsing();
                 if (parser) {
                         var lc = { line: rc.row, col: rc.col };
@@ -46,8 +187,11 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         }).grep_last(function(p){
                                 return compareRowCol(p, lc) < 0 && compareRowCol(p.closed, lc) < 0;
                         });
-                        if (p == null)
-                                throw new Ymacs_Exception("Can't figure out toplevel expression");
+                        if (p == null) {
+                                if (!noerror)
+                                        throw new Ymacs_Exception("Can't figure out toplevel expression");
+                                return null;
+                        }
                         var s = p, e = p.closed;
                         if (blink) {
                                 buffer.setOverlay("flash-code", {
@@ -115,9 +259,12 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 var PENDING_COMMANDS = {};
                 var REQ_ID = 0;
 
-                D.DEFAULT_EVENTS = [ "onLispResponse" ];
+                D.DEFAULT_EVENTS = [ "onLispResponse", "onLispNotify" ];
                 D.CONSTRUCT = function() {
-                        this.addEventListener("onLispResponse", handle_lisp_response);
+                        this.addEventListener({
+                                onLispResponse: handle_lisp_response,
+                                onLispNotify: handle_lisp_notification
+                        });
                 };
                 P.ss_log = function(thing) {
                         if (typeof thing != "string")
@@ -147,6 +294,14 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 v.handler(value, what, req_id);
                         }
                 };
+
+                function handle_lisp_notification(what, value) {
+                        switch (what.toUpperCase()) {
+                            case "MESSAGE":
+                                get_output_buffer().cmd("ss_lisp_notify_message", value);
+                                break;
+                        }
+                };
         });
 
         Ymacs_Buffer.newCommands({
@@ -165,7 +320,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 throw new Ymacs_Exception("Couldn't read Lisp expression starting at point");
                         }
                         expr = this.cmd("buffer_substring", point, point + tmp[1]);
-                        eval(this, "(%::macroexpand-1 '" + expr + ")", find_package(this));
+                        eval(this, "(ss::print-object-to-string (%::macroexpand-1 '" + expr + "))", find_package(this));
                 }),
                 ss_macroexpand_all: Ymacs_Interactive("d", function(point){
                         var code = this._bufferSubstring(point);
@@ -175,7 +330,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 throw new Ymacs_Exception("Couldn't read Lisp expression starting at point");
                         }
                         expr = this.cmd("buffer_substring", point, point + tmp[1]);
-                        eval(this, "(ss::macroexpand-all '" + expr + ")", find_package(this));
+                        eval(this, "(ss::print-object-to-string (ss::macroexpand-all '" + expr + "))", find_package(this));
                 }),
                 ss_eval_buffer: Ymacs_Interactive(function(){
                         eval(this, this.getCode());
@@ -186,6 +341,12 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         (function(){
                                 eval(this, expr, find_package(this, points[0]));
                         }).delayed(1, this);
+                }),
+                ss_indent_sexp: Ymacs_Interactive(function(){
+                        var points = find_toplevel_sexp(this, false, true);
+                        if (points) {
+                                this.cmd("indent_region", points[0], points[1]);
+                        }
                 }),
                 ss_eval_region: Ymacs_Interactive("r", function(begin, end){
                         eval(this, this.cmd("buffer_substring", begin, end), find_package(this, begin));
@@ -224,7 +385,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 // XXX:
                                 return self.cmd("newline_and_indent");
                         }
-                        self.ymacs.run_lisp("EVAL", expr, function(ret){
+                        self.ymacs.run_lisp("EVAL-PRINT", expr, function(ret){
                                 if (typeof ret != "string") ret = MACHINE.dump(ret);
                                 ss_log(ret);
                                 self.cmd("ss_repl_prompt");
@@ -292,6 +453,37 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 find_package(this),
                                 "(ymacs::exec-list-symbol-completions " + DlJSON.encode(query) + ")"
                         ));
+                },
+                ss_compile_file: Ymacs_Interactive(function() {
+                        var self = this;
+                        var filename = self.getq("webdav_filename");
+                        if (filename == null) {
+                                return self.signalError("Buffer not saved");
+                        }
+                        self.ymacs.run_lisp("COMPILE-FILE", self.cmd("webdav_url", filename), function(fasl_content){
+                                var filename_fasl = filename.replace(/(\.lisp)?$/, ".fasl");
+                                self.cmd("webdav_save", filename_fasl, fasl_content, function(error){
+                                        if (error) {
+                                                self.signalError("Error saving " + filename_fasl);
+                                        } else {
+                                                self.signalInfo(filename_fasl + " saved.", false, 1000);
+                                        }
+                                });
+                        });
+                }),
+                ss_lisp_notify_message: function(msg) {
+                        // msg should be string, but if not...
+                        if (typeof msg != "string")
+                                msg = MACHINE.dump(msg);
+                        var buf = get_output_buffer();
+                        var m = buf.getq("ss_repl_marker");
+                        var pos = buf._positionToRowCol(m.getPosition());
+                        msg = msg.replace(/[\s\n\t]*$/, "\n");
+                        buf.cmd("save_excursion", function(){
+                                buf.cmd("goto_line", pos.row + 1);
+                                buf.cmd("beginning_of_line");
+                                buf.cmd("insert", msg);
+                        });
                 }
         });
 
@@ -338,20 +530,35 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 "C-c M-o && C-c DELETE && C-c C-DELETE" : "ss_clear_output",
                 "C-c ENTER"                             : "ss_macroexpand_1",
                 "C-c M-m"                               : "ss_macroexpand_all",
+                "M-q"                                   : "ss_indent_sexp",
                 "S-TAB"                                 : "ss_complete_symbol"
         };
 
-        DEFINE_SINGLETON("Ymacs_Keymap_SS_REPL", Ymacs_Keymap, function(D, P){
+        DEFINE_SINGLETON("Ymacs_Keymap_SS_REPL", D, function(D, P){
                 D.KEYS = {
-                        "ENTER" : "ss_repl_eval",
+                        "ENTER" : Ymacs_Interactive("d", function(point){
+                                var m = this.getq("ss_repl_marker").getPosition();
+                                if (point >= m) this.cmd("ss_repl_eval");
+                                else if (point < m) {
+                                        var exp = find_toplevel_sexp(this, false, true);
+                                        if (exp && point >= exp[0] && point <= exp[1]) {
+                                                set_repl_input(this, this.cmd("buffer_substring", exp[0], exp[1]));
+                                                this.cmd("goto_char", m + exp[1] - exp[0]);
+                                        }
+                                        else
+                                                this.cmd("newline_and_indent");
+                                }
+                        }),
+                        "C-c ENTER" : "ss_macroexpand_1",
                         "M-p && C-ARROW_UP" : "ss_repl_history_back",
                         "M-n && C-ARROW_DOWN" : "ss_repl_history_forward",
                         "C-DELETE" : "ss_repl_kill_input",
                         "TAB" : "ss_complete_symbol",
                         "HOME && C-a" : Ymacs_Interactive("d", function(point){
                                 var m = this.getq("ss_repl_marker").getPosition();
-                                if (point >= m) this.cmd("goto_char", m);
-                                else this.cmd("beginning_of_line");
+                                if (this._positionToRowCol(point).row == this._positionToRowCol(m).row)
+                                        this.cmd("goto_char", m);
+                                else this.cmd("beginning_of_indentation_or_line");
                         })
                 };
         });
@@ -389,6 +596,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
 
         Ymacs_Buffer.newMode("ss_repl_mode", function(){
                 this.cmd("ss_mode");
+                this.setTokenizer(new Ymacs_Tokenizer({ type: "ss_lisp_repl", buffer: this }));
                 this.pushKeymap(Ymacs_Keymap_SS_REPL());
                 this.setq("modeline_custom_handler", null);
                 this.setq("ss_repl_history", []);
@@ -455,7 +663,7 @@ function make_desktop() {
         btn("Paste from system clipboard", function(){ buffer().cmd("yank_from_operating_system") });
 
         var ymacs = THE_EDITOR = WINDOW.YMACS = new Ymacs_SS({ buffers: [] });
-        //ymacs.setColorTheme([ "light", "standard" ]);
+        //ymacs.setColorTheme([ "light", "scintilla" ]);
         ymacs.setColorTheme([ "dark", "mishoo2" ]);
         ymacs.getActiveBuffer().cmd("ss_mode");
 

@@ -26,16 +26,26 @@
                 xhr.send(null);
         };
 
-        // load the compiler
-        load("../fasl/compiler.fasl", function(code){
-                var machine = new LispMachine();
-                machine._exec(LispMachine.unserialize(code));
-                load("../fasl/init.fasl", function(code){
+        var machine = new LispMachine();
+
+        function load_fasls(files, cont) {
+                if (files.length == 0) cont();
+                else load(files[0], function(code){
                         machine._exec(LispMachine.unserialize(code));
-                        machine.atomic_call(LispSymbol.get("LOAD").func(), [ "ide.lisp" ]);
-                        global.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
-                        window.open("ymacs.html", "ss_lisp", "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
+                        load_fasls(files.slice(1), cont);
                 });
+        };
+
+        load_fasls([
+                "../lisp/compiler.fasl",
+                "../lisp/init.fasl",
+                "../lisp/tiny-clos.fasl",
+                "../lisp/printer.fasl",
+                "ide.fasl"
+        ], function(){
+                //machine.atomic_call(LispSymbol.get("LOAD").func(), [ "ide.lisp" ]);
+                global.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
+                window.open("ymacs.html", "ss_lisp", "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
         });
 
 })(this, window);
