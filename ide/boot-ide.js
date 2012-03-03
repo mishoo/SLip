@@ -41,6 +41,7 @@
                 "../lisp/init.fasl",
                 "../lisp/tiny-clos.fasl",
                 "../lisp/printer.fasl",
+                "../lisp/format.fasl",
                 "ide.fasl"
         ], function(){
                 //machine.atomic_call(LispSymbol.get("LOAD").func(), [ "ide.lisp" ]);

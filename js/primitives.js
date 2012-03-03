@@ -470,12 +470,17 @@
                 return p;
         });
 
-        defp("list*", false, function(m, nargs) {
-                checknargs(nargs, 1);
+        function list_(m, nargs) {
                 var p = m.pop();
+                checktype(p, LispList);
                 while (--nargs > 0)
                         p = new LispCons(m.pop(), p);
                 return p;
+        };
+
+        defp("list*", false, function(m, nargs) {
+                checknargs(nargs, 1);
+                return list_(m, nargs);
         });
 
         defp("append", false, function(m, nargs) {
@@ -1143,6 +1148,13 @@
                 return stream.next();
         });
 
+        defp("%stream-prev", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var stream = m.pop();
+                checktype(stream, LispInputStream);
+                return stream.prev();
+        });
+
         defp("%make-output-stream", false, function(m, nargs){
                 checknargs(nargs, 0, 0);
                 return new LispOutputStream();
@@ -1233,6 +1245,14 @@
                 var func = m.pop();
                 checktype(func, LispClosure);
                 return LispMachine.disassemble(func.code);
+        });
+
+        defp("apply", true, function(m, nargs){
+                checknargs(nargs, 2);
+                var args = list_(m, nargs - 1);
+                var func = m.pop();
+                checktype(func, LispClosure);
+                return m._callnext(func, args);
         });
 
         defp("%apply", true, function(m, nargs){

@@ -2,32 +2,29 @@
 
 (defglobal *format-handlers* (make-hash))
 
-(defmacro set-defaults defs
-  `(progn
-     ,@(let rec ((defs defs))
-         (when defs
-           (cons `(case ,(car defs)
-                    (fetch (setf ,(car defs) (car args)
-                                 args (cdr args)))
-                    (count (setf ,(car defs) (length args)))
-                    (nil (setf ,(car defs) ,(cadr defs))))
-                 (rec (cddr defs)))))))
+(defparameter *format-current-args* nil)
 
 ;; check out some fine unhygienic macros
+
+(defmacro with-format-args (cmdargs values &body body)
+  `(let* ,(mapcar (lambda (x)
+                    (unless (consp x)
+                      (setf x (list x)))
+                    `(,(car x)
+                      (let ((val (pop ,values)))
+                        (case val
+                          (fetch (pop args))
+                          (count (length args))
+                          (nil ,(cadr x))
+                          (t val)))))
+                  cmdargs)
+     ,@body))
 
 (defmacro def-format (char cmdargs &body body)
   (let ((v (gensym)))
     `(hash-add *format-handlers* ,(upcase char)
                (lambda (output args colmod? atmod? . ,v)
-                 ;; XXX: having a dumber destructuring-bind here
-                 ;;      would help improve speed
-                 (destructuring-bind (&optional
-                                      ,@(mapcar (lambda (x)
-                                                  (if (consp x) (car x) x))
-                                                cmdargs)) ,v
-                   (set-defaults
-                    ,@(%apply #'append (collect-if #'consp cmdargs)))
-                   ,@body)))))
+                 (with-format-args ,cmdargs ,v ,@body)))))
 
 (defmacro with-input (instr &body body)
   (let ((stream (gensym)))
@@ -38,9 +35,6 @@
                   (error (strcat msg
                                  ", line: " (%stream-line ,stream)
                                  ", col: " (%stream-col ,stream))))
-                (skip (ch)
-                  (unless (eq (next) ch)
-                    (croak (strcat "Expecting " ch))))
                 (read-while (pred)
                   (let ((out (%make-output-stream)) rec)
                     (labels ((rec (ch)
@@ -48,36 +42,80 @@
                                  (%stream-put out (next))
                                  (rec (peek)))))
                       (rec (peek)))
-                    (%stream-get out))))
+                    (%stream-get out)))
+                (skip-ws ()
+                  (read-while (lambda (ch)
+                                (member ch '(#\Space
+                                             #\Newline
+                                             #\Tab
+                                             #\Page
+                                             #\Line_Separator
+                                             #\Paragraph_Separator
+                                             #\NO-BREAK_SPACE)))))
+                (expect (ch)
+                  (unless (eq (next) ch)
+                    (croak (strcat "Expecting " ch)))))
          ,@body))))
-
-(defun %wrap-lists (fmt)
-  (let looop ((list fmt) end)
-    (if list
-        (let ((x (car list)))
-          (if (listp x)
-              (if (eq end (car x))
-                  (prog1 (cdr list)
-                    (setf (cdr list) nil))
-                  (case (car x)
-                    (#\{ (looop (setf (cdr (last x)) (cdr list)
-                                      (cdr list) (looop (cdr list) #\}))
-                                end))
-                    (#\[ (looop (setf (cdr (last x)) (cdr list)
-                                      (cdr list) (looop (cdr list) #\]))
-                                end))))
-              (looop (cdr list) end)))
-        (if end
-            (error (strcat "Expecting " end)))))
-  fmt)
 
 (defun %parse-format (str)
   (with-input str
     (labels
-        ((read-directive ()
-           (skip #\~)
-           (let ((params (read-params)))
-             (cons (upcase (next)) params)))
+        ((read-sublist (end)
+           (let looop ((ret '()))
+             (case (peek)
+               (#\~ (next)
+                    (let ((tok (read-directive)))
+                      (if (consp tok)
+                          (if (eq end (car tok))
+                              (if (> (length tok) 3)
+                                  (error "End constructs ~} and ~] don't accept parameters")
+                                  (cons (cdr tok) (nreverse ret)))
+                              (looop (cons tok ret)))
+                          (if tok
+                              (looop (cons tok ret))
+                              (looop ret)))))
+               (nil (if end
+                        (error (strcat "Expecting " end))
+                        (nreverse ret)))
+               (t (looop (cons (read-text) ret))))))
+
+         (read-directive ()
+           (let* ((params (read-params))
+                  (directive (upcase (next))))
+             (labels ((slurp (end modlist)
+                        (let ((end (read-sublist end)))
+                          `(,directive
+                            ,(car params)     ;; col-mod?
+                            ,(cadr params)    ;; at-mod?
+                            ,@(car end)       ;; terminator col,at mods
+                            ,(if modlist
+                                 (funcall modlist (cdr end))
+                                 (cdr end))   ;; sublist
+                            ,@(cddr params)   ;; optional args
+                            ))))
+               (case directive
+                 (#\{
+                  (slurp #\} nil))
+                 (#\[
+                  (slurp #\] (lambda (sublist)
+                               (let ((ret (list)))
+                                 (let looop ((list sublist)
+                                             (a (list nil)))
+                                   (if list
+                                       (let ((x (car list)))
+                                         (cond ((and (listp x) (eq (car x) #\;))
+                                                (push (nreverse a) ret)
+                                                (looop (cdr list) (list (cadr x))))
+                                               (t
+                                                (looop (cdr list) (cons x a)))))
+                                       (push (nreverse a) ret)))
+                                 (nreverse ret)))))
+                 (#\Newline
+                  (destructuring-bind (colmod? atmod?) params
+                    (cond ((eq colmod? atmod?) (skip-ws) nil)
+                          (colmod? nil)
+                          (atmod? (skip-ws) #\Newline))))
+                 (t (cons directive params))))))
 
          (read-number ()
            (labels ((read-it ()
@@ -117,28 +155,55 @@
            (read-while (lambda (ch)
                          (not (char= ch #\~))))))
 
-      (%wrap-lists
-       (nreverse
-           (let looop ((ret '()))
-             (case (peek)
-               (#\~ (looop (cons (read-directive) ret)))
-               (nil ret)
-               (t (looop (cons (read-text) ret))))))))))
+      (read-sublist nil))))
 
 (defun %exec-format (list args stream)
   (let looop ((list list))
     (when list
       (let ((x (car list)))
-        (cond ((stringp x)
-               (%stream-put stream x))
-              (t
+        (cond ((listp x)
                (let ((handler (hash-get *format-handlers* (car x)))
                      (cmdargs (cdr x)))
-                 (setf args (%apply handler (list* stream args cmdargs))))))
-        (looop (cdr list))))))
+                 (setf args (apply handler stream args cmdargs))))
+              (t
+               (%stream-put stream x)))
+        (looop (cdr list)))))
+  args)
 
 ;;; directives
 
+;; basic newline
+(def-format #\% (n)
+  (if n
+      (let looop ((n n))
+        (when (> n 0)
+          (%stream-put output #\Newline)
+          (looop (1- n))))
+      (%stream-put output #\Newline))
+  args)
+
+;; fresh-line
+(labels ((fresh-line (stream)
+           (when (> (%stream-col stream) 0)
+             (%stream-put stream #\Newline))))
+  (def-format #\& ((n 1))
+    (when (> n 0)
+      (fresh-line output)
+      (let looop ((n (1- n)))
+        (when (> n 0)
+          (%stream-put output #\Newline)
+          (looop (1- n)))))
+    args))
+
+;; tilde
+(def-format #\~ ((n 1))
+  (let looop ((n n))
+    (when (> n 0)
+      (%stream-put output "~")
+      (looop (1- n))))
+  args)
+
+;; general-purpose ~A and ~S
 (flet ((print (output args colmod? atmod? mincol colinc minpad padchar)
          (cond
            ((or (plusp mincol)
@@ -159,6 +224,7 @@
     (let ((*print-escape* t))
       (print output args colmod? atmod? mincol colinc minpad padchar))))
 
+;; integers (missing ~R for now)
 (flet ((print (output args colmod? atmod? mincol padchar commachar comma-interval base)
          (let* ((x (floor (car args)))
                 (s (if (and atmod? (plusp x))
@@ -176,6 +242,95 @@
     (print output args colmod? atmod? mincol padchar commachar comma-interval 8))
   (def-format #\X ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
     (print output args colmod? atmod? mincol padchar commachar comma-interval 16)))
+
+;;; iteration
+
+(def-format #\{ (ensure-once? #:end-at? sublist maxn)
+  ;; "If str is empty, then an argument is used as str."
+  (unless sublist
+    (setf sublist (%parse-format (car args))
+          args (cdr args)))
+  ;; "if atmod, use the rest of the arguments as list"
+  (let ((*format-current-args* (if atmod? args (car args))))
+    (catch 'abort-format-iteration
+      (labels ((iterate (list i)
+                 (when (eq i maxn)
+                   (throw 'abort-format-iteration))
+                 (if list
+                     (let ((x (car list)))
+                       (if (listp x)
+                           (let ((handler (hash-get *format-handlers* (car x)))
+                                 (cmdargs (cdr x)))
+                             (setf *format-current-args*
+                                   (apply handler output *format-current-args* cmdargs)))
+                           (%stream-put output x))
+                       (iterate (cdr list) i))
+                     (unless colmod?
+                       (when *format-current-args*
+                         (iterate sublist (1+ i)))))))
+        (if colmod?
+            ;; iterate once for each argument sublist
+            (foreach *format-current-args*
+              (lambda (*format-current-args*)
+                (iterate sublist 0)))
+            ;; normal case (no colmod)
+            (iterate sublist 0)))))
+  (if atmod? nil (cdr args)))
+
+(def-format #\^ ()
+  (or *format-current-args*
+      (throw 'abort-format-iteration)))
+
+(def-format #\} ()
+  (error "Unmatched ~~}"))
+
+;;; conditional
+
+(def-format #\[ (#:end-col? #:end-at? clauses n)
+  (if atmod?
+      (if colmod?
+          (error "Both @ and : specified in conditional")
+          (if (cdr clauses)
+              (error "Only one clause can be specified with @")
+              (if (car args)
+                  (%exec-format (cdar clauses) args output)
+                  (cdr args))))
+      (if colmod?
+          (if (/= 2 (length clauses))
+              (error "Exactly two clauses expected for : specifier")
+              (%exec-format (cdr (if (pop args)
+                                     (cadr clauses)
+                                     (car clauses)))
+                            args output))
+          (let (last selected)
+            (let looop ((n (or n (pop args)))
+                        (list clauses))
+              (when list
+                (cond ((zerop n) (setf selected (car list)))
+                      (t (setf last (car list))
+                         (looop (1- n) (cdr list))))))
+            (when (and (not selected) last (car last))
+              (setf selected last))
+            (if selected
+                (%exec-format (cdr selected) args output)
+                args)))))
+
+(def-format #\] ()
+  (error "Unmatched ~~]"))
+
+(def-format #\; ()
+  (error "~~; outside ~~[...~~]"))
+
+;; recursive
+(def-format #\? ()
+  (when colmod? (error ": not supported"))
+  (if atmod?
+      (%exec-format (%parse-format (pop args))
+                    args output)
+      (progn
+        (%exec-format (%parse-format (pop args))
+                      (pop args) output)
+        args)))
 
 ;;; main entry point
 

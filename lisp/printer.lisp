@@ -108,7 +108,7 @@
 (let ((pak-keyword (%find-package :keyword)))
   (def-print (symbol)
     (if (eq symbol t)
-        "T"
+        (<< "T")
         (let ((pak (%symbol-package symbol)))
           (cond ((not pak)
                  (<< "#:"))

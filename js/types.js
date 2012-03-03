@@ -122,12 +122,25 @@ var LispInputStream = DEFTYPE("input-stream", function(D, P){
                 }
                 return null;
         };
+        P.prev = function() {
+                if (this.pos > 0) {
+                        var ch = this.text.charAt(--this.pos);
+                        if (this.col-- == 0) this._resetPos();
+                        return LispChar.get(ch);
+                }
+                return null;
+        };
         P.skip_to = function(ch) {
                 var pos = this.text.indexOf(ch, this.pos);
                 if (pos <= 0) pos = this.text.length;
                 var diff = pos - this.pos;
                 this.pos = pos;
                 return diff;
+        };
+        P._resetPos = function() {
+                var a = this.text.substr(0, this.pos).split(/\r?\n/);
+                this.line = a.length;
+                this.col = a[this.line - 1].length;
         };
 }, LispStream);
 
