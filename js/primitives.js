@@ -27,6 +27,11 @@
                 type: "number"
         };
 
+        var LispInteger = {
+                is: function(x) { return typeof x == "number" && Math.floor(x) == x },
+                type: "integer"
+        };
+
         var LispRegexp = {
                 is: function(x) { return x instanceof RegExp },
                 type: "regexp"
@@ -321,6 +326,18 @@
                 var val = m.pop(), cons = m.pop();
                 checktype(cons, LispCons);
                 return cons.cdr = val;
+        });
+
+        defp("nthcdr", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var list = m.pop(), n = m.pop();
+                checktype(n, LispInteger);
+                var p = list;
+                while (p !== null && n-- > 0) {
+                        checktype(list, LispList);
+                        p = p.cdr;
+                }
+                return p;
         });
 
         defp("reverse", false, function(m, nargs){
