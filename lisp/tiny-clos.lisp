@@ -57,12 +57,11 @@
          (defun ,name args
            (%apply (%get-entity-proc ,generic) args))))))
 
-(def-emac make-instance (class &rest initargs)
-  (with-rebinds (class)
-    `(make (if (symbolp ,class)
-               (find-class ,class)
-               ,class)
-           ,@initargs)))
+(def-efun make-instance (class . initargs)
+  (apply #'make (if (symbolp class)
+                    (find-class class)
+                    class)
+         initargs))
 
 (def-emac defmethod (name args &rest body)
   (let ((c-n-m (gensym "CALL-NEXT-METHOD")))

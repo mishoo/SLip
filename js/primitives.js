@@ -1,8 +1,5 @@
 (function(BASE_PACK, KW, undefined){
 
-        var CURRENT = null;
-        var MACHINE = null;
-
         var S_NIL = LispSymbol.get("NIL");
         var S_T = LispSymbol.get("T");
         var ALL_PRIMITIVES = null;
@@ -61,11 +58,7 @@
                 name = name.toUpperCase();
                 var sym = BASE_PACK.intern(name);
                 BASE_PACK.export(sym);
-                sym.setv("primitive", function(m, nargs){
-                        CURRENT = name;
-                        MACHINE = name;
-                        return func(m, nargs);
-                });
+                sym.setv("primitive", func);
                 sym.setv("primitive-side-effects", seff);
                 sym.setv("function", new LispClosure(LispMachine.assemble([
                         [ "PRIM", sym, -1 ],
@@ -77,7 +70,7 @@
         /// utilities
 
         function error(msg) {
-                throw new Error(msg + ", in " + CURRENT);
+                throw new LispPrimitiveError(msg);
         };
 
         function checknargs(n, min, max) {
@@ -310,7 +303,7 @@
                 checktype(i, LispNumber);
                 if (LispCons.isList(x)) return LispCons.elt(x, i);
                 if (LispArray.is(x)) return i < x.length ? x[i] : null;
-                if (LispString.is(x)) return LispChar.get(x.charAt(i)) || null;
+                if (LispString.is(x)) return i < x.length ? LispChar.get(x.charAt(i)) : null;
                 error("Unrecognized sequence");
         });
 
@@ -1678,11 +1671,11 @@
 
         /* -----[ conditions ]----- */
 
-        // pretty sucky, need to think how to do it properly
         defp("%error", true, function(m, nargs){
                 checknargs(nargs, 1, 1);
                 var msg = m.pop();
-                error(msg);
+                // that's a hard error.
+                throw new Error(msg);
         });
 
         defp("%warn", true, function(m, nargs){
@@ -1696,6 +1689,10 @@
 
         defp("%debugger", true, function(m, nargs){
                 debugger;
+        });
+
+        defp("%machine.dynamic-environment", false, function(m, nargs){
+                return m.denv;
         });
 
         defp("%eval-bytecode", true, function(m, nargs){

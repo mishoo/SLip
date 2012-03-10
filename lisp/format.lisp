@@ -1,5 +1,7 @@
 (in-package :ss)
 
+(export '(format))
+
 (defglobal *format-handlers* (make-hash))
 
 (defparameter *format-current-args* nil)

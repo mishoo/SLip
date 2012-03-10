@@ -35,11 +35,20 @@ function send_ymacs_notify(what, value) {
   (let ((name (intern (strcat "EXEC-" what))))
     `(labels ((,name ,args ,@body))
        (set-symbol-function! ',name #',name)
-       (hash-set *handlers* ,what (lambda (req-id ,@args)
-                                    (make-thread (lambda ()
-                                                   (let ((ret (,name ,@args)))
-                                                     (send-ymacs-reply req-id ,what ret)
-                                                     ret))))))))
+       (hash-set *handlers* ,what
+                 (lambda (req-id ,@args)
+                   (make-thread
+                    (lambda ()
+                      (block out
+                        (handler-bind
+                            ((warning (lambda (x)
+                                        (send-ymacs-notify :message (format nil "!WARN: ~A" x))))
+                             (error (lambda (x)
+                                      (send-ymacs-notify :message (format nil "!ERROR: ~A" x))
+                                      (return-from out x))))
+                          (let ((ret (,name ,@args)))
+                            (send-ymacs-reply req-id ,what ret)
+                            ret))))))))))
 
 (define-handler :read (pak str)
   (let ((*package* (or (and pak (%find-package pak t))
@@ -72,7 +81,7 @@ function send_ymacs_notify(what, value) {
 
 (labels ((symbol-completion (query all)
            (let* ((rx (make-regexp (strcat "^" (replace-regexp #/[-_.\/]/g
-                                                               (quote-regexp query)
+                                                               query
                                                                "[^-_./]*[-_./]"))
                                    "i"))
                   (len (length query))
@@ -118,11 +127,12 @@ function send_ymacs_notify(what, value) {
         (t
          nil)))))
 
-(defglobal *thread*
+(defglobal
+    *thread*
     (make-thread
      (lambda ()
        (let ((*package* (%find-package :ss-user))
              (*read-table* *read-table*))
          (let looop ()
-              (%receive *handlers*)
-              (looop))))))
+           (%receive *handlers*)
+           (looop))))))

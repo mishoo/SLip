@@ -134,6 +134,7 @@ return return-from setq setf multiple-value-call".qw().toHash();
                 "handler-case"        : "1*",
                 "restart-bind"        : "1*",
                 "restart-case"        : "1*",
+                "return-from"         : "1*",
                 "block"               : "1*"
         };
 

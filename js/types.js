@@ -91,10 +91,9 @@ var LispClosure = DEFTYPE("closure", function(D, P){
         };
 });
 
-var LispCondition = DEFTYPE("condition", function(D, P){
-        P.INIT = function(message, cont) {
-                this.message = message;
-                this.cont = cont;
+var LispPrimitiveError = DEFTYPE("primitive-error", function(D, P){
+        P.INIT = function(msg) {
+                this.message = msg;
         };
 });
 

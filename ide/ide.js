@@ -380,7 +380,10 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                         return self.cmd("ss_repl_prompt");
                                 var code = code.substr(0, pos).trim();
                                 var h = self.getq("ss_repl_history");
-                                if (h[0] != code) h.unshift(code);
+                                if (h[0] != code) {
+                                        h.unshift(code);
+                                        self.ymacs.ls_setFileContents("~/.ss-lisp-history", DlJSON.encode(h.slice(0, 500)));
+                                }
                         } catch(ex) {
                                 // XXX:
                                 return self.cmd("newline_and_indent");
@@ -599,7 +602,8 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 this.setTokenizer(new Ymacs_Tokenizer({ type: "ss_lisp_repl", buffer: this }));
                 this.pushKeymap(Ymacs_Keymap_SS_REPL());
                 this.setq("modeline_custom_handler", null);
-                this.setq("ss_repl_history", []);
+                var history = this.ymacs.ls_getFileContents("~/.ss-lisp-history", true) || "[]";
+                this.setq("ss_repl_history", DlJSON.decode(history));
                 return function() {
                         this.popKeymap(Ymacs_Keymap_SS_REPL());
                         this.cmd("ss_mode", false);

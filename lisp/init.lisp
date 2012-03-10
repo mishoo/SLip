@@ -4,7 +4,8 @@
       (boot (%find-package "%"))
       (user (%make-package "SS-USER")))
   (%export '(quasiquote defmacro defun when unless map labels flet foreach
-             prog1 prog2 or and cond member case mapcar with-cc aif push error
+             prog1 prog2 or and cond member case mapcar with-cc aif push
+             error warn
              lisp-reader compile compile-string load function unwind-protect
              funcall macrolet catch throw
              quote lambda let let* if progn setq t nil not
@@ -268,6 +269,10 @@
         ((funcall test (car list)) (cons (car list) (collect-if test (cdr list))))
         (t (collect-if test (cdr list)))))
 
+(def-efun remove (item list)
+  (collect-if (lambda (x)
+                (not (eq x item))) list))
+
 (labels ((finished (tails)
            (when tails
              (if (car tails) (finished (cdr tails)) t))))
@@ -335,6 +340,16 @@
         list
         (last (cdr list)))))
 
+(defun nhalf-list (a)
+  (cons a (when a
+            (let rec ((a a)
+                      (b (cddr a)))
+              (cond
+                ((eq a b) (error "Circular list detected"))
+                (b (rec (cdr a) (cddr b)))
+                (t (prog1 (cdr a)
+                     (setf (cdr a) nil))))))))
+
 (def-efun merge (list1 list2 predicate)
   (let (ret p)
     (labels ((add (cell)
@@ -371,6 +386,15 @@
 
 (set-symbol-function! 'sort #'stable-sort)
 (export 'sort)
+
+(def-emac with-append-list ((var append &key (tail (gensym))) &body body)
+  `(let (,var ,tail)
+     (flet ((,append (x)
+              (setf ,tail
+                    (last (if ,tail
+                              (setf (cdr ,tail) x)
+                              (setf ,var x))))))
+       ,@body)))
 
 (export 'destructuring-bind)
 

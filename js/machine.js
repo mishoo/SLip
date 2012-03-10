@@ -271,6 +271,15 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         break;
                         }
                 } catch(ex) {
+                        if (ex instanceof LispPrimitiveError) {
+                                var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SS"));
+                                if (pe && pe.func()) {
+                                        // RETHROW as Lisp error.
+                                        this._callnext(pe.func(), LispCons.fromArray([ "~A", ex.message ]));
+                                        return null;
+                                }
+                        }
+                        // we fucked up.
                         this.status = "halted";
                         err = this.error = ex;
                 }
