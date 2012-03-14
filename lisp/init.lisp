@@ -4,7 +4,7 @@
       (boot (%find-package "%"))
       (user (%make-package "SS-USER")))
   (%export '(quasiquote defmacro defun when unless map labels flet foreach
-             prog1 prog2 or and cond member case mapcar with-cc aif push
+             prog1 prog2 or and cond member case mapcar with-cc aif it push
              error warn
              lisp-reader compile compile-string load function unwind-protect
              funcall macrolet catch throw
@@ -124,6 +124,9 @@
                 (destructuring-bind ,lambda-list ,args ,@body)))
        (%macro! ',name #',name))))
 
+(defmacro import (symbols &optional (package *package*))
+  `(%import ,symbols ,package))
+
 (defmacro export (symbols &optional (package *package*))
   `(%export ,symbols ,package))
 
@@ -235,11 +238,11 @@
 (def-emac setf args
   `(progn ,@(%setf args)))
 
-(def-emac incf (place)
-  `(setf ,place (+ ,place 1)))
+(def-emac incf (place &optional (inc 1))
+  `(setf ,place (+ ,place ,inc)))
 
-(def-emac decf (place)
-  `(setf ,place (- ,place 1)))
+(def-emac decf (place &optional (dec 1))
+  `(setf ,place (- ,place ,dec)))
 
 (defsetf car (x) (val)
   `(rplaca ,x ,val))
@@ -385,7 +388,7 @@
                (merge (ss-list a) (ss-list b) predicate))))))
 
 (set-symbol-function! 'sort #'stable-sort)
-(export 'sort)
+(export '(sort export import))
 
 (def-emac with-append-list ((var append &key (tail (gensym))) &body body)
   `(let (,var ,tail)

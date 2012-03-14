@@ -84,8 +84,7 @@
   `((progn ,f) ,@args))
 
 (defmacro defun (name args . body)
-  `(set-symbol-function! ',name (labels ((,name ,args ,@body))
-                                  #',name)))
+  `(set-symbol-function! ',name (%fn ,name ,args ,@body)))
 
 (defun error (msg)
   (%error msg))

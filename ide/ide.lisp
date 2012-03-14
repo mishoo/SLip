@@ -81,7 +81,7 @@ function send_ymacs_notify(what, value) {
 
 (labels ((symbol-completion (query all)
            (let* ((rx (make-regexp (strcat "^" (replace-regexp #/[-_.\/]/g
-                                                               query
+                                                               (quote-regexp (replace-regexp #/\./g query "-"))
                                                                "[^-_./]*[-_./]"))
                                    "i"))
                   (len (length query))

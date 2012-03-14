@@ -150,7 +150,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         P.pop_number = function(error) {
                 var n = this.pop();
                 if (typeof n != "number") {
-                        error("Number expected");
+                        error("Number expected, got " + this.dump(n));
                 }
                 return n;
         };
@@ -937,7 +937,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                         }
                                         p = p.cdr;
                                 }
-                                throw new Error("CATCH tag not found " + LispMachine.dump(tag));
+                                throw new LispPrimitiveError("CATCH tag not found " + LispMachine.dump(tag));
                         }
                 }],
                 /// </throw,catch>
@@ -954,7 +954,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                 var count = this.count;
                                 if (count != m.n_args) {
                                         console.error(m.f);
-                                        throw new Error("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
+                                        throw new LispPrimitiveError("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
                                 }
                                 var frame = new Array(count);
                                 while (--count >= 0) frame[count] = m.pop();
@@ -965,7 +965,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         run: function(m) {
                                 var count = this.count;
                                 var passed = m.n_args;
-                                if (passed < count) throw new Error("Insufficient number of arguments");
+                                if (passed < count) throw new LispPrimitiveError("Insufficient number of arguments");
                                 var p = null;
                                 while (passed-- > count) p = new LispCons(m.pop(), p);
                                 var frame = new Array(count + 1);

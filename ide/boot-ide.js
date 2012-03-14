@@ -43,6 +43,7 @@
                 "../lisp/printer.fasl",
                 "../lisp/format.fasl",
                 "../lisp/conditions.fasl",
+                "../lisp/ffi.fasl",
                 "ide.fasl"
         ], function(){
                 //machine.atomic_call(LispSymbol.get("LOAD").func(), [ "ide.lisp" ]);

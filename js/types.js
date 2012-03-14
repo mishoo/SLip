@@ -550,8 +550,8 @@ var LispProcess = DEFTYPE("process", function(D, P){
         };
 
         P.clear_timeout = function(tm) {
+                delete this.timeouts[tm];
                 clearTimeout(tm);
-                delete self.timeouts[tm];
                 return null;
         };
 
@@ -567,11 +567,11 @@ var LispProcess = DEFTYPE("process", function(D, P){
         };
         function run() {
                 var start_time = Date.now();
-                while (Date.now() - start_time < 20) {
+                while (Date.now() - start_time < 50) {
                         if (QUEUE.length == 0) break;
                         var p = QUEUE.shift();
                         if (D.is(p)) {
-                                p.run(5000);
+                                p.run(200);
                         }
                         else if (Message.is(p)) {
                                 p.target.handle(p);

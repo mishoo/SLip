@@ -270,6 +270,11 @@
                 });
         });
 
+        defp("power", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                return Math.pow(m.pop_number(error), m.pop_number(error));
+        });
+
         defp("random", false, function(m, nargs){
                 checknargs(nargs, 0, 1);
                 if (nargs == 1) {
@@ -1732,9 +1737,53 @@
                 return boxit(func.apply(instance, args));
         });
 
+        defp("%js-camelcase-name", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var name = as_string(m.pop());
+                checktype(name, LispString);
+                name = name.toLowerCase();
+                var m = /^\+(.*)\+$/.exec(name);
+                if (m) {
+                        name = m[1].toUpperCase().replace(/-/g, "_");
+                } else {
+                        name = name.replace(/^\*([a-z])(.*)\*$/, function(str, p1, p2){
+                                return p1.toUpperCase() + p2;
+                        });
+                        name = name.replace(/-([a-z])/g, function(str, p){
+                                return p.toUpperCase();
+                        });
+                }
+                return name;
+        });
+
         defp("%get-time", false, function(m, nargs){
                 checknargs(nargs, 0, 0);
                 return Date.now();
+        });
+
+        defp("%local-date", false, function(m, nargs){
+                checknargs(nargs, 0, 0);
+                var time = new Date();
+                return LispCons.fromArray([ time.getFullYear(),
+                                            time.getMonth() + 1,
+                                            time.getDate(),
+                                            time.getHours(),
+                                            time.getMinutes(),
+                                            time.getSeconds(),
+                                            time.getMilliseconds(),
+                                            time.getTimezoneOffset() ]);
+        });
+
+        defp("%utc-date", false, function(m, nargs){
+                checknargs(nargs, 0, 0);
+                var time = new Date();
+                return LispCons.fromArray([ time.getUTCFullYear(),
+                                            time.getUTCMonth() + 1,
+                                            time.getUTCDate(),
+                                            time.getUTCHours(),
+                                            time.getUTCMinutes(),
+                                            time.getUTCSeconds(),
+                                            time.getUTCMilliseconds()  ]);
         });
 
         var HASH_SEED = 0xdeadbeef;
