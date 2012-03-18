@@ -197,6 +197,16 @@
           (draw-pin (* hour 30) (* r 0.6) 5)
           min)))))
 
+(let ((running nil))
+  (defun start-clock ()
+    (setf running t)
+    (clear)
+    (animate-clock))
+  (defun stop-clock ()
+    (setf running nil))
+  (defun clock-running ()
+    running))
+
 (defun animate-clock ()
   (when (clock-running)
     (without-interrupts
@@ -207,13 +217,3 @@
         (left (* sec 6))
         (clock 35 :hours-r 2 :hours-pin 6)))
     (set-timeout 100 #'animate-clock)))
-
-(let ((running nil))
-  (defun start-clock ()
-    (setf running t)
-    (clear)
-    (animate-clock))
-  (defun stop-clock ()
-    (setf running nil))
-  (defun clock-running ()
-    running))

@@ -573,6 +573,7 @@
 (defglobal <stream> (defclass stream (primitive) ()))
 (defglobal <input-stream> (defclass input-stream (stream) ()))
 (defglobal <output-stream> (defclass output-stream (stream) ()))
+(defglobal <unknown> (defclass unknown-class (primitive) ()))
 
 (def-efun class-of (x)
   (cond ((%objectp x) (%instance-class x))
@@ -589,7 +590,8 @@
         ((regexpp x) <regexp>)
         ((threadp x) <thread>)
         ((%input-stream-p x) <input-stream>)
-        ((%output-stream-p x) <output-stream>)))
+        ((%output-stream-p x) <output-stream>)
+        (t <unknown>)))
 
 (export '(class
           char
@@ -609,4 +611,5 @@
           thread
           stream
           input-stream
-          output-stream))
+          output-stream
+          unknown-class))

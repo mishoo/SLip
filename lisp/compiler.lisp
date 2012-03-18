@@ -381,6 +381,18 @@
          ,@body)
        ,seq)))
 
+(defmacro without-interrupts body
+  `(let ((old (%no-interrupts t)))
+     (unwind-protect
+         (progn ,@body)
+       (%no-interrupts old))))
+
+(%global! '*defining-functions*)
+(setq *defining-functions* '())
+
+(defun defun-en-course (name)
+  (member name *defining-functions*))
+
 (labels
     ((assert (p msg)
        (unless p (error msg)))
@@ -513,13 +525,17 @@
                             (%seq (when val? (if local
                                                  (gen "LVAR" (car local) (cadr local))
                                                  (progn
-                                                   (unless (symbol-function sym)
+                                                   (unless (or (symbol-function sym)
+                                                               (defun-en-course sym))
                                                      (warn (strcat "Undefined function " sym)))
                                                    (gen "FGVAR" sym))))
                                   (if more? nil (gen "RET"))))))
-              (%fn (if val?
-                       (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
-                             (if more? nil (gen "RET")))))
+              (%fn (unwind-protect
+                       (progn
+                         (push (cadr x) *defining-functions*)
+                         (%seq (if val? (comp-lambda (cadr x) (caddr x) (cdddr x) env))
+                               (if more? nil (gen "RET"))))
+                     (setq *defining-functions* (cdr *defining-functions*))))
               (tagbody (comp-tagbody (cdr x) env val? more?))
               (go (arg-count x 1 1)
                   (comp-go (cadr x) env))
@@ -680,7 +696,8 @@
                            (if val? nil (gen "POP"))
                            (if more? nil (gen "RET")))))
                 (t
-                 (unless (symbol-function f)
+                 (unless (or (symbol-function f)
+                             (defun-en-course f))
                    (warn (strcat "Undefined function " f)))
                  (mkret (gen "FGVAR" f))))))
            ((and (consp f)
@@ -780,7 +797,7 @@
                                    ,@body))
                           (,looop ,@(map (lambda (x)
                                            (if (consp x) (cadr x)))
-                                         bindings)))
+                                      bindings)))
                        env val? more?))
                (with-seq-output <<
                  (let* ((bindings (get-bindings bindings t))

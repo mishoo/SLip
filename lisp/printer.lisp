@@ -15,6 +15,9 @@
                   `(%stream-put out ,@args)))
        ,@body)))
 
+(def-print (unknown-class)
+  (<< "<UNKNOWN-CLASS>"))
+
 (def-print (object)
   (<< "<OBJECT")
   (let* ((class (class-of object))

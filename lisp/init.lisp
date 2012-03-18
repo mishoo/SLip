@@ -9,7 +9,7 @@
       (user (%make-package "SS-USER")))
   (%export '(quasiquote defmacro defun when unless map labels flet foreach
              prog1 prog2 or and cond member case mapcar with-cc aif it push
-             error warn
+             error warn without-interrupts
              lisp-reader compile compile-string load function unwind-protect
              funcall macrolet catch throw
              quote lambda let let* if progn setq t nil not
@@ -408,9 +408,3 @@
        ,@body)))
 
 (export 'destructuring-bind)
-
-(def-emac without-interrupts (&body body)
-  `(let ((old (%no-interrupts t)))
-     (unwind-protect
-         (progn ,@body)
-       (%no-interrupts old))))
