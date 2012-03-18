@@ -7,6 +7,8 @@
 
 (in-package :ymacs)
 
+(import '(ss-ffi:defun-js))
+
 (defun grep (list pred)
   (when list
     (if (funcall pred (car list))
@@ -15,21 +17,16 @@
 
 (defglobal *handlers* (make-hash))
 
-(let ((send-reply (%js-eval "
-function send_ymacs_reply(req_id, what, value) {
-    YMACS.callHooks(\"onLispResponse\", req_id, what, value);
-}
-")))
-  (defun send-ymacs-reply (req-id what value)
-    (%js-apply send-reply nil #( req-id what value ))))
+(defun-js send-ymacs-reply (req-id what value) "
+  YMACS.callHooks('onLispResponse', req_id, what, value);
+")
 
-(let ((send-notify (%js-eval "
-function send_ymacs_notify(what, value) {
-    YMACS.callHooks(\"onLispNotify\", what, value);
-}
-")))
-  (defun send-ymacs-notify (what value)
-    (%js-apply send-notify nil #( (strcat what) value ))))
+(defun-js %send-ymacs-notify (what value) "
+  YMACS.callHooks('onLispNotify', what, value);
+")
+
+(defun send-ymacs-notify (what value)
+  (%send-ymacs-notify (strcat what) value))
 
 (defmacro define-handler (what (&rest args) &body body)
   (let ((name (intern (strcat "EXEC-" what))))

@@ -27,6 +27,10 @@ body {
   background-color: rgba(200, 200, 200, 0.8);
 }
 
+.Ymacs_Frame .ss-error {
+  color: #f30;
+}
+
 .Ymacs-Theme-dark .Ymacs_Frame .ss-prompt {
   color: #fc8; font-weight: bold;
 }

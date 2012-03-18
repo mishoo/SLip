@@ -133,6 +133,9 @@ Ymacs_Tokenizer.define("ss_lisp_repl", function(stream, tok){
                 if (stream.col == 0 && (m = stream.lookingAt(/^[^<\s,'`]+?>/))) {
                         foundToken(stream.col, stream.col += m[0].length, "ss-prompt");
                 }
+                else if (stream.col == 0 && (m = stream.lookingAt(/^!(WARN|ERROR):/))) {
+                        foundToken(stream.col, stream.col += m[0].length, "ss-error");
+                }
                 else return $lisp_next();
         };
         function copy() {
@@ -375,7 +378,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 var tmp = MACHINE.read(null, code);
                                 var expr = tmp[0], pos = tmp[1];
                                 var m = self.getq("ss_repl_marker");
-                                flash_region(self, m.getPosition(), pos + m.getPosition());
+                                //flash_region(self, m.getPosition(), pos + m.getPosition());
                                 if (expr === WINDOW.LispSymbol.get("EOF"))
                                         return self.cmd("ss_repl_prompt");
                                 var code = code.substr(0, pos).trim();
