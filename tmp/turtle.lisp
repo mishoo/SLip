@@ -23,7 +23,7 @@
    tmp.style.padding = '1px';
    document.body.appendChild(tmp);
    var ctx = tmp.getContext('2d');
-   ctx.translate(width / 2, height / 2);
+   ctx.translate(width / 2 + 0.5, height / 2 + 0.5);
    ctx.scale(1, -1);
    return tmp;")
 
@@ -159,52 +159,53 @@
                    (a1 (* 180 (/ (asin (/ len x)) +PI+)))
                    (a2 (- 90 a1)))
               (left 90)
-              (without-pen (forward (/ thick 2)))
-              (right 180)
-              (forward thick)
-              (left a1)
+              (without-pen (forward t2))
+              (backward thick)
+              (right a1)
               (forward x)
               (right (+ 180 (* a2 2)))
               (forward x)))))
-  (defun clock (r)
-    (let* ((len (* 2 r +PI+))
-           (step (/ len 12)))
-      (save-excursion
-       (circle 2 10)
-       (without-pen (forward r))
-       (let looop ((i 12))
-         (when (> i 0)
-           (circle 3 10)
-           (right 105)
-           (without-pen (forward step))
-           (left 75)
-           (save-excursion (backward 10))
-           (looop (1- i)))))
-      (destructuring-bind
-          (year month date hour min sec msec)
-          (%local-date)
-        (setf sec (+ sec (/ msec 1000))
-              min (+ min (/ sec 60))
-              hour (+ hour (/ min 60)))
-        ;; seconds
+  (defun clock args
+    (destructuring-bind (r &key
+                           (hours-r 3)
+                           (hours-pin 10)) args
+      (let* ((len (* 2 r +PI+))
+             (step (/ len 12)))
         (save-excursion
-         (right (* sec 6))
-         (without-pen (backward 10))
-         (draw-pin 0 (+ r 10) 1))
-        ;; minutes
-        (draw-pin (* min 6) (* r 0.8) 4)
-        ;; hours
-        (draw-pin (* hour 30) (* r 0.6) 7)
-        sec))))
+         (circle 2 4)
+         (without-pen (forward r))
+         (let looop ((i 12))
+           (when (> i 0)
+             (circle hours-r 10)
+             (right 105)
+             (without-pen (forward step))
+             (left 75)
+             (save-excursion (backward hours-pin))
+             (looop (1- i)))))
+        (destructuring-bind
+            (year month date hour min sec msec)
+            (%local-date)
+          (incf sec (/ msec 1000))
+          (decf sec)
+          (incf min (/ sec 60))
+          (incf hour (/ min 60))
+          (save-excursion
+           (right (* sec 6))
+           (backward 10)
+           (draw-pin 0 (+ r 10) 1))
+          (draw-pin (* min 6) (* r 0.8) 3)
+          (draw-pin (* hour 30) (* r 0.6) 5)
+          min)))))
 
 (defun animate-clock ()
   (when (clock-running)
-    (clear)
-    (let ((sec (clock 150)))
-      (right (* sec 6))
-      (without-pen (backward 75))
-      (left (* sec 6))
-      (clock 35))
+    (without-interrupts
+      (clear)
+      (let ((sec (clock 150)))
+        (right (* sec 6))
+        (without-pen (backward 75))
+        (left (* sec 6))
+        (clock 35 :hours-r 2 :hours-pin 6)))
     (set-timeout 100 #'animate-clock)))
 
 (let ((running nil))

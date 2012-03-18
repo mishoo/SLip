@@ -258,10 +258,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 if (this.trace) this.trace = [ closure, args ];
         };
 
-        P.run = function(quota) {
+        P.run = function(quota, noint) {
                 var err = null;
                 try {
-                        while (quota-- > 0) {
+                        while (quota > 0) {
+                                if (!noint) --quota;
                                 if (this.pc == null) {
                                         this.status = "finished";
                                         break;

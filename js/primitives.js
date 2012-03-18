@@ -1606,6 +1606,17 @@
                 return m.process.clear_timeout(m.pop());
         });
 
+        defp("%no-interrupts", true, function(m, nargs){
+                if (!m.process) return null;
+                checknargs(nargs, 0, 2);
+                var process = nargs == 2 ? m.pop() : m.process;
+                var noint = m.pop();
+                checktype(process, LispProcess);
+                var old = process.noint;
+                process.noint = noint;
+                return old;
+        });
+
         /* -----[ DOM ]----- */
 
         defp("dom.get-element-by-id", false, function(m, nargs){

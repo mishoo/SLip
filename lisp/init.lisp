@@ -1,5 +1,9 @@
 (setq *package* (%find-package "%"))
 
+"
+(in-package :%)
+"
+
 (let ((main (%make-package "SS"))
       (boot (%find-package "%"))
       (user (%make-package "SS-USER")))
@@ -16,6 +20,10 @@
   (%use-package boot main)
   (%use-package main user)
   (setq *package* main))
+
+"
+(in-package :ss)
+"
 
 ;;;; destructuring-bind
 
@@ -401,3 +409,8 @@
 
 (export 'destructuring-bind)
 
+(def-emac without-interrupts (&body body)
+  `(let ((old (%no-interrupts t)))
+     (unwind-protect
+         (progn ,@body)
+       (%no-interrupts old))))

@@ -455,6 +455,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 this.receivers = null;
                 this.mailbox = [];
                 this.timeouts = {};
+                this.noint = false;
                 m.process = this;
                 m.set_closure(closure);
                 this.resume();
@@ -475,7 +476,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
         P.run = function(quota) {
                 var m = this.m, err;
                 if (m.status == "running") {
-                        err = m.run(quota);
+                        err = m.run(quota, this.noint);
                         if (err) {
                                 console.error("Error in PID: ", this.pid);
                                 console.log(err);
