@@ -615,6 +615,8 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
 
 });
 
+// Ymacs_Frame.DEFAULT_ARGS.highlightCurrentLine = [ "highlightCurrentLine" , false ];
+
 var THE_EDITOR;
 
 function get_output_buffer() {
@@ -669,9 +671,9 @@ function make_desktop() {
         btn("Copy to system clipboard", function(){ buffer().cmd("copy_for_operating_system") });
         btn("Paste from system clipboard", function(){ buffer().cmd("yank_from_operating_system") });
 
-        var ymacs = THE_EDITOR = WINDOW.YMACS = new Ymacs_SS({ buffers: [] });
-        ymacs.setColorTheme([ "light", "scintilla" ]);
-        //ymacs.setColorTheme([ "dark", "mishoo2" ]);
+        var ymacs = THE_EDITOR = WINDOW.YMACS = new Ymacs_SS({ buffers: [], lineNumbers: false });
+        ymacs.setColorTheme([ "light", "whiteboard" ]);
+        //ymacs.setColorTheme([ "dark", "charcoal-black" ]);
         ymacs.getActiveBuffer().cmd("ss_mode");
 
         layout.packWidget(toolbar, { pos: "top" });

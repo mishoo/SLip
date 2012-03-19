@@ -6,14 +6,14 @@ body {
 .Ymacs_Overlay .flash-code { background: #3f8; }
 
 .Ymacs_Frame {
-  font-family: "DejaVu Sans Mono","Lucida Sans Typewriter",monospace;
-  font-size: 14px;
+  font-family: "DejaVu Sans Mono","Ubuntu Mono","Lucida Sans Typewriter",monospace;
+  font-size: 13px;
   overflow: hidden;
 }
 
 .Ymacs_Modeline {
-  font-family: "DejaVu Sans Mono","Lucida Sans Typewriter",monospace;
-  font-size: 12px;
+  font-family: "DejaVu Sans Mono","Ubuntu Mono","Lucida Sans Typewriter",monospace;
+  font-size: 13px;
 }
 
 .Ymacs_Frame {
@@ -44,4 +44,8 @@ body {
 }
 
 .Ymacs-Theme-dark .Ymacs-line-numbers .Ymacs-frame-content div.line:before {
+}
+
+.Ymacs-Theme-light .Ymacs_Frame-focus .Ymacs-current-line {
+  background-color: #fff;
 }

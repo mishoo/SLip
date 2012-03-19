@@ -4,7 +4,7 @@
 
 (in-package :ss-ffi)
 
-(export '(defun-js))
+(export '(defun-js lambda-js))
 
 (defun to-js-name (name)
   (setf name (downcase (replace-regexp #/-+/g name "_")))
@@ -25,4 +25,13 @@
                                     js-argnames
                                     body))))
        (defun ,name args
-         (%js-apply ,sym nil (as-vector args))))))
+         (%js-apply ,sym nil args)))))
+
+(defmacro lambda-js (args body)
+  (let* ((sym (gensym))
+         (js-argnames (mapcar #'to-js-name args)))
+    `(let ((,sym (%js-eval ,(format nil "function (~{~A~^, ~}) { ~A }"
+                                    js-argnames
+                                    body))))
+       (lambda args
+         (%js-apply ,sym nil args)))))

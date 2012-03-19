@@ -479,7 +479,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
                         err = m.run(quota, this.noint);
                         if (err) {
                                 console.error("Error in PID: ", this.pid);
-                                console.log(err);
+                                console.dir(err);
                                 console.log(this);
                         }
                         else switch (m.status) {

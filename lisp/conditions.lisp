@@ -91,8 +91,6 @@
                     (return-from ,block-tag ,form))
                   ,@body))))))))
 
-(defclass restart () (name func))
-
 (defun existing-condition-name? (name)
   (let ((class (find-class name)))
     (and class (%memq <condition> (class-cpl class)))))

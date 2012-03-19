@@ -48,10 +48,9 @@
                                               `(find-class ',name))
                                             direct-supers)) ',direct-slots)))
 
-;; XXX: handle redefinition
 (def-emac defgeneric (name)
   (let ((generic (gensym "GENERIC")))
-    `(progn
+    `(unless (find-generic ',name)
        (let ((,generic (make-generic)))
          (setf (find-generic ',name) ,generic)
          (defun ,name args

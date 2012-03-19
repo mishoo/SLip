@@ -1,6 +1,10 @@
 (in-package :ss)
 
-(export '(print-object))
+(export '(print-object
+          *print-readably*
+          *print-escape*
+          *print-base*
+          *print-radix*))
 
 (defgeneric print-object)
 
@@ -15,8 +19,9 @@
                   `(%stream-put out ,@args)))
        ,@body)))
 
-(def-print (unknown-class)
-  (<< "<UNKNOWN-CLASS>"))
+(let ((%to-string (%js-eval "function to_string(obj) { return obj + '' }")))
+  (def-print (unknown-class)
+    (<< "<UNKNOWN-CLASS " (%js-apply %to-string nil #(unknown-class)) ">")))
 
 (def-print (object)
   (<< "<OBJECT")
