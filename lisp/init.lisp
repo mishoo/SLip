@@ -418,4 +418,11 @@
                  (go ,tag))))
        ,result-form)))
 
-(export 'destructuring-bind)
+(defparameter *standard-output* (%make-output-stream))
+(defparameter *error-output* (%make-output-stream))
+(defparameter *trace-output* (%make-output-stream))
+
+(export '(*standard-output*
+          *error-output*
+          *trace-output*
+          destructuring-bind))

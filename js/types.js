@@ -144,6 +144,7 @@ var LispInputStream = DEFTYPE("input-stream", function(D, P){
 }, LispStream);
 
 var LispOutputStream = DEFTYPE("output-stream", function(D, P){
+        P.onData = function(){};
         P.put = function(str) {
                 var lines = str.split(/\r?\n/);
                 this.line += lines.length - 1;
@@ -151,7 +152,9 @@ var LispOutputStream = DEFTYPE("output-stream", function(D, P){
                         ? lines[lines.length - 1].length
                         : this.col + lines[0].length;
                 this.pos += str.length;
-                return this.text += str;
+                this.text += str;
+                this.onData(this, str);
+                return this.text;
         };
         P.get = function() {
                 return this.text;

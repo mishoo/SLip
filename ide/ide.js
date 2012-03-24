@@ -566,6 +566,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                                 this.cmd("newline_and_indent");
                                 }
                         }),
+                        "C-ENTER" : "newline_and_indent",
                         "C-c ENTER" : "ss_macroexpand_1",
                         "M-p && C-ARROW_UP" : "ss_repl_history_back",
                         "M-n && C-ARROW_DOWN" : "ss_repl_history_forward",
@@ -624,6 +625,28 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 };
         });
 
+        // hook on *standard-output*, *error-output* and *trace-output*
+        [ "*STANDARD-OUTPUT*",
+          "*ERROR-OUTPUT*",
+          "*TRACE-OUTPUT*"
+        ].foreach(function(sym){
+                var stream = MACHINE.eval_string("SS", sym);
+                stream.onData = function(stream, str) {
+                        var ed = THE_EDITOR;
+                        var out = ed.getBuffer("*ss-output*");
+                        if (!out) {
+                                out = ed.createBuffer({ name: "*ss-output*" });
+                        }
+                        out.preventUpdates();
+                        out.cmd("end_of_buffer");
+                        out.cmd("insert", str);
+                        out.forAllFrames(function(frame){
+                                frame.ensureCaretVisible();
+                                frame.redrawModeline();
+                        });
+                        out.resumeUpdates();
+                };
+        });
 });
 
 // Ymacs_Frame.DEFAULT_ARGS.highlightCurrentLine = [ "highlightCurrentLine" , false ];
@@ -636,17 +659,21 @@ function get_output_buffer() {
         if (!out) {
                 var frame = ed.getActiveFrame(), buf = ed.getActiveBuffer();
                 out = ed.createBuffer({ name: "*ss*" });
-                out.setCode(";; Take this REPL, brother, and may it serve you well.")
+                out.setCode(";; Take this REPL, brother, and may it serve you well.\n")
                 out.cmd("end_of_buffer");
                 out.cmd("ss_repl_mode");
                 buf.cmd("split_frame_vertically", "66%");
                 buf.cmd("other_frame");
                 buf.cmd("switch_to_buffer", "*ss*");
-                ed.setActiveFrame(frame);
                 out.forAllFrames(function(frame){
                         frame.__lineNumbers = false; // :-\
                         frame.delClass("Ymacs-line-numbers");
+                        frame = frame.hsplit();
+                        ed.setActiveFrame(frame);
+                        buf.cmd("switch_to_buffer", "*ss-output*");
+
                 });
+                ed.setActiveFrame(frame);
         }
         return out;
 };

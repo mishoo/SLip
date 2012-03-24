@@ -344,5 +344,5 @@
              (doit out)
              (%stream-get out)))
           ((eq stream t)
-           (error "Standard output not yet supported!"))
+           (doit *standard-output*))
           (t (doit stream)))))

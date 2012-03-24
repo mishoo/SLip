@@ -58,6 +58,8 @@
 (defun-js %dom-canvas-width (canvas) "return canvas.width")
 (defun-js %dom-canvas-height (canvas) "return canvas.height")
 
+;; forward declarations to avoid compiler warnings
+;; should figure out a better way to do this
 (defun draw-turtle ())
 (defun hide-turtle ())
 

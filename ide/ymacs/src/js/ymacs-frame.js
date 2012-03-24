@@ -263,6 +263,7 @@ DEFINE_CLASS("Ymacs_Frame", DlContainer, function(D, P, DOM) {
                 layout.packWidget(fr, { pos: "top", fill: "*" });
                 cont.__doLayout();
                 fr.centerOnCaret();
+                return fr;
         };
 
         P.hsplit = function(percent) {
@@ -282,6 +283,7 @@ DEFINE_CLASS("Ymacs_Frame", DlContainer, function(D, P, DOM) {
                 layout.packWidget(fr, { pos: "left", fill: "*" });
                 cont.__doLayout();
                 fr.centerOnCaret();
+                return fr;
         };
 
         P.toggleLineNumbers = function() {
