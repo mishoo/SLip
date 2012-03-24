@@ -429,8 +429,14 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         this.cmd("goto_char", m);
                 }),
                 ss_complete_symbol: Ymacs_Interactive("d", function(point){
-                        if (this.previousCommand != "ss_complete_symbol" && this.previousCommand != "undo")
+                        switch (this.previousCommand) {
+                            case "ss_complete_symbol":
+                            case "undo":
+                            case "ss_repl_complete_symbol":
+                                break;
+                            default:
                                 this.setq("ss_complete_symbol_context", null);
+                        }
                         var ctx = this.getq("ss_complete_symbol_context");
                         if (!ctx) {
                                 var start = this.cmd("save_excursion", function(){
@@ -452,7 +458,12 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 var sym = ctx.list.shift();
                                 ctx.list.push(sym);
                                 this._replaceText(ctx.start, point, sym.toLowerCase());
+                                return true;
                         }
+                }),
+                ss_repl_complete_symbol: Ymacs_Interactive("d", function(point){
+                        if (!this.cmd("ss_complete_symbol", point))
+                                this.cmd("indent_line");
                 }),
                 ss_get_symbol_completions: function(query) {
                         return WINDOW.LispCons.toArray(MACHINE.eval_string(
@@ -559,7 +570,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         "M-p && C-ARROW_UP" : "ss_repl_history_back",
                         "M-n && C-ARROW_DOWN" : "ss_repl_history_forward",
                         "C-DELETE" : "ss_repl_kill_input",
-                        "TAB" : "ss_complete_symbol",
+                        "TAB" : "ss_repl_complete_symbol",
                         "HOME && C-a" : Ymacs_Interactive("d", function(point){
                                 var m = this.getq("ss_repl_marker").getPosition();
                                 if (this._positionToRowCol(point).row == this._positionToRowCol(m).row)
@@ -673,7 +684,7 @@ function make_desktop() {
 
         var ymacs = THE_EDITOR = WINDOW.YMACS = new Ymacs_SS({ buffers: [], lineNumbers: false });
         ymacs.setColorTheme([ "light", "whiteboard" ]);
-        //ymacs.setColorTheme([ "dark", "charcoal-black" ]);
+        //ymacs.setColorTheme([ "dark", "mishoo" ]);
         ymacs.getActiveBuffer().cmd("ss_mode");
 
         layout.packWidget(toolbar, { pos: "top" });

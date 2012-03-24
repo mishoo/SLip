@@ -104,8 +104,8 @@
            (right (* sec 6))
            (backward 10)
            (draw-pin 0 (+ r 10) 1))
-          (draw-pin (* min 6) (* r 0.8) 3)
-          (draw-pin (* hour 30) (* r 0.6) 5)
+          (draw-pin (* min 6) (* r 0.9) 3)
+          (draw-pin (* hour 30) (* r 0.7) 5)
           min)))))
 
 (let ((running nil))
@@ -129,3 +129,14 @@
         (clock 35 :hours-r 2 :hours-pin 6)
         (set-timeout 150 #'animate-clock)))))
 
+;; (defun animate-clock ()
+;;   (when (clock-running)
+;;     (without-interrupts
+;;       (clear)
+;;       (clock 150)
+;;       (let rec ((i 10))
+;;         (when (> i 0)
+;;           (left (* i 2))
+;;           (clock (- 150 (* 15 i)))
+;;           (rec (- i 0.5))))
+;;       (set-timeout 150 #'animate-clock))))

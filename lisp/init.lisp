@@ -407,4 +407,15 @@
                               (setf ,var x))))))
        ,@body)))
 
+(def-emac dotimes ((var count-form &optional result-form) &body body)
+  (let ((tag (gensym)))
+    `(block nil
+       (let ((,var ,count-form))
+         (tagbody
+          ,tag (when (> ,var 0)
+                 ,@body
+                 (decf ,var)
+                 (go ,tag))))
+       ,result-form)))
+
 (export 'destructuring-bind)

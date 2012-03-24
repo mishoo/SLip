@@ -77,20 +77,28 @@
     (%::eval-string str)))
 
 (labels ((symbol-completion (query all)
-           (let* ((rx (make-regexp (strcat "^" (replace-regexp #/[-_.\/]/g
-                                                               (quote-regexp (replace-regexp #/\./g query "-"))
-                                                               "[^-_./]*[-_./]"))
+           (let* ((rx (make-regexp (strcat
+                                    "^"
+                                    (replace-regexp
+                                     #/[-_.\/]/g
+                                     (quote-regexp (replace-regexp #/\./g query "-"))
+                                     "[^-_./]*[-_./]"))
                                    "i"))
                   (len (length query))
-                  (matching (mapcar #'%symbol-name
-                                    (grep all (lambda (sym)
-                                                (regexp-test rx (%symbol-name sym)))))))
-             (sort matching (lambda (a b)
-                              (cond ((string-equal a query) nil)
-                                    ((string-equal b query) t)
-                                    (t
-                                     (< (abs (- (length a) len))
-                                        (abs (- (length b) len))))))))))
+                  (matching (grep all (lambda (sym)
+                                        (regexp-test rx (%symbol-name sym))))))
+             (mapcar #'%symbol-name
+                     (sort matching
+                           (lambda (syma symb)
+                             (let ((a (%symbol-name syma))
+                                   (b (%symbol-name symb)))
+                               (cond ((string-equal a query) nil)
+                                     ((string-equal b query) t)
+                                     ((eq (%symbol-package syma) *package*) t)
+                                     ((eq (%symbol-package symb) *package*) nil)
+                                     (t
+                                      (< (abs (- (length a) len))
+                                         (abs (- (length b) len))))))))))))
 
   (define-handler :list-symbol-completions (query)
     (let (m)
