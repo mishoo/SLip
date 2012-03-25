@@ -25,8 +25,9 @@
    tmp.style.border = '1px solid red';
    tmp.style.padding = '1px';
    tmp.style.position = 'absolute';
-   tmp.style.left = '5px';
-   tmp.style.top = '5px';
+   tmp.style.boxShadow = '0 0 10px #999';
+   tmp.style.left = '10px';
+   tmp.style.top = '10px';
    document.body.appendChild(tmp);
    var ctx = tmp.getContext('2d');
    ctx.translate(width / 2, height / 2);

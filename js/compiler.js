@@ -103,7 +103,7 @@ function lisp_reader(code) {
                 return new RegExp(str, mods);
         };
         function skip_comment() {
-                read_while(function(ch){ return ch != "\n"; });
+                read_while(function(ch){ return ch && ch != "\n" });
         };
         function read_symbol() {
                 var str = read_while(function(ch){

@@ -710,7 +710,7 @@ function make_desktop() {
         btn("Paste from system clipboard", function(){ buffer().cmd("yank_from_operating_system") });
 
         var ymacs = THE_EDITOR = WINDOW.YMACS = new Ymacs_SS({ buffers: [], lineNumbers: false });
-        ymacs.setColorTheme([ "light", "whiteboard" ]);
+        ymacs.setColorTheme([ "light", "tango" ]);
         //ymacs.setColorTheme([ "dark", "mishoo" ]);
         ymacs.getActiveBuffer().cmd("ss_mode");
 

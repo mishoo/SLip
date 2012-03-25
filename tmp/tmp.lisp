@@ -1,3 +1,5 @@
+(in-package :turtle)
+
 (defun rect-spiral (max)
   (save-excursion
    (let rec ((n 0))
