@@ -153,7 +153,7 @@
                 };
                 function read_token() {
                         skip_ws();
-                        if (!caret_token && caret != null && input.pos == caret) {
+                        if (!caret_token && caret != null && input.pos == caret && (!parent || parent.type == "list")) {
                                 return caret_token = token("caret");
                         }
                         switch (peek()) {
@@ -161,18 +161,26 @@
                             case "\"" : return token("string", read_string);
                             case "("  : return token("list", read_list);
                             case "#"  : return token("sharp", read_sharp);
-                            case "`"  : next(); return token("qq", read_token);
-                            case ","  : next(); return token("comma", read_token);
-                            case "'"  : next(); return token("quote", read_token);
-                            case ")"  : return false;
-                            case null : return false; // EOF
+                            case "`"  : next(); return token("qq", read_token, -1);
+                            case ","  :
+                                next();
+                                if (peek() == "@") {
+                                        next();
+                                        return token("splice", read_token, -2);
+                                }
+                                return token("unquote", read_token, -1);
+                            case "'"  : next(); return token("quote", read_token, -1);
+                            case ")"  : return null;
+                            case null : return null; // EOF
                         }
                         return token("symbol", read_symbol);
                 };
                 function read_all() {
                         var ret = [];
                         while (peek() != null) {
-                                ret.push(read_token());
+                                var tok = read_token();
+                                if (tok == null) break;
+                                ret.push(tok);
                                 ++list_index;
                         }
                         return ret;
@@ -182,17 +190,18 @@
                 var caret = null;
                 var parent = null;
                 var cont_exp = null;
-                function token(type, reader) {
+                function token(type, reader, adjust_start) {
+                        if (adjust_start == null) adjust_start = 0;
                         var save_parent = parent;
                         try {
                                 var tok = {
                                         index  : list_index,
                                         type   : type,
-                                        start  : input.pos,
+                                        start  : input.pos + adjust_start,
                                         parent : parent,
                                         depth  : parent ? parent.depth + 1 : 0
                                 };
-                                parent = tok;
+                                if (type == "list") parent = tok;
                                 tok.value = reader ? reader() : null;
                                 tok.end = input.pos;
                                 if (caret != null) {
@@ -217,13 +226,19 @@
                                 if (caret_token) {
                                         return caret_token.parent.value[caret_token.index - 1];
                                 } else {
-                                        return cont_exp;
+                                        return cont_exp.parent.value[cont_exp.index];
                                 }
+                        },
+                        caret_token: function() {
+                                return caret_token;
+                        },
+                        cont_exp: function() {
+                                return cont_exp;
                         },
                         list: function() {
                                 var tok = cont_exp;
-                                tok = tok.parent;
-                                while (tok.type != "list") tok = tok.parent;
+                                while (tok && (tok.type != "list" || tok.end == caret))
+                                        tok = tok.parent;
                                 return tok;
                         }
                 };
@@ -236,6 +251,9 @@
                                 var p = QuickParser(this);
                                 var ast = p.parse(this.point());
                                 console.log(ast);
+                                console.log(p.caret_token());
+                                console.log(p.cont_exp());
+                                console.log(p.prev_exp());
                         } catch(ex) {
                                 console.log(ex);
                         }
@@ -258,7 +276,7 @@
                         var p = QuickParser(this);
                         p.parse(this.point());
                         var list = p.list();
-                        if (list) this.cmd("goto_char", list.start);
+                        if (list && list.parent) this.cmd("goto_char", list.start);
                 }),
 
                 lisp_open_paren: Ymacs_Interactive(function(what) {
@@ -672,6 +690,10 @@ Ymacs_Buffer.newMode("lisp_mode", function() {
         this.setTokenizer(new Ymacs_Tokenizer({ buffer: this, type: "lisp" }));
         var changed_vars = this.setq({
                 indent_level: 2,
+                syntax_comment_line: {
+                        rx: /\s*;+\s?/g,
+                        ch: ";;"
+                },
                 syntax_word_dabbrev: {
                         test: function(c) {
                                 if (c) {
@@ -696,18 +718,16 @@ Ymacs_Buffer.newMode("lisp_mode", function() {
         this.pushKeymap(keymap);
         var was_paren_match = this.cmd("paren_match_mode", true);
 
-        this.COMMANDS = Object.makeCopy(this.COMMANDS);
-        Object.foreach({
+        var changed_commands = this.replaceCommands({
                 "forward_sexp"            : "lisp_forward_sexp",
                 "backward_sexp"           : "lisp_backward_sexp",
                 "backward_up_list"        : "lisp_backward_up_list"
-        }, function(val, key){
-                this[key] = this[val];
-        }, this.COMMANDS);
+        });
 
         return function() {
                 this.setTokenizer(tok);
                 this.setq(changed_vars);
+                this.newCommands(changed_commands);
                 this.popKeymap(keymap);
                 if (!was_paren_match)
                         this.cmd("paren_match_mode", false);

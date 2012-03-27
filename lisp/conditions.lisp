@@ -11,7 +11,8 @@
           warning
           signal
           handler-case
-          handler-bind))
+          handler-bind
+          ignore-errors))
 
 (defun typep (obj type)
   (if (is-a obj type) t nil))
@@ -90,6 +91,10 @@
                   (handler-bind ,bindings
                     (return-from ,block-tag ,form))
                   ,@body))))))))
+
+(defmacro ignore-errors (&body body)
+  `(handler-case (progn ,@body)
+     (error (condition))))
 
 (defun existing-condition-name? (name)
   (let ((class (find-class name)))
