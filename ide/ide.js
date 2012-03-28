@@ -4,7 +4,7 @@
 
 (function(){
 
-        var WEBDAV_ROOT = "../lisp/";
+        var WEBDAV_ROOT = "../";
 
         function webdav_url(filename) {
                 return WEBDAV_ROOT + filename;
@@ -373,25 +373,20 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 },
                 ss_repl_eval: Ymacs_Interactive(function() {
                         var self = this;
-                        var code = get_repl_input(self);
-                        try {
-                                var tmp = MACHINE.read(null, code);
-                                var expr = tmp[0], pos = tmp[1];
-                                var m = self.getq("ss_repl_marker");
-                                //flash_region(self, m.getPosition(), pos + m.getPosition());
-                                if (expr === WINDOW.LispSymbol.get("EOF"))
-                                        return self.cmd("ss_repl_prompt");
-                                var code = code.substr(0, pos).trim();
-                                var h = self.getq("ss_repl_history");
-                                if (h[0] != code) {
-                                        h.unshift(code);
-                                        self.ymacs.ls_setFileContents("~/.ss-lisp-history", DlJSON.encode(h.slice(0, 500)));
-                                }
-                        } catch(ex) {
-                                // XXX:
+                        var repl_start = self.getq("ss_repl_marker").getPosition();
+                        var parser = self.cmd("lisp_make_quick_parser", repl_start);
+                        var expr = parser.read();
+                        if (!expr)
+                                return self.cmd("ss_repl_prompt");
+                        if (expr.partial)
                                 return self.cmd("newline_and_indent");
+                        var code = self.cmd("buffer_substring", expr.start, expr.end);
+                        var h = self.getq("ss_repl_history");
+                        if (h[0] != code) {
+                                h.unshift(code);
+                                self.ymacs.ls_setFileContents("~/.ss-lisp-history", DlJSON.encode(h.slice(0, 1000)));
                         }
-                        self.ymacs.run_lisp("EVAL-PRINT", expr, function(ret){
+                        self.ymacs.run_lisp("READ-EVAL-PRINT", code, function(ret){
                                 if (typeof ret != "string") ret = MACHINE.dump(ret);
                                 ss_log(ret);
                                 self.cmd("ss_repl_prompt");
@@ -506,6 +501,15 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
 
         var HISTORY_COMPLETIONS;
 
+        function uniq(a) {
+                if (a.length <= 1) return a;
+                for (var ret = [ a[0] ], i = 1; i < a.length; ++i) {
+                        var el = a[i];
+                        if (el != ret.peek()) ret.push(el);
+                }
+                return ret;
+        };
+
         function get_relevant_history(buf) {
                 var h = buf.getq("ss_repl_history").slice();
                 var m = buf.getq("ss_repl_marker");
@@ -516,6 +520,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         }).mergeSort(function(a, b){
                                 return a.indexOf(input) - b.indexOf(input);
                         });
+                        h = uniq(h);
                 }
                 return h;
         };

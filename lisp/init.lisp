@@ -2,7 +2,7 @@
 
 "
 (in-package :%)
-"
+" ;; hack for Ymacs
 
 (let ((main (%make-package "SS"))
       (boot (%find-package "%"))
@@ -167,12 +167,6 @@
        (prog1 (progn ,@body)
          (console.print "Evaluation time:" (- (%get-time) ,t1))))))
 
-;; (def-emac defun (name lambda-list &body body)
-;;   (let ((args (gensym "ARGS")))
-;;     `(labels ((,name ,args
-;;                 (destructuring-bind ,lambda-list ,args ,@body)))
-;;        (set-symbol-function! ',name #',name))))
-
 (def-emac intern (symbol-name &optional (package *package*))
   `(%intern ,symbol-name ,package))
 
@@ -267,7 +261,7 @@
     `(let (,@(mapcar (lambda (g) `(,g (gensym))) gensyms))
        `(let (,,@(mapcar (lambda (g n) ``(,,g ,,n)) gensyms names))
           ,(let (,@(mapcar (lambda (n g) `(,n ,g)) names gensyms))
-                ,@body)))))
+             ,@body)))))
 
 (def-emac pop (place)
   (let ((v (gensym)))

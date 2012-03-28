@@ -126,7 +126,7 @@
   (let ((condition (%condition datum arguments 'simple-error)))
     (signal condition)
     ;; XXX: no debugger
-    (%error (%dump condition))))
+    (%error condition)))
 
 (defun primitive-error (fmt . arguments)
   (error 'primitive-error 'format-control fmt 'format-args arguments))

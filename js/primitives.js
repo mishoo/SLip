@@ -651,7 +651,8 @@
                             default:
                                 if (LispChar.is(arg)) ret = arg.value + ret;
                                 else if (LispSymbol.is(arg)) ret = LispSymbol.symname(arg) + ret;
-                                else error("Unrecognized argument type");
+                                else if (LispPackage.is(arg)) ret = arg.name + ret;
+                                else error("Unrecognized argument type in STRCAT");
                         }
                 }
                 return ret;
@@ -1376,14 +1377,6 @@
                 return sym === S_NIL ? null : sym === S_T ? true : sym;
         });
 
-        defp("%externalp", false, function(m, nargs){
-                checknargs(nargs, 2, 2);
-                var pak = m.pop(), sym = m.pop();
-                checktype(sym, LispSymbol);
-                checktype(pak, LispPackage);
-                return pak.exports.indexOf(sym) >= 0 ? true : null;
-        });
-
         defp("%accessible-symbols", false, function(m, nargs){
                 checknargs(nargs, 1, 2);
                 var ext = nargs == 2 ? m.pop() : null;
@@ -1409,13 +1402,28 @@
 
         defp("%find-symbol", false, function(m, nargs){
                 checknargs(nargs, 2, 2);
-                var pak = m.pop(), name = m.pop();
-                checktype(pak, LispPackage);
-                name = as_string(name);
+                var pak = m.pop(), name = as_string(m.pop());
                 checktype(name, LispString);
+                checktype(pak, LispPackage);
                 var sym = pak.find(name);
                 if (!sym) error("Symbol " + name + " not found in " + pak.name);
                 return sym;
+        });
+
+        defp("%find-exported-symbol", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var pak = m.pop(), name = as_string(m.pop());
+                checktype(name, LispString);
+                checktype(pak, LispPackage);
+                return pak.find_exported(name);
+        });
+
+        defp("%find-internal-symbol", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var pak = m.pop(), name = as_string(m.pop());
+                checktype(name, LispString);
+                checktype(pak, LispPackage);
+                return pak.find_internal(name);
         });
 
         defp("%find-package", false, function(m, nargs){
@@ -1435,6 +1443,8 @@
                 var pak = m.pop(), syms = as_list(m.pop());
                 checktype(pak, LispPackage);
                 LispCons.forEach(syms, function(sym){
+                        if (LispString.is(sym))
+                                sym = pak.intern(sym);
                         pak.export(sym);
                 });
                 return pak;
@@ -1689,9 +1699,8 @@
 
         defp("%error", true, function(m, nargs){
                 checknargs(nargs, 1, 1);
-                var msg = m.pop();
                 // that's a hard error.
-                throw new Error(msg);
+                throw m.pop();
         });
 
         defp("%warn", true, function(m, nargs){

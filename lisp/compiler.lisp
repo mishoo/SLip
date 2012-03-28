@@ -60,11 +60,10 @@
 
 ;; better to avoid quasiquote here:
 (%macro! 'defmacro
-         (labels ((defmacro (name args . body)
-                            (list '%macro!
-                                  (list 'quote name)
-                                  (list* '%fn name args body))))
-           #'defmacro))
+         (%fn defmacro (name args . body)
+              (list '%macro!
+                    (list 'quote name)
+                    (list* '%fn name args body))))
 
 (defmacro quasiquote (thing)
   (qq thing))
@@ -185,6 +184,9 @@
 (defmacro push (obj place)
   `(setq ,place (cons ,obj ,place)))
 
+(%global! '+keyword-package+)
+(setq +keyword-package+ (%find-package "KEYWORD"))
+
 ;;;; parser/compiler
 
 (defun lisp-reader (text eof)
@@ -271,15 +273,24 @@
              (aif (and (regexp-test #/^-?[0-9]*\.?[0-9]*$/ str)
                        (parse-number str))
                   it
-                  (aif (regexp-exec #/^(.*?)::?(.*)$/ str)
+                  (aif (regexp-exec #/^(.*?)(::?)(.*)$/ str)
                        (let ((pak (elt it 1))
-                             (sym (elt it 2)))
+                             (sym (elt it 3))
+                             (internal (string= (elt it 2) "::")))
                          (when (zerop (length sym))
-                           (error "Bad symbol name"))
-                         (setq pak (%find-package (if (zerop (length pak))
-                                                      "KEYWORD"
-                                                      pak)))
-                         (%intern sym pak))
+                           (error (strcat "Bad symbol name in " str)))
+                         (cond
+                           ((zerop (length pak))
+                            ;; KEYWORD
+                            (setq sym (%intern sym +keyword-package+))
+                            (%export sym +keyword-package+)
+                            sym)
+                           (t
+                            (setq pak (%find-package pak))
+                            (if internal
+                                (%intern sym pak)
+                                (or (%find-exported-symbol sym pak)
+                                    (error (strcat "Symbol " sym " not accessible in package " pak)))))))
                        (%intern str *package*)))))
 
          (read-char ()

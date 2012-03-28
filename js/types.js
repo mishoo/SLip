@@ -271,19 +271,28 @@ var LispPackage = DEFTYPE("package", function(D, P){
                 this.symbols.set(name, sym);
                 return sym;
         };
-        P.find_accessible = function(name) {
+        P.find_exported = function(name) {
                 var a = this.exports;
                 for (var i = a.length; --i >= 0;) {
                         var sym = a[i];
                         if (LispSymbol.symname(sym) == name)
                                 return sym;
                 }
-                a = this.uses;
-                for (var i = a.length; --i >= 0;) {
-                        var sym = a[i].find_accessible(name);
-                        if (sym) return sym;
-                }
                 return null;
+        };
+        P.find_internal = function(name) {
+                return this.symbols.get(name);
+        };
+        P.find_accessible = function(name) {
+                var sym = this.find_exported(name);
+                if (!sym) {
+                        var a = this.uses;
+                        for (var i = a.length; --i >= 0;) {
+                                var sym = a[i].find_accessible(name);
+                                if (sym) break;
+                        }
+                }
+                return sym;
         };
         P.all_accessible = function(external) {
                 var ret = external

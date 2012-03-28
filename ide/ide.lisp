@@ -56,6 +56,13 @@
   (let ((ret (%::eval expr)))
     ret))
 
+(define-handler :read-eval-print (code)
+  (let* ((expr (vector-ref (%::read1-from-string code) 0))
+         (ret (%::eval expr)))
+    (if (stringp ret)
+        ret
+        (print-object-to-string ret))))
+
 (define-handler :eval-print (expr)
   (let ((ret (%::eval expr)))
     (if (stringp ret)
