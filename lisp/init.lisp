@@ -10,7 +10,7 @@
   (%export '(quasiquote defmacro defun when unless map labels flet foreach
              prog1 prog2 or and cond member case mapcar with-cc aif it push
              error warn without-interrupts
-             lisp-reader compile compile-string load function unwind-protect
+             lisp-reader compile load function unwind-protect
              funcall macrolet catch throw
              quote lambda let let* if progn setq t nil not
              tagbody go block return return-from
@@ -127,10 +127,11 @@
   (%fn-destruct args values body))
 
 (defmacro defmacro (name lambda-list . body)
+  (%::maybe-xref-info name "DEFMACRO")
   (let ((args (gensym "ARGS")))
-    `(labels ((,name ,args
-                (destructuring-bind ,lambda-list ,args ,@body)))
-       (%macro! ',name #',name))))
+    `(%macro! ',name (%::%fn ',name ,args
+                             (destructuring-bind ,lambda-list ,args
+                               ,@body)))))
 
 (defmacro import (symbols &optional (package *package*))
   `(%import ,symbols ,package))
@@ -201,11 +202,13 @@
 
 (def-emac defparameter (name val)
   (%special! name)
+  (%::maybe-xref-info name "DEFPARAMETER")
   `(progn (%special! ',name)
           (setq ,name ,val)))
 
 (def-emac defglobal (name val)
   (%global! name)
+  (%::maybe-xref-info name "DEFGLOBAL")
   `(progn (%global! ',name)
           (setq ,name ,val)))
 

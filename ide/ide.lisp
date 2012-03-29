@@ -144,8 +144,7 @@
     (make-thread
      (lambda ()
        (let ((*package* (%find-package :ss-user))
-             (*read-table* *read-table*)
-             (%::*url-prefix* "../"))
+             (*read-table* *read-table*))
          (let looop ()
            (%receive *handlers*)
            (looop))))))

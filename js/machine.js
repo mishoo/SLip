@@ -98,6 +98,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.ret.run(m, this.addr, retval);
         };
 
+        D.XREF = {};            // store per-file cross-reference information
+
         /// constructor
         P.INIT = function(pm) {
                 this.code = null;

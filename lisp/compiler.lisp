@@ -19,7 +19,8 @@
            '*current-file*
            '*current-pos*
            '*url-prefix*
-           '*defining-functions*)
+           '*defining-functions*
+           '*xref-info*)
 
 ;; props to http://norstrulde.org/ilge10/
 (set-symbol-function!
@@ -38,35 +39,17 @@
                 (list 'quote x))))
    #'qq))
 
-;; (set-symbol-function!
-;;  'qq
-;;  (labels ((qq-expand-list (x)
-;;             (if (consp x)
-;;                 (if (eq (car x) 'qq-unquote)
-;;                     (list 'list (cadr x))
-;;                     (if (eq (car x) 'qq-splice)
-;;                         (cadr x)
-;;                         (if (eq (car x) 'quasiquote)
-;;                             (qq-expand-list (qq-expand (cadr x)))
-;;                             (list 'list (list 'append
-;;                                               (qq-expand-list (car x))
-;;                                               (qq-expand (cdr x)))))))
-;;                 (list 'quote (list x))))
-;;           (qq-expand (x)
-;;             (if (consp x)
-;;                 (if (eq (car x) 'qq-unquote)
-;;                     (cadr x)
-;;                     (if (eq (car x) 'quasiquote)
-;;                         (qq-expand (qq-expand (cadr x)))
-;;                         (list 'append
-;;                               (qq-expand-list (car x))
-;;                               (qq-expand (cdr x)))))
-;;                 (list 'quote x))))
-;;    #'qq-expand))
+(set-symbol-function!
+ 'maybe-xref-info
+ (%fn maybe-xref-info (name type)
+      (if *xref-info*
+          (vector-push *xref-info*
+                       #(name type *current-pos*)))))
 
 ;; better to avoid quasiquote here:
 (%macro! 'defmacro
          (%fn defmacro (name args . body)
+              (maybe-xref-info name "DEFMACRO")
               (list '%macro!
                     (list 'quote name)
                     (list* '%fn name args body))))
@@ -89,6 +72,7 @@
   `((progn ,f) ,@args))
 
 (defmacro defun (name args . body)
+  (maybe-xref-info name "DEFUN")
   `(set-symbol-function! ',name (%fn ,name ,args ,@body)))
 
 (defun error (msg)
@@ -381,11 +365,21 @@
              (#\, (read-comma))
              (#\' (read-quote))
              (nil eof)
-             (otherwise (read-symbol)))))
+             (otherwise (read-symbol))))
+
+         (read-toplevel ()
+           (labels ((fwd ()
+                      (skip-ws)
+                      (when (eq (peek) #\;)
+                        (skip-comment)
+                        (fwd))))
+             (fwd)
+             (cons (%stream-pos input)
+                   (read-token)))))
 
       (lambda (what)
         (case what
-          (next (read-token))
+          (next (read-toplevel))
           (pos (%stream-pos input))
           (col (%stream-col input))
           (line (%stream-line input)))))))
@@ -891,43 +885,54 @@
        (let ((reader (lisp-reader str 'EOF))
              (out (%make-output-stream))
              (is-first t)
-             (link-addr 0))
-         (labels ((rec ()
-                    (let ((form (funcall reader 'next)))
+             (link-addr 0)
+             (*xref-info* #())
+             (env (make-environment)))
+         (labels ((comp1 (form)
+                    (let ((code (comp form env nil t)))
+                      (when code
+                        (setq code (%exec-code code))
+                        (%relocate-code code link-addr)
+                        (setq link-addr (+ link-addr (length code)))
+                        (if is-first
+                            (setq is-first nil)
+                            (%stream-put out #\,))
+                        (%stream-put out (%serialize-code code) #\Newline))))
+                  (rec ()
+                    (let* ((token (funcall reader 'next))
+                           (*current-pos* (car token))
+                           (form (cdr token)))
                       (unless (eq form 'EOF)
-                        (let ((code (comp form (make-environment) nil t)))
-                          (when code
-                            (setq code (%exec-code code))
-                            (%relocate-code code link-addr)
-                            (setq link-addr (+ link-addr (length code)))
-                            (if is-first
-                                (setq is-first nil)
-                                (%stream-put out #\,))
-                            (%stream-put out (%serialize-code code) #\Newline)))
+                        (comp1 form)
                         (rec)))))
            (rec)
+           (let* ((xref *xref-info*)
+                  (*xref-info* nil))
+             (when (and *current-file* (> (length xref) 0))
+               (comp1 `(%grok-xref-info ,*current-file* ,xref))))
            (%stream-get out)))))
 
   (set-symbol-function! 'compile #'compile)
   (set-symbol-function! 'compile-string #'compile-string))
 
 (defun read1-from-string (str)
-  (let* ((reader (lisp-reader str 'EOF)))
-    #( (funcall reader 'next) (funcall reader 'pos) )))
+  (let ((reader (lisp-reader str 'EOF)))
+    #( (cdr (funcall reader 'next)) (funcall reader 'pos) )))
 
 (defun eval (expr)
   ((compile (list 'lambda nil expr))))
 
 (defun eval-string (str)
-  (let* ((reader (lisp-reader str 'EOF)))
+  (let ((reader (lisp-reader str 'EOF)))
     (labels ((rec (last expr)
                (if (eq expr 'EOF) last
                    (rec ((compile (list 'lambda nil expr)))
-                        (funcall reader 'next)))))
-      (rec nil (funcall reader 'next)))))
+                        (cdr (funcall reader 'next))))))
+      (rec nil (cdr (funcall reader 'next))))))
 
 (defun %load (url)
-  (compile-string (%get-file-contents url)))
+  (let ((*current-file* url))
+    (compile-string (%get-file-contents (make-url url)))))
 
 (defun make-url (url)
   (if *url-prefix*
@@ -936,21 +941,12 @@
 
 (defun load (url)
   (let ((*package* *package*)
-        (*read-table* *read-table*)
-        (*current-file* (make-url url)))
-    (%load *current-file*)))
+        (*read-table* *read-table*))
+    (%load url)))
 
 ;;;
 
 EOF
 
-;; (console.print (compile-string "
-;;  (let ((a 10) (b 20))
-;;    (if a (+ a b) (/ a b))
-;;  )
-;;  (let ((c 10) (d 20))
-;;    (if d (+ c d) (/ c d))
-;;  )
-;; "))
-
-(console.print (compile-string (%js-eval "window.CURRENT_FILE")))
+(let ((*current-file* "compiler.lisp"))
+  (console.print (compile-string (%js-eval "window.CURRENT_FILE"))))

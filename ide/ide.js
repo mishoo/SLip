@@ -4,7 +4,8 @@
 
 (function(){
 
-        var WEBDAV_ROOT = "../";
+        //var WEBDAV_ROOT = "../";
+        var WEBDAV_ROOT = "";
 
         function webdav_url(filename) {
                 return WEBDAV_ROOT + filename;
@@ -70,18 +71,21 @@
                         if (buf) {
                                 ymacs.switchToBuffer(buf);
                         } else {
+                                buf = ymacs.createBuffer({ name: filename });
                                 webdav_load(filename, function(error, code){
                                         if (error) {
                                                 self.signalInfo("New file: " + filename);
                                                 code = "";
                                         }
-                                        var buf = ymacs.createBuffer({ name: filename });
                                         buf.setq("webdav_filename", filename);
                                         buf.setCode(code);
                                         ymacs.switchToBuffer(buf);
                                         automode(buf);
+                                        var cont = buf.getq("webdav_after_load");
+                                        if (cont) cont(buf);
                                 });
                         }
+                        return buf;
                 }),
                 webdav_save_file_buffer: Ymacs_Interactive(function(){
                         var self = this;
@@ -179,35 +183,29 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
         };
 
         function find_toplevel_sexp(buffer, blink, noerror) {
-                var rc = buffer._rowcol, parser = buffer.tokenizer.finishParsing();
-                if (parser) {
-                        var lc = { line: rc.row, col: rc.col };
-                        var p = getPP(parser).grep("closed").mergeSort(compareRowCol).grep_first(function(p){
-                                return compareRowCol(p, lc) <= 0 && compareRowCol(p.closed, lc) >= 0;
-                        });
-                        if (p == null) p = getPP(parser).grep("closed").mergeSort(function(a, b){
-                                return compareRowCol(a.closed, b.closed);
-                        }).grep_last(function(p){
-                                return compareRowCol(p, lc) < 0 && compareRowCol(p.closed, lc) < 0;
-                        });
-                        if (p == null) {
-                                if (!noerror)
-                                        throw new Ymacs_Exception("Can't figure out toplevel expression");
-                                return null;
-                        }
-                        var s = p, e = p.closed;
-                        if (blink) {
-                                buffer.setOverlay("flash-code", {
-                                        line1: s.line, col1: s.col,
-                                        line2: e.line, col2: e.col + 1
-                                });
-                                (function(){
-                                        buffer.deleteOverlay("flash-code");
-                                }).delayed(500);
-                        }
-                        return [ buffer._rowColToPosition(s.line, s.col),
-                                 buffer._rowColToPosition(e.line, e.col + 1) ];
+                var p = buffer.cmd("lisp_make_quick_parser");
+                p.parse(buffer.point());
+                var exp = p.cont_exp();
+                while (exp && exp.parent && exp.parent.parent) {
+                        exp = exp.parent;
                 }
+                if (exp == null || !exp.parent) {
+                        if (!noerror)
+                                throw new Ymacs_Exception("Can't figure out toplevel expression");
+                        return null;
+                }
+                if (exp.partial) throw new Ymacs_Exception("Incomplete toplevel expression");
+                if (blink) {
+                        var s = buffer._positionToRowCol(exp.start), e = buffer._positionToRowCol(exp.end);
+                        buffer.setOverlay("flash-code", {
+                                line1: s.row, col1: s.col,
+                                line2: e.row, col2: e.col
+                        });
+                        (function(){
+                                buffer.deleteOverlay("flash-code");
+                        }).delayed(500);
+                }
+                return [ exp.start, exp.end ];
         };
 
         function find_in_package(buffer, start) {
@@ -310,6 +308,55 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
         Ymacs_Buffer.newCommands({
                 ss_get_output_buffer: get_output_buffer,
                 ss_log: ss_log,
+                ss_get_symbol: function(pos){
+                        var p = this.cmd("lisp_make_quick_parser");
+                        p.parse(pos);
+                        var expr = p.cont_exp();
+                        if (expr && expr.type == "caret")
+                                expr = expr.parent.value[expr.index + 1];
+                        if (expr && (expr.type == "symbol" || expr.type == "function"))
+                                return expr;
+                },
+                ss_xref_symbol: Ymacs_Interactive("d", function(point){
+                        var sym = this.cmd("ss_get_symbol", point);
+                        if (sym) {
+                                var debug = MACHINE.eval_string(
+                                        find_package(this),
+                                        "(%get-symbol-prop '" + sym.value + " \"XREF\")"
+                                );
+                                if (debug) debug = Array.$(debug).grep(function(stuff){
+                                        switch (stuff[0]) {
+                                            case "DEFMACRO":
+                                            case "DEFUN":
+                                            case "DEFPARAMETER":
+                                            case "DEFVAR":
+                                            case "DEFGLOBAL":
+                                            case "DEFCONSTANT":
+                                                return true;
+                                        }
+                                });
+                                if (!debug || debug.length == 0)
+                                        throw new Ymacs_Exception("No xref information for symbol " + sym.value);
+                                var stuff = debug.peek();
+                                var filename = stuff[1];
+                                var position = stuff[2];
+                                var ymacs = this.ymacs;
+                                var buf = ymacs.getBuffer(filename);
+                                function cont(buf) {
+                                        buf.cmd("goto_char", position);
+                                        buf.cmd("ensure_caret_visible");
+                                };
+                                if (buf) {
+                                        ymacs.switchToBuffer(buf);
+                                        cont(buf);
+                                } else {
+                                        buf = this.cmd("webdav_load_file_buffer", filename);
+                                        buf.setq("webdav_after_load", cont);
+                                }
+                        } else {
+                                throw new Ymacs_Exception("No symbol at point");
+                        }
+                }),
                 ss_clear_output: Ymacs_Interactive(function(){
                         var buf = get_output_buffer();
                         buf.setCode("");
@@ -424,15 +471,13 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         this.cmd("goto_char", m);
                 }),
                 ss_complete_symbol: Ymacs_Interactive("d", function(point){
+                        var ctx;
                         switch (this.previousCommand) {
                             case "ss_complete_symbol":
                             case "undo":
                             case "ss_repl_complete_symbol":
-                                break;
-                            default:
-                                this.setq("ss_complete_symbol_context", null);
+                                ctx = this.getq("ss_complete_symbol_context");
                         }
-                        var ctx = this.getq("ss_complete_symbol_context");
                         if (!ctx) {
                                 var start = this.cmd("save_excursion", function(){
                                         if (!this.cmd("search_backward_regexp", /[^-a-z0-9_*&^%$@!=+\/.<>?:]/ig))
@@ -553,7 +598,9 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 "C-c ENTER"                             : "ss_macroexpand_1",
                 "C-c M-m"                               : "ss_macroexpand_all",
                 "M-q"                                   : "ss_indent_sexp",
-                "S-TAB"                                 : "ss_complete_symbol"
+                "S-TAB"                                 : "ss_complete_symbol",
+                "M-."                                   : "ss_xref_symbol"
+                //,"M-,"                                   : "ss_xref_back_history"
         };
 
         DEFINE_SINGLETON("Ymacs_Keymap_SS_REPL", D, function(D, P){
@@ -585,6 +632,8 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         })
                 };
         });
+
+        Ymacs_Buffer.setGlobal("ss_xref_history", []);
 
         Ymacs_Buffer.newMode("ss_mode", function(){
                 this.cmd("lisp_mode", true);
@@ -715,7 +764,7 @@ function make_desktop() {
         btn("Paste from system clipboard", function(){ buffer().cmd("yank_from_operating_system") });
 
         var ymacs = THE_EDITOR = WINDOW.YMACS = new Ymacs_SS({ buffers: [], lineNumbers: false });
-        ymacs.setColorTheme([ "light", "tango" ]);
+        ymacs.setColorTheme([ "light", "whiteboard" ]);
         //ymacs.setColorTheme([ "dark", "mishoo" ]);
         ymacs.getActiveBuffer().cmd("ss_mode");
 

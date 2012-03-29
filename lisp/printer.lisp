@@ -9,7 +9,7 @@
 (defgeneric print-object)
 
 (defparameter *print-readably* nil)
-(defparameter *print-escape* nil)
+(defparameter *print-escape* t)
 (defparameter *print-base* 10)
 (defparameter *print-radix* nil)
 

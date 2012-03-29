@@ -1717,6 +1717,22 @@
                 debugger;
         });
 
+        defp("%grok-xref-info", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var xref = m.pop();
+                var filename = m.pop();
+                xref.forEach(function(data){
+                        var sym = data[0], type = data[1], pos = data[2];
+                        if (sym instanceof LispSymbol) {
+                                var a = sym.getv("XREF");
+                                if (a === null) a = sym.setv("XREF", []);
+                                a.push([ type, filename, pos ]);
+                        }
+                });
+                LispMachine.XREF[filename] = xref;
+                return null;
+        });
+
         defp("%machine.dynamic-environment", false, function(m, nargs){
                 return m.denv;
         });
