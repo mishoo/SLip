@@ -550,6 +550,20 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         LispSymbol.is(x);
         };
 
+        function is_jump_instruction(op) {
+                switch (op) {
+                    case "JUMP":
+                    case "TJUMP":
+                    case "FJUMP":
+                    case "LRET":
+                    case "LJUMP":
+                    case "UPOPEN":
+                    case "SAVE":
+                    case "CATCH":
+                        return true;
+                }
+        };
+
         function assemble(code) {
                 optimize(code);
                 var ret = [];
@@ -564,23 +578,27 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                             case "FN":
                                 ret[i] = OPS.FN.make(assemble(el[1]), el[2]);
                                 break;
-                            case "JUMP":
-                            case "TJUMP":
-                            case "FJUMP":
-                            case "LJUMP":
-                            case "LRET":
-                            case "UPOPEN":
-                            case "SAVE":
-                            case "CATCH":
-                                el[1] = el[1].value;
                             default:
+                                if (is_jump_instruction(el[0]))
+                                        el[1] = el[1].value;
                                 ret[i] = OPS[el[0]].make.apply(null, el.slice(1));
                         }
                 }
                 return ret;
         };
+
+        function relocate(code, addr) {
+                for (var i = code.length; --i >= 0;) {
+                        var op = code[i];
+                        if (is_jump_instruction(op._name))
+                                op.addr += addr;
+                }
+                return code;
+        };
+
         D.assemble = assemble;
         D.constantp = constantp;
+        D.relocate = relocate;
 
         ////// <disassemble>
 
@@ -595,18 +613,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 function disassemble(code, level) {
                         var labels = {};
                         code.forEach(function(op, i){
-                                switch (op._name) {
-                                    case "JUMP":
-                                    case "TJUMP":
-                                    case "FJUMP":
-                                    case "LRET":
-                                    case "LJUMP":
-                                    case "UPOPEN":
-                                    case "SAVE":
-                                    case "CATCH":
+                                if (is_jump_instruction(op._name))
                                         if (!HOP(labels, op.addr))
                                                 labels[op.addr] = "L" + (++lab);
-                                }
                         });
                         return code.map(function(op, i){
                                 var l = labels[i] || "";
@@ -624,17 +633,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                                     case "CONST":
                                         data = LispMachine.dump(op.val);
                                         break;
-                                    case "JUMP":
-                                    case "TJUMP":
-                                    case "FJUMP":
-                                    case "LRET":
-                                    case "LJUMP":
-                                    case "UPOPEN":
-                                    case "SAVE":
-                                    case "CATCH":
-                                        data = labels[op.addr];
-                                        break;
                                     default:
+                                        if (is_jump_instruction(opcode)) {
+                                                data = labels[op.addr];
+                                                break;
+                                        }
                                         data = op._args.map(function(el){
                                                 return pad_string(
                                                         LispMachine.serialize_const(op[el]),

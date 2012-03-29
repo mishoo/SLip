@@ -885,27 +885,31 @@
        (assert (and (consp exp)
                     (member (car exp) '(%fn lambda)))
                "Expecting (LAMBDA (...) ...) in COMPILE")
-       (%eval-bytecode (comp exp (make-environment) t nil))))
+       (%eval-bytecode (comp exp (make-environment) t nil)))
 
-  (set-symbol-function! 'compile #'compile))
+     (compile-string (str)
+       (let ((reader (lisp-reader str 'EOF))
+             (out (%make-output-stream))
+             (is-first t)
+             (link-addr 0))
+         (labels ((rec ()
+                    (let ((form (funcall reader 'next)))
+                      (unless (eq form 'EOF)
+                        (let ((code (comp form (make-environment) nil t)))
+                          (when code
+                            (setq code (%exec-code code))
+                            (%relocate-code code link-addr)
+                            (setq link-addr (+ link-addr (length code)))
+                            (if is-first
+                                (setq is-first nil)
+                                (%stream-put out #\,))
+                            (%stream-put out (%serialize-code code) #\Newline)))
+                        (rec)))))
+           (rec)
+           (%stream-get out)))))
 
-(defun compile-string (str)
-  (let ((reader (lisp-reader str 'EOF))
-        (out (%make-output-stream)))
-    (labels ((rec (is-first)
-               (let ((form (funcall reader 'next)))
-                 (unless (eq form 'EOF)
-                   (let ((f (compile (list 'lambda nil form))))
-                     (let ((code (%serialize-bytecode f nil)))
-                       (unless is-first (%stream-put out #\,))
-                       (%stream-put out "FN(" code "),EXEC()")
-                       (when (< 0 (length code))
-                         (%stream-put out ",POP()"))
-                       (%stream-put out #\Newline))
-                     (funcall f))
-                   (rec nil)))))
-      (rec t)
-      (%stream-get out))))
+  (set-symbol-function! 'compile #'compile)
+  (set-symbol-function! 'compile-string #'compile-string))
 
 (defun read1-from-string (str)
   (let* ((reader (lisp-reader str 'EOF)))
@@ -939,5 +943,14 @@
 ;;;
 
 EOF
+
+;; (console.print (compile-string "
+;;  (let ((a 10) (b 20))
+;;    (if a (+ a b) (/ a b))
+;;  )
+;;  (let ((c 10) (d 20))
+;;    (if d (+ c d) (/ c d))
+;;  )
+;; "))
 
 (console.print (compile-string (%js-eval "window.CURRENT_FILE")))

@@ -70,6 +70,7 @@
         /// utilities
 
         function error(msg) {
+                console.error(msg);
                 throw new LispPrimitiveError(msg);
         };
 
@@ -652,7 +653,7 @@
                                 if (LispChar.is(arg)) ret = arg.value + ret;
                                 else if (LispSymbol.is(arg)) ret = LispSymbol.symname(arg) + ret;
                                 else if (LispPackage.is(arg)) ret = arg.name + ret;
-                                else error("Unrecognized argument type in STRCAT");
+                                else error("Unrecognized argument type in STRCAT " + arg);
                         }
                 }
                 return ret;
@@ -1729,14 +1730,42 @@
                 return m._callnext(f, null);
         });
 
-        defp("%serialize-bytecode", false, function(m, nargs){
-                checknargs(nargs, 1, 2);
-                var strip = nargs == 2 ? m.pop() : null;
-                var func = m.pop();
-                checktype(func, LispClosure);
-                var code = strip ? func.code.slice(0, func.code.length - 1) : func.code;
-                var ret = LispMachine.serialize(code, strip);
-                return ret;
+        // The following is called only in COMPILE-STRING (that is, at
+        // compile time).  Its purpose is to evaluate the given code
+        // into the compiler environment, and return the assembled
+        // code.  COMPILE-STRING guarantees that the code passed here
+        // doesn't leave a return value on the stack.
+        defp("%exec-code", true, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var code = m.pop();
+                checktype(code, LispArray);
+                code = LispMachine.assemble(code);
+                // hack: this function needs to return the assembled
+                // code, so we push two instructions to do it.  we
+                // need to copy the code (slice) in order to not
+                // include these two instructions in the return value.
+                code.push.apply(code, LispMachine.assemble([
+                        [ "CONST", code.slice() ],
+                        [ "RET" ]
+                ]));
+                var f = new LispClosure(code, null, new LispCons([], null));
+                return m._callnext(f, null);
+        });
+
+        defp("%relocate-code", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var addr = m.pop();
+                var code = m.pop();
+                checktype(code, LispArray);
+                checktype(addr, LispNumber);
+                return LispMachine.relocate(code, addr);
+        });
+
+        defp("%serialize-code", false, function(m, nargs){
+                checknargs(nargs, 1, 1);
+                var code = m.pop();
+                checktype(code, LispArray);
+                return LispMachine.serialize(code, true);
         });
 
         defp("%js-eval", true, function(m, nargs){
