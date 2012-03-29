@@ -13,7 +13,13 @@
 " ;; hack for Ymacs to get the right package
 
 (setq %::*package* (%find-package "%"))
-(%special! '*read-table* '*package* '*standard-input*)
+(%special! '*read-table*
+           '*package*
+           '*standard-input*
+           '*current-file*
+           '*current-pos*
+           '*url-prefix*
+           '*defining-functions*)
 
 ;; props to http://norstrulde.org/ilge10/
 (set-symbol-function!
@@ -398,9 +404,6 @@
          (progn ,@body)
        (%no-interrupts old))))
 
-(%global! '*defining-functions*)
-(setq *defining-functions* '())
-
 (defun defun-en-course (name)
   (member name *defining-functions*))
 
@@ -541,12 +544,9 @@
                                                      (warn (strcat "Undefined function " sym)))
                                                    (gen "FGVAR" sym))))
                                   (if more? nil (gen "RET"))))))
-              (%fn (unwind-protect
-                       (progn
-                         (push (cadr x) *defining-functions*)
-                         (%seq (if val? (comp-lambda (cadr x) (caddr x) (cdddr x) env))
-                               (if more? nil (gen "RET"))))
-                     (setq *defining-functions* (cdr *defining-functions*))))
+              (%fn (let ((*defining-functions* (cons (cadr x) *defining-functions*)))
+                     (%seq (if val? (comp-lambda (cadr x) (caddr x) (cdddr x) env))
+                           (if more? nil (gen "RET")))))
               (tagbody (comp-tagbody (cdr x) env val? more?))
               (go (arg-count x 1 1)
                   (comp-go (cadr x) env))
@@ -916,19 +916,25 @@
 
 (defun eval-string (str)
   (let* ((reader (lisp-reader str 'EOF)))
-    (let rec ((last nil)
-              (expr (funcall reader 'next)))
-         (if (eq expr 'EOF) last
-             (rec ((compile (list 'lambda nil expr)))
-                  (funcall reader 'next))))))
+    (labels ((rec (last expr)
+               (if (eq expr 'EOF) last
+                   (rec ((compile (list 'lambda nil expr)))
+                        (funcall reader 'next)))))
+      (rec nil (funcall reader 'next)))))
 
 (defun %load (url)
   (compile-string (%get-file-contents url)))
 
+(defun make-url (url)
+  (if *url-prefix*
+      (strcat *url-prefix* url)
+      url))
+
 (defun load (url)
   (let ((*package* *package*)
-        (*read-table* *read-table*))
-    (%load url)))
+        (*read-table* *read-table*)
+        (*current-file* (make-url url)))
+    (%load *current-file*)))
 
 ;;;
 
