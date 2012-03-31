@@ -483,24 +483,27 @@
         });
 
         defp("append", false, function(m, nargs) {
-                var p = null;
-                while (nargs-- > 0) {
-                        if (p === null) p = m.pop();
-                        else {
-                                var last = null;
-                                var list = m.pop();
-                                if (list !== null) {
-                                        list = LispCons.map(list, function(x, i, dot, cell){
-                                                if (dot) error("Improper list");
-                                                last = cell;
-                                                return x;
-                                        });
-                                        last.cdr = p;
-                                        p = list;
-                                }
-                        }
-                }
-                return p;
+                return nargs == 0 ? null : LispCons.append(m.stack.splice(-nargs));
+        });
+
+        defp("nconc", true, function(m, nargs){
+                return nargs == 0 ? null : LispCons.nconc(m.stack.splice(-nargs));
+        });
+
+        defp("revappend", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var tail = m.pop(), list = m.pop();
+                checktype(list, LispList);
+                checktype(tail, LispList);
+                return LispCons.revappend(list, tail);
+        });
+
+        defp("nreconc", true, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var tail = m.pop(), list = m.pop();
+                checktype(list, LispList);
+                checktype(tail, LispList);
+                return LispCons.nreconc(list, tail);
         });
 
         /* -----[ arrays ]----- */

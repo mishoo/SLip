@@ -5,6 +5,9 @@ var LispCons = DEFTYPE("cons", function(D, P){
         function listp(thing) {
                 return thing === null || thing instanceof D;
         };
+        function check_list(list, func) {
+                if (!listp(list)) throw new LispPrimitiveError("Non-list (improper list?) argument in " + func);
+        };
         P.INIT = function(a, b) {
                 this.car = a;
                 this.cdr = b;
@@ -33,25 +36,84 @@ var LispCons = DEFTYPE("cons", function(D, P){
                 });
                 return ret;
         };
+        D.last = function(list) {
+                while (list && cdr(list)) {
+                        check_list(list, "LAST");
+                        list = cdr(list);
+                }
+                return list;
+        };
         D.reverse = function(list) {
                 var a = null;
                 while (list != null) {
-                        if (!listp(list)) throw new Error("Improper list in REVERSE");
+                        check_list(list, "REVERSE");
                         a = new LispCons(car(list), a);
                         list = cdr(list);
                 }
                 return a;
         };
         D.nreverse = function(list) {
-                if (list === null || list.cdr === null) return list;
+                if (list === null || cdr(list) === null) return list;
                 var p = null;
                 while (true) {
+                        check_list(list, "NREVERSE");
                         var next = list.cdr;
                         list.cdr = p;
                         p = list;
                         if (next === null) return list;
                         list = next;
                 }
+        };
+        D.append = function(lists) {
+                if (lists.length == 0) return null;
+                var ret = null, p = null;
+                while (lists.length > 1) {
+                        var l = lists.shift();
+                        while (l !== null) {
+                                check_list(l, "APPEND");
+                                var cell = new LispCons(l.car, null);
+                                if (p) p.cdr = cell;
+                                else ret = cell;
+                                p = cell;
+                                l = l.cdr;
+                        }
+                }
+                if (p) {
+                        p.cdr = lists[0];
+                        return ret;
+                }
+                return lists[0];
+        };
+        D.nconc = function(lists) {
+                var ret = null, p = null;
+                for (var i = 0; i < lists.length; ++i) {
+                        var l = lists[i];
+                        check_list(l, "NCONC");
+                        if (!l) continue;
+                        if (!ret) ret = l;
+                        if (p) p.cdr = l;
+                        p = D.last(l);
+                }
+                return ret;
+        };
+        D.nreconc = function(list, tail) {
+                if (list === null) return tail;
+                var tmp = list;
+                list = D.nreverse(list);
+                tmp.cdr = tail;
+                return list;
+        };
+        D.revappend = function(list, tail) {
+                if (list === null) return tail;
+                var a = null, last = null;
+                while (list != null) {
+                        check_list(list, "REVERSE");
+                        a = new LispCons(car(list), a);
+                        if (!last) last = a;
+                        list = cdr(list);
+                }
+                last.cdr = tail;
+                return a;
         };
         D.fromArray = function(a) {
                 var ret = null, dot = false;
