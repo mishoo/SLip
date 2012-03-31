@@ -156,12 +156,6 @@
       (macroexpand (macroexpand-1 form))
       form))
 
-(def-efun macroexpand-all (form)
-  (if (consp form)
-      (let ((form (macroexpand form)))
-        (map #'macroexpand-all form))
-      form))
-
 (def-emac time body
   (let ((t1 (gensym)))
     `(let ((,t1 (%get-time)))

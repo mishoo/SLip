@@ -70,6 +70,7 @@
         var lisp_files = [
                 "../lisp/compiler.lisp",
                 "../lisp/init.lisp",
+                "../lisp/macroexpand.lisp",
                 "../lisp/tiny-clos.lisp",
                 "../lisp/printer.lisp",
                 "../lisp/format.lisp",

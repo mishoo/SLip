@@ -1445,6 +1445,9 @@
         defp("%export", true, function(m, nargs){
                 checknargs(nargs, 2, 2);
                 var pak = m.pop(), syms = as_list(m.pop());
+                if (!LispPackage.is(pak)) {
+                        pak = LispPackage.get(as_string(pak));
+                }
                 checktype(pak, LispPackage);
                 LispCons.forEach(syms, function(sym){
                         if (LispString.is(sym))
@@ -1457,6 +1460,9 @@
         defp("%import", true, function(m, nargs){
                 checknargs(nargs, 2, 2);
                 var pak = m.pop(), syms = as_list(m.pop());
+                if (!LispPackage.is(pak)) {
+                        pak = LispPackage.get(as_string(pak));
+                }
                 checktype(pak, LispPackage);
                 LispCons.forEach(syms, function(sym){
                         pak.import(sym);
