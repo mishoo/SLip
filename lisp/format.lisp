@@ -70,7 +70,7 @@
                       (if (consp tok)
                           (if (eq end (car tok))
                               (if (> (length tok) 3)
-                                  (error "End constructs ~} and ~] don't accept parameters")
+                                  (error "End constructs ~~} and ~~] don't accept parameters")
                                   (cons (cdr tok) (nreverse ret)))
                               (looop (cons tok ret)))
                           (if tok

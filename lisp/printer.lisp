@@ -40,7 +40,7 @@
   (<< ">"))
 
 (def-print (number)
-  (<< (number-string number)))
+  (<< (number-string number *print-base*)))
 
 (def-print (function)
   (<< "<FUNCTION")
