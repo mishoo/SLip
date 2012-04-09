@@ -716,8 +716,8 @@ function get_output_buffer() {
                 out.setCode(";; Take this REPL, brother, and may it serve you well.\n")
                 out.cmd("end_of_buffer");
                 out.cmd("ss_repl_mode");
-                buf.cmd("split_frame_vertically", "66%");
-                buf.cmd("other_frame");
+                // buf.cmd("split_frame_vertically", "66%");
+                // buf.cmd("other_frame");
                 buf.cmd("switch_to_buffer", "*ss*");
                 out.forAllFrames(function(frame){
                         frame.__lineNumbers = false; // :-\
