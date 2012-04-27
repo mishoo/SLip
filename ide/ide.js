@@ -713,7 +713,7 @@ function get_output_buffer() {
         if (!out) {
                 var frame = ed.getActiveFrame(), buf = ed.getActiveBuffer();
                 out = ed.createBuffer({ name: "*ss*" });
-                out.setCode(";; Take this REPL, brother, and may it serve you well.\n")
+                out.setCode(";; Hacks and glory await!\n")
                 out.cmd("end_of_buffer");
                 out.cmd("ss_repl_mode");
                 // buf.cmd("split_frame_vertically", "66%");
@@ -722,7 +722,7 @@ function get_output_buffer() {
                 out.forAllFrames(function(frame){
                         frame.__lineNumbers = false; // :-\
                         frame.delClass("Ymacs-line-numbers");
-                        frame = frame.hsplit();
+                        frame = frame.vsplit();
                         ed.setActiveFrame(frame);
                         buf.cmd("switch_to_buffer", "*ss-output*");
 

@@ -1,6 +1,6 @@
 server {
        	listen 80;
-	server_name ss-lisp.local;
+	server_name ss-lisp-test.local;
 	charset utf-8;
 
 	location / {
