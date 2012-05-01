@@ -346,3 +346,9 @@
           ((eq stream t)
            (doit *standard-output*))
           (t (doit stream)))))
+
+(def-emac time body
+  (let ((t1 (gensym)))
+    `(let ((,t1 (%get-time)))
+       (prog1 (progn ,@body)
+         (format t "Evaluation time: ~Ams~%" (- (%get-time) ,t1))))))

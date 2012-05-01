@@ -156,12 +156,6 @@
       (macroexpand (macroexpand-1 form))
       form))
 
-(def-emac time body
-  (let ((t1 (gensym)))
-    `(let ((,t1 (%get-time)))
-       (prog1 (progn ,@body)
-         (console.print "Evaluation time:" (- (%get-time) ,t1))))))
-
 (def-emac intern (symbol-name &optional (package *package*))
   `(%intern ,symbol-name ,package))
 
