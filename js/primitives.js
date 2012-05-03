@@ -1185,6 +1185,7 @@
                 var url = m.pop();
                 checktype(url, LispString);
                 var xhr = new XMLHttpRequest();
+                url += "?killCache=" + Date.now(); // is this a good idea?
                 xhr.open("GET", url, cont ? true : false);
                 if (cont) xhr.onreadystatechange = function() {
                         if (xhr.readyState == 4)

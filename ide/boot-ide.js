@@ -47,22 +47,31 @@
                 if (files.length == 0) cont();
                 else {
                         var filename = files[0].replace(/(\.lisp)?$/, ".fasl");
-                        load(filename, function(code){
+                        log("Loading: " + filename);
+                        load(filename + "?killCache=" + Date.now(), function(code){
                                 machine._exec(LispMachine.unserialize(code));
                                 load_fasls(files.slice(1), cont);
                         });
                 }
         };
 
+        function log(str) {
+                var div = document.createElement("div");
+                div.innerHTML = str;
+                div.className = "lisp-log";
+                document.body.appendChild(div);
+                document.body.scrollTop = div.offsetTop;
+        };
+
         function compile(files, cont) {
                 if (files.length == 0) return cont();
                 var filename = files[0];
-                console.log("Compiling " + filename);
+                log("Compiling " + filename);
                 var bytecode = machine.atomic_call(LispSymbol.get("%LOAD").func(), [ filename ]);
                 var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
                 save(fasl, bytecode, function(error){
                         if (error) throw new Error("Failed to save bytecode");
-                        console.log(fasl + " saved.");
+                        log(fasl + " saved.");
                         compile(files.slice(1), cont);
                 });
         };
@@ -82,17 +91,35 @@
         function recompile_all() {
                 load_fasls([ "../lisp/compiler.lisp"], function(){
                         compile(lisp_files, function(){
-                                console.log("DONE");
+                                log("DONE — I will reload in 3 seconds");
+                                setTimeout(function(){
+                                        window.parent.opener.location.reload(true);
+                                }, 3000);
                         });
                 });
         };
 
         // recompile_all();
 
-        load_fasls(lisp_files, function(){
-                //machine.atomic_call(LispSymbol.get("LOAD").func(), [ "ide.lisp" ]);
-                global.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
-                window.open("ymacs.html", "ss_lisp", "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
-        });
+        function init() {
+                load_fasls(lisp_files, function(){
+                        //machine.atomic_call(LispSymbol.get("LOAD").func(), [ "ide.lisp" ]);
+                        global.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
+                        Array.prototype.slice.call(document.getElementsByTagName("div")).map(function(el){
+                                if (el.className == "lisp-log")
+                                        el.parentNode.removeChild(el);
+                        });
+                        window.open("ymacs.html", "ss_lisp", "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
+                });
+        };
+
+        global.lisp_recompile_all = recompile_all;
+        global.lisp_ide_init = init;
+
+        if (/\?recompile$/.test(window.location)) {
+                recompile_all();
+        } else {
+                init();
+        }
 
 })(this, window);

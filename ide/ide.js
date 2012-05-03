@@ -8,7 +8,7 @@
         var WEBDAV_ROOT = "";
 
         function webdav_url(filename) {
-                return WEBDAV_ROOT + filename;
+                return WEBDAV_ROOT + filename + "?killCache=" + Date.now();
         };
 
         function automode(buf) {
@@ -527,6 +527,17 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                         }
                                 });
                         });
+                }),
+                ss_recompile_everything: Ymacs_Interactive(function(){
+                        var dlg = this.createDialog({
+                                title     : "Compiling...",
+                                resizable : true,
+                                modal     : true,
+                                quitBtn   : "destroy"
+                        });
+                        dlg.setContent("<iframe style='margin: 0; padding: 0; width: 100%; height: 100%; border: 0;' src='./?recompile'></iframe>");
+                        dlg.setSize({ x: 600, y: 400 });
+                        dlg.show(true);
                 }),
                 ss_lisp_notify_message: function(msg) {
                         // msg should be string, but if not...

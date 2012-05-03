@@ -83,9 +83,12 @@
      (%dom-restore *context*)))
 
 (defmacro without-pen (&body body)
-  `(let ((*pen* nil)
-         (*show-turtle* nil))
-     ,@body))
+  `(progn
+     (let ((*pen* nil)
+           (*show-turtle* nil))
+       ,@body)
+     (when *show-turtle*
+       (show-turtle))))
 
 (defun orientation ()
   (* +PI+ (/ *orientation* 180)))
