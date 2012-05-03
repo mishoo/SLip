@@ -720,16 +720,16 @@ var THE_EDITOR;
 
 function get_output_buffer() {
         var ed = THE_EDITOR;
-        var out = ed.getBuffer("*ss*");
+        var out = ed.getBuffer("*ss-repl*");
         if (!out) {
                 var frame = ed.getActiveFrame(), buf = ed.getActiveBuffer();
-                out = ed.createBuffer({ name: "*ss*" });
+                out = ed.createBuffer({ name: "*ss-repl*" });
                 out.setCode(";; Hacks and glory await!\n")
                 out.cmd("end_of_buffer");
                 out.cmd("ss_repl_mode");
                 // buf.cmd("split_frame_vertically", "66%");
                 // buf.cmd("other_frame");
-                buf.cmd("switch_to_buffer", "*ss*");
+                buf.cmd("switch_to_buffer", "*ss-repl*");
                 out.forAllFrames(function(frame){
                         frame.__lineNumbers = false; // :-\
                         frame.delClass("Ymacs-line-numbers");
