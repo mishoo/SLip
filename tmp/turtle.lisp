@@ -3,6 +3,22 @@
 
 (in-package :turtle)
 
+(export '(draw-turtle
+          hide-turtle
+          show-turtle
+          save-excursion
+          without-pen
+          orientation
+          forward
+          backward
+          set-color
+          left
+          right
+          penup
+          pendown
+          clear
+          triangle))
+
 (import '(ss-ffi:defun-js))
 
 (defparameter *canvas-id* "thy-canvas")
@@ -58,11 +74,6 @@
 
 (defun-js %dom-canvas-width (canvas) "return canvas.width")
 (defun-js %dom-canvas-height (canvas) "return canvas.height")
-
-;; forward declarations to avoid compiler warnings
-;; should figure out a better way to do this
-(defun draw-turtle ())
-(defun hide-turtle ())
 
 (defun init-canvas (width height)
   (setf *canvas* (%dom-create *canvas-id* width height)
