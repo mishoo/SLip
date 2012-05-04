@@ -39,9 +39,9 @@
                       (block out
                         (handler-bind
                             ((warning (lambda (x)
-                                        (send-ymacs-notify :message (format nil "!WARN: ~A" x))))
+                                        (send-ymacs-notify :warning (format nil "~A" x))))
                              (error (lambda (x)
-                                      (send-ymacs-notify :message (format nil "!ERROR: ~A" x))
+                                      (send-ymacs-notify :error (format nil "~A" x))
                                       (return-from out x))))
                           (let ((ret (,name ,@args)))
                             (send-ymacs-reply req-id ,what ret)

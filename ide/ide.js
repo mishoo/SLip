@@ -21,7 +21,11 @@
         Ymacs_Keymap_Emacs().defineKeys({
                 "C-\\"    : "switch_to_buffer",
                 "C-x C-s" : "webdav_save_file_buffer",
-                "C-x C-f" : "webdav_load_file_buffer"
+                "C-x C-f" : "webdav_load_file_buffer",
+                "F5"      : function() {
+                        if (confirm("Reload page?"))
+                                window.location.reload(true);
+                }
         });
 
         function webdav_load(filename, cont) {
@@ -297,9 +301,18 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 };
 
                 function handle_lisp_notification(what, value) {
+                        var buf = get_output_buffer();
                         switch (what.toUpperCase()) {
                             case "MESSAGE":
-                                get_output_buffer().cmd("ss_lisp_notify_message", value);
+                                buf.cmd("ss_lisp_notify_message", value);
+                                break;
+                            case "ERROR":
+                                buf.cmd("ss_lisp_notify_message", "!ERROR: " + value);
+                                //THE_EDITOR.getActiveBuffer().signalError(value);
+                                break;
+                            case "WARNING":
+                                buf.cmd("ss_lisp_notify_message", "!WARN: " + value);
+                                //THE_EDITOR.getActiveBuffer().signalError(value);
                                 break;
                         }
                 };
