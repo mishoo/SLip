@@ -9,7 +9,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.env = m.env;
                 this.denv = m.denv;
                 this.n_args = m.n_args;
-                if (m.trace) this.trace = m.trace.slice();
+                //if (m.trace) this.trace = m.trace.slice();
         };
         LispRet.prototype.run = function(m) {
                 m.f = this.f;
@@ -18,7 +18,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 m.env = this.env;
                 m.denv = this.denv;
                 m.n_args = this.n_args;
-                if (this.trace) m.trace = this.trace;
+                //if (this.trace) m.trace = this.trace;
         };
 
         function LispCleanup(ret, addr) {
@@ -37,7 +37,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.denv = m.denv;
                 this.slen = m.stack.length;
                 this.n_args = m.n_args;
-                if (m.trace) this.trace = m.trace.slice();
+                //if (m.trace) this.trace = m.trace.slice();
         };
         LispLongRet.prototype.unwind = function(m, addr) {
                 m.f = this.f;
@@ -47,7 +47,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 m.stack.length = this.slen;
                 m.pc = addr;
                 m.n_args = this.n_args;
-                if (this.trace) m.trace = this.trace;
+                //if (this.trace) m.trace = this.trace;
         };
 
         var NO_RET_VAL = {};
@@ -75,12 +75,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         function LispCC(m) {
                 this.stack = m.stack.slice();
                 this.denv = m.denv;
-                if (m.trace) this.trace = m.trace.slice();
+                //if (m.trace) this.trace = m.trace.slice();
         };
         LispCC.prototype.run = function(m) {
                 m.stack = this.stack.slice();
                 m.denv = this.denv;
-                if (this.trace) m.trace = this.trace.slice();
+                //if (this.trace) m.trace = this.trace.slice();
         };
 
         // dynamic bindings
@@ -189,18 +189,18 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 var save_nargs = this.n_args;
                 var save_pc = this.pc;
                 var save_f = this.f;
-                var save_trace = this.trace;
+                //var save_trace = this.trace;
                 this.code = closure.code;
                 this.env = null;
                 this.stack = [ new LispRet(this, null) ].concat(args);
                 this.n_args = args.length;
                 this.pc = 0;
                 this.f = closure;
-                if (this.trace) this.trace = [ closure, args ];
+                //if (this.trace) this.trace = [ closure, args ];
                 try {
                         return this.loop();
                 } finally {
-                        this.trace = save_trace;
+                        //this.trace = save_trace;
                         this.f = save_f;
                         this.pc = save_pc;
                         this.n_args = save_nargs;
@@ -234,7 +234,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
         P._callnext = function(closure, args) {
                 this.stack.push(this.mkret(this.pc));
-                if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
+                //if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
                 this.code = closure.code;
                 this.env = closure.env;
                 var n = 0;
@@ -257,7 +257,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 this.n_args = args.length;
                 this.pc = 0;
                 this.f = closure;
-                if (this.trace) this.trace = [ closure, args ];
+                //if (this.trace) this.trace = [ closure, args ];
         };
 
         P.run = function(quota, noint) {
@@ -874,7 +874,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["CALL", "count", {
                         run: function(m){
                                 var closure = m.pop();
-                                if (m.trace) m.trace.push([ closure, m.stack.slice(-this.count) ]);
+                                //if (m.trace) m.trace.push([ closure, m.stack.slice(-this.count) ]);
                                 m.n_args = this.count;
                                 m.code = closure.code;
                                 m.env = closure.env;
@@ -885,7 +885,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 ["EXEC", 0, {
                         run: function(m){
                                 var closure = m.pop();
-                                if (m.trace) m.trace.push([ closure, [] ]);
+                                //if (m.trace) m.trace.push([ closure, [] ]);
                                 m.push(m.mkret(m.pc));
                                 m.n_args = 0;
                                 m.code = closure.code;
