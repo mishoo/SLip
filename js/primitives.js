@@ -252,6 +252,12 @@
                 });
         });
 
+        defp("mod", false, function(m, nargs){
+                checknargs(nargs, 2, 2);
+                var a = m.pop_number(error), b = m.pop_number(error);
+                return b % a;
+        });
+
         [
                 [ "abs", Math.abs ],
                 [ "sin", Math.sin ],
