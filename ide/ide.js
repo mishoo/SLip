@@ -4,8 +4,7 @@
 
 (function(){
 
-        //var WEBDAV_ROOT = "../";
-        var WEBDAV_ROOT = "";
+        var WEBDAV_ROOT = "../";
 
         function webdav_url(filename) {
                 return WEBDAV_ROOT + filename + "?killCache=" + Date.now();
@@ -548,7 +547,8 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                                 modal     : true,
                                 quitBtn   : "destroy"
                         });
-                        dlg.setContent("<iframe style='margin: 0; padding: 0; width: 100%; height: 100%; border: 0;' src='./?recompile'></iframe>");
+                        var url = WINDOW.location.toString().replace(/\?.*$/, "") + "?recompile";
+                        dlg.setContent("<iframe style='margin: 0; padding: 0; width: 100%; height: 100%; border: 0;' src='" + url + "'></iframe>");
                         dlg.setSize({ x: 600, y: 400 });
                         dlg.show(true);
                 }),

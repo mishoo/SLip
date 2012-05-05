@@ -1,5 +1,17 @@
 (function(global, window){
 
+        var lisp_files = [
+                "lisp/compiler.lisp",
+                "lisp/init.lisp",
+                "lisp/macroexpand.lisp",
+                "lisp/tiny-clos.lisp",
+                "lisp/printer.lisp",
+                "lisp/format.lisp",
+                "lisp/ffi.lisp",
+                "lisp/conditions.lisp",
+                "ide/ide.lisp"
+        ];
+
         LispMachine.extend({
                 read: function(pak, str) {
                         var f = LispSymbol.get("EXEC-READ", LispPackage.get("YMACS")).func();
@@ -76,20 +88,8 @@
                 });
         };
 
-        var lisp_files = [
-                "../lisp/compiler.lisp",
-                "../lisp/init.lisp",
-                "../lisp/macroexpand.lisp",
-                "../lisp/tiny-clos.lisp",
-                "../lisp/printer.lisp",
-                "../lisp/format.lisp",
-                "../lisp/ffi.lisp",
-                "../lisp/conditions.lisp",
-                "ide.lisp"
-        ];
-
         function recompile_all() {
-                load_fasls([ "../lisp/compiler.lisp"], function(){
+                load_fasls([ "lisp/compiler.lisp"], function(){
                         compile(lisp_files, function(){
                                 log("DONE — I will reload in 3 seconds");
                                 setTimeout(function(){
@@ -109,12 +109,11 @@
                                 if (el.className == "lisp-log")
                                         el.parentNode.removeChild(el);
                         });
-                        window.open("ymacs.html", "ss_lisp", "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
+                        if (/\?ide$/.test(window.location))
+                                window.open("ide/ymacs.html", "ss_lisp",
+                                            "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
                 });
         };
-
-        global.lisp_recompile_all = recompile_all;
-        global.lisp_ide_init = init;
 
         if (/\?recompile$/.test(window.location)) {
                 recompile_all();
