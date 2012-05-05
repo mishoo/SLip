@@ -763,36 +763,36 @@ function make_desktop() {
 
         var layout = new DlLayout({ parent: desktop });
 
-        var toolbar = new DlContainer({ className: "DlToolbar" });
-        var menu = new DlHbox({ parent: toolbar });
+        // var toolbar = new DlContainer({ className: "DlToolbar" });
+        // var menu = new DlHbox({ parent: toolbar });
 
-        function btn(label, action) {
-                var b = new DlButton({ parent: menu, label: label });
-                b.addEventListener("onClick", function(){
-                        THE_EDITOR.focus();
-                        action();
-                });
-                return b;
-        };
+        // function btn(label, action) {
+        //         var b = new DlButton({ parent: menu, label: label });
+        //         b.addEventListener("onClick", function(){
+        //                 THE_EDITOR.focus();
+        //                 action();
+        //         });
+        //         return b;
+        // };
 
-        function buffer(){ return THE_EDITOR.getActiveBuffer() };
+        // function buffer(){ return THE_EDITOR.getActiveBuffer() };
 
-        btn("Eval buffer", function(){ buffer().cmd("ss_eval_buffer") });
-        btn("Eval expression", function(){ buffer().cmd("ss_eval_sexp") });
-        btn("Eval selection", function(){ buffer().cmd("ss_eval_region") });
-        btn("Macroexpand", function(){ buffer().cmd("ss_macroexpand_1", buffer().point()) });
+        // btn("Eval buffer", function(){ buffer().cmd("ss_eval_buffer") });
+        // btn("Eval expression", function(){ buffer().cmd("ss_eval_sexp") });
+        // btn("Eval selection", function(){ buffer().cmd("ss_eval_region") });
+        // btn("Macroexpand", function(){ buffer().cmd("ss_macroexpand_1", buffer().point()) });
 
-        menu.addSeparator("wide-separator");
+        // menu.addSeparator("wide-separator");
 
-        btn("Copy to system clipboard", function(){ buffer().cmd("copy_for_operating_system") });
-        btn("Paste from system clipboard", function(){ buffer().cmd("yank_from_operating_system") });
+        // btn("Copy to system clipboard", function(){ buffer().cmd("copy_for_operating_system") });
+        // btn("Paste from system clipboard", function(){ buffer().cmd("yank_from_operating_system") });
 
         var ymacs = THE_EDITOR = WINDOW.YMACS = new Ymacs_SS({ buffers: [], lineNumbers: false });
         ymacs.setColorTheme([ "light", "whiteboard" ]);
         //ymacs.setColorTheme([ "dark", "mishoo" ]);
         ymacs.getActiveBuffer().cmd("ss_mode");
 
-        layout.packWidget(toolbar, { pos: "top" });
+        // layout.packWidget(toolbar, { pos: "top" });
         layout.packWidget(ymacs, { pos: "bottom", fill: "*" });
 
         desktop.callHooks("onResize");
