@@ -254,7 +254,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 output.cmd("newline");
                 output.forAllFrames(function(frame){
                         frame.ensureCaretVisible();
-                        frame.redrawModeline();
+                        frame.redrawModelineWithTimer();
                 });
                 output.resumeUpdates();
         };
@@ -426,7 +426,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         this.setq("ss_repl_marker", m);
                         this.forAllFrames(function(frame){ // this stinks. :-\
                                 frame.ensureCaretVisible();
-                                frame.redrawModeline();
+                                frame.redrawModelineWithTimer();
                                 frame._redrawCaret(true);
                         });
                 },
@@ -720,7 +720,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         out.cmd("insert", str);
                         out.forAllFrames(function(frame){
                                 frame.ensureCaretVisible();
-                                frame.redrawModeline();
+                                frame.redrawModelineWithTimer();
                         });
                         out.resumeUpdates();
                 };
