@@ -244,7 +244,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
         };
 
         function ss_log(txt) {
-                var output = get_output_buffer();
+                var output = get_repl_buffer();
                 output.preventUpdates();
                 output.cmd("end_of_buffer");
                 var pos = output._positionToRowCol(output.point());
@@ -300,7 +300,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 };
 
                 function handle_lisp_notification(what, value) {
-                        var buf = get_output_buffer();
+                        var buf = get_repl_buffer();
                         switch (what.toUpperCase()) {
                             case "MESSAGE":
                                 buf.cmd("ss_lisp_notify_message", value);
@@ -318,7 +318,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
         });
 
         Ymacs_Buffer.newCommands({
-                ss_get_output_buffer: get_output_buffer,
+                ss_get_repl_buffer: get_repl_buffer,
                 ss_log: ss_log,
                 ss_get_symbol: function(pos){
                         var p = this.cmd("lisp_make_quick_parser");
@@ -370,7 +370,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         }
                 }),
                 ss_clear_output: Ymacs_Interactive(function(){
-                        var buf = get_output_buffer();
+                        var buf = get_repl_buffer();
                         buf.setCode("");
                         buf.cmd("ss_repl_prompt");
                 }),
@@ -549,14 +549,14 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                         });
                         var url = WINDOW.location.toString().replace(/\?.*$/, "") + "?recompile";
                         dlg.setContent("<iframe style='margin: 0; padding: 0; width: 100%; height: 100%; border: 0;' src='" + url + "'></iframe>");
-                        dlg.setSize({ x: 600, y: 400 });
+                        dlg.setSize({ x: 400, y: 300 });
                         dlg.show(true);
                 }),
                 ss_lisp_notify_message: function(msg) {
                         // msg should be string, but if not...
                         if (typeof msg != "string")
                                 msg = MACHINE.dump(msg);
-                        var buf = get_output_buffer();
+                        var buf = get_repl_buffer();
                         var m = buf.getq("ss_repl_marker");
                         var pos = buf._positionToRowCol(m.getPosition());
                         msg = msg.replace(/[\s\n\t]*$/, "\n");
@@ -610,7 +610,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 buf.ymacs.run_lisp("EVAL-STRING", pack, expr, function(val){
                         if (typeof val != "string") val = MACHINE.dump(val);
                         ss_log(val + "\n<== in " + ((new Date().getTime() - start) / 1000).toFixed(3) + "s");
-                        get_output_buffer().cmd("ss_repl_prompt");
+                        get_repl_buffer().cmd("ss_repl_prompt");
                 });
         };
 
@@ -623,9 +623,18 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
                 "C-c M-m"                               : "ss_macroexpand_all",
                 "M-q"                                   : "ss_indent_sexp",
                 "S-TAB"                                 : "ss_complete_symbol",
-                "M-."                                   : "ss_xref_symbol"
-                //,"M-,"                                   : "ss_xref_back_history"
+                "M-."                                   : "ss_xref_symbol",
+                //"M-,"                                   : "ss_xref_back_history",
         };
+
+        Ymacs_Keymap_Emacs().defineKeys({
+                "C-c s r": Ymacs_Interactive(function(){
+                        this.cmd("switch_to_buffer", get_repl_buffer());
+                }),
+                "C-c s s": Ymacs_Interactive(function(){
+                        this.cmd("switch_to_buffer", "*ss-output*");
+                })
+        });
 
         DEFINE_SINGLETON("Ymacs_Keymap_SS_REPL", D, function(D, P){
                 D.KEYS = {
@@ -731,7 +740,7 @@ DEFINE_SINGLETON("Ymacs_Keymap_SS", Ymacs_Keymap, function(D, P){
 
 var THE_EDITOR;
 
-function get_output_buffer() {
+function get_repl_buffer() {
         var ed = THE_EDITOR;
         var out = ed.getBuffer("*ss-repl*");
         if (!out) {
@@ -802,7 +811,7 @@ function make_desktop() {
         });
 
         ymacs.focus();
-        get_output_buffer().cmd("ss_repl_prompt");
+        get_repl_buffer().cmd("ss_repl_prompt");
 };
 
 function load(url, cont) {

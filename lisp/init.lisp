@@ -403,6 +403,9 @@
                  (go ,tag))))
        ,result-form)))
 
+(def-emac use-package (source &optional (target *package*))
+  `(%use-package (%find-package ,source) (%find-package ,target)))
+
 (defparameter *standard-output* (%make-output-stream))
 (defparameter *error-output* (%make-output-stream))
 (defparameter *trace-output* (%make-output-stream))

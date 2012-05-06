@@ -62,3 +62,7 @@ body {
   border-top: 1px solid #000;
   border-bottom: 1px solid #000;
 }
+
+.Ymacs-Theme-light .Ymacs_Frame {
+  background-color: #fff8ee;
+}

@@ -83,7 +83,7 @@
                 var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
                 save(fasl, bytecode, function(error){
                         if (error) throw new Error("Failed to save bytecode");
-                        log(fasl + " saved.");
+                        log("... " + fasl + " saved.");
                         compile(files.slice(1), cont);
                 });
         };
