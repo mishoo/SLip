@@ -24,7 +24,7 @@ body {
 }
 
 .DlResizeBar {
-  background-color: rgba(200, 200, 200, 0.8);
+  background-color: rgba(200, 200, 200, 0.9);
 }
 
 .Ymacs_Frame .ss-error {
@@ -48,4 +48,17 @@ body {
 
 .Ymacs-Theme-light .Ymacs_Frame-focus .Ymacs-current-line {
   background-color: #fff;
+}
+
+.Ymacs-Theme-light .Ymacs_Modeline {
+  background-color: #aaa;
+  color: #111;
+  border-top: 1px solid #777;
+  border-bottom: 1px solid #777;
+}
+
+.Ymacs-Theme-light .Ymacs_Frame-active .Ymacs_Modeline {
+  background-color: #aaf;
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #000;
 }
