@@ -51,14 +51,14 @@ body {
 }
 
 .Ymacs-Theme-light .Ymacs_Modeline {
-  background-color: #aaa;
+  background-color: #bbb;
   color: #111;
   border-top: 1px solid #777;
   border-bottom: 1px solid #777;
 }
 
 .Ymacs-Theme-light .Ymacs_Frame-active .Ymacs_Modeline {
-  background-color: #aaf;
+  background-color: #fea;
   border-top: 1px solid #000;
   border-bottom: 1px solid #000;
 }
