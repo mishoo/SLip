@@ -1195,10 +1195,10 @@
                 xhr.open("GET", url, cont ? true : false);
                 if (cont) xhr.onreadystatechange = function() {
                         if (xhr.readyState == 4)
-                                m.call(cont, new LispCons(xhr.responseText, null));
+                                m.call(cont, new LispCons(xhr.status == 200 ? xhr.responseText : null, null));
                 };
                 xhr.send(null);
-                return cont ? null : xhr.responseText;
+                return cont ? null : xhr.status == 200 ? xhr.responseText : null;
         });
 
         defp("%input-stream-p", false, function(m, nargs){

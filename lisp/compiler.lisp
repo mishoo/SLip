@@ -931,8 +931,10 @@
       (rec nil (cdr (funcall reader 'next))))))
 
 (defun %load (url)
-  (let ((*current-file* url))
-    (compile-string (%get-file-contents (make-url url)))))
+  (let ((*current-file* url)
+        (code (%get-file-contents (make-url url))))
+    (unless code (error (strcat "Unable to load file: " url)))
+    (compile-string code)))
 
 (defun make-url (url)
   (if *url-prefix*
