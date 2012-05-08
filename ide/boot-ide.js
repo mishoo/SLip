@@ -101,6 +101,13 @@
 
         // recompile_all();
 
+        function open_ide() {
+                window.open("ide/ymacs.html", "ss_lisp",
+                            "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
+        };
+
+        document.body.ondblclick = open_ide;
+
         function init() {
                 load_fasls(lisp_files, function(){
                         //machine.atomic_call(LispSymbol.get("LOAD").func(), [ "ide.lisp" ]);
@@ -110,8 +117,7 @@
                                         el.parentNode.removeChild(el);
                         });
                         if (/\?ide$/.test(window.location))
-                                window.open("ide/ymacs.html", "ss_lisp",
-                                            "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
+                                open_ide();
                 });
         };
 
