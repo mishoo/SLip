@@ -393,13 +393,15 @@
        ,@body)))
 
 (def-emac dotimes ((var count-form &optional result-form) &body body)
-  (let ((tag (gensym)))
+  (let ((tag (gensym))
+        (end (gensym)))
     `(block nil
-       (let ((,var ,count-form))
+       (let ((,end ,count-form)
+             (,var 0))
          (tagbody
-          ,tag (when (> ,var 0)
+          ,tag (when (< ,var ,end)
                  ,@body
-                 (decf ,var)
+                 (incf ,var)
                  (go ,tag))))
        ,result-form)))
 

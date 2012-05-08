@@ -106,7 +106,12 @@
                             "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
         };
 
-        document.body.ondblclick = open_ide;
+        document.body.ondblclick = function(ev){
+                if (ev.ctrlKey) {
+                        open_ide();
+                        return false;
+                }
+        };
 
         function init() {
                 load_fasls(lisp_files, function(){
