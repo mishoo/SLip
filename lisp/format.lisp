@@ -245,6 +245,15 @@
   (def-format #\X ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
     (print output args colmod? atmod? mincol padchar commachar comma-interval 16)))
 
+;; floating-point (incomplete)
+(def-format #\f ((mincol 0) declen scale overflowchar padchar)
+  (let ((x (car args)))
+    (setf x (if declen
+                (number-fixed x declen)
+                (strcat x)))
+    (%stream-put output (%pad-string x mincol padchar))
+    (cdr args)))
+
 ;;; iteration
 
 (def-format #\{ (ensure-once? #:end-at? sublist maxn)
