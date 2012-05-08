@@ -1635,7 +1635,7 @@
 
         defp("%no-interrupts", true, function(m, nargs){
                 if (!m.process) return null;
-                checknargs(nargs, 0, 2);
+                checknargs(nargs, 1, 2);
                 var process = nargs == 2 ? m.pop() : m.process;
                 var noint = m.pop();
                 checktype(process, LispProcess);
@@ -1751,6 +1751,10 @@
 
         defp("%machine.dynamic-environment", false, function(m, nargs){
                 return m.denv;
+        });
+
+        defp("%machine.stack", false, function(m, nargs){
+                return m.stack.slice();
         });
 
         defp("%eval-bytecode", true, function(m, nargs){
