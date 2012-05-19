@@ -274,7 +274,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                         }
                 } catch(ex) {
                         if (ex instanceof LispPrimitiveError) {
-                                var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SS"));
+                                var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
                                 if (pe && pe.func()) {
                                         // RETHROW as Lisp error.
                                         this._callnext(pe.func(), LispCons.fromArray([ "~A", ex.message ]));

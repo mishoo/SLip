@@ -3,11 +3,11 @@
 ;;; symbol completion.
 
 (defpackage :ymacs
-  (:use :ss))
+  (:use :sl))
 
 (in-package :ymacs)
 
-(import '(ss-ffi:defun-js))
+(import '(sl-ffi:defun-js))
 
 (defun grep (list pred)
   (when list
@@ -143,7 +143,7 @@
     *thread*
     (make-thread
      (lambda ()
-       (let ((*package* (%find-package :ss-user))
+       (let ((*package* (%find-package :sl-user))
              (*read-table* *read-table*))
          (let looop ()
            (%receive *handlers*)

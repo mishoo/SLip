@@ -102,7 +102,7 @@
         // recompile_all();
 
         function open_ide() {
-                window.open("ide/ymacs.html", "ss_lisp",
+                window.open("ide/ymacs.html", "SLIP",
                             "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
         };
 

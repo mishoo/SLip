@@ -1,8 +1,8 @@
-(defpackage :ss-ffi
-  (:use :ss)
+(defpackage :sl-ffi
+  (:use :sl)
   (:nicknames :ffi))
 
-(in-package :ss-ffi)
+(in-package :sl-ffi)
 
 (export '(defun-js lambda-js))
 

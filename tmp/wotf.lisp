@@ -1,5 +1,5 @@
 (defpackage :wotf
-  (:use :ss))
+  (:use :sl))
 
 (in-package :wotf)
 

@@ -1,7 +1,7 @@
 ;;;; modeled after conditions.lisp from project Sacla
 ;;;; http://homepage1.nifty.com/bmonkey/lisp/sacla/html/lisp/condition.lisp.html
 
-(in-package :ss)
+(in-package :sl)
 
 (export '(condition
           simple-condition

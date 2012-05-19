@@ -1,4 +1,4 @@
-(in-package :ss)
+(in-package :sl)
 
 ;; Implementation based on TinyCLOS.  Original license:
 ;;

@@ -1,5 +1,5 @@
 (defpackage :test
-  (:use :ss))
+  (:use :sl))
 
 (in-package :test)
 

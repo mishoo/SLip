@@ -1,5 +1,5 @@
 (defpackage :turtle
-  (:use :ss))
+  (:use :sl))
 
 (in-package :turtle)
 
@@ -29,7 +29,7 @@
           set-rotation
           set-scale))
 
-(import '(ss-ffi:defun-js))
+(import '(sl-ffi:defun-js))
 
 (defparameter *canvas-id* "thy-canvas")
 (defparameter *position* (cons 0 0))

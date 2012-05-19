@@ -4,9 +4,9 @@
 (in-package :%)
 " ;; hack for Ymacs
 
-(let ((main (%make-package "SS"))
+(let ((main (%make-package "SL"))
       (boot (%find-package "%"))
-      (user (%make-package "SS-USER")))
+      (user (%make-package "SL-USER")))
   (%export '(quasiquote defmacro defun when unless map labels flet foreach
              prog1 prog2 or and cond member case mapcar with-cc aif it push
              error warn without-interrupts
@@ -22,7 +22,7 @@
   (setq *package* main))
 
 "
-(in-package :ss)
+(in-package :sl)
 "
 
 ;;;; destructuring-bind
@@ -368,7 +368,7 @@
       ret)))
 
 (def-efun stable-sort (list predicate)
-  (let ss-list ((list list))
+  (let sort ((list list))
     (cond ((not list) nil)
           ((not (cdr list)) list)
           (t (let* ((a list)
@@ -378,7 +378,7 @@
                                         (setf (cdr list) nil))
                                       (sub (cdr list) i))))
                          (sub list (floor (length list) 2)))))
-               (merge (ss-list a) (ss-list b) predicate))))))
+               (merge (sort a) (sort b) predicate))))))
 
 (set-symbol-function! 'sort #'stable-sort)
 (export '(sort export import))

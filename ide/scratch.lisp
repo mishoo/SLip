@@ -1,5 +1,4 @@
-;;; Some Sort of Lisp
-;;; SS-LISP
+;;; SLip - Lisp in JavaScript
 ;;;
 ;;; © Mihai Bazon 2012
 ;;; http://mihai.bazon.net/blog
