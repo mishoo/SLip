@@ -267,6 +267,7 @@
                 [ "tan", Math.cos ],
                 [ "atan", Math.acos ],
                 [ "exp", Math.exp ],
+                [ "log", Math.log ],
                 [ "sqrt", Math.sqrt ]
 
         ].forEach(function(f){
