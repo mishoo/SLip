@@ -593,14 +593,14 @@ DEFINE_CLASS("Ymacs_Frame", DlContainer, function(D, P, DOM) {
                 if (div) {
                         div = DOM.createFromHtml(div);
                         var p = this.getOverlaysContainer(),
-                            old = !isNew && $(this.getOverlayId(name));
+                            old = !isNew && document.getElementById(this.getOverlayId(name));
                         old ? p.replaceChild(div, old) : p.appendChild(div);
                         // this.condClass(this.getOverlaysCount() > 0, "Ymacs_Frame-hasOverlays");
                 }
         };
 
         P._on_bufferOverlayDelete = function(name, props, isNew) {
-                DOM.trash($(this.getOverlayId(name)));
+                DOM.trash(document.getElementById(this.getOverlayId(name)));
                 // this.condClass(this.getOverlaysCount() > 0, "Ymacs_Frame-hasOverlays");
         };
 
