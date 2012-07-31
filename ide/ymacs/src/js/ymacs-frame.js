@@ -636,6 +636,8 @@ DEFINE_CLASS("Ymacs_Frame", DlContainer, function(D, P, DOM) {
         function CLEAR_CLICK_COUNT() { CLICK_COUNT = null };
 
         P._on_mouseDown = function(ev) {
+                if (ev.ctrlKey && ev.shiftKey)
+                        return;
                 clearTimeout(CLICK_COUNT_TIMER);
                 CLICK_COUNT++;
                 CLICK_COUNT_TIMER = CLEAR_CLICK_COUNT.delayed(DBL_CLICK_SPEED);
