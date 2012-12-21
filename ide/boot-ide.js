@@ -56,15 +56,21 @@
         var machine = new LispMachine();
 
         function load_fasls(files, cont) {
-                if (files.length == 0) cont();
-                else {
-                        var filename = files[0].replace(/(\.lisp)?$/, ".fasl");
+                var count = files.length;
+                var fasls = [];
+                files.forEach(function(filename, i){
+                        filename = filename.replace(/(\.lisp)?$/, ".fasl");
                         log("Loading: " + filename);
                         load(filename + "?killCache=" + Date.now(), function(code){
-                                machine._exec(LispMachine.unserialize(code));
-                                load_fasls(files.slice(1), cont);
+                                fasls[i] = code;
+                                if (--count == 0) {
+                                        fasls.forEach(function(code){
+                                                machine._exec(LispMachine.unserialize(code));
+                                        });
+                                        cont();
+                                }
                         });
-                }
+                });
         };
 
         function log(str) {
