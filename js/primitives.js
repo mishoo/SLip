@@ -1365,7 +1365,11 @@
                 checktype(name, LispString);
                 var pak = LispPackage.get(name);
                 LispCons.forEach(uses, function(use){
-                        pak.use(LispPackage.get_existing(as_string(use)));
+                        use = as_string(use);
+                        var p = LispPackage.get_existing(use);
+                        if (!LispPackage.is(p))
+                                error("Cannot find package " + use);
+                        pak.use(p);
                 });
                 LispCons.forEach(nicknames, function(nick){
                         pak.alias(as_string(nick));
