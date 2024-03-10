@@ -1,68 +1,37 @@
-body {
-  background: #888 url("canvas.png");
+@import url("./ymacs/ymacs.css");
+@import url("./ymacs/themes/emacs-material.css");
+@import url("./ymacs/themes/emacs-sanityinc-tomorrow-day.css");
+@import url("./ymacs/themes/emacs-sanityinc-tomorrow-night.css");
+@import url("./ymacs/themes/emacs-sanityinc-tomorrow-blue.css");
+@import url("./ymacs/themes/emacs-base16-apathy.css");
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+.Ymacs {
+  position: fixed;
+  left: 0; top: 0; right: 0; bottom: 0;
 }
 
 .Ymacs_Overlay .flash-code { opacity: 0.6; filter: alpha(opacity=60); }
 .Ymacs_Overlay .flash-code { background: #3f8; }
 
-.Ymacs_Frame {
-  font-family: "DejaVu Sans Mono","Ubuntu Mono","Lucida Sans Typewriter",monospace;
-  font-size: 13px;
-  overflow: hidden;
-}
-
-.Ymacs_Modeline {
-  font-family: "DejaVu Sans Mono","Ubuntu Mono","Lucida Sans Typewriter",monospace;
-  font-size: 13px;
-}
-
-.Ymacs_Frame {
-  opacity: 0.95;
-}
-.Ymacs_Frame-active {
-  opacity: 1;
-}
-
-.DlResizeBar {
-  background-color: rgba(200, 200, 200, 0.9);
-}
-
 .Ymacs_Frame .ss-error {
   color: #f30;
 }
 
-.Ymacs-Theme-dark .Ymacs_Frame .ss-prompt {
+.Ymacs-Theme-dark .Ymacs_Frame .sl-prompt {
   color: #fc8; font-weight: bold;
 }
 
-.Ymacs-Theme-light .Ymacs_Frame .ss-prompt {
+.Ymacs-Theme-light .Ymacs_Frame .sl-prompt {
   color: #000; font-weight: bold;
-}
-
-.Ymacs-Theme-light .Ymacs-line-numbers .Ymacs-frame-content div.line:before {
-  border-right: 1px solid #ccc;
-}
-
-.Ymacs-Theme-dark .Ymacs-line-numbers .Ymacs-frame-content div.line:before {
-}
-
-.Ymacs-Theme-light .Ymacs_Frame-focus .Ymacs-current-line {
-  background-color: #fff;
-}
-
-.Ymacs-Theme-light .Ymacs_Modeline {
-  background-color: #bbb;
-  color: #111;
-  border-top: 1px solid #777;
-  border-bottom: 1px solid #777;
 }
 
 .Ymacs-Theme-light .Ymacs_Frame-active .Ymacs_Modeline {
   background-color: #fea;
   border-top: 1px solid #000;
   border-bottom: 1px solid #000;
-}
-
-.Ymacs-Theme-light .Ymacs_Frame {
-  background-color: #fff8ee;
 }

@@ -1,9 +1,8 @@
 #! /bin/bash
 
-pushd ~/work/my/ymacs/build/
-./build.sh
+pushd ~/work/my/ymacs/
+npx parcel build
 popd
 
-tar zxf /tmp/ymacs.tar.gz
-rm -rf ../ide/ymacs
-mv Ymacs ../ide/ymacs
+rm -rf ../ide/ymacs/
+cp -r ~/work/my/ymacs/dist/ ../ide/ymacs
