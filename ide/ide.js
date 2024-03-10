@@ -6,6 +6,11 @@ import { Ymacs, Ymacs_Keymap, Ymacs_Buffer,
          Ymacs_Interactive, Ymacs_Tokenizer,
          Ymacs_Exception } from "./ymacs/ymacs.mjs";
 
+window.addEventListener("beforeunload", ev => {
+    ev.preventDefault();
+    return ev.returnValue = true;
+});
+
 (function(){
 
     var WEBDAV_ROOT = "../";
