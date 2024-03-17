@@ -447,7 +447,7 @@ class Ymacs_SL extends Ymacs {
             this.forAllFrames(function(frame){ // this stinks. :-\
                 frame.ensureCaretVisible();
                 frame.redrawModelineWithTimer();
-                frame._redrawCaret(true);
+                frame.redrawCaret(true);
             });
         },
         sl_repl_eval: Ymacs_Interactive(function() {
@@ -763,7 +763,7 @@ function get_repl_buffer() {
 function make_desktop() {
     var WINDOW = window.opener || window.parent;
     var ymacs = THE_EDITOR = WINDOW.YMACS = new Ymacs_SL();
-    ymacs.setColorTheme([ "light", "sanityinc-tomorrow-day" ]);
+    ymacs.setColorTheme([ "ef-cyprus" ]);
     ymacs.getActiveBuffer().cmd("sl_mode");
     document.body.appendChild(ymacs.getElement());
 
