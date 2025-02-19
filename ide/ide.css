@@ -1,13 +1,11 @@
 @import url("./ymacs/ymacs.css");
 @import url("./ymacs/themes/base16-apathy.css");
 @import url("./ymacs/themes/ef-cyprus.css");
+@import url("./ymacs/themes/ef-duo-light.css");
+@import url("./ymacs/themes/ef-duo-dark.css");
+@import url("./ymacs/themes/ef-maris-light.css");
+@import url("./ymacs/themes/ef-maris-dark.css");
 @import url("./ymacs/themes/ef-deuteranopia-light.css");
-@import url("./ymacs/themes/material.css");
-@import url("./ymacs/themes/sanityinc-tomorrow-blue.css");
-@import url("./ymacs/themes/sanityinc-tomorrow-bright.css");
-@import url("./ymacs/themes/sanityinc-tomorrow-day.css");
-@import url("./ymacs/themes/sanityinc-tomorrow-eighties.css");
-@import url("./ymacs/themes/sanityinc-tomorrow-night.css");
 @import url("./ymacs/themes/standard-dark.css");
 @import url("./ymacs/themes/standard-light.css");
 @import url("./ymacs/themes/whiteboard.css");
@@ -23,13 +21,17 @@ html, body {
   left: 0; top: 0; right: 0; bottom: 0;
 }
 
-.Ymacs_Overlay .flash-code { opacity: 0.6; z-index: 50; }
+.Ymacs_Overlay .flash-code { opacity: 0.2; z-index: 50; }
 .Ymacs_Overlay .flash-code { background: #3f8; }
 
-.Ymacs_Frame .ss-error {
+.Ymacs .Ymacs_Frame .sl-error {
   color: #f30;
 }
 
 .Ymacs .Ymacs_Frame .sl-prompt {
   font-weight: bold;
+}
+
+.Ymacs_Frame .Ymacs-frame-content .trailing-whitespace {
+  text-decoration: none;
 }

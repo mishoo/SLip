@@ -4,6 +4,7 @@
 
 import { Ymacs, Ymacs_Keymap, Ymacs_Buffer,
          Ymacs_Interactive, Ymacs_Tokenizer,
+         Ymacs_Lang_Lisp,
          Ymacs_Exception } from "./ymacs/ymacs.mjs";
 
 window.addEventListener("beforeunload", ev => {
@@ -30,10 +31,6 @@ window.addEventListener("beforeunload", ev => {
         "C-\\"    : "switch_to_buffer",
         "C-x C-s" : "webdav_save_file_buffer",
         "C-x C-f" : "webdav_load_file_buffer",
-        "F5"      : function() {
-            if (confirm("Reload page?"))
-                window.location.reload(true);
-        }
     });
 
     function webdav_load(filename, cont) {
@@ -106,6 +103,7 @@ window.addEventListener("beforeunload", ev => {
                     if (error) {
                         self.signalError("Failed to save " + filename);
                     } else {
+                        self.dirty(false);
                         self.cmd("rename_buffer", filename);
                         self.setq("webdav_filename", filename);
                         self.signalInfo("File " + filename + " saved.", false, 1000);
@@ -125,48 +123,23 @@ window.addEventListener("beforeunload", ev => {
 
 })();
 
-// Ymacs tokenizer interface is EVIL.  Stupid me.
-Ymacs_Tokenizer.define("sl_lisp_repl", function(stream, tok){
-    // All this is necessary just to highlight the PACKAGE> prompt
-    // in the REPL.  I don't wanna modify the built-in Ymacs Lisp
-    // mode for that.
-    var $lisp = tok.getLanguage("lisp");
-    var $lisp_next = $lisp.next;
-    var $cont = [];
-    var PARSER = {
-        next: next,
-        copy: copy,
-        indentation: $lisp.indentation
-    };
-    function foundToken(c1, c2, type) {
-        tok.onToken(stream.line, c1, c2, type);
-    };
-    function next() {
-        if ($cont.length > 0)
-            return $cont.at(-1)();
-        stream.checkStop();
-        var m;
-        if (stream.col == 0 && (m = stream.lookingAt(/^[^<\s,'`]+?>/))) {
-            foundToken(stream.col, stream.col += m[0].length, "sl-prompt");
+class Repl_Tokenizer extends Ymacs_Lang_Lisp {
+    readCustom() {
+        let s = this._stream, m;
+        if (s.col == 0 && (m = s.lookingAt(/^[^<\s,'`]+?>/))) {
+            this.t("sl-prompt", m[0].length);
+            return true;
         }
-        else if (stream.col == 0 && (m = stream.lookingAt(/^!(WARN|ERROR):/))) {
-            foundToken(stream.col, stream.col += m[0].length, "sl-error");
+        if (s.col == 0 && (m = s.lookingAt(/^!(WARN|ERROR):/))) {
+            this.t("sl-error", m[0].length);
+            return true;
         }
-        else return $lisp_next();
-    };
-    function copy() {
-        var _cont = $cont.slice();
-        var _lisp = $lisp.copy();
-        function resume() {
-            $cont = _cont.slice();
-            $lisp = _lisp();
-            return PARSER;
-        };
-        resume.context = _lisp.context;
-        return resume;
-    };
-    return PARSER;
-});
+        return super.readCustom();
+    }
+}
+
+Ymacs_Tokenizer.define("sl_lisp_repl", (stream, tok, options = {}) =>
+    new Repl_Tokenizer({ stream, tok, ...options }));
 
 let Ymacs_Keymap_SL = Ymacs_Keymap.define(null, {
     "C-c C-c && C-M-x"                      : "sl_eval_sexp",
@@ -176,6 +149,7 @@ let Ymacs_Keymap_SL = Ymacs_Keymap.define(null, {
     "C-c Enter"                             : "sl_macroexpand_1",
     "C-c M-m"                               : "sl_macroexpand_all",
     "M-q"                                   : "sl_indent_sexp",
+    "S-M-q"                                 : "fill_paragraph",
     "S-Tab"                                 : "sl_complete_symbol",
     "M-."                                   : "sl_xref_symbol",
     //"M-,"                                   : "sl_xref_back_history",
@@ -284,7 +258,7 @@ class Ymacs_SL extends Ymacs {
             });
             setTimeout(function(){
                 buffer.deleteOverlay("flash-code");
-            }, 500);
+            }, 333);
         }
         return [ exp.start, exp.end ];
     };
@@ -328,8 +302,10 @@ class Ymacs_SL extends Ymacs {
         var pos = output._positionToRowCol(output.point());
         if (pos.col > 0)
             output.cmd("newline");
-        output.cmd("insert", txt);
-        output.cmd("newline");
+        output._disableUndo(() => {
+            output.cmd("insert", txt);
+            output.cmd("newline");
+        });
         output.forAllFrames(function(frame){
             frame.ensureCaretVisible();
             frame.redrawModelineWithTimer();
@@ -440,8 +416,10 @@ class Ymacs_SL extends Ymacs {
             if (m) m.destroy();
             var pak = MACHINE.eval_string(null, "%::*PACKAGE*");
             var name = pak.name;
-            this.cmd("insert", name + "> ");
-            this.cmd("end_of_line");
+            this._disableUndo(() => {
+                this.cmd("insert", name + "> ");
+                this.cmd("end_of_line");
+            });
             m = this.createMarker(null, true);
             this.setq("sl_repl_marker", m);
             this.forAllFrames(function(frame){ // this stinks. :-\
@@ -449,6 +427,7 @@ class Ymacs_SL extends Ymacs {
                 frame.redrawModelineWithTimer();
                 frame.redrawCaret(true);
             });
+            this.tokenizer.start();
         },
         sl_repl_eval: Ymacs_Interactive(function() {
             var self = this;
@@ -580,11 +559,14 @@ class Ymacs_SL extends Ymacs {
             var m = buf.getq("sl_repl_marker");
             var pos = buf._positionToRowCol(m.getPosition());
             msg = msg.replace(/[\s\n\t]*$/, "\n");
-            buf.cmd("save_excursion", function(){
-                buf.cmd("goto_line", pos.row + 1);
-                buf.cmd("beginning_of_line");
-                buf.cmd("insert", msg);
+            buf._disableUndo(() => {
+                buf.cmd("save_excursion", function(){
+                    buf.cmd("goto_line", pos.row + 1);
+                    buf.cmd("beginning_of_line");
+                    buf.cmd("insert", msg);
+                });
             });
+            buf.tokenizer.start();
         }
     });
 

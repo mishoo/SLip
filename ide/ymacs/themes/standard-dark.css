@@ -1,2 +1,189 @@
-.Ymacs-Theme-standard-dark{--ymacs-cursor-bg:#fff;--ymacs-cursor-fg:#000;color:#fff;background-color:#000}.Ymacs-Theme-standard-dark .Ymacs_SplitCont>.bar{background-color:#969896}.Ymacs-Theme-standard-dark .Ymacs_SplitCont.horiz>.bar{border-top:1px solid #ccc;border-bottom:1px solid #666}.Ymacs-Theme-standard-dark .Ymacs_SplitCont.vert>.bar{border-left:1px solid #ccc;border-right:1px solid #666}.Ymacs-Theme-standard-dark .Ymacs_Frame-active .Ymacs-current-line{background-color:#33481563}.Ymacs-Theme-standard-dark .Ymacs-frame-content div.line:before{color:#a6a6a6}.Ymacs-Theme-standard-dark .Ymacs_Frame-active div.line.Ymacs-current-line:before{color:#fff;font-weight:700}.Ymacs-Theme-standard-dark .Ymacs-frame-content:before{color:#a6a6a6;background-color:#000}.Ymacs-Theme-standard-dark .Ymacs_Popup{--ymacs-popup-bg:#141414;--ymacs-popup-fg:#fff;--ymacs-popup-scrollbar-thumb:var(--ymacs-popup-fg)}.Ymacs-Theme-standard-dark .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item:hover,.Ymacs-Theme-standard-dark .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item.selected,.Ymacs-Theme-standard-dark .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item.selected:hover{background-color:#254b5f}.Ymacs-Theme-standard-dark .Ymacs_Overlay.selection div{background-color:#20009d}.Ymacs-Theme-standard-dark .Ymacs_Overlay.isearch div{color:#fff;background-color:#7030af}.Ymacs-Theme-standard-dark .Ymacs_Overlay.isearch-lazy div{color:#fff;background-color:#2266ae}.Ymacs-Theme-standard-dark .Ymacs_Overlay.match-paren div{color:#000;background-color:#32cd32}.Ymacs-Theme-standard-dark .Ymacs_Modeline{color:#a6a6a6;background-color:#323232;border:1px solid #606070}.Ymacs-Theme-standard-dark .Ymacs_Frame-active .Ymacs_Modeline{color:#fff;background-color:#505050;border:1px outset #505050}.Ymacs-Theme-standard-dark .minibuffer-prompt{color:#87ceff}.Ymacs-Theme-standard-dark .mode-line-buffer-id{font-weight:700}.Ymacs-Theme-standard-dark .directive{color:#b0c4de}.Ymacs-Theme-standard-dark .type{color:#98fb98}.Ymacs-Theme-standard-dark .builtin{color:#b0c4de}.Ymacs-Theme-standard-dark .function-name{color:#87cefa}.Ymacs-Theme-standard-dark .variable-name{color:#eedd82}.Ymacs-Theme-standard-dark .constant{color:#7fffd4}.Ymacs-Theme-standard-dark .string,.Ymacs-Theme-standard-dark .string-starter,.Ymacs-Theme-standard-dark .string-stopper,.Ymacs-Theme-standard-dark .regexp,.Ymacs-Theme-standard-dark .regexp-starter,.Ymacs-Theme-standard-dark .regexp-stopper,.Ymacs-Theme-standard-dark .regexp-modifier{color:#ffa07a}.Ymacs-Theme-standard-dark .keyword{color:#0ff}.Ymacs-Theme-standard-dark .comment,.Ymacs-Theme-standard-dark .mcomment,.Ymacs-Theme-standard-dark .comment-starter,.Ymacs-Theme-standard-dark .mcomment-starter,.Ymacs-Theme-standard-dark .mcomment-stopper{color:#ff7f24}.Ymacs-Theme-standard-dark .number{color:#7fffd4}.Ymacs-Theme-standard-dark .error{color:#fec43f}.Ymacs-Theme-standard-dark .isearch-fail{color:#fff;background-color:#9d1f1f}.Ymacs-Theme-standard-dark .xml-open-tag,.Ymacs-Theme-standard-dark .xml-close-tag{color:#87cefa}.Ymacs-Theme-standard-dark .xml-attribute{color:#eedd82}.Ymacs-Theme-standard-dark .xml-entity-starter,.Ymacs-Theme-standard-dark .xml-entity-stopper,.Ymacs-Theme-standard-dark .xml-entity{color:#7fffd4}.Ymacs-Theme-standard-dark .xml-cdata,.Ymacs-Theme-standard-dark .xml-cdata-starter,.Ymacs-Theme-standard-dark .xml-cdata-stopper{color:#ff7f24}.Ymacs-Theme-standard-dark .lisp-keyword{color:#b0c4de}.Ymacs-Theme-standard-dark .heading1{color:#87cefa;font-weight:700}.Ymacs-Theme-standard-dark .heading2{color:#eedd82;font-weight:700}.Ymacs-Theme-standard-dark .heading3{color:#0ff;font-weight:700}.Ymacs-Theme-standard-dark .heading4{color:#ff7f24;font-weight:700}.Ymacs-Theme-standard-dark .markdown-blockquote,.Ymacs-Theme-standard-dark .markdown-blockquote1,.Ymacs-Theme-standard-dark .markdown-blockquote2,.Ymacs-Theme-standard-dark .markdown-blockquote3{color:#ff7f24}.Ymacs-Theme-standard-dark.Ymacs-line-numbers .Ymacs-frame-content:before{border-right:1px solid #000}.Ymacs-Theme-standard-dark.Ymacs-line-numbers .Ymacs_Frame-active .Ymacs-frame-content:before{box-shadow:3px 0 7px -3px #0004}
+.Ymacs-Theme-standard-dark {
+  --ymacs-cursor-bg: #fff;
+  --ymacs-cursor-fg: #000;
+  color: #fff;
+  background-color: #000;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_SplitCont > .bar {
+  background-color: #969896;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_SplitCont.horiz > .bar {
+  border-top: 1px solid #ccc;
+  border-bottom: 1px solid #666;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_SplitCont.vert > .bar {
+  border-left: 1px solid #ccc;
+  border-right: 1px solid #666;
+}
+
+.Ymacs-Theme-standard-dark.Ymacs-hl-line .Ymacs_Frame-active div.line:has(.Ymacs-caret) {
+  background-color: #33481563;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs-frame-content div.line:before {
+  color: #a6a6a6;
+}
+
+.Ymacs-Theme-standard-dark.Ymacs-hl-line .Ymacs_Frame-active div.line:has(.Ymacs-caret):before {
+  color: #fff;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs-frame-content:before {
+  color: #a6a6a6;
+  background-color: #000;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_Popup {
+  --ymacs-popup-bg: #141414;
+  --ymacs-popup-fg: #fff;
+  --ymacs-popup-scrollbar-thumb: var(--ymacs-popup-fg);
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item:hover, .Ymacs-Theme-standard-dark .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item.selected, .Ymacs-Theme-standard-dark .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item.selected:hover {
+  background-color: #254b5f;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_Overlay.selection div {
+  background-color: #20009d;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_Overlay.isearch div {
+  color: #fff;
+  background-color: #7030af;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_Overlay.isearch-lazy div {
+  color: #fff;
+  background-color: #2266ae;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_Overlay.match-paren div {
+  color: #000;
+  background-color: #32cd32;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_Modeline {
+  color: #a6a6a6;
+  background-color: #323232;
+  border: 1px solid #606070;
+}
+
+.Ymacs-Theme-standard-dark .Ymacs_Frame-active .Ymacs_Modeline {
+  color: #fff;
+  background-color: #505050;
+  border: 1px outset #505050;
+}
+
+.Ymacs-Theme-standard-dark .minibuffer-prompt {
+  color: #87ceff;
+}
+
+.Ymacs-Theme-standard-dark .mode-line-buffer-id {
+  font-weight: bold;
+}
+
+.Ymacs-Theme-standard-dark .directive {
+  color: #b0c4de;
+}
+
+.Ymacs-Theme-standard-dark .type {
+  color: #98fb98;
+}
+
+.Ymacs-Theme-standard-dark .builtin {
+  color: #b0c4de;
+}
+
+.Ymacs-Theme-standard-dark .function-name {
+  color: #87cefa;
+}
+
+.Ymacs-Theme-standard-dark .variable-name {
+  color: #eedd82;
+}
+
+.Ymacs-Theme-standard-dark .constant {
+  color: #7fffd4;
+}
+
+.Ymacs-Theme-standard-dark .string, .Ymacs-Theme-standard-dark .string-starter, .Ymacs-Theme-standard-dark .string-stopper, .Ymacs-Theme-standard-dark .regexp, .Ymacs-Theme-standard-dark .regexp-starter, .Ymacs-Theme-standard-dark .regexp-stopper, .Ymacs-Theme-standard-dark .regexp-modifier {
+  color: #ffa07a;
+}
+
+.Ymacs-Theme-standard-dark .keyword {
+  color: #0ff;
+}
+
+.Ymacs-Theme-standard-dark .comment, .Ymacs-Theme-standard-dark .mcomment, .Ymacs-Theme-standard-dark .comment-starter, .Ymacs-Theme-standard-dark .mcomment-starter, .Ymacs-Theme-standard-dark .mcomment-stopper {
+  color: #ff7f24;
+}
+
+.Ymacs-Theme-standard-dark .number {
+  color: #7fffd4;
+}
+
+.Ymacs-Theme-standard-dark .error {
+  color: #fec43f;
+}
+
+.Ymacs-Theme-standard-dark .isearch-fail {
+  color: #fff;
+  background-color: #9d1f1f;
+}
+
+.Ymacs-Theme-standard-dark .xml-open-tag, .Ymacs-Theme-standard-dark .xml-close-tag {
+  color: #87cefa;
+}
+
+.Ymacs-Theme-standard-dark .xml-attribute {
+  color: #eedd82;
+}
+
+.Ymacs-Theme-standard-dark .xml-entity-starter, .Ymacs-Theme-standard-dark .xml-entity-stopper, .Ymacs-Theme-standard-dark .xml-entity {
+  color: #7fffd4;
+}
+
+.Ymacs-Theme-standard-dark .xml-open-bracket, .Ymacs-Theme-standard-dark .xml-close-bracket, .Ymacs-Theme-standard-dark .xml-closetag-slash, .Ymacs-Theme-standard-dark .xml-cdata, .Ymacs-Theme-standard-dark .xml-cdata-starter, .Ymacs-Theme-standard-dark .xml-cdata-stopper {
+  color: #fff;
+}
+
+.Ymacs-Theme-standard-dark .block-starter, .Ymacs-Theme-standard-dark .block-stopper, .Ymacs-Theme-standard-dark .exp-starter, .Ymacs-Theme-standard-dark .exp-stopper, .Ymacs-Theme-standard-dark .lisp-keyword {
+  color: #b0c4de;
+}
+
+.Ymacs-Theme-standard-dark .heading1 {
+  color: #87cefa;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-standard-dark .heading2 {
+  color: #eedd82;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-standard-dark .heading3 {
+  color: #0ff;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-standard-dark .heading4 {
+  color: #ff7f24;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-standard-dark .markdown-blockquote, .Ymacs-Theme-standard-dark .markdown-blockquote1, .Ymacs-Theme-standard-dark .markdown-blockquote2, .Ymacs-Theme-standard-dark .markdown-blockquote3 {
+  color: #ff7f24;
+}
+
+.Ymacs-Theme-standard-dark.Ymacs-line-numbers .Ymacs-frame-content:before {
+  border-right: 1px solid #000;
+}
+
+.Ymacs-Theme-standard-dark.Ymacs-line-numbers .Ymacs_Frame-active .Ymacs-frame-content:before {
+  box-shadow: 3px 0 7px -3px #0004;
+}
 /*# sourceMappingURL=standard-dark.css.map */
