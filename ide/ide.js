@@ -29,6 +29,7 @@ window.addEventListener("beforeunload", ev => {
 
     Ymacs_Keymap.get("emacs").defineKeys({
         "C-\\"    : "switch_to_buffer",
+        "C-z"     : "switch_to_buffer",
         "C-x C-s" : "webdav_save_file_buffer",
         "C-x C-f" : "webdav_load_file_buffer",
     });

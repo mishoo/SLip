@@ -350,7 +350,7 @@
         checknargs(nargs, 1, 1);
         var x = m.pop();
         if (LispList.is(x)) return LispCons.reverse(x);
-        if (LispArray.is(x)) return x.slice().reverse();
+        if (LispArray.is(x)) return [...x].reverse();
         if (LispString.is(x)) {
             for (var i = x.length, ret = ""; --i >= 0;) ret += x.charAt(i);
             return ret;
@@ -1759,7 +1759,7 @@
     });
 
     defp("%machine.stack", false, function(m, nargs){
-        return m.stack.slice();
+        return [...m.stack];
     });
 
     defp("%eval-bytecode", true, function(m, nargs){
@@ -1781,12 +1781,12 @@
         var code = m.pop();
         checktype(code, LispArray);
         code = LispMachine.assemble(code);
-        // hack: this function needs to return the assembled
-        // code, so we push two instructions to do it.  we
-        // need to copy the code (slice) in order to not
-        // include these two instructions in the return value.
+        // hack: this function needs to return the assembled code, so
+        // we push two instructions to do it.  we need to copy the
+        // code in order to not include these two instructions in the
+        // return value.
         code.push.apply(code, LispMachine.assemble([
-            [ "CONST", code.slice() ],
+            [ "CONST", [...code] ],
             [ "RET" ]
         ]));
         var f = new LispClosure(code, null, new LispCons([], null));

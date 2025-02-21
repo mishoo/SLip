@@ -73,12 +73,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
     // continuations
     function LispCC(m) {
-        this.stack = m.stack.slice();
+        this.stack = [ ...m.stack ];
         this.denv = m.denv;
         //if (m.trace) this.trace = m.trace.slice();
     };
     LispCC.prototype.run = function(m) {
-        m.stack = this.stack.slice();
+        m.stack = [ ...this.stack ];
         m.denv = this.denv;
         //if (this.trace) m.trace = this.trace.slice();
     };
@@ -249,8 +249,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         return false;
     };
 
-    P.set_closure = function(closure) {
-        var args = slice(arguments, 1);
+    P.set_closure = function(closure, ...args) {
         this.stack = [ new LispRet(this, null) ].concat(args);
         this.code = closure.code;
         this.env = closure.env;
@@ -682,8 +681,8 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         names.push("p"); values.push(function(name){
             return LispPackage.get(name);
         });
-        names.push("l"); values.push(function(){
-            return LispCons.fromArray(slice(arguments));
+        names.push("l"); values.push(function(...args){
+            return LispCons.fromArray(args);
         });
         names.push("c"); values.push(function(char){
             return LispChar.get(char);

@@ -300,8 +300,8 @@ function lisp_reader(code) {
 
     var seq = append;
 
-    function gen() {
-        return [ slice(arguments) ];
+    function gen(...args) {
+        return [ args ];
     };
 
     function nullp(x) {

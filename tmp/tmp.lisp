@@ -1,5 +1,7 @@
 (in-package :turtle)
 
+(init-canvas 700 700)
+
 (defun rect-spiral (max)
   (save-excursion
    (let rec ((n 0))
@@ -90,7 +92,7 @@
          (without-pen (forward r))
          (let looop ((i 12))
            (when (> i 0)
-             (circle hours-r 4)
+             (circle hours-r 6)
              (right 105)
              (without-pen (forward step))
              (left 75)
@@ -104,10 +106,16 @@
           (incf hour (/ min 60))
           (save-excursion
            (right (* sec 6))
+           (set-thickness 2)
            (backward 10)
+           (set-thickness 1)
+           (set-color "#bbc")
            (draw-pin 0 (+ r 10) 1))
-          (draw-pin (* min 6) (* r 0.9) 3)
-          (draw-pin (* hour 30) (* r 0.7) 5)
+          (save-excursion
+           (set-color "red")
+           (draw-pin (* min 6) (* r 0.9) 3)
+           (set-color "blue")
+           (draw-pin (* hour 30) (* r 0.7) 5))
           min)))))
 
 (let ((running nil))
@@ -127,9 +135,9 @@
       (let ((sec (clock 150)))
         (let ((*orientation* *orientation*))
           (right (* sec 6))
-          (without-pen (backward 75)))
+          (without-pen (backward 250)))
         (clock 35 :hours-r 2 :hours-pin 6)
-        (set-timeout 150 #'animate-clock)))))
+        (set-timeout 75 #'animate-clock)))))
 
 ;; (defun animate-clock ()
 ;;   (when (clock-running)
