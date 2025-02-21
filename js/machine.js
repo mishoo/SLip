@@ -1048,7 +1048,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 run: function(cc){
                         return function(m) {
                                 m.push(new LispClosure(cc, null, new LispCons([ m.mkcont() ])));
-                        }
+                        };
                 }(assemble([
                         ["ARGS", 1],
                         ["LVAR", 1, 0],

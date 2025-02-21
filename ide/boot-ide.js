@@ -95,7 +95,7 @@
     };
 
     function recompile_all() {
-        load_fasls([ "lisp/compiler.lisp"], function(){
+        load_fasls([ "lisp/compiler.lisp" ], function(){
             compile(lisp_files, function(){
                 log("DONE — I will reload in 3 seconds");
                 setTimeout(function(){
