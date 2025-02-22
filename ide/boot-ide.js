@@ -101,7 +101,7 @@ import { make_desktop } from "./ide.js";
             compile(lisp_files, function(){
                 log("DONE — I will reload in 3 seconds");
                 setTimeout(function(){
-                    window.parent.opener.location.reload(true);
+                    window.location.replace((""+window.location).replace(/\?recompile$/, ""));
                 }, 3000);
             });
         });

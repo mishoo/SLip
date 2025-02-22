@@ -1042,7 +1042,6 @@
         }
         var hash = new LispHash();
         keys.forEach(function(key, i){
-            if (LispSymbol.is(key)) key = LispSymbol.symname(key);
             hash.set(key, values[i]);
         });
         return hash;
@@ -1051,8 +1050,7 @@
     defp("hash-get", false, function(m, nargs){
         checknargs(nargs, 2, 3);
         var def = (nargs == 3) ? m.pop() : null;
-        var key = as_string(m.pop()), hash = m.pop();
-        checktype(key, LispString);
+        var key = m.pop(), hash = m.pop();
         checktype(hash, LispHash);
         var h = hash.has(key);
         if (h) return h.get(key);
@@ -1061,16 +1059,14 @@
 
     defp("hash-add", true, function(m, nargs){
         checknargs(nargs, 3, 3);
-        var val = m.pop(), key = as_string(m.pop()), hash = m.pop();
-        checktype(key, LispString);
+        var val = m.pop(), key = m.pop(), hash = m.pop();
         checktype(hash, LispHash);
         return hash.set(key, val);
     });
 
     defp("hash-set", true, function(m, nargs){
         checknargs(nargs, 3, 3);
-        var val = m.pop(), key = as_string(m.pop()), hash = m.pop();
-        checktype(key, LispString);
+        var val = m.pop(), key = m.pop(), hash = m.pop();
         checktype(hash, LispHash);
         var h = hash.has(key);
         if (h) return h.set(key, val);
@@ -1082,13 +1078,6 @@
         var hash = m.pop();
         checktype(hash, LispHash);
         return hash.copy();
-    });
-
-    defp("hash-extend", false, function(m, nargs){
-        checknargs(nargs, 1, 1);
-        var hash = m.pop();
-        checktype(hash, LispHash);
-        return hash.extend();
     });
 
     defp("hash-keys", false, function(m, nargs){

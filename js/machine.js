@@ -611,10 +611,10 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
     D.disassemble = function(code) {
         var lab = 0;
         function disassemble(code, level) {
-            var labels = {};
+            var labels = Object.create(null);
             code.forEach(function(op, i){
                 if (is_jump_instruction(op._name))
-                    if (!HOP(labels, op.addr))
+                    if (!labels[op.addr])
                         labels[op.addr] = "L" + (++lab);
             });
             return code.map(function(op, i){

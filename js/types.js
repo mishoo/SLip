@@ -164,65 +164,54 @@ var LispOutputStream = DEFTYPE("output-stream", function(D, P){
 var LispHash = DEFTYPE("simple-hash", function(D, P){
     D.fromObject = function(obj) {
         var hash = new LispHash;
-        hash.data = obj;
+        hash.data = new Map(Object.entries(obj));
         return hash;
     };
-    P.INIT = function(parent) {
-        function ctor(){};
-        if (parent) {
-            ctor.prototype = parent.data;
-            this.level = parent.level + 1;
-        } else {
-            this.level = 0;
-        }
-        this.data = new ctor;
-        this.parent = parent || null;
+    P.toObject = function() {
+        let obj = Object.create(null);
+        this.data.entries().forEach(([ key, val ]) => obj[key] = val);
+        return obj;
     };
-    P.get = function(name) {
-        return HOP(this.data, name) ? this.data[name] : null;
+    P.INIT = function(parent = null) {
+        this.data = new Map();
+        this.parent = parent;
+    };
+    P.get = function(key) {
+        let hash = this;
+        while (hash) {
+            if (hash.data.has(key))
+                return hash.data.get(key);
+            hash = hash.parent;
+        }
+        return null;
     };
     P.set = function(name, val) {
-        return this.data[name] = val;
+        this.data.set(name, val);
+        return val;
     };
-    P.has = function(name) {
-        var p = this;
-        while (p != null) {
-            if (HOP(p.data, name)) return p;
-            p = p.parent;
+    P.has = function(key) {
+        let hash = this;
+        while (hash) {
+            if (hash.data.has(key))
+                return hash;
+            hash = hash.parent;
         }
         return null;
     };
     P.size = function() {
-        var count = 0;
-        for (var i in this.data) if (HOP(this.data, i)) ++count;
-        return count;
+        return this.data.size();
     };
     P.serialize = function() {
-        return "h(" + LispChar.sanitize(JSON.stringify(this.data)) + ")";
+        return "h(" + LispChar.sanitize(JSON.stringify(this.toObject())) + ")";
     };
     P.copy = function() {
-        var copy = new LispHash(this.parent);
-        for (var i in this.data) if (HOP(this.data, i)) {
-            copy.data[i] = this.data[i];
-        }
-        return copy;
-    };
-    P.extend = function() {
         return new LispHash(this);
     };
     P.keys = function() {
-        var a = [];
-        for (var i in this.data)
-            if (HOP(this.data, i))
-                a.push(i);
-        return a;
+        return [...this.data.keys()];
     };
     P.values = function() {
-        var a = [];
-        for (var i in this.data)
-            if (HOP(this.data, i))
-                a.push(this.data[i]);
-        return a;
+        return [...this.data.values()];
     };
 });
 
@@ -355,8 +344,8 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
             this.name = name + "";
             this.pak = pak || null;
             this.value = null;
-            this.plist = {};
-            this.vlist = {};
+            this.plist = Object.create(null);
+            this.vlist = Object.create(null);
         }
     };
     P.toString = function() { return this.name };
@@ -425,14 +414,14 @@ var LispProcess = DEFTYPE("process", function(D, P){
 
     // many ideas from http://norstrulde.org/ilge10/ — Kudos Eric Bergstrome!
 
-    var Message = DEFCLASS("Message", null, function(D, P){
-        P.INIT = function(sender, target, signal, args) {
+    class Message {
+        constructor(sender, target, signal, args) {
             this.sender = sender;
             this.target = target;
             this.signal = signal;
             this.args = args;
-        };
-    });
+        }
+    }
 
     LispMutex.extend({
         acquire: function(process) {
@@ -589,7 +578,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
             if (D.is(p)) {
                 p.run(200);
             }
-            else if (Message.is(p)) {
+            else if (p instanceof Message) {
                 p.target.handle(p);
             }
             else throw new Error("Unknown object in scheduler queue");

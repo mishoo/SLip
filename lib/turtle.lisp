@@ -238,7 +238,7 @@
 (defun set-rotation (angle)
   (%dom-set-rotation *context* angle))
 
-(defun set-translaction (x y)
+(defun set-translation (x y)
   (%dom-set-translation *context* x y))
 
 (defun set-scale (x y)

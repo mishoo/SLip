@@ -32,7 +32,7 @@
   (let ((name (intern (strcat "EXEC-" what))))
     `(labels ((,name ,args ,@body))
        (setf (symbol-function ',name) #',name)
-       (hash-set *handlers* ,what
+       (hash-set *handlers* ,(%symbol-name what)
                  (lambda (req-id ,@args)
                    (make-thread
                     (lambda ()
