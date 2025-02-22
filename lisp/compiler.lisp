@@ -884,6 +884,7 @@
 
      (compile-string (str)
        (let ((reader (lisp-reader str 'EOF))
+             (cache (make-hash))
              (out (%make-output-stream))
              (is-first t)
              (link-addr 0)
@@ -898,7 +899,7 @@
                         (if is-first
                             (setq is-first nil)
                             (%stream-put out #\,))
-                        (%stream-put out (%serialize-code code) #\Newline))))
+                        (%stream-put out (%serialize-code code cache) #\Newline))))
                   (rec ()
                     (let* ((token (funcall reader 'next))
                            (*current-pos* (car token))

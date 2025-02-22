@@ -657,29 +657,41 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
     ///// </disassemble>
 
-    D.serialize = function(code, strip) {
+    D.serialize = function(code, strip, cache) {
         code = code.map(function(op){
-            return op._disp();
+            return op._disp(cache);
         }).join(",");
         return strip ? code : "[" + code + "]";
     };
 
     D.unserialize = function(code) {
-        var names = [], values = [];
+        var names = [], values = [], cache = [];
         for (var i in OPS) if (HOP(OPS, i)) {
             var op = OPS[i];
             names.push(i);
             values.push(op.make);
         }
         names.push("s"); values.push(function(name, pak){
-            if (pak != null) {
-                pak = LispPackage.get(pak);
-                return LispSymbol.get(name, pak);
+            if (arguments.length == 1 && typeof name == "number") {
+                return cache[name];
             }
-            return new LispSymbol(name);
+            let sym;
+            if (pak != null) {
+                pak = LispPackage.is(pak) ? pak : LispPackage.get(pak);
+                sym = LispSymbol.get(name, pak);
+            } else {
+                sym = new LispSymbol(name);
+            }
+            cache.push(sym);
+            return sym;
         });
         names.push("p"); values.push(function(name){
-            return LispPackage.get(name);
+            if (arguments.length == 1 && typeof name == "number") {
+                return cache[name];
+            }
+            let pak = LispPackage.get(name);
+            cache.push(pak);
+            return pak;
         });
         names.push("l"); values.push(function(...args){
             return LispCons.fromArray(args);
@@ -693,23 +705,25 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         return code;
     };
 
-    function serialize_const(val) {
-        if (val === null || val === true) return val + "";
-        if (LispSymbol.is(val) || LispPackage.is(val) || LispChar.is(val)) return val.serialize();
-        if (val instanceof RegExp) return val.toString();
-        if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(serialize_const).join(",") + ")";
-        if (val instanceof Array) return "[" + val.map(serialize_const).join(",") + "]";
-        if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
-        return val + "";
+    function serialize_const(val, cache) {
+        return function dump(val) {
+            if (val === null || val === true) return val + "";
+            if (LispSymbol.is(val) || LispPackage.is(val) || LispChar.is(val)) return val.serialize(cache);
+            if (val instanceof RegExp) return val.toString();
+            if (LispCons.is(val)) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
+            if (val instanceof Array) return "[" + val.map(dump).join(",") + "]";
+            if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
+            return val + "";
+        }(val);
     };
 
     D.serialize_const = serialize_const;
 
     var OP = DEFCLASS("NOP", null, function(D, P){
-        P._disp = function() {
+        P._disp = function(cache) {
             var self = this;
             return self._name + "(" + self._args.map(function(el){
-                return serialize_const(self[el]);
+                return serialize_const(self[el], cache);
             }).join(",") + ")";
         };
     });
@@ -1004,8 +1018,10 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
             run: function(m) {
                 m.push(new LispClosure(this.code, this.name, m.env));
             },
-            _disp: function() {
-                return "FN(" + D.serialize(this.code) + (this.name ? "," + LispMachine.serialize_const(this.name) : "") + ")";
+            _disp: function(cache) {
+                return "FN(" + D.serialize(this.code, false, cache) +
+                    (this.name ? "," + D.serialize_const(this.name, cache) : "")
+                    + ")";
             }
         }],
         ["PRIM", "name nargs", {

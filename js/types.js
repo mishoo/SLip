@@ -199,7 +199,7 @@ var LispHash = DEFTYPE("simple-hash", function(D, P){
         return null;
     };
     P.size = function() {
-        return this.data.size();
+        return this.data.size;
     };
     P.serialize = function() {
         return "h(" + LispChar.sanitize(JSON.stringify(this.toObject())) + ")";
@@ -226,7 +226,7 @@ var LispObject = DEFTYPE("object", function(D, P){
 });
 
 var LispPackage = DEFTYPE("package", function(D, P){
-    var PACKAGES = {};
+    var PACKAGES = Object.create(null);
     P.INIT = function(name) {
         this.name = name + "";
         this.symbols = new LispHash();
@@ -235,7 +235,12 @@ var LispPackage = DEFTYPE("package", function(D, P){
     };
     P.toString = function() { return this.name };
     P.print = function() { return "<package " + this.name + ">" };
-    P.serialize = function() {
+    P.serialize = function(cache) {
+        if (cache) {
+            let id = cache.get(this);
+            if (id != null) return `p(${id})`;
+            cache.set(this, cache.size());
+        }
         return "p(" + JSON.stringify(this.name) + ")";
     };
     P.intern = function(name) {
@@ -322,7 +327,7 @@ var LispPackage = DEFTYPE("package", function(D, P){
         return null;
     };
     D.get = function(name) {
-        return HOP(PACKAGES, name) ? PACKAGES[name] : (
+        return PACKAGES[name] || (
             PACKAGES[name] = new D(name)
         );
     };
@@ -349,11 +354,20 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         }
     };
     P.toString = function() { return this.name };
-    P.serialize = function() {
-        return "s(" +
+    P.serialize = function(cache) {
+        if (cache) {
+            let id = cache.get(this);
+            if (id != null) return `s(${id})`;
+        }
+        let code = "s(" +
             JSON.stringify(this.name) +
-            (this.pak ? ("," + JSON.stringify(this.pak.name)) : "") +
+            (this.pak ? ("," + this.pak.serialize(cache)) : "") +
             ")";
+        // note: pak.serialize will cache package as well; order is
+        // important, we have to put ourselves in the cache *after*
+        // the package.
+        if (cache) cache.set(this, cache.size());
+        return code;
     };
     P.set = function(key, val) {
         return this.plist[key] = val;

@@ -1792,10 +1792,12 @@
     });
 
     defp("%serialize-code", false, function(m, nargs){
-        checknargs(nargs, 1, 1);
+        checknargs(nargs, 1, 2);
+        var cache = nargs == 2 ? m.pop() : null;
         var code = m.pop();
         checktype(code, LispArray);
-        return LispMachine.serialize(code, true);
+        if (nargs == 2) checktype(cache, LispHash);
+        return LispMachine.serialize(code, true, cache);
     });
 
     defp("%js-eval", true, function(m, nargs){
