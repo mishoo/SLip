@@ -243,6 +243,11 @@
 (defsetf cdr (x) (val)
   `(rplacd ,x ,val))
 
+(defsetf symbol-function (sym) (func)
+  `(progn
+     (%::maybe-xref-info ,sym "DEFUN")
+     (set-symbol-function! ,sym ,func)))
+
 (def-emac push (obj place)
   `(setf ,place (cons ,obj ,place)))
 
@@ -380,7 +385,7 @@
                          (sub list (floor (length list) 2)))))
                (merge (sort a) (sort b) predicate))))))
 
-(set-symbol-function! 'sort #'stable-sort)
+(setf (symbol-function 'sort) #'stable-sort)
 (export '(sort export import))
 
 (def-emac with-append-list ((var append &key (tail (gensym))) &body body)

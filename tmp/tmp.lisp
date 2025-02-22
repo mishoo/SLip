@@ -116,7 +116,7 @@
            (draw-pin (* min 6) (* r 0.9) 3)
            (set-color "blue")
            (draw-pin (* hour 30) (* r 0.7) 5))
-          min)))))
+          sec)))))
 
 (let ((running nil))
   (defun start-clock ()
@@ -137,7 +137,7 @@
           (right (* sec 6))
           (without-pen (backward 250)))
         (clock 35 :hours-r 2 :hours-pin 6)
-        (set-timeout 75 #'animate-clock)))))
+        (set-timeout 45 #'animate-clock)))))
 
 ;; (defun animate-clock ()
 ;;   (when (clock-running)

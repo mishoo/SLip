@@ -31,7 +31,7 @@
 (defmacro define-handler (what (&rest args) &body body)
   (let ((name (intern (strcat "EXEC-" what))))
     `(labels ((,name ,args ,@body))
-       (set-symbol-function! ',name #',name)
+       (setf (symbol-function ',name) #',name)
        (hash-set *handlers* ,what
                  (lambda (req-id ,@args)
                    (make-thread
