@@ -89,6 +89,13 @@
       (let* ((len (* 2 r +PI+))
              (step (/ len 12)))
         (save-excursion
+         (set-color "#ccc")
+         (dotimes (i 60)
+           (save-excursion
+            (without-pen (forward (- r 3)))
+            (forward 6))
+           (right 6)))
+        (save-excursion
          (without-pen (forward r))
          (let looop ((i 12))
            (when (> i 0)
@@ -105,17 +112,17 @@
           (incf min (/ sec 60))
           (incf hour (/ min 60))
           (save-excursion
+           (set-color "orange")
+           (draw-pin (* min 6) (* r 0.9) 3)
+           (set-color "red")
+           (draw-pin (* hour 30) (* r 0.7) 5))
+          (save-excursion
            (right (* sec 6))
            (set-thickness 2)
            (backward 10)
            (set-thickness 1)
-           (set-color "#bbc")
+           (set-color "#445")
            (draw-pin 0 (+ r 10) 1))
-          (save-excursion
-           (set-color "red")
-           (draw-pin (* min 6) (* r 0.9) 3)
-           (set-color "blue")
-           (draw-pin (* hour 30) (* r 0.7) 5))
           sec)))))
 
 (let ((running nil))
@@ -132,11 +139,11 @@
   (when (clock-running)
     (without-interrupts
       (clear)
-      (let ((sec (clock 150)))
-        (let ((*orientation* *orientation*))
-          (right (* sec 6))
-          (without-pen (backward 250)))
-        (clock 35 :hours-r 2 :hours-pin 6)
+      (let ((sec (clock 250)))
+        ;; (let ((*orientation* *orientation*))
+        ;;   (right (* sec 6))
+        ;;   (without-pen (backward 250)))
+        ;; (clock 35 :hours-r 2 :hours-pin 6)
         (set-timeout 45 #'animate-clock)))))
 
 ;; (defun animate-clock ()

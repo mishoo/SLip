@@ -41,7 +41,7 @@
 (defparameter *turtle-context* nil)
 (defparameter *show-turtle* t)
 
-(defun-js %dom-create-canvas (id width height)
+(defun-js %dom-create-canvas (id width height bg)
   "var tmp = document.getElementById(id);
    if (tmp) tmp.parentNode.removeChild(tmp);
    tmp = document.createElement('canvas');
@@ -52,8 +52,8 @@
    tmp.style.padding = '1px';
    tmp.style.position = 'absolute';
    tmp.style.boxShadow = '0 0 10px #999';
-   tmp.style.background = '#ffffff80';
-   tmp.style.left = '10px';
+   if (bg) tmp.style.background = bg;
+   tmp.style.right = '10px';
    tmp.style.top = '10px';
    document.body.appendChild(tmp);
    var ctx = tmp.getContext('2d');
@@ -118,7 +118,7 @@
    return [ box.width, box.height ];")
 
 (defun init-canvas (width height)
-  (setf *canvas* (%dom-create-canvas *canvas-id* width height)
+  (setf *canvas* (%dom-create-canvas *canvas-id* width height "#ffffff80")
         *context* (%dom-canvas-context *canvas*)
         *turtle-canvas* (%dom-create-canvas (strcat *canvas-id* "-turtle") width height)
         *turtle-context* (%dom-canvas-context *turtle-canvas*))
@@ -259,4 +259,4 @@
           (%dom-fill-text *context* text 0 0))
       (%dom-restore *context*))))
 
-(init-canvas 400 400)
+(init-canvas 700 700)

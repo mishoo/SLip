@@ -525,16 +525,7 @@ Ymacs_Buffer.newCommands({
         });
     }),
     sl_recompile_everything: Ymacs_Interactive(function(){
-        var dlg = this.createDialog({
-            title     : "Compiling...",
-            resizable : true,
-            modal     : true,
-            quitBtn   : "destroy"
-        });
-        var url = window.location.toString().replace(/\?.*$/, "") + "?recompile";
-        dlg.setContent("<iframe style='margin: 0; padding: 0; width: 100%; height: 100%; border: 0;' src='" + url + "'></iframe>");
-        dlg.setSize({ x: 400, y: 300 });
-        dlg.show(true);
+        this.signalInfo("Just add ?recompile to the URL");
     }),
     sl_lisp_notify_message: function(msg) {
         // msg should be string, but if not...
@@ -718,7 +709,7 @@ export function make_desktop() {
     ymacs.getActiveBuffer().cmd("sl_mode");
     document.body.appendChild(ymacs.getElement());
 
-    load("./scratch.lisp", function(code){
+    load("./ide/scratch.lisp", function(code){
         ymacs.getBuffer("*scratch*").setCode(code);
     });
 

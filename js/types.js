@@ -14,7 +14,7 @@ function DEFTYPE(name, func, base) {
 
 var LispChar = DEFTYPE("char", function(D, P){
     // TODO: this table should be really long.
-    var NAMES_TO = {
+    var NAMES_TO = Object.assign(Object.create(null), {
         " "      : "SPACE",
         "\t"     : "TAB",
         "\r"     : "RETURN",
@@ -24,16 +24,13 @@ var LispChar = DEFTYPE("char", function(D, P){
         "\u2028" : "LINE_SEPARATOR",
         "\u2029" : "PARAGRAPH_SEPARATOR",
         "\xA0"   : "NO-BREAK_SPACE"
-    };
+    });
     var NAMES_FROM = (function(h){
-        for (var i in NAMES_TO) {
-            if (HOP(NAMES_TO, i)) {
-                h[NAMES_TO[i]] = i;
-            }
-        }
+        for (var i in NAMES_TO)
+            h[NAMES_TO[i]] = i;
         h.LINEFEED = "\n";
         return h;
-    })({});
+    })(Object.create(null));
     var OBJECTS = {};
     D.fromName = function(name) {
         if (name.length == 1)
@@ -337,7 +334,8 @@ var LispPackage = DEFTYPE("package", function(D, P){
 });
 
 var LispSymbol = DEFTYPE("symbol", function(D, P){
-    var SYMBOLS = {};
+    var SYMBOLS = Object.create(null);
+    var BASE_PACK = LispPackage.get("%");
     D.symname = function(sym) {
         return sym === null ? "NIL" : sym === true ? "T" : sym.name;
     };
@@ -373,13 +371,13 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         return this.plist[key] = val;
     };
     P.get = function(key) {
-        return HOP(this.plist, key) ? this.plist[key] : null;
+        return key in this.plist ? this.plist[key] : null;
     };
     P.setv = function(key, val) {
         return this.vlist[key] = val;
     };
     P.getv = function(key) {
-        return HOP(this.vlist, key) ? this.vlist[key] : null;
+        return key in this.vlist ? this.vlist[key] : null;
     };
     P.macro = function() {
         return this.getv("macro");
@@ -398,16 +396,16 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
     };
     D.get = function(name, pak) {
         if (pak == null) pak = BASE_PACK;
-        var ret = pak ? pak.intern(name) : HOP(SYMBOLS, name) ? SYMBOLS[name] : (
+        var ret = pak ? pak.intern(name) : (SYMBOLS[name] || (
             SYMBOLS[name] = new D(name)
-        );
+        ));
         return ret;
     };
     P.print = function() {
-        if (this.pak && this.pak.name == "KEYWORD") return ":" + this.name;
+        if (this.pak?.name == "KEYWORD")
+            return ":" + this.name;
         return this.name;
     };
-    var BASE_PACK = LispPackage.get("%");
 });
 
 (function(BASE_PACK){
@@ -500,14 +498,15 @@ var LispProcess = DEFTYPE("process", function(D, P){
             console.dir(err);
             console.dir(err.stack);
             console.log(this);
-        }
-        else switch (m.status) {
+        } else {
+            switch (m.status) {
               case "running":
-            QUEUE.push(this);
-            break;
+                QUEUE.push(this);
+                break;
               case "waiting":
-            this.checkmail();
-            break;
+                this.checkmail();
+                break;
+            }
         }
     };
 
