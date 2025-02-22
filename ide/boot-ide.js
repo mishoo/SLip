@@ -1,4 +1,6 @@
-(function(global, window){
+import { make_desktop } from "./ide.js";
+
+(function(window){
 
     var lisp_files = [
         "lisp/compiler.lisp",
@@ -107,28 +109,14 @@
 
     // recompile_all();
 
-    function open_ide() {
-        window.open("ide/ymacs.html", "SLIP",
-                    "width=800,height=600,menubar=0,toolbar=0,location=0,personalbar=0,status=0,dependent=1,chrome=1");
-    };
-
-    document.body.ondblclick = function(ev){
-        if (ev.ctrlKey) {
-            open_ide();
-            return false;
-        }
-    };
-
     function init() {
         load_fasls(lisp_files, function(){
-            //machine.atomic_call(LispSymbol.get("LOAD").func(), [ "ide.lisp" ]);
-            global.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
+            window.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
             Array.prototype.slice.call(document.getElementsByTagName("div")).map(function(el){
                 if (el.className == "lisp-log")
                     el.parentNode.removeChild(el);
             });
-            if (/\?ide$/.test(window.location))
-                open_ide();
+            make_desktop();
         });
     };
 
@@ -138,4 +126,4 @@
         init();
     }
 
-})(this, window);
+})(window);
