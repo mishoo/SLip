@@ -53,27 +53,13 @@
       (right 3)
       (leaf (- n 5)))))
 
-(defun circle args
-  (destructuring-bind (r &optional (n 40)) args
-    (save-excursion
-     (without-pen (forward r))
-     (let* ((len (* 2 r +PI+))
-            (step (/ len n))
-            (rot (/ 360 n)))
-       (right (+ 90 (/ rot 2)))
-       (let looop ((i n))
-         (when (> i 0)
-           (forward step)
-           (right rot)
-           (looop (1- i))))))))
-
 (defun ease-decelerate (f)
   (setf f (- 1 f))
   (- 1 (* f f)))
 
 (defun ease-elastic (f)
-  (- 1 (/ (cos (* 5 +pi+ f))
-          (expt 2 (* 10 f)))))
+  (- 1 (/ (cos (* 4 +pi+ f))
+          (expt 2 (* 8 f)))))
 
 (defun floatmap (f a b)
   (+ a (* f (- b a))))
@@ -95,10 +81,11 @@
               (forward x)))))
   (defun clock args
     (destructuring-bind (r &key
-                           (hours-r 3)
+                           (hours-r 6)
                            (hours-pin 10)) args
       (let* ((len (* 2 r +PI+))
-             (step (/ len 12)))
+             (step (/ len 12))
+             sec0)
         (save-excursion
          (set-color "#ccc")
          (dotimes (i 60)
@@ -107,19 +94,19 @@
             (forward 6))
            (right 6)))
         (save-excursion
-         (without-pen (forward r))
          (let looop ((i 12))
            (when (> i 0)
-             (circle hours-r 6)
-             (right 105)
-             (without-pen (forward step))
-             (left 75)
-             (save-excursion (backward hours-pin))
+             (save-excursion
+              (without-pen (forward (* r 1.02)))
+              (circle hours-r)
+              (backward hours-pin))
+             (right 30)
              (looop (1- i)))))
         (destructuring-bind
             (year month date hour min sec msec)
             (%local-date)
-          (incf sec (ease-elastic (/ msec 1000)))
+          (setf sec0 sec)
+          (incf sec (/ msec 1000))
           (incf min (/ sec 60))
           (incf hour (/ min 60))
           (save-excursion
@@ -128,9 +115,10 @@
            (set-color "red")
            (draw-pin (* hour 30) (* r 0.7) 5))
           (save-excursion
-           (right (* sec 6))
+           (incf sec0 (ease-elastic (/ msec 300)))
+           (right (* sec0 6))
            (set-thickness 2)
-           (without-pen (backward 20))
+           (without-pen (backward (* r 0.07)))
            (set-thickness 1)
            (set-color "#445")
            (draw-pin 0 (* r 1.1) 2))
@@ -150,12 +138,12 @@
   (when (clock-running)
     (without-interrupts
       (clear)
-      (let ((sec (clock 250)))
+      (let ((sec (clock 200)))
         ;; (let ((*orientation* *orientation*))
         ;;   (right (* sec 6))
-        ;;   (without-pen (backward 250)))
-        ;; (clock 35 :hours-r 2 :hours-pin 6)
-        (set-timeout 25 #'animate-clock)))))
+        ;;   (without-pen (backward 280)))
+        ;; (clock 40 :hours-r 2 :hours-pin 6)
+        (set-timeout 16 #'animate-clock)))))
 
 ;; (defun animate-clock ()
 ;;   (when (clock-running)

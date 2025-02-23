@@ -91,6 +91,9 @@
 (defun-js %dom-set-color (context color)
   "context.strokeStyle = color;")
 
+(defun-js %dom-set-fill (context color)
+  "context.fillStyle = color;")
+
 (defun-js %dom-set-thickness (context width)
   "context.lineWidth = width;")
 
@@ -116,6 +119,11 @@
 (defun-js %dom-measure-text (context text)
   "var box = context.measureText(text);
    return [ box.width, box.height ];")
+
+(defun-js %dom-circle (context x y radius)
+  "context.beginPath();
+   context.arc(x, y, radius, 0, 2 * Math.PI);
+   context.stroke();")
 
 (defun init-canvas (width height)
   (setf *canvas* (%dom-create-canvas *canvas-id* width height "#ffffff80")
@@ -143,6 +151,9 @@
        ,@body)
      (when *show-turtle*
        (show-turtle))))
+
+(defun circle (r)
+  (%dom-circle *context* (car *position*) (cdr *position*) r))
 
 (defun orientation-radians ()
   (* +PI+ (/ *orientation* 180)))
