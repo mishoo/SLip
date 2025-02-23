@@ -803,7 +803,10 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         ["FGVAR", "name", {
             run: function(m) {
                 var f = this.name.func();
-                if (!f) console.error("Undefined function", this.name);
+                if (!f) {
+                    //console.error("Undefined function", this.name);
+                    throw new LispPrimitiveError(`Undefined function ${D.dump(this.name)}`);
+                }
                 m.push(f);
             }
         }],
