@@ -1,18 +1,3 @@
-var $concat = Array.prototype.concat;
-
-var $HOP = Object.prototype.hasOwnProperty;
-function HOP(obj, prop) { return $HOP.call(obj, prop) };
-
-function defmerge(target, args, defs) {
-    var ret = {};
-    if (args === true || !args)
-        args = {};
-    for (var i in defs) if (HOP(defs, i)) {
-        target[i] = ret[i] = (args && HOP(args, i)) ? args[i] : defs[i];
-    }
-    return ret;
-};
-
 function repeat_string(str, i) {
     if (i <= 0) return "";
     if (i == 1) return str;
@@ -31,6 +16,15 @@ function pad_string(str, width, ch) {
 };
 
 var DEFCLASS = (function(NOINIT){
+    function defmerge(target, args, defs) {
+        var ret = {};
+        if (args === true || !args)
+            args = {};
+        for (var i in defs) if (Object.hasOwn(defs, i)) {
+            target[i] = ret[i] = (args && Object.hasOwn(args, i)) ? args[i] : defs[i];
+        }
+        return ret;
+    }
     return function(name, BASE, func, skip_base) {
         var code = "var D = function " + (name || "D")
             + " (a){ if (a !== NOINIT) {\n";

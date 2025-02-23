@@ -36,7 +36,7 @@ var LispChar = DEFTYPE("char", function(D, P){
         if (name.length == 1)
             return D.get(name); // hack
         name = name.toUpperCase();
-        if (HOP(NAMES_FROM, name))
+        if (Object.hasOwn(NAMES_FROM, name))
             return D.get(NAMES_FROM[name]);
         return null;
     };
@@ -65,7 +65,7 @@ var LispChar = DEFTYPE("char", function(D, P){
     };
     P.print = function() {
         var ch = this.value;
-        return "#\\" + (HOP(NAMES_TO, ch) ? NAMES_TO[ch] : ch);
+        return "#\\" + (Object.hasOwn(NAMES_TO, ch) ? NAMES_TO[ch] : ch);
     };
     P.serialize = function() {
         var ch = D.sanitize(JSON.stringify(this.value));
@@ -550,7 +550,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
     };
 
     P.has_timeouts = function() {
-        for (var i in this.timeouts) if (HOP(this.timeouts, i)) return true;
+        for (var i in this.timeouts) if (Object.hasOwn(this.timeouts, i)) return true;
         return null;
     };
 

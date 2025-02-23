@@ -426,7 +426,7 @@
     })(0);
 
     (function(make, i){
-        for (i in LispCons) if (HOP(LispCons, i) && /^c[ad]+r$/.test(i)) {
+        for (i in LispCons) if (Object.hasOwn(LispCons, i) && /^c[ad]+r$/.test(i)) {
             defp(i, false, make(LispCons[i]));
         }
     })(function(func){
@@ -1528,7 +1528,7 @@
         checknargs(nargs, 1, 1);
         var sym = m.pop();
         checktype(sym, LispSymbol);
-        return HOP(sym, "value") ? sym.value : null;
+        return Object.hasOwn(sym, "value") ? sym.value : null;
     });
 
     defp("symbol-function", false, function(m, nargs){

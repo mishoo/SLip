@@ -126,7 +126,7 @@
    context.stroke();")
 
 (defun init-canvas (width height)
-  (setf *canvas* (%dom-create-canvas *canvas-id* width height "#ffffff80")
+  (setf *canvas* (%dom-create-canvas *canvas-id* width height "#ffffffd0")
         *context* (%dom-canvas-context *canvas*)
         *turtle-canvas* (%dom-create-canvas (strcat *canvas-id* "-turtle") width height)
         *turtle-context* (%dom-canvas-context *turtle-canvas*))

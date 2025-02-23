@@ -298,7 +298,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
     };
 
     function max_stat(name, val) {
-        if (!HOP(D.stats, name) || D.stats[name] < val)
+        if (!Object.hasOwn(D.stats, name) || D.stats[name] < val)
             D.stats[name] = val;
     };
 
@@ -666,7 +666,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
 
     D.unserialize = function(code) {
         var names = [], values = [], cache = [];
-        for (var i in OPS) if (HOP(OPS, i)) {
+        for (var i in OPS) if (Object.hasOwn(OPS, i)) {
             var op = OPS[i];
             names.push(i);
             values.push(op.make);
@@ -743,7 +743,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         )(ctor);
         proto._name = name;
         proto._args = args;
-        for (var i in proto) if (HOP(proto, i)) {
+        for (var i in proto) if (Object.hasOwn(proto, i)) {
             ctor.prototype[i] = proto[i];
         }
         return OPS[name] = ctor;
@@ -1077,7 +1077,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
     });
 
     (function(i){
-        for (i in LispCons) if (HOP(LispCons, i) && /^c[ad]+r$/.test(i)) {
+        for (i in LispCons) if (Object.hasOwn(LispCons, i) && /^c[ad]+r$/.test(i)) {
             defop(i.toUpperCase(), 0, {
                 run: new Function("f", "return function(m){ m.push(f(m.pop())) }")(LispCons[i])
             });
