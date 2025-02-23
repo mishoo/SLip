@@ -10,7 +10,7 @@
     };
 
     var LispArray = {
-        is: function(x) { return x instanceof Array },
+        is: Array.isArray,
         type: "array"
     };
 

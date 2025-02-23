@@ -131,6 +131,5 @@
           (<< (%symbol-name symbol))))))
 
 (def-efun print-object-to-string (obj)
-  (let ((out (%make-output-stream)))
-    (print-object obj out)
-    (%stream-get out)))
+  (with-output-to-string (out)
+    (print-object obj out)))

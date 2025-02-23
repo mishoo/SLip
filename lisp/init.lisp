@@ -417,6 +417,13 @@
 (defparameter *error-output* (%make-output-stream))
 (defparameter *trace-output* (%make-output-stream))
 
+(def-emac with-output-to-string ((var &optional string) &body body)
+  `(let ((,var (%make-output-stream)))
+     ,@(when string
+         `((%stream-put ,var ,string)))
+     ,@body
+     (%stream-get ,var)))
+
 (export '(*standard-output*
           *error-output*
           *trace-output*
