@@ -223,7 +223,8 @@
       (print output args colmod? atmod? mincol colinc minpad padchar)))
 
   (def-format #\S ((mincol 0) (colinc 1) (minpad 0) (padchar #\Space))
-    (let ((*print-escape* t))
+    (let ((*print-escape* t)
+          (*print-readably* t))
       (print output args colmod? atmod? mincol colinc minpad padchar))))
 
 ;; integers (missing ~R for now)

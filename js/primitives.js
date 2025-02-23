@@ -278,9 +278,11 @@
         });
     });
 
-    defp("power", false, function(m, nargs){
+    defp("expt", false, function(m, nargs){
         checknargs(nargs, 2, 2);
-        return Math.pow(m.pop_number(error), m.pop_number(error));
+        let exp = m.pop_number(error);
+        let base = m.pop_number(error);
+        return Math.pow(base, exp);
     });
 
     defp("random", false, function(m, nargs){
@@ -1395,7 +1397,7 @@
         var pak = m.pop(), sym = m.pop();
         checktype(sym, LispSymbol);
         checktype(pak, LispPackage);
-        return pak.all_accessible().indexOf(sym) >= 0 ? true : null; // XXX: optimize this
+        return pak.all_accessible(true).indexOf(sym) >= 0 ? true : null; // XXX: optimize this
     });
 
     defp("%interned-symbols", false, function(m, nargs){

@@ -67,6 +67,17 @@
            (right rot)
            (looop (1- i))))))))
 
+(defun ease-decelerate (f)
+  (setf f (- 1 f))
+  (- 1 (* f f)))
+
+(defun ease-elastic (f)
+  (- 1 (/ (cos (* 5 +pi+ f))
+          (expt 2 (* 10 f)))))
+
+(defun floatmap (f a b)
+  (+ a (* f (- b a))))
+
 (labels ((draw-pin (angle len thick)
            (save-excursion
             (right angle)
@@ -108,7 +119,7 @@
         (destructuring-bind
             (year month date hour min sec msec)
             (%local-date)
-          (incf sec (/ msec 1000))
+          (incf sec (ease-elastic (/ msec 1000)))
           (incf min (/ sec 60))
           (incf hour (/ min 60))
           (save-excursion
@@ -119,10 +130,10 @@
           (save-excursion
            (right (* sec 6))
            (set-thickness 2)
-           (backward 10)
+           (without-pen (backward 20))
            (set-thickness 1)
            (set-color "#445")
-           (draw-pin 0 (+ r 10) 1))
+           (draw-pin 0 (* r 1.1) 2))
           sec)))))
 
 (let ((running nil))
@@ -144,7 +155,7 @@
         ;;   (right (* sec 6))
         ;;   (without-pen (backward 250)))
         ;; (clock 35 :hours-r 2 :hours-pin 6)
-        (set-timeout 45 #'animate-clock)))))
+        (set-timeout 25 #'animate-clock)))))
 
 ;; (defun animate-clock ()
 ;;   (when (clock-running)
