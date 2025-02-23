@@ -86,25 +86,28 @@
       (let* ((len (* 2 r +PI+))
              (step (/ len 12))
              sec0)
-        (save-excursion
-         (set-color "#ccc")
-         (dotimes (i 60)
-           (save-excursion
-            (without-pen (forward (- r 3)))
-            (forward 6))
-           (right 6)))
-        (save-excursion
-         (let looop ((i 12))
-           (when (> i 0)
-             (save-excursion
-              (without-pen (forward (* r 1.02)))
-              (circle hours-r)
-              (backward hours-pin))
-             (right 30)
-             (looop (1- i)))))
         (destructuring-bind
-            (year month date hour min sec msec)
+            (year month date hour min sec msec
+                  &aux (anim-pos (/ msec 300)))
             (%local-date)
+          (save-excursion
+           (set-color "#ccc")
+           (dotimes (i 60)
+             (save-excursion
+              (without-pen (forward (- r 3)))
+              (forward 6))
+             (right 6)))
+          (save-excursion
+           (let looop ((i 12))
+             (when (> i 0)
+               (save-excursion
+                (without-pen
+                  (forward (floatmap (ease-elastic (/ msec 700))
+                                     r (* r 1.02))))
+                (circle hours-r)
+                (backward hours-pin))
+               (right 30)
+               (looop (1- i)))))
           (setf sec0 sec)
           (incf sec (/ msec 1000))
           (incf min (/ sec 60))
@@ -115,7 +118,7 @@
            (set-color "red")
            (draw-pin (* hour 30) (* r 0.7) 5))
           (save-excursion
-           (incf sec0 (ease-elastic (/ msec 300)))
+           (incf sec0 (ease-elastic anim-pos))
            (right (* sec0 6))
            (set-thickness 2)
            (without-pen (backward (* r 0.07)))

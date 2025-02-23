@@ -31,6 +31,9 @@
   `(prog1 (car ,lst)
      (setq ,lst (cdr ,lst))))
 
+(defun %dbind-error-missing-arg (arg)
+  (error (strcat "Missing required argument: " arg)))
+
 (defun %fn-destruct (args values body)
   (let (names decls)
     (let ((topv (gensym)) rec)
@@ -93,7 +96,7 @@
                             (t
                              (add thisarg `(if ,values
                                                (%next ,values)
-                                               (error ,(strcat "Missing required argument: " thisarg))))))
+                                               (%dbind-error-missing-arg ',thisarg)))))
                           (rec optional? rest? key? aux? (cdr args) values (+ i 1)))))
 
                       ((consp thisarg)
