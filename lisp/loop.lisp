@@ -141,21 +141,19 @@
         (pop args)
         (setf init-form (pop args)))
 
-      (%list-add *loop-start*
-                 `(setf ,var ,(or init-form
-                                  (if upwards
-                                      0
-                                      (error "Downward LOOP requires init form")))))
+      (unless init-form
+        (if upwards
+            (setf init-form 0)
+            (error "Downward LOOP requires init form")))
+
+      (%list-add *loop-start* `(setf ,var ,init-form))
 
       (when (iskw (car args) '(to upto downto below above))
-        (if upwards
-            (when (iskw (car args) '(downto above))
-              (unless upwards
-                (error "Conflicting LOOP direction (~A ~A)" kind (car args))))
-            (when (iskw (car args) '(upto below))
-              (unless upwards
-                (error "Conflicting LOOP direction (~A ~A)" kind (car args)))))
-
+        (cond
+          ((iskw (car args) '(downto above))
+           (setf upwards nil))
+          ((iskw (car args) '(upto below))
+           (setf upwards t)))
         (setf noteq (iskw (pop args) '(below above))
               limit-form (pop args))
         (%list-add *loop-variables* limit)
