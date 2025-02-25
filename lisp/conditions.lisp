@@ -12,7 +12,8 @@
           signal
           handler-case
           handler-bind
-          ignore-errors))
+          ignore-errors
+          assert))
 
 (defun typep (obj type)
   (if (is-a obj type) t nil))
@@ -127,6 +128,9 @@
     (signal condition)
     ;; XXX: no debugger
     (%error condition)))
+
+(defun assert (cond . arguments)
+  (unless cond (apply #'error arguments)))
 
 (defun primitive-error (fmt . arguments)
   (error 'primitive-error 'format-control fmt 'format-args arguments))

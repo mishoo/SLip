@@ -186,6 +186,9 @@ var LispHash = DEFTYPE("simple-hash", function(D, P){
         this.data.set(name, val);
         return val;
     };
+    P.delete = function(name) {
+        this.data.delete(name);
+    };
     P.has = function(key) {
         let hash = this;
         while (hash) {
@@ -243,6 +246,9 @@ var LispPackage = DEFTYPE("package", function(D, P){
     P.intern = function(name) {
         return this.symbols.get(name) ||
             this.symbols.set(name, new LispSymbol(name, this));
+    };
+    P.unintern = function(name) {
+        this.symbols.delete(name);
     };
     P.export = function(sym) {
         sym = this.find(LispSymbol.symname(sym));

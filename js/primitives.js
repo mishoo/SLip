@@ -1384,6 +1384,15 @@
         return sym === S_NIL ? null : sym === S_T ? true : sym;
     });
 
+    defp("%unintern", true, function(m, nargs){
+        checknargs(nargs, 2, 2);
+        var pak = m.pop(), name = m.pop();
+        checktype(pak, LispPackage);
+        checktype(name, LispString);
+        pak.unintern(name);
+        return S_NIL;
+    });
+
     defp("%accessible-symbols", false, function(m, nargs){
         checknargs(nargs, 1, 2);
         var ext = nargs == 2 ? m.pop() : null;

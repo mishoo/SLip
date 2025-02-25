@@ -11,6 +11,7 @@ import { make_desktop } from "./ide.js";
         "lisp/format.lisp",
         "lisp/ffi.lisp",
         "lisp/conditions.lisp",
+        "lisp/loop.lisp",
         "ide/ide.lisp"
     ];
 
