@@ -6,6 +6,8 @@
                'sl::when 'sl::unless
                'sl::for 'sl::do
                'sl::collect 'sl::collecting
+               'sl::append 'sl::appending
+               'sl::nconc 'sl::nconcing
                'sl::sum 'sl::summing
                'sl::maximize 'sl::maximizing
                'sl::minimize 'sl::minimizing
@@ -44,11 +46,11 @@
 (defun %register-parser (name parser)
   (cond
     ((consp name)
-     (foreach name (lambda (name)
-                     (%register-parser name parser))))
+     (%register-parser (car name) parser)
+     (%register-parser (cdr name) parser))
     ((symbolp name)
      (%register-parser (%symbol-name name) parser))
-    (t
+    ((stringp name)
      (let ((symbol (%intern name (%find-package :sl)))
            (kwsym (%intern name (%find-package :keyword))))
        (hash-add *clause-parsers* symbol parser)
@@ -241,7 +243,7 @@
   (let ((form (pop args))
         (name (if (iskw (car args) 'into)
                   (progn (pop args) (pop args))
-                  (gensym "list")))
+                  (gensym "collect")))
         (tail (gensym "tail")))
     (%list-append *loop-variables* `(,name ,tail))
     (%list-add *loop-body*
@@ -253,6 +255,33 @@
     (unless (%symbol-package name)
       (%list-add *loop-finish* name)))
   args)
+
+(defun %loop-list (append args)
+  (let ((form (pop args))
+        (name (if (iskw (car args) 'into)
+                  (progn (pop args) (pop args))
+                  (gensym (if append "append" "nconc"))))
+        (tail (unless append (gensym "tail"))))
+    (%list-add *loop-variables* name)
+    (when tail (%list-add *loop-variables* tail))
+    (%list-add *loop-body*
+               (if append
+                   `(setf ,name (append ,name ,form))
+                   `(let ((ls ,form))
+                      (when ls
+                        (if ,tail
+                            (setf (cdr ,tail) ls)
+                            (setf ,name ls))
+                        (setf ,tail (last ls))))))
+    (unless (%symbol-package name)
+      (%list-add *loop-finish* name)))
+  args)
+
+(defparser (append appending) args
+  (%loop-list t args))
+
+(defparser (nconc nconcing) args
+  (%loop-list nil args))
 
 (defparser (sum summing) args
   (let ((form (pop args))
