@@ -704,7 +704,7 @@ function load(url, cont) {
 
 export function make_desktop() {
     var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL();
-    ymacs.setColorTheme([ "ef-cyprus" ]);
+    ymacs.setColorTheme([ "ef-maris-dark" ]);
     ymacs.addClass("Ymacs-hl-line");
     ymacs.getActiveBuffer().cmd("sl_mode");
     document.body.appendChild(ymacs.getElement());
