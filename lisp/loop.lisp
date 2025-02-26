@@ -237,11 +237,14 @@
       (t
        args))))
 
+(defmacro maybe-into (name)
+  `(if (iskw (car args) 'into)
+       (progn (pop args) (pop args))
+       (gensym ,name)))
+
 (defparser (collect collecting) args
   (let ((form (pop args))
-        (name (if (iskw (car args) 'into)
-                  (progn (pop args) (pop args))
-                  (gensym "collect")))
+        (name (maybe-into "collect"))
         (tail (gensym "tail")))
     (%list-append *loop-variables* `(,name ,tail))
     (%list-add *loop-body*
@@ -256,9 +259,7 @@
 
 (defun %loop-list (append args)
   (let ((form (pop args))
-        (name (if (iskw (car args) 'into)
-                  (progn (pop args) (pop args))
-                  (gensym (if append "append" "nconc"))))
+        (name (maybe-into (if append "append" "nconc")))
         (tail (unless append (gensym "tail"))))
     (%list-add *loop-variables* name)
     (when tail (%list-add *loop-variables* tail))
@@ -283,9 +284,7 @@
 
 (defparser (sum summing) args
   (let ((form (pop args))
-        (name (if (iskw (car args) 'into)
-                  (progn (pop args) (pop args))
-                  (gensym "sum"))))
+        (name (maybe-into "sum")))
     (%list-add *loop-variables* name)
     (%list-add *loop-start* `(setf ,name 0))
     (%list-add *loop-body* `(setf ,name (+ ,name ,form)))
@@ -295,9 +294,7 @@
 
 (defparser (count counting) args
   (let ((form (pop args))
-        (name (if (iskw (car args) 'into)
-                  (progn (pop args) (pop args))
-                  (gensym "count"))))
+        (name (maybe-into "count")))
     (%list-add *loop-variables* `(,name 0))
     (%list-add *loop-body* `(when ,form (incf ,name)))
     (unless (%symbol-package name)
@@ -306,9 +303,7 @@
 
 (defun extremizing (name op args)
   (let ((form (pop args))
-        (name (if (iskw (car args) 'into)
-                  (progn (pop args) (pop args))
-                  (gensym name))))
+        (name (maybe-into name)))
     (%list-add *loop-variables* name)
     (%list-add *loop-body* `(let ((val ,form))
                               (if (or (not ,name)
