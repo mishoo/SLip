@@ -213,6 +213,9 @@ var LispHash = DEFTYPE("simple-hash", function(D, P){
     P.values = function() {
         return [...this.data.values()];
     };
+    P.iterator = P[Symbol.iterator] = function() {
+        return this.data.entries();
+    };
 });
 
 var LispObject = DEFTYPE("object", function(D, P){

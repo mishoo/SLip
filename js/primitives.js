@@ -49,6 +49,18 @@
         type: "native-function"
     };
 
+    var LispIterator = {
+        // XXX: is there some good way to check if it's actually a
+        // "good boy" iterator? Seems instanceof Iterator is not
+        // widely supported..
+        is: function(x) {
+            return x != null
+                && typeof x == "object"
+                && x.next instanceof Function;
+        },
+        type: "iterator"
+    };
+
     function boxit(stuff) {
         if (stuff === undefined || stuff === false) return null;
         return stuff;
@@ -1094,6 +1106,21 @@
         var hash = m.pop();
         checktype(hash, LispHash);
         return hash.values();
+    });
+
+    defp("hash-iterator", false, function(m, nargs){
+        checknargs(nargs, 1, 1);
+        var hash = m.pop();
+        checktype(hash, LispHash);
+        return hash.iterator();
+    });
+
+    defp("iterator-next", true, function(m, nargs){
+        checknargs(nargs, 1, 1);
+        var it = m.pop();
+        checktype(it, LispIterator);
+        var result = it.next();
+        return new LispCons(boxit(result.value), boxit(result.done));
     });
 
     /* -----[ simple streams ]----- */

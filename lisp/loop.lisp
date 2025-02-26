@@ -14,6 +14,9 @@
                'sl::with 'sl::and 'sl::into
                'sl::finally 'sl::count 'sl::counting
                'sl::from 'sl::upfrom 'sl::downfrom
+               'sl::being 'sl::each 'sl::the 'sl::of 'sl::using
+               'sl::hash-key 'sl::hash-keys
+               'sl::hash-value 'sl::hash-values
                'sl::to 'sl::downto 'sl::upto 'sl::below 'sl::above)
          (%find-package :sl))
 
@@ -179,6 +182,52 @@
                                   `(,(if upwards '1+ '1-) ,var))))))
   args)
 
+(defun parse-for-hash (var args)
+  (let ((next (pop args)))
+    (assert (iskw next '(each the)) "Bad LOOP FOR-hash syntax: ~A" next)
+    (macrolet ((dig-var ()
+                 `(progn
+                    (setf next (pop args))
+                    (cond
+                      ((iskw next '(hash-value hash-values))
+                       (when vval
+                         (error "LOOP for-hash value variable already defined"))
+                       (setf vval var))
+                      ((iskw next '(hash-key hash-keys))
+                       (when vkey
+                         (error "LOOP for-hash key variable already defined"))
+                       (setf vkey var))
+                      (t (error "Bad LOOP FOR-hash syntax: ~A" next))))))
+      (let ((iter (gensym "hash-iterator"))
+            (itval (gensym "hash-current"))
+            (hash-form nil)
+            (vkey nil)
+            (vval nil))
+        (dig-var)
+        (setf next (pop args))
+        (assert (iskw next '(in of)) "Bad LOOP FOR-hash syntax: ~A" next)
+        (setf hash-form (pop args))
+        (when (iskw (car args) 'using)
+          (pop args)
+          (let* ((args (pop args))
+                 (var (cadr args)))
+            (dig-var)))
+        (%list-append *loop-variables* (list iter itval))
+        (when vkey
+          (%list-add *loop-variables* vkey))
+        (when vval
+          (%list-add *loop-variables* vval))
+        (%list-add *loop-start* `(setf ,iter (hash-iterator ,hash-form)))
+        (%list-append *loop-body*
+                      `((setf ,itval (iterator-next ,iter))
+                        (when (cdr ,itval)
+                          (go %loop-end))))
+        (when vkey
+          (%list-add *loop-body* `(setf ,vkey (vector-ref (car ,itval) 0))))
+        (when vval
+          (%list-add *loop-body* `(setf ,vval (vector-ref (car ,itval) 1)))))))
+  args)
+
 (defparser for (var . args)
   (let ((kind (pop args)))
     (cond
@@ -190,6 +239,8 @@
        (parse-for-across var args))
       ((iskw kind '(from downfrom upfrom to upto below))
        (parse-for-arithmetic var (cons kind args)))
+      ((iskw kind 'being)
+       (parse-for-hash var args))
       (t (error "Unknown token in LOOP FOR: ~A" kind)))))
 
 (defparser repeat args
