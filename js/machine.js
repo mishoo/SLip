@@ -151,15 +151,13 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
     };
     P.pop_number = function(error) {
         var n = this.pop();
-        if (typeof n != "number") {
-            error("Number expected, got " + this.dump(n));
-        }
-        return n;
+        if (typeof n == "number") return n;
+        return error("Number expected, got " + this.dump(n), n);
     };
     P.pop_list = function(error) {
         var cell = this.pop();
-        if (cell == null || LispCons.is(cell)) return cell;
-        error("List expected, got " + this.dump(cell));
+        if (cell == null || cell === S_NIL || LispCons.is(cell)) return cell;
+        return error("List expected, got " + this.dump(cell), cell);
     };
     P.mkret = function(pc) {
         return new LispRet(this, pc);

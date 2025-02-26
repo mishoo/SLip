@@ -20,7 +20,10 @@
       form))
 
 (progn
-  `(1 2 3 4 5 6 ,@foo ,@bar ,@baz 3))
+  `(1 ,@a))
+
+(progn
+  `(1 2 3 4 5 6 ,@foo ,@bar ,@baz 3 ,@wak))
 
 (progn
   `(1 2 3 4 5 6 7 8 9))

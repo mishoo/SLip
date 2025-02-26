@@ -22,49 +22,79 @@
            '*defining-functions*
            '*xref-info*)
 
+;; (defmacro cond cases
+;;   (if cases
+;;       `(if ,(caar cases)
+;;            (progn ,@(cdar cases))
+;;            (cond ,@(cdr cases)))))
+
+;; Since we don't yet have quasiquote, I've macro-expanded it below. It's
+;; horrible to write it manually.
+(%macro! 'cond
+         (%fn 'cond cases
+              (if cases
+                  (cons 'if (cons (caar cases)
+                                  (cons (cons 'progn
+                                              (cdar cases))
+                                        (list (cons 'cond
+                                                    (cdr cases)))))))))
+
 ;; props to http://norstrulde.org/ilge10/
 (set-symbol-function!
  'qq
  (labels
      ((opt-splice (x)
-        (if (cdr x)
-            (let ((rest (qq (cdr x))))
-              (if (eq 'append (car rest))
-                  (list* 'append (cadar x) (cdr rest))
-                  (list 'append (cadar x) rest)))
-            (cadar x)))
+        (cond
+          ((cdr x)
+           (let ((rest (qq (cdr x))))
+             (if (eq 'append (car rest))
+                 (list* 'append (cadar x) (cdr rest))
+                 (list 'append (cadar x) rest))))
+          (t
+           (cadar x))))
+
+      (opt-list (first second rest)
+        (cond
+          ((not rest)
+           (list 'list first second))
+          ((not (consp rest))
+           (list 'list* first second rest))
+          ((eq 'list* (car rest))
+           (list* 'list* first second (cdr rest)))
+          ((eq 'list (car rest))
+           (list* 'list first second (cdr rest)))
+          (t
+           (list 'list* first second rest))))
 
       (opt-cons (x)
         (let ((first (qq (car x)))
               (second (qq (cdr x))))
-          (if (eq 'cons (car second))
-              (if (caddr second)
-                  (if (eq 'list* (caaddr second))
-                      (list* 'list* first (cadr second) (cdaddr second))
-                      (if (eq 'list (caaddr second))
-                          (list* 'list first (cadr second) (cdaddr second))
-                          (list 'list* first (cadr second) (caddr second))))
-                  (list 'list first (cadr second)))
-              (if (eq 'list (car second))
-                  (list* 'list first (cdr second))
-                  (if (eq 'list* (car second))
-                      (list* 'list* first (cdr second))
-                      (if second
-                          (list 'cons first second)
-                          (list 'list first)))))))
+          (cond
+            ((not second)
+             (list 'list first))
+            ((and (consp second)
+                  (eq 'cons (car second)))
+             (opt-list first (cadr second) (caddr second)))
+            (t
+             (list 'cons first second)))))
 
       (qq (x)
-        (if (consp x)
-            (if (eq 'qq-unquote (car x))
-                (cadr x)
-                (if (eq 'quasiquote (car x))
-                    (qq (qq (cadr x)))
-                    (if (consp (car x))
-                        (if (eq 'qq-splice (caar x))
-                            (opt-splice x)
-                            (opt-cons x))
-                        (opt-cons x))))
-            (if x (list 'quote x)))))
+        (cond
+          ((or (numberp x)
+               (stringp x))
+           x)
+          ((not (consp x))
+           (if x (list 'quote x)))
+          ((eq 'qq-unquote (car x))
+           (cadr x))
+          ((eq 'quasiquote (car x))
+           (qq (qq (cadr x))))
+          ((consp (car x))
+           (if (eq 'qq-splice (caar x))
+               (opt-splice x)
+               (opt-cons x)))
+          (t
+           (opt-cons x)))))
    #'qq))
 
 (set-symbol-function!
@@ -114,12 +144,6 @@
 
 (defmacro unless (pred . body)
   `(if ,pred nil (progn ,@body)))
-
-(defmacro cond cases
-  (if cases
-      `(if ,(caar cases)
-           (progn ,@(cdar cases))
-           (cond ,@(cdr cases)))))
 
 (defun map (func lst)
   (labels ((rec (lst ret)
