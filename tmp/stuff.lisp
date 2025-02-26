@@ -19,6 +19,12 @@
         (map macroexpand-all form))
       form))
 
+(progn
+  `(1 2 3 4 5 6 ,@foo ,@bar ,@baz 3))
+
+(progn
+  `(1 2 3 4 5 6 7 8 9))
+
 (defmacro pushnew (obj place)
   (let ((sym (gensym)))
     `(let ((,sym ,obj))

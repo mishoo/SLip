@@ -308,7 +308,7 @@
       (%list-add *loop-finish* name)))
   args)
 
-(defun %loop-list (append args)
+(defun %loop-make-list (append args)
   (let ((form (pop args))
         (name (maybe-into (if append "append" "nconc")))
         (tail (unless append (gensym "tail"))))
@@ -328,10 +328,10 @@
   args)
 
 (defparser (append appending) args
-  (%loop-list t args))
+  (%loop-make-list t args))
 
 (defparser (nconc nconcing) args
-  (%loop-list nil args))
+  (%loop-make-list nil args))
 
 (defparser (sum summing) args
   (let ((form (pop args))
