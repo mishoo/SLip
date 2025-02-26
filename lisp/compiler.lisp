@@ -66,7 +66,8 @@
         (cond
           ((cdr x)
            (let ((rest (qq (cdr x))))
-             (if (eq 'append (car rest))
+             (if (and (consp rest)
+                      (eq 'append (car rest)))
                  (list* 'append (cadar x) (cdr rest))
                  (list 'append (cadar x) rest))))
           (t
@@ -91,8 +92,11 @@
           (cond
             ((not second)
              (list 'list first))
-            ((and (consp second)
-                  (eq 'cons (car second)))
+            ((not (consp second))
+             (list 'cons first second))
+            ((eq 'list (car second))
+             (list* 'list first (cdr second)))
+            ((eq 'cons (car second))
              (opt-list first (cadr second) (caddr second)))
             (t
              (list 'cons first second)))))
@@ -326,7 +330,7 @@
                           (member ch
                                   '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
                                     #\@ #\! #\? #\& #\= #\< #\>
-                                    #\[ #\] #\{ #\} #\/ #\^ #\# )))))))
+                                    #\[ #\] #\{ #\} #\/ #\^ #\#)))))))
              (upcase str)))
 
          (read-symbol ()
