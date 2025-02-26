@@ -27,7 +27,7 @@
 ;;       `(if ,(caar cases)
 ;;            (progn ,@(cdar cases))
 ;;            (cond ,@(cdr cases)))))
-
+;;
 ;; Since we don't yet have quasiquote, I've macro-expanded it below. It's
 ;; horrible to write it manually.
 (%macro! 'cond
@@ -39,7 +39,26 @@
                                         (list (cons 'cond
                                                     (cdr cases)))))))))
 
-;; props to http://norstrulde.org/ilge10/
+;; props to http://norstrulde.org/ilge10/ - pasting here the original version,
+;; because it's small and beautiful and it's the heart of quasiquotation:
+;;
+;; (set-symbol-function!
+;;  'qq
+;;  (labels ((qq (x)
+;;             (if (consp x)
+;;                 (if (eq 'qq-unquote (car x))
+;;                     (cadr x)
+;;                     (if (eq 'quasiquote (car x))
+;;                         (qq (qq (cadr x)))
+;;                         (if (consp (car x))
+;;                             (if (eq 'qq-splice (caar x))
+;;                                 (list 'append (cadar x) (qq (cdr x)))
+;;                                 (list 'cons (qq (car x)) (qq (cdr x))))
+;;                             (list 'cons (qq (car x)) (qq (cdr x))))))
+;;                 (list 'quote x))))
+;;    #'qq))
+;;
+;; The version below has a bunch of optimizations and uses `cond'.
 (set-symbol-function!
  'qq
  (labels
