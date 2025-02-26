@@ -156,6 +156,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         }
         return n;
     };
+    P.pop_list = function(error) {
+        var cell = this.pop();
+        if (cell == null || LispCons.is(cell)) return cell;
+        error("List expected, got " + this.dump(cell));
+    };
     P.mkret = function(pc) {
         return new LispRet(this, pc);
     };
@@ -1076,13 +1081,18 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         ]))
     });
 
-    (function(i){
-        for (i in LispCons) if (Object.hasOwn(LispCons, i) && /^c[ad]+r$/.test(i)) {
+    function error(msg) {
+        throw new LispPrimitiveError(msg);
+    }
+
+    for (let i in LispCons) {
+        if (Object.hasOwn(LispCons, i) && /^c[ad]+r$/.test(i)) {
+            let func = LispCons[i];
             defop(i.toUpperCase(), 0, {
-                run: new Function("f", "return function(m){ m.push(f(m.pop())) }")(LispCons[i])
+                run(m) { m.push(func(m.pop_list(error))) }
             });
         }
-    })();
+    }
 
     var S_QUOTE = LispSymbol.get("QUOTE");
 
