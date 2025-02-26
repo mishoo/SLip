@@ -331,6 +331,7 @@
              (#\( (list* 'vector (read-list)))
              (#\' (next) (list 'function (read-token)))
              (#\: (next) (%make-symbol (read-symbol-name)))
+             (#\. (next) (eval (read-token)))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
 
          (read-quote ()

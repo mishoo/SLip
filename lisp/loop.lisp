@@ -18,7 +18,7 @@
                'sl::hash-key 'sl::hash-keys
                'sl::hash-value 'sl::hash-values
                'sl::to 'sl::downto 'sl::upto 'sl::below 'sl::above)
-         (%find-package :sl))
+         #.(%find-package :sl))
 
 (defpackage :sl-loop
   (:use :sl))
@@ -54,8 +54,8 @@
     ((symbolp name)
      (%register-parser (%symbol-name name) parser))
     ((stringp name)
-     (let ((symbol (%intern name (%find-package :sl)))
-           (kwsym (%intern name (%find-package :keyword))))
+     (let ((symbol (%intern name #.(%find-package :sl)))
+           (kwsym (%intern name #.(%find-package :keyword))))
        (hash-add *clause-parsers* symbol parser)
        (hash-add *clause-parsers* kwsym parser)))))
 
@@ -87,7 +87,7 @@
               (iskw x (cdr name)))
           (or (eq x name)
               (eq x (%intern (%symbol-name name)
-                             (%find-package "KEYWORD")))))))
+                             #.(%find-package :keyword)))))))
 
 (defun parse-for-in (kind var args)
   (let ((seq (gensym "list"))
