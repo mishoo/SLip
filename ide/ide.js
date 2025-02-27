@@ -133,10 +133,12 @@ class Repl_Tokenizer extends Ymacs_Lang_Lisp {
         let s = this._stream, m;
         if (s.col == 0 && (m = s.lookingAt(/^[^<\s,'`]+?>/))) {
             this.t("sl-prompt", m[0].length);
+            this.newArg();
             return true;
         }
         if (s.col == 0 && (m = s.lookingAt(/^!(WARN|ERROR):/))) {
             this.t("sl-error", m[0].length);
+            this.newArg();
             return true;
         }
         return super.readCustom();
@@ -156,8 +158,9 @@ let Ymacs_Keymap_SL = Ymacs_Keymap.define(null, {
     "M-q"                                   : "sl_indent_sexp",
     "S-M-q"                                 : "fill_paragraph",
     "S-Tab"                                 : "sl_complete_symbol",
+    "Tab"                                   : "sl_complete_symbol_indent",
     "M-."                                   : "sl_xref_symbol",
-    //"M-,"                                   : "sl_xref_back_history",
+    "M-,"                                   : "sl_xref_back_history",
 });
 
 let PENDING_COMMANDS = {};
@@ -235,6 +238,9 @@ function find_toplevel_sexp(buffer, blink, noerror) {
     var exp = p.cont_exp();
     while (exp && exp.parent && exp.parent.parent) {
         exp = exp.parent;
+    }
+    if (exp.type == "caret" && exp.parent && !exp.parent.parent) {
+        exp = exp.parent.value[exp.index + 1] || exp.parent.value[exp.index - 1];
     }
     if (exp == null || !exp.parent) {
         if (!noerror)
@@ -330,6 +336,8 @@ Ymacs_Buffer.newCommands({
             });
             if (!debug || debug.length == 0)
                 throw new Ymacs_Exception("No xref information for symbol " + sym.value);
+            var history = this.getq("sl_xref_history");
+            history.push({ buffer: this.name, point: point });
             var stuff = debug.at(-1);
             var filename = stuff[1];
             var position = stuff[2];
@@ -348,6 +356,22 @@ Ymacs_Buffer.newCommands({
             }
         } else {
             throw new Ymacs_Exception("No symbol at point");
+        }
+    }),
+    sl_xref_back_history: Ymacs_Interactive(function(){
+        var history = this.getq("sl_xref_history");
+        var pos = history.pop();
+        if (!pos) {
+            this.signalError(`No more history`, 2000);
+            return;
+        }
+        var ymacs = this.ymacs;
+        var buf = ymacs.getBuffer(pos.buffer);
+        if (buf) {
+            if (buf !== this) ymacs.switchToBuffer(buf);
+            if (+buf.point() != +pos.point) buf.cmd("goto_char", pos.point);
+        } else {
+            this.signalError(`Buffer ${pos.buffer} has been deleted`);
         }
     }),
     sl_clear_output: Ymacs_Interactive(function(){
@@ -376,7 +400,7 @@ Ymacs_Buffer.newCommands({
         eval_lisp(this, "(sl::print-object-to-string (sl::macroexpand-all '" + expr + "))", find_package(this));
     }),
     sl_eval_buffer: Ymacs_Interactive(function(){
-        eval_lisp(this, this.getCode());
+        compile_lisp(this, this.getCode());
     }),
     sl_eval_sexp: Ymacs_Interactive(function(){
         var points = find_toplevel_sexp(this, true);
@@ -472,6 +496,7 @@ Ymacs_Buffer.newCommands({
           case "sl_complete_symbol":
           case "undo":
           case "sl_repl_complete_symbol":
+          case "sl_complete_symbol_indent":
             ctx = this.getq("sl_complete_symbol_context");
         }
         if (!ctx) {
@@ -496,6 +521,10 @@ Ymacs_Buffer.newCommands({
             this._replaceText(ctx.start, point, sym.toLowerCase());
             return true;
         }
+    }),
+    sl_complete_symbol_indent: Ymacs_Interactive("d", function(point){
+        this.cmd("indent_line");
+        this.cmd("sl_complete_symbol", point);
     }),
     sl_repl_complete_symbol: Ymacs_Interactive("d", function(point){
         if (!this.cmd("sl_complete_symbol", point))
@@ -525,7 +554,7 @@ Ymacs_Buffer.newCommands({
         });
     }),
     sl_recompile_everything: Ymacs_Interactive(function(){
-        this.signalInfo("Just add ?recompile to the URL");
+        window.location.replace((window.location+"").replace(/\?.*$/, "") + "?recompile");
     }),
     sl_lisp_notify_message: function(msg) {
         // msg should be string, but if not...
@@ -543,7 +572,17 @@ Ymacs_Buffer.newCommands({
             });
         });
         buf.tokenizer.start();
-    }
+    },
+    sl_repl_set_package: Ymacs_Interactive(function(){
+        this.ymacs.run_lisp("LIST-PACKAGES", pak_names => {
+            this.cmd("minibuffer_prompt", "Package: ");
+            this.cmd("minibuffer_read_string", pak_names, (name) => {
+                this.ymacs.run_lisp("SET-PACKAGE", name, () => {
+                    this.cmd("sl_repl_prompt");
+                });
+            });
+        });
+    }),
 });
 
 var HISTORY_COMPLETIONS;
@@ -586,8 +625,20 @@ function eval_lisp(buf, expr, pack) {
     if (!pack) pack = null;
     var start = new Date().getTime();
     buf.ymacs.run_lisp("EVAL-STRING", pack, expr, function(val){
+        var end = new Date().getTime();
         if (typeof val != "string") val = MACHINE().dump(val);
-        sl_log(val + "\n<== in " + ((new Date().getTime() - start) / 1000).toFixed(3) + "s");
+        sl_log(val + "\n;; <== in " + ((end - start) / 1000).toFixed(3) + "s");
+        get_repl_buffer().cmd("sl_repl_prompt");
+    });
+};
+
+function compile_lisp(buf, code) {
+    var start = new Date().getTime();
+    buf.ymacs.run_lisp("COMPILE-STRING", code, buf.name, function(val){
+        var end = new Date().getTime();
+        // sl_log(val);
+        window.last_fasl = val;
+        sl_log(`;; ${buf.name} compiled in ` + ((end - start) / 1000).toFixed(3) + "s");
         get_repl_buffer().cmd("sl_repl_prompt");
     });
 };
@@ -621,6 +672,7 @@ let Ymacs_Keymap_SL_REPL = Ymacs_Keymap.define(null, {
     "M-n && C-ArrowDown" : "sl_repl_history_forward",
     "C-Delete" : "sl_repl_kill_input",
     "Tab" : "sl_repl_complete_symbol",
+    "C-c M-p": "sl_repl_set_package",
     "Home && C-a" : Ymacs_Interactive("d", function(point){
         var m = this.getq("sl_repl_marker").getPosition();
         if (this._positionToRowCol(point).row == this._positionToRowCol(m).row)
@@ -704,7 +756,11 @@ function load(url, cont) {
 
 export function make_desktop() {
     var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL();
-    ymacs.setColorTheme([ "ef-maris-dark" ]);
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        ymacs.setColorTheme([ "ef-maris-dark" ]);
+    } else {
+        ymacs.setColorTheme([ "ef-cyprus" ]);
+    }
     ymacs.addClass("Ymacs-hl-line");
     ymacs.getActiveBuffer().cmd("sl_mode");
     document.body.appendChild(ymacs.getElement());

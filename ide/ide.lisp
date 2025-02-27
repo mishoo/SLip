@@ -74,7 +74,7 @@
     (prog1
         (%::load filename)
       (send-ymacs-notify :message
-                         (strcat "; " filename
+                         (strcat ";; " filename
                                  " compiled in "
                                  (number-fixed (/ (- (%get-time) t1) 1000) 3) " s")))))
 
@@ -82,6 +82,9 @@
   (let ((*package* (or (and pak (%find-package pak t))
                        *package*)))
     (%::eval-string str)))
+
+(define-handler :compile-string (code filename)
+  (%::compile-string code filename))
 
 (labels ((symbol-completion (query all)
            (let* ((rx (make-regexp (strcat
@@ -138,6 +141,12 @@
         ;; dunno what to do here, just return empty list
         (t
          nil)))))
+
+(define-handler :list-packages ()
+  (apply #'vector (mapcar #'package-name (%list-packages))))
+
+(define-handler :set-package (name)
+  (setf *package* (%find-package name)))
 
 (defglobal
     *thread*

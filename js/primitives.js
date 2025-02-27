@@ -1481,6 +1481,22 @@
         return pak;
     });
 
+    defp("%list-packages", false, function(m, nargs){
+        checknargs(nargs, 0, 0);
+        return LispCons.fromArray(Object.values(LispPackage.all()));
+    });
+
+    defp("package-name", false, function(m, nargs){
+        checknargs(nargs, 1, 1);
+        var name = m.pop();
+        if (LispPackage.is(name)) return name.name;
+        name = as_string(name);
+        checktype(name, LispString);
+        var pak = LispPackage.get_existing(name);
+        if (!pak) error("Package " + name + " not found");
+        return pak.name;
+    });
+
     defp("%export", true, function(m, nargs){
         checknargs(nargs, 2, 2);
         var pak = m.pop(), syms = as_list(m.pop());

@@ -1,6 +1,6 @@
 ;; make sure to intern/export symbols into the SL package before we use them
 ;; in SL-LOOP.
-(%export (list 'sl::loop
+(%export (list 'sl::loop 'sl::as
                'sl::in 'sl::on 'sl::by 'sl::across 'sl::named
                'sl::then 'sl::else 'sl::repeat
                'sl::when 'sl::unless
@@ -228,7 +228,7 @@
           (%list-add *loop-body* `(setf ,vval (vector-ref (car ,itval) 1)))))))
   args)
 
-(defparser for (var . args)
+(defparser (for as) (var . args)
   (let ((kind (pop args)))
     (cond
       ((iskw kind '(in on))
@@ -401,4 +401,10 @@
          ,@(car *loop-finish*)))))
 
 (defmacro loop (&body args)
-  (expand-loop args))
+  (if (symbolp (car args))
+      (expand-loop args)
+      ;; simple loop
+      `(block nil
+         (let %loop-next ()
+           ,@args
+           (%loop-next)))))

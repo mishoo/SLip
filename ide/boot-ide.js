@@ -84,23 +84,25 @@ import { make_desktop } from "./ide.js";
         document.body.scrollTop = div.offsetTop;
     };
 
-    function compile(files, cont) {
-        if (files.length == 0) return cont();
+    function compile(files, cont, nosave) {
+        if (files.length == 0) return cont ? cont() : null;
         var filename = files[0];
-        log("Compiling " + filename);
+        if (!nosave) log("Compiling " + filename);
         var bytecode = machine.atomic_call(LispSymbol.get("%LOAD").func(), [ filename ]);
-        var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
-        save(fasl, bytecode, function(error){
-            if (error) throw new Error("Failed to save bytecode");
-            log("... " + fasl + " saved.");
-            compile(files.slice(1), cont);
-        });
+        if (!nosave) {
+            var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
+            save(fasl, bytecode, function(error){
+                if (error) throw new Error("Failed to save bytecode");
+                log("... " + fasl + " saved.");
+                compile(files.slice(1), cont);
+            });
+        }
     };
 
     function recompile_all() {
         load_fasls([ "lisp/compiler.lisp" ], function(){
             compile(lisp_files, function(){
-                log("DONE — I will reload in 3 seconds");
+                log("<span style='color: green'><b>DONE — I will reload in 3 seconds</b></span>");
                 setTimeout(function(){
                     window.location.replace((""+window.location).replace(/\?recompile$/, ""));
                 }, 3000);
@@ -110,6 +112,8 @@ import { make_desktop } from "./ide.js";
 
     // recompile_all();
 
+    var startup_files = [];
+
     function init() {
         load_fasls(lisp_files, function(){
             window.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
@@ -118,12 +122,15 @@ import { make_desktop } from "./ide.js";
                     el.parentNode.removeChild(el);
             });
             make_desktop();
+            compile(startup_files, () => {}, true);
         });
     };
 
     if (/\?recompile$/.test(window.location)) {
         recompile_all();
     } else {
+        let m = /\?load=([^&]+)/.exec(window.location);
+        if (m) startup_files = m[1].split(/\s*,\s*/);
         init();
     }
 

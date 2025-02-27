@@ -958,8 +958,10 @@
                "Expecting (LAMBDA (...) ...) in COMPILE")
        (%eval-bytecode (comp exp (make-environment) t nil)))
 
-     (compile-string (str)
-       (let ((reader (lisp-reader str 'EOF))
+     (compile-string (str . filename)
+       (let ((*current-file* (or (car filename)
+                                 *current-file*))
+             (reader (lisp-reader str 'EOF))
              (cache (make-hash))
              (out (%make-output-stream))
              (is-first t)
@@ -1009,10 +1011,9 @@
       (rec nil (cdr (funcall reader 'next))))))
 
 (defun %load (url)
-  (let ((*current-file* url)
-        (code (%get-file-contents (make-url url))))
+  (let ((code (%get-file-contents (make-url url))))
     (unless code (error (strcat "Unable to load file: " url)))
-    (compile-string code)))
+    (compile-string code url)))
 
 (defun make-url (url)
   (if *url-prefix*

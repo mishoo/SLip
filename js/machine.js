@@ -57,7 +57,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         var val = arguments.length > 2 ? arguments[2] : NO_RET_VAL;
         (function doit() {
             var p = m.denv;
-            while (p && p != self.denv) {
+            while (p && p !== self.denv) {
                 var c = p.car;
                 if (c instanceof LispCleanup) {
                     m.after_cleanup = doit;

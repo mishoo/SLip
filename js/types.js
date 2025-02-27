@@ -288,7 +288,7 @@ var LispPackage = DEFTYPE("package", function(D, P){
         if (!sym) {
             var a = this.uses;
             for (var i = a.length; --i >= 0;) {
-                var sym = a[i].find_accessible(name);
+                sym = a[i].find_accessible(name);
                 if (sym) break;
             }
         }
@@ -339,6 +339,9 @@ var LispPackage = DEFTYPE("package", function(D, P){
     };
     D.get_existing = function(name) {
         return PACKAGES[name] || null;
+    };
+    D.all = function() {
+        return PACKAGES;
     };
 });
 
