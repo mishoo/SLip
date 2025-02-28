@@ -128,11 +128,11 @@
 (defun init-canvas (width height)
   (setf *canvas* (%dom-create-canvas *canvas-id* width height "#ffffffd0")
         *context* (%dom-canvas-context *canvas*)
-        *turtle-canvas* (%dom-create-canvas (strcat *canvas-id* "-turtle") width height)
+        *turtle-canvas* (%dom-create-canvas (%:strcat *canvas-id* "-turtle") width height)
         *turtle-context* (%dom-canvas-context *turtle-canvas*))
   (when *show-turtle* (draw-turtle)))
 
-(defglobal +PI+ (%js-eval "Math.PI"))
+(defglobal +PI+ (%:%js-eval "Math.PI"))
 (defglobal +PI2+ (/ +PI+ 2))
 
 (defmacro save-excursion (&body body)
@@ -151,6 +151,18 @@
        ,@body)
      (when *show-turtle*
        (show-turtle))))
+
+(defun set-color (color) (%dom-set-color *context* color))
+
+(defun set-thickness (width) (%dom-set-thickness *context* width))
+
+(defun draw-turtle ()
+  (let ((*canvas* *turtle-canvas*)
+        (*context* *turtle-context*))
+    (%dom-clear *canvas*)
+    (save-excursion
+     (set-color "#c03")
+     (triangle 15 10))))
 
 (defun circle (r)
   (%dom-circle *context* (car *position*) (cdr *position*) r))
@@ -178,9 +190,6 @@
 
 (defun backward (n)
   (forward (- n)))
-
-(defun set-color (color) (%dom-set-color *context* color))
-(defun set-thickness (width) (%dom-set-thickness *context* width))
 
 (defun left (angle)
   (incf *orientation* angle)
@@ -218,14 +227,6 @@
     (right (- 180 α))
     (forward (* 2 x))))
 
-(defun draw-turtle ()
-  (let ((*canvas* *turtle-canvas*)
-        (*context* *turtle-context*))
-    (%dom-clear *canvas*)
-    (save-excursion
-     (set-color "#c03")
-     (triangle 15 10))))
-
 (defun hide-turtle ()
   (setf *show-turtle* nil)
   (%dom-clear *turtle-canvas*))
@@ -244,7 +245,7 @@
   (%dom-set-text-align *context* align))
 
 (defun measure-text (text)
-  (as-list (%dom-measure-text *context* text)))
+  (%:as-list (%dom-measure-text *context* text)))
 
 (defun set-rotation (angle)
   (%dom-set-rotation *context* angle))
@@ -269,5 +270,3 @@
           (%dom-set-rotation *context* (- (- (orientation-radians) +PI2+)))
           (%dom-fill-text *context* text 0 0))
       (%dom-restore *context*))))
-
-(init-canvas 700 700)

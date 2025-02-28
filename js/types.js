@@ -247,8 +247,14 @@ var LispPackage = DEFTYPE("package", function(D, P){
         return "p(" + JSON.stringify(this.name) + ")";
     };
     P.intern = function(name) {
-        return this.symbols.get(name) ||
-            this.symbols.set(name, new LispSymbol(name, this));
+        let sym = this.symbols.get(name);
+        if (!sym) {
+            sym = this.symbols.set(name, new LispSymbol(name, this));
+            if (this === D.BASE_PACK) {
+                this.exports.push(sym);
+            }
+        }
+        return sym;
     };
     P.unintern = function(name) {
         this.symbols.delete(name);
@@ -294,15 +300,16 @@ var LispPackage = DEFTYPE("package", function(D, P){
         }
         return sym;
     };
-    P.all_accessible = function(external) {
-        var ret = external
-            ? this.exports.slice()
-            : this.symbols.values();
+    P.all_accessible = function() {
+        var ret = this.symbols.values();
         var a = this.uses;
         for (var i = a.length; --i >= 0;) {
-            ret.push.apply(ret, a[i].all_accessible(true));
+            ret.push.apply(ret, a[i].exports);
         }
         return ret;
+    };
+    P.all_exported = function() {
+        return [ ...this.exports ];
     };
     P.all_interned = function() {
         return this.symbols.values();
@@ -311,7 +318,7 @@ var LispPackage = DEFTYPE("package", function(D, P){
         var sym = this.symbols.get(name);
         if (sym) return sym;
         for (var i = this.uses.length; --i >= 0;) {
-            sym = this.uses[i].find_accessible(name);
+            sym = this.uses[i].find_exported(name);
             if (sym) return sym;
         }
         return null;
@@ -347,7 +354,7 @@ var LispPackage = DEFTYPE("package", function(D, P){
 
 var LispSymbol = DEFTYPE("symbol", function(D, P){
     var SYMBOLS = Object.create(null);
-    var BASE_PACK = LispPackage.get("%");
+    var BASE_PACK = LispPackage.BASE_PACK = LispPackage.get("%");
     D.symname = function(sym) {
         return sym === null ? "NIL" : sym === true ? "T" : sym.name;
     };
@@ -424,6 +431,7 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
     var pak = BASE_PACK.intern("*PACKAGE*");
     pak.value = BASE_PACK;
     pak.setv("special", true);
+    BASE_PACK.PACKAGE_VAR = pak;
 })(LispPackage.get("%"));
 
 var LispMutex = DEFTYPE("mutex", function(D, P){
@@ -431,6 +439,28 @@ var LispMutex = DEFTYPE("mutex", function(D, P){
         this.name = name || null;
         this.waiters = [];
         this.locked = null;
+    };
+    P.acquire = function(process) {
+        if (!this.locked) {
+            this.locked = process;
+            return process;
+        } else {
+            this.waiters.push(process);
+            process.m.status = "locked";
+            return null;
+        }
+    };
+    P.release = function() {
+        if (!this.locked) return null;
+        if (this.waiters.length > 0) {
+            var process = this.waiters.shift();
+            this.locked = process;
+            process.resume();
+            return process;
+        } else {
+            this.locked = null;
+            return true;
+        }
     };
 });
 
@@ -446,31 +476,6 @@ var LispProcess = DEFTYPE("process", function(D, P){
             this.args = args;
         }
     }
-
-    LispMutex.extend({
-        acquire: function(process) {
-            if (!this.locked) {
-                this.locked = process;
-                return process;
-            } else {
-                this.waiters.push(process);
-                process.m.status = "locked";
-                return null;
-            }
-        },
-        release: function() {
-            if (!this.locked) return null;
-            if (this.waiters.length > 0) {
-                var process = this.waiters.shift();
-                this.locked = process;
-                process.resume();
-                return process;
-            } else {
-                this.locked = null;
-                return true;
-            }
-        }
-    });
 
     var PID = 0;
     var QUEUE = [];
@@ -585,19 +590,12 @@ var LispProcess = DEFTYPE("process", function(D, P){
         return null;
     };
 
-    var TIMER = null;
     function start() {
-        if (!TIMER) TIMER = setTimeout(run, 0);
-    };
-    function stop() {
-        if (TIMER) {
-            clearTimeout(TIMER);
-            TIMER = null;
-        }
+        setTimeout(run, 0);
     };
     function run() {
         var start_time = Date.now();
-        while (Date.now() - start_time < 50) {
+        while (Date.now() - start_time < 100) {
             if (QUEUE.length == 0) break;
             var p = QUEUE.shift();
             if (D.is(p)) {
@@ -608,6 +606,6 @@ var LispProcess = DEFTYPE("process", function(D, P){
             }
             else throw new Error("Unknown object in scheduler queue");
         }
-        TIMER = QUEUE.length > 0 ? setTimeout(run, 0) : null;
+        if (QUEUE.length > 0) setTimeout(run, 0);
     };
 });

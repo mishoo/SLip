@@ -12,7 +12,7 @@
 (in-package :%)
 " ;; hack for Ymacs to get the right package
 
-(setq %::*package* (%find-package "%"))
+(setq %::*package* (find-package "%"))
 (%special! '*read-table*
            '*package*
            '*standard-input*
@@ -130,6 +130,8 @@
 ;; better to avoid quasiquote here:
 (%macro! 'defmacro
          (%fn defmacro (name args . body)
+              (if (%primitivep name)
+                  (error (strcat "Cannot DEFMACRO on primitive " name)))
               (maybe-xref-info name "DEFMACRO")
               (list '%macro!
                     (list 'quote name)
@@ -250,7 +252,7 @@
   `(setq ,place (cons ,obj ,place)))
 
 (%global! '+keyword-package+)
-(setq +keyword-package+ (%find-package "KEYWORD"))
+(setq +keyword-package+ (find-package "KEYWORD"))
 
 ;;;; parser/compiler
 
@@ -347,16 +349,16 @@
                          (cond
                            ((zerop (length pak))
                             ;; KEYWORD
-                            (setq sym (%intern sym +keyword-package+))
+                            (setq sym (intern sym +keyword-package+))
                             (%export sym +keyword-package+)
                             sym)
                            (t
-                            (setq pak (%find-package pak))
+                            (setq pak (find-package pak))
                             (if internal
-                                (%intern sym pak)
+                                (intern sym pak)
                                 (or (%find-exported-symbol sym pak)
                                     (error (strcat "Symbol " sym " not accessible in package " pak)))))))
-                       (%intern str *package*)))))
+                       (intern str *package*)))))
 
          (read-char ()
            (let ((name (strcat (next)
@@ -377,7 +379,7 @@
              (#\/ (read-regexp))
              (#\( (list* 'vector (read-list)))
              (#\' (next) (list 'function (read-token)))
-             (#\: (next) (%make-symbol (read-symbol-name)))
+             (#\: (next) (make-symbol (read-symbol-name)))
              (#\. (next) (eval (read-token)))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
 
@@ -721,7 +723,7 @@
          ((not pred) (comp else env val? more?))
          ((or (numberp pred)
               (stringp pred)
-              (regexp pred)
+              (regexpp pred)
               (charp pred)
               (vectorp pred)
               (eq pred t))

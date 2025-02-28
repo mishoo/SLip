@@ -1,5 +1,5 @@
 (defpackage :sl-ffi
-  (:use :sl)
+  (:use :sl :%)
   (:nicknames :ffi))
 
 (in-package :sl-ffi)

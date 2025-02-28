@@ -1,24 +1,53 @@
-(setq *package* (%find-package "%"))
+(setq *package* (find-package "%"))
 
 "
 (in-package :%)
 " ;; hack for Ymacs
 
-(let ((main (%make-package "SL"))
-      (boot (%find-package "%"))
-      (user (%make-package "SL-USER")))
-  (%export '(quasiquote defmacro defun when unless map labels flet foreach
-             prog1 prog2 or and cond member case mapcar with-cc aif it push
-             error warn without-interrupts
-             lisp-reader compile load function unwind-protect
-             funcall macrolet catch throw
-             quote lambda let let* if progn setq t nil not
-             tagbody go block return return-from
-             *package* *read-table*
-             &key &rest &body &whole &optional &aux)
-           boot)
+(let ((main (make-package "SL"))
+      (boot (find-package "%"))
+      (user (make-package "SL-USER"))
+      exported)
   (%use-package boot main)
   (%use-package main user)
+  (setq exported
+        '(atom quasiquote defmacro defun when unless labels flet foreach
+          prog1 prog2 or and cond member case mapcar with-cc aif it push
+          error warn without-interrupts
+          lisp-reader compile load function unwind-protect
+          apply funcall macrolet catch throw
+          quote lambda let let* if progn setq t nil not
+          tagbody go block return return-from
+          *package* *read-table*
+          elt rplaca rplacd nthcdr last reverse nreverse append nconc nreconc revappend
+          char-name char-code name-char code-char upcase downcase
+          charp char-equal char= char< char<= char> char>= letterp digitp
+          stringp string-equal string= string< string<= string> string>=
+          make-regexp regexp-test regexp-exec replace-regexp quote-regexp regexpp
+          vectorp vector vector-ref vector-set vector-push vector-pop make-vector
+          getf
+          list list* listp cons consp eq eql equal equalp gensym length
+
+          numberp zerop plusp minusp parse-number parse-integer number-fixed number-string
+          < <= > >= + - * / = /= null 1+ 1- floor ceiling round mod
+          abs sin asin cos acos tan atan exp log sqrt expt random
+
+          make-hash hash-get hash-set hash-add hash-copy hash-keys hash-values
+          hash-iterator iterator-next
+
+          macroexpand-1 disassemble
+
+          make-package find-package make-symbol symbol-name symbol-package symbol-function
+          packagep symbolp keywordp intern shadow find-symbol package-name
+          threadp make-thread current-thread set-timeout clear-timeout
+
+          car cdr caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr
+          cddar cdddr caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
+          cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
+
+          &key &rest &body &whole &optional &aux))
+  (%export exported boot)
+  (%export exported main)
   (setq *package* main))
 
 "
@@ -92,7 +121,7 @@
                             (aux?
                              (add thisarg nil))
                             (key?
-                             (add thisarg `(%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")))))
+                             (add thisarg `(getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")))))
                             (t
                              (add thisarg `(if ,values
                                                (%next ,values)
@@ -109,7 +138,7 @@
                               (add thisarg-p `(if ,values t nil)))
                             (add thisarg (if key?
                                              (let ((val (gensym)))
-                                               `(let ((,val (%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")) 'not-found)))
+                                               `(let ((,val (getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")) 'not-found)))
                                                   (if (eq ,val 'not-found) ,default ,val)))
                                              `(if ,values (%next ,values) ,default)))))
                          (aux? (let ((thisarg (car thisarg))
@@ -131,6 +160,8 @@
 
 (defmacro defmacro (name lambda-list . body)
   (%::maybe-xref-info name "DEFMACRO")
+  (if (%primitivep name)
+      (error (strcat "We shall not DEFMACRO on " name " (primitive function)")))
   (let ((args (gensym "ARGS")))
     `(%macro! ',name (%::%fn ',name ,args
                              (destructuring-bind ,lambda-list ,args
@@ -159,9 +190,6 @@
       (macroexpand (macroexpand-1 form))
       form))
 
-(def-emac intern (symbol-name &optional (package *package*))
-  `(%intern ,symbol-name ,package))
-
 (def-emac defpackage (name &rest options)
   (let ((nicknames nil)
         (use nil)
@@ -173,23 +201,23 @@
                   (setq nicknames (append nicknames (cdr opt))))
                  (:use
                   (setq use (append use (cdr opt)))))))
-    `(let ((,pak (%make-package ',name ',use ',nicknames)))
+    `(let ((,pak (make-package ',name ',use ',nicknames)))
        ,@(map (lambda (opt)
                 (case (car opt)
                   (:export
                    `(%export (list ,@(cdr opt)) ,pak))
                   (:import-from
                    (destructuring-bind (source &rest names) (cdr opt)
-                     (setq source (%find-package source))
+                     (setq source (find-package source))
                      `(%import ',(map (lambda (name)
-                                        (%find-symbol name source))
+                                        (find-symbol name source))
                                       names)
                                ,pak)))))
               options)
        ,pak)))
 
 (def-emac in-package (name)
-  (setq *package* (%find-package name)) nil)
+  (setq *package* (find-package name)) nil)
 
 (def-emac defparameter (name val)
   (%special! name)
@@ -250,6 +278,9 @@
   `(progn
      (%::maybe-xref-info ,sym "DEFUN")
      (set-symbol-function! ,sym ,func)))
+
+(defsetf getf (place indicator) (value)
+  `(setf ,place (%:%putf ,place ,indicator ,value)))
 
 (def-emac push (obj place)
   `(setf ,place (cons ,obj ,place)))
@@ -391,15 +422,6 @@
 (setf (symbol-function 'sort) #'stable-sort)
 (export '(sort export import))
 
-(def-emac with-append-list ((var append &key (tail (gensym))) &body body)
-  `(let (,var ,tail)
-     (flet ((,append (x)
-              (setf ,tail
-                    (last (if ,tail
-                              (setf (cdr ,tail) x)
-                              (setf ,var x))))))
-       ,@body)))
-
 (def-emac dotimes ((var count-form &optional result-form) &body body)
   (let ((tag (gensym))
         (end (gensym)))
@@ -414,7 +436,7 @@
        ,result-form)))
 
 (def-emac use-package (source &optional (target *package*))
-  `(%use-package (%find-package ,source) (%find-package ,target)))
+  `(%use-package (find-package ,source) (find-package ,target)))
 
 (defparameter *standard-output* (%make-output-stream))
 (defparameter *error-output* (%make-output-stream))

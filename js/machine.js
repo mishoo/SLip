@@ -144,6 +144,12 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         this.env.car[i] = null;
     };
     P.push = function(v) {
+        // XXX: we should limit the stack; otherwise cases of infinite
+        // non-tail recursion are close to impossible to debug. I'm
+        // not decided on a proper maximum size though.
+        //
+        // if (this.stack.length > 20000) debugger;
+
         this.stack.push(v);
     };
     P.pop = function() {

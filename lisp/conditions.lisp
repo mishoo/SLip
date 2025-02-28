@@ -50,6 +50,15 @@
                 *handler-clusters*)))
      ,@body))
 
+(defmacro with-append-list ((var append &key (tail (gensym))) &body body)
+  `(let (,var ,tail)
+     (flet ((,append (x)
+              (setf ,tail
+                    (last (if ,tail
+                              (setf (cdr ,tail) x)
+                              (setf ,var x))))))
+       ,@body)))
+
 (defun handler-case-bindings (block-tag condition-variable clauses)
   (with-append-list (body body-add)
     (let ((bindings '()))
@@ -65,14 +74,14 @@
                     bindings)
               (body-add `(,clause-tag
                           (return-from
-                              ,block-tag
+                           ,block-tag
                             (let ,(when var `((,var ,condition-variable)))
                               ,@rest))))))
           (looop (cdr clauses))))
       (cons (nreverse bindings) body))))
 
 (defmacro handler-case (form &rest clauses)
-  (let ((has-no-error (assq :no-error clauses)))
+  (let ((has-no-error (%assq :no-error clauses)))
     (if has-no-error
         (let ((normal-return (gensym "NORMAL-RETURN-"))
               (error-return (gensym "ERROR-RETURN-")))

@@ -1,7 +1,7 @@
 ;;; based on “Some Useful Lisp Algorithms: Part 2” by Richard C. Waters
 
 (defpackage :sl-mexp
-  (:use :sl))
+  (:use :sl :%))
 
 (in-package :sl-mexp)
 

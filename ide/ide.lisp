@@ -3,7 +3,7 @@
 ;;; symbol completion.
 
 (defpackage :ymacs
-  (:use :sl))
+  (:use :sl :%))
 
 (in-package :ymacs)
 
@@ -32,7 +32,7 @@
   (let ((name (intern (strcat "EXEC-" what))))
     `(labels ((,name ,args ,@body))
        (setf (symbol-function ',name) #',name)
-       (hash-set *handlers* ,(%symbol-name what)
+       (hash-set *handlers* ,(symbol-name what)
                  (lambda (req-id ,@args)
                    (make-thread
                     (lambda ()
@@ -48,23 +48,23 @@
                             ret))))))))))
 
 (define-handler :read (pak str)
-  (let ((*package* (or (and pak (%find-package pak t))
+  (let ((*package* (or (and pak (find-package pak t))
                        *package*)))
-    (%::read1-from-string str)))
+    (read1-from-string str)))
 
 (define-handler :eval (expr)
-  (let ((ret (%::eval expr)))
+  (let ((ret (eval expr)))
     ret))
 
 (define-handler :read-eval-print (code)
-  (let* ((expr (vector-ref (%::read1-from-string code) 0))
-         (ret (%::eval expr)))
+  (let* ((expr (vector-ref (read1-from-string code) 0))
+         (ret (eval expr)))
     (if (stringp ret)
         ret
         (print-object-to-string ret))))
 
 (define-handler :eval-print (expr)
-  (let ((ret (%::eval expr)))
+  (let ((ret (eval expr)))
     (if (stringp ret)
         ret
         (print-object-to-string ret))))
@@ -72,40 +72,39 @@
 (define-handler :compile-file (filename)
   (let ((t1 (%get-time)))
     (prog1
-        (%::load filename)
+        (load filename)
       (send-ymacs-notify :message
                          (strcat ";; " filename
                                  " compiled in "
                                  (number-fixed (/ (- (%get-time) t1) 1000) 3) " s")))))
 
 (define-handler :eval-string (pak str)
-  (let ((*package* (or (and pak (%find-package pak t))
+  (let ((*package* (or (and pak (find-package pak t))
                        *package*)))
-    (%::eval-string str)))
+    (eval-string str)))
 
 (define-handler :compile-string (code filename)
-  (%::compile-string code filename))
+  (compile-string code filename))
 
 (labels ((symbol-completion (query all)
-           (let* ((rx (make-regexp (strcat
-                                    "^"
-                                    (replace-regexp
-                                     #/[-_.\/]/g
-                                     (quote-regexp (replace-regexp #/\./g query "-"))
-                                     "[^-_./]*[-_./]"))
+           (let* ((rx (make-regexp (strcat "^"
+                                           (replace-regexp
+                                            #/[-_.\/]/g
+                                            (quote-regexp (replace-regexp #/\./g query "-"))
+                                            "[^-_./]*[-_./]"))
                                    "i"))
                   (len (length query))
                   (matching (grep all (lambda (sym)
-                                        (regexp-test rx (%symbol-name sym))))))
-             (mapcar #'%symbol-name
+                                        (regexp-test rx (symbol-name sym))))))
+             (mapcar #'symbol-name
                      (sort matching
                            (lambda (syma symb)
-                             (let ((a (%symbol-name syma))
-                                   (b (%symbol-name symb)))
+                             (let ((a (symbol-name syma))
+                                   (b (symbol-name symb)))
                                (cond ((string-equal a query) nil)
                                      ((string-equal b query) t)
-                                     ((eq (%symbol-package syma) *package*) t)
-                                     ((eq (%symbol-package symb) *package*) nil)
+                                     ((eq (symbol-package syma) *package*) t)
+                                     ((eq (symbol-package symb) *package*) nil)
                                      (t
                                       (< (abs (- (length a) len))
                                          (abs (- (length b) len))))))))))))
@@ -119,17 +118,17 @@
                 (comps (symbol-completion query
                                           (as-list
                                            (%interned-symbols
-                                            (%find-package :keyword))))))
+                                            (find-package :keyword))))))
            (mapcar (lambda (x) (strcat ":" x)) comps)))
 
         ;; fully qualified symbol?
         ((setf m (regexp-exec #/^([^:]*?)(::?)([^:]*)/ query))
-         (let* ((pak (%find-package (upcase (elt m 1)) t))
+         (let* ((pak (find-package (upcase (elt m 1)) t))
                 (sep (elt m 2))
                 (external (= 1 (length sep)))
                 (query (elt m 3)))
            (when pak
-             (mapcar (lambda (x) (strcat (%package-name pak) sep x))
+             (mapcar (lambda (x) (strcat (package-name pak) sep x))
                      (symbol-completion query
                                         (as-list
                                          (%accessible-symbols pak external)))))))
@@ -146,13 +145,13 @@
   (apply #'vector (mapcar #'package-name (%list-packages))))
 
 (define-handler :set-package (name)
-  (setf *package* (%find-package name)))
+  (setf *package* (find-package name)))
 
 (defglobal
     *thread*
     (make-thread
      (lambda ()
-       (let ((*package* (%find-package :sl-user))
+       (let ((*package* (find-package :sl-user))
              (*read-table* *read-table*))
          (let looop ()
            (%receive *handlers*)

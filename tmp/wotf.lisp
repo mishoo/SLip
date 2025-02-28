@@ -1,11 +1,12 @@
 (defpackage :wotf
-  (:use :sl))
+  (:use :sl :%))
 
 (in-package :wotf)
 
 (defmacro with-cc (name &rest body)
   `((lambda (,name)
-      ,@body) (%::c/c)))
+      ,@body)
+    (%::c/c)))
 
 (%special! '*amb-fail*)
 (setq *amb-fail* (lambda (arg)
@@ -32,9 +33,14 @@
 ;; The solution here is based on my implementation in JavaScript:
 ;; http://mihai.bazon.net/blog/amb-in-javascript/take-two#wotf
 
+(defparameter *backtrack-count* 0)
+
 ;; fail if condition is not true
+(shadow 'assert)
 (defmacro assert (condition)
-  `(unless ,condition (amb)))
+  `(unless ,condition
+     (incf *backtrack-count*)
+     (amb)))
 
 ;; a house is represented as a list of 5 elements -- nationality,
 ;; beverage, tobacco brand, pet and color (in this order).  This
@@ -73,6 +79,7 @@
 ;; asserts the problem conditions, using the helper functions and
 ;; macros defined above.
 (defun who-owns-the-fish ()
+  (setf *backtrack-count* 0)
   (macrolet ((pick (type . choices)
                `(let ((tmp (amb ,@choices)))
                   (assert (not (find-house houses ,type tmp)))

@@ -129,8 +129,8 @@
          (let* ((new (%allocate-instance
                       class
                       (length *the-slots-of-a-class*)))
-                (dsupers (%getf initargs 'direct-supers '()))
-                (dslots (map #'list (%getf initargs 'direct-slots '())))
+                (dsupers (getf initargs 'direct-supers '()))
+                (dslots (map #'list (getf initargs 'direct-slots '())))
                 (cpl (labels ((rec (sups so-far)
                                 (if (not sups)
                                     (nreverse so-far)
@@ -153,7 +153,7 @@
                                           (cons (car s) (funcall allocator (lambda ()))))
                                         slots)))
 
-           (slot-set new 'name (%getf initargs 'name))
+           (slot-set new 'name (getf initargs 'name))
            (slot-set new 'direct-supers dsupers)
            (slot-set new 'direct-slots dslots)
            (slot-set new 'cpl cpl)
@@ -173,8 +173,8 @@
         ((eq class <method>)
          (let ((new (%allocate-instance class
                                         (length (class-slots class)))))
-           (slot-set new 'specializers (%getf initargs 'specializers '()))
-           (slot-set new 'procedure (%getf initargs 'procedure '()))
+           (slot-set new 'specializers (getf initargs 'specializers '()))
+           (slot-set new 'procedure (getf initargs 'procedure '()))
            new))))
 
 (def-efun slot-ref (object slot-name)
@@ -191,7 +191,7 @@
   (let* ((getters-n-setters (if (eq class <class>)
                                 *getters-n-setters-for-class*
                                 (slot-ref class 'getters-n-setters)))
-         (entry (assq slot-name getters-n-setters)))
+         (entry (%assq slot-name getters-n-setters)))
     (if entry
         (cdr entry)
         (error (strcat "No slot " slot-name)))))
@@ -444,14 +444,14 @@
  (make-method (list <class>)
               (lambda (call-next-method class initargs)
                 (slot-set class 'direct-supers
-                          (%getf initargs 'direct-supers '()))
+                          (getf initargs 'direct-supers '()))
                 (slot-set class 'direct-slots
                           (map (lambda (s)
                                  (if (consp s) s (list s)))
-                               (%getf initargs 'direct-slots '())))
+                               (getf initargs 'direct-slots '())))
                 (slot-set class 'cpl (compute-cpl class))
                 (slot-set class 'slots (compute-slots class))
-                (slot-set class 'name (%getf initargs 'name))
+                (slot-set class 'name (getf initargs 'name))
                 (let* ((nfields 0)
                        (field-initializers '())
                        (allocator
@@ -480,8 +480,8 @@
  'initialize
  (make-method (list <method>)
               (lambda (call-next-method method initargs)
-                (slot-set method 'specializers (%getf initargs 'specializers '()))
-                (slot-set method 'procedure (%getf initargs 'procedure '())))))
+                (slot-set method 'specializers (getf initargs 'specializers '()))
+                (slot-set method 'procedure (getf initargs 'procedure '())))))
 
 (add-method
  'allocate-instance

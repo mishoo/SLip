@@ -18,10 +18,10 @@
                'sl::hash-key 'sl::hash-keys
                'sl::hash-value 'sl::hash-values
                'sl::to 'sl::downto 'sl::upto 'sl::below 'sl::above)
-         #.(%find-package :sl))
+         #.(find-package :sl))
 
 (defpackage :sl-loop
-  (:use :sl))
+  (:use :sl :%))
 
 (in-package :sl-loop)
 
@@ -52,10 +52,10 @@
      (%register-parser (car name) parser)
      (%register-parser (cdr name) parser))
     ((symbolp name)
-     (%register-parser (%symbol-name name) parser))
+     (%register-parser (symbol-name name) parser))
     ((stringp name)
-     (let ((symbol (%intern name #.(%find-package :sl)))
-           (kwsym (%intern name #.(%find-package :keyword))))
+     (let ((symbol (intern name #.(find-package :sl)))
+           (kwsym (intern name #.(find-package :keyword))))
        (hash-add *clause-parsers* symbol parser)
        (hash-add *clause-parsers* kwsym parser)))))
 
@@ -86,8 +86,8 @@
           (or (iskw x (car name))
               (iskw x (cdr name)))
           (or (eq x name)
-              (eq x (%intern (%symbol-name name)
-                             #.(%find-package :keyword)))))))
+              (eq x (intern (symbol-name name)
+                            #.(find-package :keyword)))))))
 
 (defun parse-for-in (kind var args)
   (let ((seq (gensym "list"))
@@ -304,7 +304,7 @@
                         (if ,tail
                             (setf (cdr ,tail) cell)
                             (setf ,name cell)))))
-    (unless (%symbol-package name)
+    (unless (symbol-package name)
       (%list-add *loop-finish* name)))
   args)
 
@@ -323,7 +323,7 @@
                             (setf (cdr ,tail) ls)
                             (setf ,name ls))
                         (setf ,tail (last ls))))))
-    (unless (%symbol-package name)
+    (unless (symbol-package name)
       (%list-add *loop-finish* name)))
   args)
 
@@ -339,7 +339,7 @@
     (%list-add *loop-variables* name)
     (%list-add *loop-start* `(setf ,name 0))
     (%list-add *loop-body* `(setf ,name (+ ,name ,form)))
-    (unless (%symbol-package name)
+    (unless (symbol-package name)
       (%list-add *loop-finish* name)))
   args)
 
@@ -348,7 +348,7 @@
         (name (maybe-into "count")))
     (%list-add *loop-variables* `(,name 0))
     (%list-add *loop-body* `(when ,form (incf ,name)))
-    (unless (%symbol-package name)
+    (unless (symbol-package name)
       (%list-add *loop-finish* name)))
   args)
 
@@ -360,7 +360,7 @@
                               (if (or (not ,name)
                                       (,op val ,name))
                                   (setf ,name val))))
-    (unless (%symbol-package name)
+    (unless (symbol-package name)
       (%list-add *loop-finish* name)))
   args)
 
@@ -392,11 +392,11 @@
     `(block ,*loop-block-name*
        (let (,@(car *loop-variables*))
          (tagbody
-          ,@(car *loop-start*)
+            ,@(car *loop-start*)
           %loop-next
-          ,@(car *loop-body*)
-          ,@(car *loop-iterate*)
-          (go %loop-next)
+            ,@(car *loop-body*)
+            ,@(car *loop-iterate*)
+            (go %loop-next)
           %loop-end)
          ,@(car *loop-finish*)))))
 

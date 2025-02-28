@@ -125,7 +125,7 @@
                            (aux?
                             (push thisarg decls))
                            (key?
-                            (push `(,thisarg (%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")))) decls))
+                            (push `(,thisarg (getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")))) decls))
                            (t
                             (push `(,thisarg (if ,values
                                                  (%next ,values)
@@ -143,7 +143,7 @@
                              (push `(,thisarg-p (if ,values t nil)) decls))
                            (push `(,thisarg ,(if key?
                                                  (let ((val (gensym)))
-                                                   `(let ((,val (%getf ,values ,(%intern (%symbol-name thisarg) (%find-package "KEYWORD")) 'not-found)))
+                                                   `(let ((,val (getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")) 'not-found)))
                                                       (if (eq ,val 'not-found) ,default ,val)))
                                                  `(if ,values (%next ,values) ,default)))
                                  decls)))

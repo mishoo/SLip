@@ -23,7 +23,7 @@
       (destructuring-bind
           (year month date hour min sec msec
                 &aux (anim-pos (/ msec 400)))
-          (%local-date)
+          (%:%local-date)
         (setf sec0 sec)
         (save-excursion
          (set-color "#aab")
@@ -104,5 +104,6 @@
 
 (make-thread
  (lambda ()
-   (turtle::hide-turtle)
-   (turtle::start-clock)))
+   (init-canvas 700 700)
+   (hide-turtle)
+   (start-clock)))

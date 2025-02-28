@@ -11,11 +11,6 @@ function MACHINE() {
     return window.MACHINE;
 }
 
-window.addEventListener("beforeunload", ev => {
-    ev.preventDefault();
-    return ev.returnValue = true;
-});
-
 (function(){
 
     var WEBDAV_ROOT = "./";
@@ -132,7 +127,7 @@ class Repl_Tokenizer extends Ymacs_Lang_Lisp {
     readCustom() {
         let s = this._stream, m;
         if (s.col == 0 && (m = s.lookingAt(/^[^<\s,'`]+?>/))) {
-            this.t("sl-prompt", m[0].length);
+            this.t("sl-prompt directive", m[0].length);
             this.newArg();
             return true;
         }
@@ -286,7 +281,7 @@ function find_package(buffer, start) {
     return null;
 };
 
-function sl_log(txt) {
+function sl_log(txt, { newline = true } = {}) {
     var output = get_repl_buffer();
     output.preventUpdates();
     output.cmd("end_of_buffer");
@@ -295,7 +290,9 @@ function sl_log(txt) {
         if (pos.col > 0)
             output.cmd("newline");
         output.cmd("insert", txt);
-        output.cmd("newline");
+        if (newline) {
+            output.cmd("newline");
+        }
     });
     output.forAllFrames(function(frame){
         frame.ensureCaretVisible();
@@ -321,7 +318,7 @@ Ymacs_Buffer.newCommands({
         if (sym) {
             var debug = MACHINE().eval_string(
                 find_package(this),
-                "(%get-symbol-prop '" + sym.value + " \"XREF\")"
+                "(%:%get-symbol-prop '" + sym.value + " \"XREF\")"
             );
             if (debug) debug = [...debug].filter(function(stuff){
                 switch (stuff[0]) {
@@ -384,7 +381,7 @@ Ymacs_Buffer.newCommands({
         try {
             var tmp = MACHINE().read(find_package(this), code);
         } catch(ex) {
-            throw new Ymacs_Exception("Couldn't read Lisp expression starting at point");
+            throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
         }
         let expr = this.cmd("buffer_substring", point, point + tmp[1]);
         eval_lisp(this, "(sl::print-object-to-string (%::macroexpand-1 '" + expr + "))", find_package(this));
@@ -394,7 +391,7 @@ Ymacs_Buffer.newCommands({
         try {
             var tmp = MACHINE().read(find_package(this), code);
         } catch(ex) {
-            throw new Ymacs_Exception("Couldn't read Lisp expression starting at point");
+            throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
         }
         let expr = this.cmd("buffer_substring", point, point + tmp[1]);
         eval_lisp(this, "(sl::print-object-to-string (sl::macroexpand-all '" + expr + "))", find_package(this));
@@ -692,7 +689,7 @@ Ymacs_Buffer.newMode("sl_mode", function(){
         var ret = [ "SL" ];
         var pak = find_in_package(this, this.point());
         if (pak) {
-            pak = pak.replace(/^\(in-/, "(%::%find-").replace(/\)/, " t)"); // that's a pervert hack
+            pak = pak.replace(/^\(in-/, "(%::find-").replace(/\)/, " t)"); // that's a pervert hack
             try {
                 pak = MACHINE().eval_string(null, pak);
             } catch(ex) {
@@ -755,6 +752,10 @@ function load(url, cont) {
 };
 
 export function make_desktop() {
+    window.addEventListener("beforeunload", ev => {
+        ev.preventDefault();
+        return ev.returnValue = true;
+    });
     var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL();
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
         ymacs.setColorTheme([ "ef-maris-dark" ]);
@@ -775,20 +776,30 @@ export function make_desktop() {
       "*TRACE-OUTPUT*"
     ].forEach(function(sym){
         var stream = MACHINE().eval_string("SL", sym);
+        var buffer_for_repl = "";
         stream.onData = function(stream, str) {
             var ed = THE_EDITOR;
             var out = ed.getBuffer("*sl-output*");
             if (!out) {
                 out = ed.createBuffer({ name: "*sl-output*" });
             }
-            out.preventUpdates();
-            out.cmd("end_of_buffer");
-            out.cmd("insert", str);
-            out.forAllFrames(function(frame){
-                frame.ensureCaretVisible();
-                frame.redrawModelineWithTimer();
+            out._disableUndo(() => {
+                out.preventUpdates();
+                out.cmd("end_of_buffer");
+                out.cmd("insert", str);
+                out.forAllFrames(function(frame){
+                    frame.ensureCaretVisible();
+                    frame.redrawModelineWithTimer();
+                });
+                out.resumeUpdates();
             });
-            out.resumeUpdates();
+            var m = /^(.*?)\n(.*)$/s.exec(str);
+            if (m) {
+                sl_log(buffer_for_repl + m[1]);
+                buffer_for_repl = m[2];
+            } else {
+                buffer_for_repl += str;
+            }
         };
     });
 
