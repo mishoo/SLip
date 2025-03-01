@@ -54,7 +54,7 @@
    tmp.style.boxShadow = '0 0 10px #999';
    if (bg) tmp.style.background = bg;
    tmp.style.right = '10px';
-   tmp.style.top = '10px';
+   tmp.style.bottom = '10px';
    document.body.appendChild(tmp);
    var ctx = tmp.getContext('2d');
    ctx.translate(width / 2, height / 2);

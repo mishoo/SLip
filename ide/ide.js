@@ -30,6 +30,7 @@ function MACHINE() {
         "C-\\"    : "switch_to_buffer",
         "C-z"     : "switch_to_buffer",
         "C-x C-s" : "webdav_save_file_buffer",
+        "C-x s"   : "webdav_save_all",
         "C-x C-f" : "webdav_load_file_buffer",
     });
 
@@ -751,7 +752,7 @@ function load(url, cont) {
     xhr.send();
 };
 
-export function make_desktop() {
+export function make_desktop(load_files = []) {
     window.addEventListener("beforeunload", ev => {
         ev.preventDefault();
         return ev.returnValue = true;
@@ -768,6 +769,12 @@ export function make_desktop() {
 
     load("./ide/scratch.lisp", function(code){
         ymacs.getBuffer("*scratch*").setCode(code);
+    });
+
+    load_files.forEach(name => {
+        let buf = get_repl_buffer();
+        buf.cmd("split_frame_horizontally");
+        buf.cmd("webdav_load_file_buffer", name);
     });
 
     // hook on *standard-output*, *error-output* and *trace-output*

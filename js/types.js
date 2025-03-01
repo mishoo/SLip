@@ -366,7 +366,6 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
             this.name = name + "";
             this.pak = pak || null;
             this.value = null;
-            this.plist = Object.create(null);
             this.vlist = Object.create(null);
         }
     };
@@ -385,12 +384,6 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         // the package.
         if (cache) cache.set(this, cache.size());
         return code;
-    };
-    P.set = function(key, val) {
-        return this.plist[key] = val;
-    };
-    P.get = function(key) {
-        return key in this.plist ? this.plist[key] : null;
     };
     P.setv = function(key, val) {
         return this.vlist[key] = val;

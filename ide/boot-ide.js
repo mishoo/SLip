@@ -121,7 +121,7 @@ import { make_desktop } from "./ide.js";
         load_fasls(lisp_files, function(){
             window.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
             [ ...document.querySelectorAll(".lisp-log") ].forEach(el => el.remove());
-            make_desktop();
+            make_desktop(startup_files);
             compile(startup_files, () => {}, true);
         });
     };

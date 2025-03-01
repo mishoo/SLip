@@ -26,7 +26,7 @@
           (%:%local-date)
         (setf sec0 sec)
         (save-excursion
-         (set-color "#aab")
+         (set-color "#889")
          (dotimes (i 60)
            (save-excursion
             (without-pen (forward (- r 3)))
@@ -104,6 +104,6 @@
 
 (make-thread
  (lambda ()
-   (init-canvas 700 700)
+   (init-canvas 500 500)
    (hide-turtle)
    (start-clock)))
