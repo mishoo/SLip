@@ -1,3 +1,13 @@
+;; An implementation for the LOOP macro.
+;;
+;; (c) Mihai Bazon <mihai.bazon@gmail.com> 2025
+;; License: MIT
+;;
+;; Missing at the moment:
+;;
+;;   - iteration through package symbols
+;;   - WITH+AND bindings are sequential, not parallel as mandated by the spec.
+
 ;; make sure to intern/export symbols into the SL package before we use them
 ;; in SL-LOOP.
 (%export (list 'sl::loop 'sl::as

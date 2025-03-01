@@ -33,7 +33,7 @@
             (forward 6))
            (right 6)))
         (save-excursion
-         (set-thickness 2)
+         (set-thickness (/ r 90))
          (let looop ((i 0))
            (when (< i 12)
              (save-excursion
@@ -91,16 +91,25 @@
   (defun clock-running ()
     running))
 
+(defparameter iii 0)
+
+(defun rect-spiral (max)
+  (save-excursion
+   (loop for n below max by 2 do
+         (forward n)
+         (left 89.7))))
+
 (defun animate-clock ()
   (when (clock-running)
     (without-interrupts
       (clear)
-      (let ((sec (clock 175)))
-        ;; (let ((*orientation* *orientation*))
-        ;;   (right (* sec 6))
-        ;;   (without-pen (backward 280)))
-        ;; (clock 40 :hours-r 2 :hours-pin 6)
-        (set-timeout 16 #'animate-clock)))))
+      (save-excursion
+       (set-color "#aba")
+       (left (* iii 20))
+       (rect-spiral 700))
+      (left (* 10 (cos iii)))
+      (clock (+ 160 (* 30 (sin (incf iii 0.05)))))
+      (set-timeout 16 #'animate-clock))))
 
 (make-thread
  (lambda ()

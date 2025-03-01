@@ -881,7 +881,7 @@
                                    ,@body))
                           (,looop ,@(map (lambda (x)
                                            (if (consp x) (cadr x)))
-                                      bindings)))
+                                         bindings)))
                        env val? more?))
                (with-seq-output <<
                  (let* ((bindings (get-bindings bindings t))
