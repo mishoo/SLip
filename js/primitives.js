@@ -2,6 +2,7 @@
 
     var S_NIL = LispSymbol.get("NIL");
     var S_T = LispSymbol.get("T");
+    var S_PROGN = LispSymbol.get("PROGN");
     var ALL_PRIMITIVES = null;
 
     var LispList = {
@@ -1278,6 +1279,9 @@
         var form = m.pop();
         if (!LispCons.is(form)) return form;
         var first = form.car;
+        if (!LispSymbol.is(first)) return form;
+        if (first === S_PROGN && LispCons.cddr(form) === null)
+            return LispCons.cadr(form);
         if (!first.macro()) return form;
         return m._callnext(first.macro(), LispCons.cdr(form));
     });

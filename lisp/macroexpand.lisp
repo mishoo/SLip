@@ -76,6 +76,11 @@
     ,(all-lambda-mexp (cadr f))
     ,@(all-mexp (cddr f))))
 
+(defun progn-mexp (f)
+  (if (cddr f)
+      `(progn ,@(all-mexp (cdr f)))
+      (mexp (cadr f))))
+
 (foreach `((block           ,#'block-mexp)
            (catch           ,#'funcall-mexp)
            (flet            ,#'flet-mexp)
@@ -86,7 +91,7 @@
            (lambda          ,#'lambda-mexp)
            (let             ,#'let-mexp)
            (let*            ,#'let-mexp)
-           (progn           ,#'funcall-mexp)
+           (progn           ,#'progn-mexp)
            (quote           ,#'quote-mexp)
            (return-from     ,#'block-mexp)
            (setq            ,#'funcall-mexp)
