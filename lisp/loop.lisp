@@ -5,7 +5,7 @@
 
 (in-package :sl)
 
-(export '(loop as in on by across named then else repeat when unless for do
+(export '(loop as in on by across named then else repeat when unless for do doing
           collect collecting append appending nconc nconcing sum summing maximize
           maximizing minimize minimizing with and into finally count counting from
           upfrom downfrom being each the of using hash-key hash-keys hash-value
@@ -65,22 +65,23 @@
   `(labels ((parser ,args ,@body))
      (%register-parser ',symbol #'parser)))
 
-(defun dsetq (var data)
-  (cond
-    ((not var))
-    ((symbolp var)
-     (unless (member var (car *loop-variables*))
-       (%list-add *loop-variables* var))
-     (when data
-       (list `(setf ,var ,data))))
-    ((consp var)
-     (if data
-         (list `(let ((%data ,data))
-                  ,@(dsetq (car var) '(car %data))
-                  ,@(dsetq (cdr var) '(cdr %data))))
-         (progn
-           (dsetq (car var) nil)
-           (dsetq (cdr var) nil))))))
+(let ((%data (gensym "dsetq")))
+  (defun dsetq (var data)
+    (cond
+      ((not var))
+      ((symbolp var)
+       (unless (member var (car *loop-variables*))
+         (%list-add *loop-variables* var))
+       (when data
+         (list `(setf ,var ,data))))
+      ((consp var)
+       (if data
+           (list `(let ((,%data ,data))
+                    ,@(dsetq (car var) `(car ,%data))
+                    ,@(dsetq (cdr var) `(cdr ,%data))))
+           (progn
+             (dsetq (car var) nil)
+             (dsetq (cdr var) nil)))))))
 
 (defun iskw (x name)
   (if (and name (symbolp x))
