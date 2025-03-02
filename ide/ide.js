@@ -154,7 +154,7 @@ let Ymacs_Keymap_SL = Ymacs_Keymap.define(null, {
     "M-q"                                   : "sl_indent_sexp",
     "S-M-q"                                 : "fill_paragraph",
     "S-Tab"                                 : "sl_complete_symbol",
-    "Tab"                                   : "sl_complete_symbol_indent",
+    //"Tab"                                   : "sl_complete_symbol_indent",
     "M-."                                   : "sl_xref_symbol",
     "M-,"                                   : "sl_xref_back_history",
 });
