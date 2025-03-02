@@ -3,39 +3,22 @@
 ;; (c) Mihai Bazon <mihai.bazon@gmail.com> 2025
 ;; License: MIT
 
-;; make sure to intern/export symbols into the SL package before we use them
-;; in SL-LOOP.
-(%export (list 'sl::loop 'sl::as
-               'sl::in 'sl::on 'sl::by 'sl::across 'sl::named
-               'sl::then 'sl::else 'sl::repeat
-               'sl::when 'sl::unless
-               'sl::for 'sl::do
-               'sl::collect 'sl::collecting
-               'sl::append 'sl::appending
-               'sl::nconc 'sl::nconcing
-               'sl::sum 'sl::summing
-               'sl::maximize 'sl::maximizing
-               'sl::minimize 'sl::minimizing
-               'sl::with 'sl::and 'sl::into
-               'sl::finally 'sl::count 'sl::counting
-               'sl::from 'sl::upfrom 'sl::downfrom
-               'sl::being 'sl::each 'sl::the 'sl::of 'sl::using
-               'sl::hash-key 'sl::hash-keys
-               'sl::hash-value 'sl::hash-values
-               'sl::present-symbol 'sl::present-symbols
-               'sl::symbol 'sl::symbols
-               'sl::external-symbol 'sl::external-symbols
-               'sl::while 'sl::until 'sl::initially
-               'sl::always 'sl::never 'sl::thereis
-               'sl::to 'sl::downto 'sl::upto 'sl::below 'sl::above)
-         #.(find-package :sl))
+(in-package :sl)
+
+(export '(loop as in on by across named then else repeat when unless for do
+          collect collecting append appending nconc nconcing sum summing maximize
+          maximizing minimize minimizing with and into finally count counting from
+          upfrom downfrom being each the of using hash-key hash-keys hash-value
+          hash-values present-symbol present-symbols symbol symbols external-symbol
+          external-symbols while until initially always never thereis to downto upto
+          below above))
 
 (defpackage :sl-loop
   (:use :sl :%))
 
 (in-package :sl-loop)
 
-(defparameter *clause-parsers* (make-hash))
+(defparameter *clause-parsers* (list))
 (defparameter *loop-body* (cons nil nil))
 (defparameter *loop-variables* (cons nil nil))
 (defparameter *loop-start* (cons nil nil))
@@ -47,7 +30,7 @@
   (let ((sym (car args)))
     (unless (symbolp sym)
       (error "Expecting loop clause, got ~A" sym))
-    (let ((parser (hash-get *clause-parsers* sym)))
+    (let ((parser (getf *clause-parsers* sym)))
       (unless parser
         (error "Unknown loop clause ~A" sym))
       (apply parser (cdr args)))))
@@ -75,8 +58,8 @@
     ((stringp name)
      (let ((symbol (intern name #.(find-package :sl)))
            (kwsym (intern name #.(find-package :keyword))))
-       (hash-add *clause-parsers* symbol parser)
-       (hash-add *clause-parsers* kwsym parser)))))
+       (setf (getf *clause-parsers* symbol) parser)
+       (setf (getf *clause-parsers* kwsym) parser)))))
 
 (defmacro defparser (symbol args &body body)
   `(labels ((parser ,args ,@body))
@@ -147,6 +130,9 @@
     (%list-append *loop-iterate* (dsetq var (pop args))))
   args)
 
+(defun check-positive-loop-step (step)
+  (assert (> step 0) "LOOP FOR step must be positive"))
+
 (defun parse-for-arithmetic (var args)
   (%list-add *loop-variables* var)
   (let ((step nil))
@@ -186,7 +172,7 @@
         (setf step-form (pop args))
         (%list-add *loop-variables* step)
         (%list-add *loop-start* `(setf ,step ,step-form))
-        (%list-add *loop-start* `(assert (> ,step 0) "LOOP FOR step must be positive")))
+        (%list-add *loop-start* `(check-positive-loop-step ,step)))
 
       (when limit-form
         (%list-add *loop-body*

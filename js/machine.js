@@ -137,11 +137,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         this.denv = new LispCons(thing, this.denv);
     };
     P.bind = function(symbol, i) {
-        this.denv = new LispCons(
-            new LispBinding(symbol, this.env.car[i]),
-            this.denv
-        );
-        this.env.car[i] = null;
+        let frame = this.env.car;
+        this.dynpush(new LispBinding(symbol, frame[i]));
+        frame[i] = null;
     };
     P.push = function(v) {
         // XXX: we should limit the stack; otherwise cases of infinite
@@ -154,6 +152,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
     };
     P.pop = function() {
         return this.stack.pop();
+    };
+    P.pop_frame = function(n) {
+        return this.stack.splice(this.stack.length - n, n);
     };
     P.pop_number = function(error) {
         var n = this.pop();
@@ -973,10 +974,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         /// </throw,catch>
         ["LET", "count", {
             run: function(m){
-                var count = this.count;
-                var frame = new Array(count);
-                while (--count >= 0) frame[count] = m.pop();
-                m.env = new LispCons(frame, m.env);
+                m.env = new LispCons(m.pop_frame(this.count), m.env);
             }
         }],
         ["ARGS", "count", {
@@ -986,21 +984,21 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                     console.error(m.f);
                     throw new LispPrimitiveError("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
                 }
-                var frame = new Array(count);
-                while (--count >= 0) frame[count] = m.pop();
-                m.env = new LispCons(frame, m.env);
+                m.env = new LispCons(m.pop_frame(this.count), m.env);
             }
         }],
         ["ARG_", "count", {
             run: function(m) {
                 var count = this.count;
                 var passed = m.n_args;
-                if (passed < count) throw new LispPrimitiveError("Insufficient number of arguments");
+                if (passed < count) {
+                    console.error(m.f);
+                    throw new LispPrimitiveError("Insufficient number of arguments");
+                }
                 var p = null;
                 while (passed-- > count) p = new LispCons(m.pop(), p);
-                var frame = new Array(count + 1);
-                frame[count] = p;
-                while (--count >= 0) frame[count] = m.pop();
+                var frame = m.pop_frame(count);
+                frame.push(p);
                 m.env = new LispCons(frame, m.env);
             }
         }],

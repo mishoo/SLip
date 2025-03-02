@@ -30,7 +30,7 @@ function MACHINE() {
         "C-\\"    : "switch_to_buffer",
         "C-z"     : "switch_to_buffer",
         "C-x C-s" : "webdav_save_file_buffer",
-        "C-x s"   : "webdav_save_all",
+        //"C-x s"   : "webdav_save_all",
         "C-x C-f" : "webdav_load_file_buffer",
     });
 
@@ -128,7 +128,7 @@ class Repl_Tokenizer extends Ymacs_Lang_Lisp {
     readCustom() {
         let s = this._stream, m;
         if (s.col == 0 && (m = s.lookingAt(/^[^<\s,'`]+?>/))) {
-            this.t("sl-prompt directive", m[0].length);
+            this.t("sl-prompt builtin", m[0].length);
             this.newArg();
             return true;
         }
@@ -759,7 +759,7 @@ export function make_desktop(load_files = []) {
     });
     var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL();
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        ymacs.setColorTheme([ "ef-maris-dark" ]);
+        ymacs.setColorTheme([ "ef-elea-dark" ]);
     } else {
         ymacs.setColorTheme([ "ef-cyprus" ]);
     }

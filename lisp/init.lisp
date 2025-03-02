@@ -28,7 +28,7 @@
           getf
           list list* listp cons consp eq eql equal equalp gensym length
 
-          numberp zerop plusp minusp parse-number parse-integer number-fixed number-string
+          numberp zerop plusp minusp evenp oddp parse-number parse-integer number-fixed number-string
           < <= > >= + - * / = /= null 1+ 1- floor ceiling round mod
           abs sin asin cos acos tan atan exp log sqrt expt random
 

@@ -973,6 +973,16 @@
         var x = m.pop_number(error);
         return x > 0 ? true : null;
     });
+    defp("evenp", false, function(m, nargs){
+        checknargs(nargs, 1, 1);
+        var x = m.pop_number(error);
+        return x % 2 == 0 ? true : null;
+    });
+    defp("oddp", false, function(m, nargs){
+        checknargs(nargs, 1, 1);
+        var x = m.pop_number(error);
+        return x % 2 == 1 ? true : null;
+    });
 
     defp("parse-number", false, function(m, nargs){
         checknargs(nargs, 1, 1);
