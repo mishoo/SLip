@@ -25,6 +25,8 @@
                'sl::present-symbol 'sl::present-symbols
                'sl::symbol 'sl::symbols
                'sl::external-symbol 'sl::external-symbols
+               'sl::while 'sl::until 'sl::initially
+               'sl::always 'sl::never 'sl::thereis
                'sl::to 'sl::downto 'sl::upto 'sl::below 'sl::above)
          #.(find-package :sl))
 
@@ -40,6 +42,15 @@
 (defparameter *loop-iterate* (cons nil nil))
 (defparameter *loop-finish* (cons nil nil))
 (defparameter *loop-block-name* nil)
+
+(defun parse-clause (args)
+  (let ((sym (car args)))
+    (unless (symbolp sym)
+      (error "Expecting loop clause, got ~A" sym))
+    (let ((parser (hash-get *clause-parsers* sym)))
+      (unless parser
+        (error "Unknown loop clause ~A" sym))
+      (apply parser (cdr args)))))
 
 (defun %list-add (ls thing)
   (let ((cell (cons thing nil)))
@@ -291,12 +302,16 @@
     (%list-add *loop-body* `(when (< (decf ,count) 0) (go %loop-end))))
   args)
 
-(defparser do args
+(defparser (do doing) args
   (cond
     ((and args (consp (car args)))
      (%list-add *loop-body* (car args))
      (apply #'parser (cdr args)))
     (t args)))
+
+(defparser return args
+  (%list-add *loop-body* `(return-from ,*loop-block-name* ,(pop args)))
+  args)
 
 (defparser named args
   (setf *loop-block-name* (car args))
@@ -309,6 +324,13 @@
      (apply #'parser (cdr args)))
     (t args)))
 
+(defparser initially args
+  (cond
+    ((and args (consp (car args)))
+     (%list-add *loop-start* (car args))
+     (apply #'parser (cdr args)))
+    (t args)))
+
 (defparser with args
   (let ((variable (pop args))
         (value (when (iskw (car args) '=)
@@ -317,7 +339,8 @@
     (cond
       ((symbolp variable)
        (%list-add *loop-variables* variable)
-       (%list-add *loop-start* `(setf ,variable ,value)))
+       (when value
+         (%list-add *loop-start* `(setf ,variable ,value))))
       (t
        (%list-append *loop-start* (dsetq variable value))))
     (cond
@@ -411,14 +434,63 @@
 (defparser (minimize minimizing) args
   (extremizing "min" '< args))
 
-(defun parse-clause (args)
-  (let ((sym (car args)))
-    (unless (symbolp sym)
-      (error "Expecting loop clause, got ~A" sym))
-    (let ((parser (hash-get *clause-parsers* sym)))
-      (unless parser
-        (error "Unknown loop clause ~A" sym))
-      (apply parser (cdr args)))))
+(defparser when args
+  (let ((condition (pop args))
+        (body (let* ((*loop-body* (cons nil nil)))
+                (setf args (parse-clause args))
+                (car *loop-body*))))
+    (%list-add *loop-body* `(when ,condition ,@body)))
+  args)
+
+(defparser unless args
+  (let ((condition (pop args))
+        (body (let* ((*loop-body* (cons nil nil)))
+                (setf args (parse-clause args))
+                (car *loop-body*))))
+    (%list-add *loop-body* `(unless ,condition ,@body)))
+  args)
+
+(defparser if args
+  (let ((condition (pop args))
+        (then-body (let* ((*loop-body* (cons nil nil)))
+                     (setf args (parse-clause args))
+                     (car *loop-body*)))
+        (else-body (when (iskw (car args) 'else)
+                     (let* ((*loop-body* (cons nil nil)))
+                       (setf args (parse-clause (cdr args)))
+                       (car *loop-body*)))))
+    (%list-add *loop-body* `(if ,condition
+                                (progn ,@then-body)
+                                (progn ,@else-body))))
+  args)
+
+(defparser while args
+  (let ((condition (pop args)))
+    (%list-add *loop-body* `(unless ,condition (go %loop-end))))
+  args)
+
+(defparser until args
+  (let ((condition (pop args)))
+    (%list-add *loop-body* `(when ,condition (go %loop-end))))
+  args)
+
+(defparser always args
+  (%list-add *loop-body* `(unless ,(pop args)
+                            (return-from ,*loop-block-name* nil)))
+  (%list-add *loop-finish* t)
+  args)
+
+(defparser never args
+  (%list-add *loop-body* `(when ,(pop args)
+                            (return-from ,*loop-block-name* nil)))
+  (%list-add *loop-finish* t)
+  args)
+
+(defparser thereis args
+  (%list-add *loop-body* `(let ((obj ,(pop args)))
+                            (when obj
+                              (return-from ,*loop-block-name* obj))))
+  args)
 
 (defun expand-loop (args)
   (let ((*loop-body* (cons nil nil))
