@@ -208,10 +208,10 @@ var LispHash = DEFTYPE("simple-hash", function(D, P){
         return new LispHash(this);
     };
     P.keys = function() {
-        return [...this.data.keys()];
+        return [ ...this.data.keys() ];
     };
     P.values = function() {
-        return [...this.data.values()];
+        return [ ...this.data.values() ];
     };
     P.iterator = P[Symbol.iterator] = function() {
         return this.data.entries();

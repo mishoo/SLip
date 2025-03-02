@@ -1500,6 +1500,13 @@
         return ext ? pak.all_exported() : pak.all_accessible();
     });
 
+    defp("%external-symbols", false, function(m, nargs){
+        checknargs(nargs, 1);
+        var pak = m.pop();
+        checktype(pak, LispPackage);
+        return pak.all_exported();
+    });
+
     defp("%symbol-accessible", false, function(m, nargs){
         checknargs(nargs, 2, 2);
         var pak = m.pop(), sym = m.pop();
@@ -1532,15 +1539,12 @@
     });
 
     defp("find-package", false, function(m, nargs){
-        checknargs(nargs, 1, 2);
-        var noerr = nargs == 2 ? m.pop() : null;
+        checknargs(nargs, 1, 1);
         var name = m.pop();
         if (LispPackage.is(name)) return name;
         name = as_string(name);
         checktype(name, LispString);
-        var pak = LispPackage.get_existing(name);
-        if (!pak && !noerr) error("Package " + name + " not found");
-        return pak;
+        return LispPackage.get_existing(name);
     });
 
     defp("%list-packages", false, function(m, nargs){

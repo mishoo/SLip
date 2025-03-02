@@ -2,11 +2,6 @@
 ;;
 ;; (c) Mihai Bazon <mihai.bazon@gmail.com> 2025
 ;; License: MIT
-;;
-;; Missing at the moment:
-;;
-;;   - iteration through package symbols
-;;   - WITH+AND bindings are sequential, not parallel as mandated by the spec.
 
 ;; make sure to intern/export symbols into the SL package before we use them
 ;; in SL-LOOP.
@@ -27,6 +22,9 @@
                'sl::being 'sl::each 'sl::the 'sl::of 'sl::using
                'sl::hash-key 'sl::hash-keys
                'sl::hash-value 'sl::hash-values
+               'sl::present-symbol 'sl::present-symbols
+               'sl::symbol 'sl::symbols
+               'sl::external-symbol 'sl::external-symbols
                'sl::to 'sl::downto 'sl::upto 'sl::below 'sl::above)
          #.(find-package :sl))
 
@@ -192,51 +190,84 @@
                                   `(,(if upwards '1+ '1-) ,var))))))
   args)
 
-(defun parse-for-hash (var args)
-  (let ((next (pop args)))
-    (assert (iskw next '(each the)) "Bad LOOP FOR-hash syntax: ~A" next)
-    (macrolet ((dig-var ()
-                 `(progn
-                    (setf next (pop args))
-                    (cond
-                      ((iskw next '(hash-value hash-values))
-                       (when vval
-                         (error "LOOP for-hash value variable already defined"))
-                       (setf vval var))
-                      ((iskw next '(hash-key hash-keys))
-                       (when vkey
-                         (error "LOOP for-hash key variable already defined"))
-                       (setf vkey var))
-                      (t (error "Bad LOOP FOR-hash syntax: ~A" next))))))
-      (let ((iter (gensym "hash-iterator"))
-            (itval (gensym "hash-current"))
-            (hash-form nil)
-            (vkey nil)
-            (vval nil))
-        (dig-var)
-        (setf next (pop args))
-        (assert (iskw next '(in of)) "Bad LOOP FOR-hash syntax: ~A" next)
-        (setf hash-form (pop args))
-        (when (iskw (car args) 'using)
-          (pop args)
-          (let* ((args (pop args))
-                 (var (cadr args)))
-            (dig-var)))
-        (%list-append *loop-variables* (list iter itval))
-        (when vkey
-          (%list-add *loop-variables* vkey))
-        (when vval
-          (%list-add *loop-variables* vval))
-        (%list-add *loop-start* `(setf ,iter (hash-iterator ,hash-form)))
-        (%list-append *loop-body*
-                      `((setf ,itval (iterator-next ,iter))
-                        (when (cdr ,itval)
-                          (go %loop-end))))
-        (when vkey
-          (%list-add *loop-body* `(setf ,vkey (vector-ref (car ,itval) 0))))
-        (when vval
-          (%list-add *loop-body* `(setf ,vval (vector-ref (car ,itval) 1)))))))
+(defun parse-for-being-symbols (var args)
+  (let ((index (gensym "index"))
+        (length (gensym "length"))
+        (symbols (gensym "symbols"))
+        (get-symbols nil)
+        (next (pop args)))
+    (cond
+      ((iskw next '(present-symbol present-symbols))
+       (setf get-symbols (list '%:%interned-symbols)))
+      ((iskw next '(symbol symbols))
+       (setf get-symbols (list '%:%accessible-symbols)))
+      ((iskw next '(external-symbol external-symbols))
+       (setf get-symbols (list '%:%external-symbols))))
+    (setf next (pop args))
+    (assert (iskw next '(in of)) "Bad LOOP for-being syntax: ~A" next)
+    (push `(find-package ,(pop args)) get-symbols)
+    (%list-append *loop-variables* `((,index 0) ,length ,symbols ,var))
+    (%list-append *loop-start* `((setf ,symbols ,(nreverse get-symbols))
+                                 (setf ,length (length ,symbols))))
+    (%list-append *loop-body* `((when (>= ,index ,length)
+                                  (go %loop-end))
+                                (setf ,var (vector-ref ,symbols ,index))
+                                (incf ,index))))
   args)
+
+(defun parse-for-being (var args)
+  (let ((next (pop args)))
+    (assert (iskw next '(each the)) "Bad LOOP for-being syntax: ~A" next)
+    (cond
+      ((iskw (car args)
+             '(present-symbol present-symbols
+               symbol symbols
+               external-symbol external-symbols))
+       (parse-for-being-symbols var args))
+      (t
+       ;; hash table
+       (macrolet ((dig-var ()
+                    `(progn
+                       (setf next (pop args))
+                       (cond
+                         ((iskw next '(hash-value hash-values))
+                          (when vval
+                            (error "LOOP for-being value variable already defined"))
+                          (setf vval var))
+                         ((iskw next '(hash-key hash-keys))
+                          (when vkey
+                            (error "LOOP for-being key variable already defined"))
+                          (setf vkey var))
+                         (t (error "Bad LOOP for-being syntax: ~A" next))))))
+         (let ((iter (gensym "hash-iterator"))
+               (itval (gensym "hash-current"))
+               (hash-form nil)
+               (vkey nil)
+               (vval nil))
+           (dig-var)
+           (setf next (pop args))
+           (assert (iskw next '(in of)) "Bad LOOP for-being syntax: ~A" next)
+           (setf hash-form (pop args))
+           (when (iskw (car args) 'using)
+             (pop args)
+             (let* ((args (pop args))
+                    (var (cadr args)))
+               (dig-var)))
+           (%list-append *loop-variables* (list iter itval))
+           (when vkey
+             (%list-add *loop-variables* vkey))
+           (when vval
+             (%list-add *loop-variables* vval))
+           (%list-add *loop-start* `(setf ,iter (hash-iterator ,hash-form)))
+           (%list-append *loop-body*
+                         `((setf ,itval (iterator-next ,iter))
+                           (when (cdr ,itval)
+                             (go %loop-end))))
+           (when vkey
+             (%list-add *loop-body* `(setf ,vkey (vector-ref (car ,itval) 0))))
+           (when vval
+             (%list-add *loop-body* `(setf ,vval (vector-ref (car ,itval) 1))))))
+       args))))
 
 (defparser (for as) (var . args)
   (let ((kind (pop args)))
@@ -250,7 +281,7 @@
       ((iskw kind '(from downfrom upfrom to upto below))
        (parse-for-arithmetic var (cons kind args)))
       ((iskw kind 'being)
-       (parse-for-hash var args))
+       (parse-for-being var args))
       (t (error "Unknown token in LOOP FOR: ~A" kind)))))
 
 (defparser repeat args

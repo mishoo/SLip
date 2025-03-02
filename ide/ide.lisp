@@ -48,7 +48,7 @@
                             ret))))))))))
 
 (define-handler :read (pak str)
-  (let ((*package* (or (and pak (find-package pak t))
+  (let ((*package* (or (and pak (find-package pak))
                        *package*)))
     (read1-from-string str)))
 
@@ -79,7 +79,7 @@
                                  (number-fixed (/ (- (%get-time) t1) 1000) 3) " s")))))
 
 (define-handler :eval-string (pak str)
-  (let ((*package* (or (and pak (find-package pak t))
+  (let ((*package* (or (and pak (find-package pak))
                        *package*)))
     (eval-string str)))
 
@@ -123,7 +123,7 @@
 
         ;; fully qualified symbol?
         ((setf m (regexp-exec #/^([^:]*?)(::?)([^:]*)/ query))
-         (let* ((pak (find-package (upcase (elt m 1)) t))
+         (let* ((pak (find-package (upcase (elt m 1))))
                 (sep (elt m 2))
                 (external (= 1 (length sep)))
                 (query (elt m 3)))

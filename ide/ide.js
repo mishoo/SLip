@@ -690,7 +690,7 @@ Ymacs_Buffer.newMode("sl_mode", function(){
         var ret = [ "SL" ];
         var pak = find_in_package(this, this.point());
         if (pak) {
-            pak = pak.replace(/^\(in-/, "(%::find-").replace(/\)/, " t)"); // that's a pervert hack
+            pak = pak.replace(/^\(in-/, "(%::find-").replace(/\)/, ")"); // that's a pervert hack
             try {
                 pak = MACHINE().eval_string(null, pak);
             } catch(ex) {
