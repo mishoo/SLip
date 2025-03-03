@@ -37,16 +37,16 @@
 
 (defun %list-add (ls thing)
   (let ((cell (cons thing nil)))
-    (if (car ls)
-        (setf (cdr (cdr ls)) cell)
-        (setf (car ls) cell))
-    (setf (cdr ls) cell)))
+    (setf (cdr ls)
+          (if (car ls)
+              (setf (cdr (cdr ls)) cell)
+              (setf (car ls) cell)))))
 
 (defun %list-append (ls elements)
-  (if (car ls)
-      (setf (cdr (cdr ls)) elements)
-      (setf (car ls) elements))
-  (setf (cdr ls) (last elements)))
+  (setf (cdr ls)
+        (last (if (car ls)
+                  (setf (cdr (cdr ls)) elements)
+                  (setf (car ls) elements)))))
 
 (defun %register-parser (name parser)
   (cond

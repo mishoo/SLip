@@ -285,14 +285,6 @@
 (def-emac push (obj place)
   `(setf ,place (cons ,obj ,place)))
 
-;; this is `once-only' from Practical Common Lisp
-(def-emac with-rebinds (names . body)
-  (let ((gensyms (mapcar (lambda (_) (gensym)) names)))
-    `(let (,@(mapcar (lambda (g) `(,g (gensym))) gensyms))
-       `(let (,,@(mapcar (lambda (g n) ``(,,g ,,n)) gensyms names))
-          ,(let (,@(mapcar (lambda (n g) `(,n ,g)) names gensyms))
-             ,@body)))))
-
 (def-emac pop (place)
   (let ((v (gensym)))
     `(let ((,v ,place))
