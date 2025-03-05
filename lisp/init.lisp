@@ -163,7 +163,7 @@
   (if (%primitivep name)
       (error (strcat "We shall not DEFMACRO on " name " (primitive function)")))
   (let ((args (gensym "ARGS")))
-    `(%macro! ',name (%::%fn ',name ,args
+    `(%macro! ',name (%::%fn ,name ,args
                              (destructuring-bind ,lambda-list ,args
                                ,@body)))))
 
