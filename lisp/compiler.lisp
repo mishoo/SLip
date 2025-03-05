@@ -20,7 +20,10 @@
            '*current-pos*
            '*url-prefix*
            '*defining-functions*
-           '*xref-info*)
+           '*xref-info*
+           '*comp-blocks*)
+
+(%global! '*comp-blocks*)
 
 ;; (defmacro cond cases
 ;;   (if cases
@@ -31,7 +34,7 @@
 ;; Since we don't yet have quasiquote, I've macro-expanded it below. It's
 ;; horrible to write it manually.
 (%macro! 'cond
-         (%fn 'cond cases
+         (%fn cond cases
               (if cases
                   (cons 'if (cons (caar cases)
                                   (cons (cons 'progn
@@ -476,6 +479,9 @@
          (progn ,@body)
        (%no-interrupts old))))
 
+(defmacro return (val)
+  `(return-from nil ,val))
+
 (defun defun-en-course (name)
   (member name *defining-functions*))
 
@@ -578,24 +584,24 @@
          ((atom x) (comp-const x val? more?))
          (t (case (car x)
               (quote (arg-count x 1 1)
-                     (comp-const (cadr x) val? more?))
+               (comp-const (cadr x) val? more?))
               (progn (comp-seq (cdr x) env val? more?))
               (setq (arg-count x 2 2)
-                    (assert (symbolp (cadr x)) "Only symbols can be SETQ")
-                    (%seq (comp (caddr x) env t t)
-                          (gen-set (cadr x) env)
-                          (unless val? (gen "POP"))
-                          (unless more? (gen "RET"))))
+               (assert (symbolp (cadr x)) "Only symbols can be SETQ")
+               (%seq (comp (caddr x) env t t)
+                     (gen-set (cadr x) env)
+                     (unless val? (gen "POP"))
+                     (unless more? (gen "RET"))))
               (if (arg-count x 2 3)
                   (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
               (not (arg-count x 1 1)
-                   (if val?
-                       (%seq (comp (cadr x) env t t)
-                             (gen "NOT")
-                             (if more? nil (gen "RET")))
-                       (comp (cadr x) env val? more?)))
+               (if val?
+                   (%seq (comp (cadr x) env t t)
+                         (gen "NOT")
+                         (if more? nil (gen "RET")))
+                   (comp (cadr x) env val? more?)))
               (c/c (arg-count x 0 0)
-                   (if val? (gen "CC")))
+               (if val? (gen "CC")))
               (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
@@ -605,25 +611,24 @@
                           (%seq (comp-lambda nil (cadr x) (cddr x) env)
                                 (if more? nil (gen "RET")))))
               (function (arg-count x 1 1)
-                        (let ((sym (cadr x)))
-                          (assert (symbolp sym) "FUNCTION requires a symbol")
-                          (let ((local (find-func sym env)))
-                            (%seq (when val? (if local
-                                                 (gen "LVAR" (car local) (cadr local))
-                                                 (progn
-                                                   (unless (or (symbol-function sym)
-                                                               (defun-en-course sym))
-                                                     (warn (strcat "Undefined function " sym)))
-                                                   (gen "FGVAR" sym))))
-                                  (if more? nil (gen "RET"))))))
+               (let ((sym (cadr x)))
+                 (assert (symbolp sym) "FUNCTION requires a symbol")
+                 (let ((local (find-func sym env)))
+                   (%seq (when val? (if local
+                                        (gen "LVAR" (car local) (cadr local))
+                                        (progn
+                                          (unless (or (symbol-function sym)
+                                                      (defun-en-course sym))
+                                            (warn (strcat "Undefined function " sym)))
+                                          (gen "FGVAR" sym))))
+                         (if more? nil (gen "RET"))))))
               (%fn (let ((*defining-functions* (cons (cadr x) *defining-functions*)))
                      (%seq (if val? (comp-lambda (cadr x) (caddr x) (cdddr x) env))
                            (if more? nil (gen "RET")))))
               (tagbody (comp-tagbody (cdr x) env val? more?))
               (go (arg-count x 1 1)
-                  (comp-go (cadr x) env))
+               (comp-go (cadr x) env))
               (block (comp-block (cadr x) (cddr x) env val? more?))
-              (return (arg-count x 0 1) (comp-return nil (cadr x) env))
               (return-from (arg-count x 1 2) (comp-return (cadr x) (caddr x) env))
               (catch (comp-catch (cadr x) (cddr x) env val? more?))
               (throw (comp-throw (cadr x) (caddr x) env))
@@ -655,17 +660,25 @@
 
      (comp-block (name forms env val? more?)
        (assert (symbolp name) "BLOCK expects a symbol")
-       (let ((label (gensym "block")))
-         (%seq (gen "BLOCK")
-               (comp-seq forms (extenv env :lex (list (list name :block label))) val? t)
-               (gen "UNFR" 1 0)
-               #( label )
-               (if more? nil (gen "RET")))))
+       (let* ((label (gensym "block"))
+              (usage (cons name 0))
+              (body (let ((*comp-blocks* (cons usage *comp-blocks*)))
+                      (comp-seq forms (extenv env :lex (list (list name :block label))) val? t))))
+         (if (zerop (cdr usage))
+             (%seq body
+                   (if more? nil (gen "RET")))
+             (%seq (gen "BLOCK")
+                   body
+                   (gen "UNFR" 1 0)
+                   #( label )
+                   (if more? nil (gen "RET"))))))
 
      (comp-return (name value env)
        (assert (symbolp name) "RETURN-FROM expects a symbol")
        (let ((block (find-block name env)))
          (assert block (strcat "BLOCK " name " not found"))
+         (let ((usage (%assq name *comp-blocks*)))
+           (rplacd usage (1+ (cdr usage))))
          (%seq (comp value env t t)
                (gen "LVAR" (car block) (cadr block))
                (gen "LRET" (caddr block)))))
@@ -814,9 +827,11 @@
                                       (push #("BIND" x i) dyn))
                                     (%incf i)))
                     (%seq dyn
-                          (comp-seq body (if args
-                                             (extenv env :lex (map (lambda (name) (list name :var)) args))
-                                             env) t nil))))
+                          (comp-seq body
+                                    (if args
+                                        (extenv env :lex (map (lambda (name) (list name :var)) args))
+                                        env)
+                                    t nil))))
             name))
 
      (get-bindings (bindings vars?)
