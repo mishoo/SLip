@@ -487,7 +487,7 @@
 
 (labels
     ((assert (p msg)
-       (unless p (error msg)))
+       (if p p (error msg)))
 
      (arg-count (x min max)
        (assert (<= min (- (length x) 1) max) "Wrong number of arguments"))
@@ -675,13 +675,14 @@
 
      (comp-return (name value env)
        (assert (symbolp name) "RETURN-FROM expects a symbol")
-       (let ((block (find-block name env)))
-         (assert block (strcat "BLOCK " name " not found"))
+       (let* ((block (assert (find-block name env)
+                             (strcat "BLOCK " name " not found")))
+              (label (caddr block)))
          (let ((usage (%assq name *comp-blocks*)))
            (rplacd usage (1+ (cdr usage))))
          (%seq (comp value env t t)
                (gen "LVAR" (car block) (cadr block))
-               (gen "LRET" (caddr block)))))
+               (gen "LRET" label))))
 
      (comp-tagbody (forms env val? more?)
        ;; a TAGBODY introduces a single return point in the lexical
