@@ -659,13 +659,13 @@
                (comp-list (cdr exps) env))))
 
      (comp-block (name forms env val? more?)
-       (assert (symbolp name) "BLOCK expects a symbol")
+       (assert (symbolp name) (strcat "BLOCK expects a symbol, got " name))
        (let* ((label (gensym "block"))
               (usage (cons name 0))
               (body (let ((*comp-blocks* (cons usage *comp-blocks*)))
                       (comp-seq forms (extenv env :lex (list (list name :block label))) val? t))))
          (if (zerop (cdr usage))
-             (%seq body
+             (%seq (comp-seq forms env val? t) ;; XXX: MUST RECOMPILE because different :lex env!
                    (if more? nil (gen "RET")))
              (%seq (gen "BLOCK")
                    body
@@ -827,11 +827,11 @@
                                       (push #("BIND" x i) dyn))
                                     (%incf i)))
                     (%seq dyn
-                          (comp-seq body
-                                    (if args
-                                        (extenv env :lex (map (lambda (name) (list name :var)) args))
-                                        env)
-                                    t nil))))
+                          (comp-block name body
+                                      (if args
+                                          (extenv env :lex (map (lambda (name) (list name :var)) args))
+                                          env)
+                                      t nil))))
             name))
 
      (get-bindings (bindings vars?)
