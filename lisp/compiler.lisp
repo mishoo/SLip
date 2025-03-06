@@ -69,8 +69,7 @@
         (cond
           ((cdr x)
            (let ((rest (qq (cdr x))))
-             (if (and (consp rest)
-                      (eq 'append (car rest)))
+             (if (if (consp rest) (eq 'append (car rest)))
                  (list* 'append (cadar x) (cdr rest))
                  (list 'append (cadar x) rest))))
           (t
@@ -106,9 +105,9 @@
 
       (qq (x)
         (cond
-          ((or (numberp x)
-               (stringp x))
-           x)
+          ((numberp x) x)
+          ((stringp x) x)
+          ((regexpp x) x)
           ((not (consp x))
            (if x (list 'quote x)))
           ((eq 'qq-unquote (car x))
