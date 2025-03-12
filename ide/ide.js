@@ -30,7 +30,6 @@ function MACHINE() {
         "C-\\"    : "switch_to_buffer",
         "C-z"     : "switch_to_buffer",
         "C-x C-s" : "webdav_save_file_buffer",
-        //"C-x s"   : "webdav_save_all",
         "C-x C-f" : "webdav_load_file_buffer",
     });
 
@@ -144,7 +143,7 @@ class Repl_Tokenizer extends Ymacs_Lang_Lisp {
 Ymacs_Tokenizer.define("sl_lisp_repl", (stream, tok, options = {}) =>
     new Repl_Tokenizer({ stream, tok, ...options }));
 
-let Ymacs_Keymap_SL = Ymacs_Keymap.define(null, {
+let Ymacs_Keymap_SL = Ymacs_Keymap.define("slip", {
     "C-c C-c && C-M-x"                      : "sl_eval_sexp",
     "C-c C-k"                               : "sl_eval_buffer",
     "C-c C-r"                               : "sl_eval_region",
@@ -314,6 +313,25 @@ Ymacs_Buffer.newCommands({
         if (expr && (expr.type == "symbol" || expr.type == "function"))
             return expr;
     },
+    sl_repl_eval_or_copy_sexp: Ymacs_Interactive("d", function(point){
+        var m = this.getq("sl_repl_marker").getPosition();
+        if (point >= m) this.cmd("sl_repl_eval");
+        else if (point < m) {
+            var exp = find_toplevel_sexp(this, false, true);
+            if (exp && point >= exp[0] && point <= exp[1]) {
+                set_repl_input(this, this.cmd("buffer_substring", exp[0], exp[1]));
+                this.cmd("goto_char", m + exp[1] - exp[0]);
+            }
+            else
+                this.cmd("newline_and_indent");
+        }
+    }),
+    sl_repl_beginning_of_input: Ymacs_Interactive("d", function(point){
+        var m = this.getq("sl_repl_marker").getPosition();
+        if (this._positionToRowCol(point).row == this._positionToRowCol(m).row)
+            this.cmd("goto_char", m);
+        else this.cmd("beginning_of_indentation_or_line");
+    }),
     sl_xref_symbol: Ymacs_Interactive("d", function(point){
         var sym = this.cmd("sl_get_symbol", point);
         if (sym) {
@@ -441,8 +459,10 @@ Ymacs_Buffer.newCommands({
         var repl_start = self.getq("sl_repl_marker").getPosition();
         var parser = self.cmd("lisp_make_quick_parser", repl_start);
         var expr = parser.read();
-        if (!expr)
-            return self.cmd("sl_repl_prompt");
+        if (!expr) {
+            self.signalInfo("No input", false, 2000);
+            return true;
+        }
         if (expr.partial)
             return self.cmd("newline_and_indent");
         var code = self.cmd("buffer_substring", expr.start, expr.end);
@@ -650,20 +670,8 @@ Ymacs_Keymap.get("emacs").defineKeys({
     })
 });
 
-let Ymacs_Keymap_SL_REPL = Ymacs_Keymap.define(null, {
-    "Enter" : Ymacs_Interactive("d", function(point){
-        var m = this.getq("sl_repl_marker").getPosition();
-        if (point >= m) this.cmd("sl_repl_eval");
-        else if (point < m) {
-            var exp = find_toplevel_sexp(this, false, true);
-            if (exp && point >= exp[0] && point <= exp[1]) {
-                set_repl_input(this, this.cmd("buffer_substring", exp[0], exp[1]));
-                this.cmd("goto_char", m + exp[1] - exp[0]);
-            }
-            else
-                this.cmd("newline_and_indent");
-        }
-    }),
+let Ymacs_Keymap_SL_REPL = Ymacs_Keymap.define("slip_repl", {
+    "Enter" : "sl_repl_eval_or_copy_sexp",
     "C-Enter" : "newline_and_indent",
     "C-c Enter" : "sl_macroexpand_1",
     "M-p && C-ArrowUp" : "sl_repl_history_back",
@@ -671,12 +679,7 @@ let Ymacs_Keymap_SL_REPL = Ymacs_Keymap.define(null, {
     "C-Delete" : "sl_repl_kill_input",
     "Tab" : "sl_repl_complete_symbol",
     "C-c M-p": "sl_repl_set_package",
-    "Home && C-a" : Ymacs_Interactive("d", function(point){
-        var m = this.getq("sl_repl_marker").getPosition();
-        if (this._positionToRowCol(point).row == this._positionToRowCol(m).row)
-            this.cmd("goto_char", m);
-        else this.cmd("beginning_of_indentation_or_line");
-    })
+    "Home && C-a" : "sl_repl_beginning_of_input",
 });
 
 Ymacs_Buffer.setGlobal("sl_xref_history", []);
@@ -757,7 +760,7 @@ export function make_desktop(load_files = []) {
         ev.preventDefault();
         return ev.returnValue = true;
     });
-    var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL();
+    var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL({ ls_keyName: ".slip" });
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
         ymacs.setColorTheme([ "ef-elea-dark" ]);
     } else {
