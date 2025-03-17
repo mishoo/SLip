@@ -335,10 +335,13 @@ Ymacs_Buffer.newCommands({
     sl_xref_symbol: Ymacs_Interactive("d", function(point){
         var sym = this.cmd("sl_get_symbol", point);
         if (sym) {
-            var debug = MACHINE().eval_string(
-                find_package(this),
-                "(%:%get-symbol-prop '" + sym.value + " \"XREF\")"
-            );
+            var debug = null;
+            try {
+                debug = MACHINE().eval_string(
+                    find_package(this),
+                    "(%:%get-symbol-prop '" + sym.value + " \"XREF\")"
+                );
+            } catch(ex) {};
             if (debug) debug = [...debug].filter(function(stuff){
                 switch (stuff[0]) {
                   case "DEFMACRO":
