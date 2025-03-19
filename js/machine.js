@@ -1039,7 +1039,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                 var n = this.nargs;
                 if (n == -1) n = m.n_args;
                 var ret = this.name.primitive()(m, n);
-                if (ret !== false) m.push(ret);
+                if (ret !== false) m.push(ret ?? null);
             }
         }],
         ["NIL", 0, { run: function(m) { m.push(null) } }],

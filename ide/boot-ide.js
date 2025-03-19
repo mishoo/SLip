@@ -12,7 +12,7 @@ import { make_desktop } from "./ide.js";
         "lisp/ffi.lisp",
         "lisp/conditions.lisp",
         "lisp/loop.lisp",
-        "ide/ide.lisp"
+        "ide/ide.lisp",
     ];
 
     LispMachine.extend({
@@ -27,12 +27,20 @@ import { make_desktop } from "./ide.js";
         eval_string: function(pak, str) {
             var f = LispSymbol.get("EXEC-EVAL-STRING", LispPackage.get("YMACS")).func();
             return this.atomic_call(f, [ pak, str ]);
-        }
+        },
     });
 
     function load(url, callback) {
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", url, true);
+        if (!/^https?:\/\//i.test(url)) {
+            // local storage takes priority
+            let content = LispMachine.ls_get_file_contents(url);
+            if (content != null) {
+                setTimeout(() => callback(content), 0);
+                return;
+            }
+        }
+        xhr.open("GET", url + "?killCache=" + Date.now(), true);
         xhr.onreadystatechange = function() {
             if (xhr.readyState == 4) {
                 callback(xhr.responseText);
@@ -42,6 +50,10 @@ import { make_desktop } from "./ide.js";
     };
 
     function save(url, content, callback) {
+        if (!/^https?:\/\//i.test(url)) {
+            // save to localStorage as well
+            LispMachine.ls_set_file_contents(url, content);
+        }
         var xhr = new XMLHttpRequest();
         xhr.open("PUT", url, true);
         xhr.onreadystatechange = function() {
@@ -56,7 +68,7 @@ import { make_desktop } from "./ide.js";
         xhr.send(content);
     };
 
-    var machine = new LispMachine();
+    let machine = new LispMachine();
 
     function load_fasls(files, cont) {
         var count = files.length;
@@ -64,7 +76,7 @@ import { make_desktop } from "./ide.js";
         files.forEach(function(filename, i){
             filename = filename.replace(/(\.lisp)?$/, ".fasl");
             log("Loading: " + filename);
-            load(filename + "?killCache=" + Date.now(), function(code){
+            load(filename, function(code){
                 fasls[i] = LispMachine.unserialize(code);
                 if (--count == 0) {
                     fasls.forEach(function(code){
@@ -92,8 +104,11 @@ import { make_desktop } from "./ide.js";
         if (!nosave) {
             var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
             save(fasl, bytecode, function(error){
-                if (error) throw new Error("Failed to save bytecode");
-                log("... " + fasl + " saved.");
+                if (error) {
+                    console.log(`Saving ${fasl} via webdav failed; it was saved in localStorage. Continuing...`);
+                } else {
+                    log("... " + fasl + " saved.");
+                }
                 compile(files.slice(1), cont);
             });
         }

@@ -11,117 +11,49 @@ function MACHINE() {
     return window.MACHINE;
 }
 
-(function(){
+var WEBDAV_ROOT = "./";
+var HISTORY_KEY = ".slip-repl-history";
 
-    var WEBDAV_ROOT = "./";
+function webdav_url(filename) {
+    return WEBDAV_ROOT + filename + "?killCache=" + Date.now();
+};
 
-    function webdav_url(filename) {
-        return WEBDAV_ROOT + filename + "?killCache=" + Date.now();
-    };
+Ymacs_Keymap.get("emacs").defineKeys({
+    "C-\\"    : "switch_to_buffer",
+    "C-z"     : "switch_to_buffer",
+});
 
-    function automode(buf) {
-        if (/\.lisp$/i.test(buf.name)) return buf.cmd("sl_mode");
-        if (/\.js$/i.test(buf.name)) return buf.cmd("javascript_mode");
-        if (/\.css$/i.test(buf.name)) return buf.cmd("css_mode");
-        if (/\.(html?|xml)$/i.test(buf.name)) return buf.cmd("xml_mode");
-    };
-
-    Ymacs_Keymap.get("emacs").defineKeys({
-        "C-\\"    : "switch_to_buffer",
-        "C-z"     : "switch_to_buffer",
-        "C-x C-s" : "webdav_save_file_buffer",
-        "C-x C-f" : "webdav_load_file_buffer",
-    });
-
-    function webdav_load(filename, cont) {
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", webdav_url(filename), true);
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState == 4) {
-                if (xhr.status == 200) {
-                    cont(false, xhr.responseText);
-                } else {
-                    cont(true);
-                }
-            }
-        };
-        xhr.send(null);
-    };
-
-    function webdav_save(filename, content, cont) {
-        var xhr = new XMLHttpRequest();
-        xhr.open("PUT", webdav_url(filename), true);
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState == 4) {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    cont(false);
-                } else {
-                    cont(true);
-                }
-            }
-        };
-        xhr.send(content);
-    };
-
-    Ymacs_Buffer.newCommands({
-        webdav_load: function(filename, cont) {
-            return webdav_load(filename, cont);
-        },
-        webdav_save: function(filename, content, cont) {
-            return webdav_save(filename, content, cont);
-        },
-        webdav_url: function(filename) {
-            return webdav_url(filename);
-        },
-        webdav_load_file_buffer: Ymacs_Interactive("sFile name: ", function(filename){
-            var self = this;
-            var ymacs = self.ymacs;
-            var buf = ymacs.getBuffer(filename);
-            if (buf) {
-                ymacs.switchToBuffer(buf);
+function webdav_load(filename, cont) {
+    filename = THE_EDITOR.fs_normalizePath(filename);
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", webdav_url(filename), true);
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState == 4) {
+            if (xhr.status == 200) {
+                cont(false, xhr.responseText);
             } else {
-                buf = ymacs.createBuffer({ name: filename });
-                webdav_load(filename, function(error, code){
-                    if (error) {
-                        self.signalInfo("New file: " + filename);
-                        code = "";
-                    }
-                    buf.setq("webdav_filename", filename);
-                    buf.setCode(code);
-                    ymacs.switchToBuffer(buf);
-                    automode(buf);
-                    var cont = buf.getq("webdav_after_load");
-                    if (cont) cont(buf);
-                });
+                cont(true);
             }
-            return buf;
-        }),
-        webdav_save_file_buffer: Ymacs_Interactive(function(){
-            var self = this;
-            function doit(filename) {
-                webdav_save(filename, self.getCode(), function(error){
-                    if (error) {
-                        self.signalError("Failed to save " + filename);
-                    } else {
-                        self.dirty(false);
-                        self.cmd("rename_buffer", filename);
-                        self.setq("webdav_filename", filename);
-                        self.signalInfo("File " + filename + " saved.", false, 1000);
-                        return;
-                    }
-                });
-            };
-            var filename = self.getq("webdav_filename");
-            if (filename == null) {
-                self.cmd("minibuffer_prompt", "Write file: ");
-                self.cmd("minibuffer_read_string", null, function(filename){
-                    doit(filename);
-                });
-            } else doit(filename);
-        })
-    });
+        }
+    };
+    xhr.send(null);
+};
 
-})();
+function webdav_save(filename, content, cont) {
+    filename = THE_EDITOR.fs_normalizePath(filename);
+    var xhr = new XMLHttpRequest();
+    xhr.open("PUT", webdav_url(filename), true);
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState == 4) {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                cont(false);
+            } else {
+                cont(true);
+            }
+        }
+    };
+    xhr.send(content);
+};
 
 class Repl_Tokenizer extends Ymacs_Lang_Lisp {
     readCustom() {
@@ -145,7 +77,7 @@ Ymacs_Tokenizer.define("sl_lisp_repl", (stream, tok, options = {}) =>
 
 let Ymacs_Keymap_SL = Ymacs_Keymap.define("slip", {
     "C-c C-c && C-M-x"                      : "sl_eval_sexp",
-    "C-c C-k"                               : "sl_eval_buffer",
+    "C-c C-k"                               : "sl_compile_file",
     "C-c C-r"                               : "sl_eval_region",
     "C-c M-o && C-c Delete && C-c C-Delete" : "sl_clear_output",
     "C-c Enter"                             : "sl_macroexpand_1",
@@ -193,6 +125,9 @@ class Ymacs_SL extends Ymacs {
             onLispResponse: handle_lisp_response,
             onLispNotify: handle_lisp_notification
         });
+        document.addEventListener("ymacs-reset-local-storage", ev => {
+            this.ls_store = ev.store;
+        });
     }
     sl_log(thing) {
         if (typeof thing != "string")
@@ -212,6 +147,37 @@ class Ymacs_SL extends Ymacs {
         }
         var thread = MACHINE().eval_string("YMACS", "*THREAD*");
         thread.sendmsg(thread, what, window.LispCons.fromArray(args));
+    }
+    fs_getFileContents(name, nothrow, cont) {
+        name = this.fs_normalizePath(name);
+        let code = this.ls_getFileContents(name, true);
+        if (code == null) {
+            webdav_load(name, (error, code) => {
+                if (error) {
+                    code = null;
+                } else {
+                    this.ls_setFileContents(name, code);
+                }
+                cont(code, code);
+            });
+        } else {
+            return cont(code, code);
+        }
+    }
+    fs_setFileContents(name, code, stamp, cont) {
+        name = this.fs_normalizePath(name);
+        super.fs_setFileContents(name, code, null, (stamp) => {
+            if (stamp) {
+                webdav_save(name, code, (error) => {
+                    if (error) {
+                        console.log(`Saving ${name} via webdav failed; it was saved in localStorage. Continuing...`);
+                    }
+                });
+                cont(stamp);
+            } else {
+                cont(null);
+            }
+        });
     }
 }
 
@@ -302,6 +268,31 @@ function sl_log(txt, { newline = true } = {}) {
 };
 
 Ymacs_Buffer.newCommands({
+    mode_from_name: function(name) {
+        if (!name) name = this.name;
+        var ext = (/\.[^.]+$/.exec(name) || [""])[0];
+        switch (ext) {
+          case ".css":
+            return "css";
+          case ".js":
+          case ".fasl":
+            return "javascript";
+          case ".lisp":
+            return "sl";
+          case ".scm":
+          case ".el":
+            return "lisp";
+          case ".md":
+            return "markdown";
+          case ".xml":
+            return "xml";
+          case ".html":
+            return "html";
+          case ".twig":
+            return "twig_html";
+        }
+        return null;
+    },
     sl_get_repl_buffer: get_repl_buffer,
     sl_log: sl_log,
     sl_get_symbol: function(pos){
@@ -365,13 +356,12 @@ Ymacs_Buffer.newCommands({
             function cont(buf) {
                 buf.cmd("goto_char", position);
                 buf.cmd("ensure_caret_visible");
-            };
+            }
+            ymacs.listenOnce("onBufferSwitch", cont);
             if (buf) {
                 ymacs.switchToBuffer(buf);
-                cont(buf);
             } else {
-                buf = this.cmd("webdav_load_file_buffer", filename);
-                buf.setq("webdav_after_load", cont);
+                this.cmd("find_file", filename);
             }
         } else {
             throw new Ymacs_Exception("No symbol at point");
@@ -472,7 +462,7 @@ Ymacs_Buffer.newCommands({
         var h = self.getq("sl_repl_history");
         if (h[0] != code) {
             h.unshift(code);
-            self.ymacs.ls_setFileContents("~/.sl-lisp-history", JSON.stringify(h.slice(0, 1000)));
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 1000)));
         }
         self.ymacs.run_lisp("READ-EVAL-PRINT", code, function(ret){
             if (typeof ret != "string") ret = MACHINE().dump(ret);
@@ -559,14 +549,14 @@ Ymacs_Buffer.newCommands({
     },
     sl_compile_file: Ymacs_Interactive(function() {
         var self = this;
-        var filename = self.getq("webdav_filename");
-        if (filename == null) {
+        var filename = self.name;
+        if (self.dirty() || !filename) {
             return self.signalError("Buffer not saved");
         }
-        self.ymacs.run_lisp("COMPILE-FILE", self.cmd("webdav_url", filename), function(fasl_content){
+        self.ymacs.run_lisp("COMPILE-FILE", filename, function(fasl_content){
             var filename_fasl = filename.replace(/(\.lisp)?$/, ".fasl");
-            self.cmd("webdav_save", filename_fasl, fasl_content, function(error){
-                if (error) {
+            self.ymacs.fs_setFileContents(filename_fasl, fasl_content, null, function(stamp){
+                if (!stamp) {
                     self.signalError("Error saving " + filename_fasl);
                 } else {
                     self.signalInfo(filename_fasl + " saved.", false, 1000);
@@ -679,7 +669,7 @@ let Ymacs_Keymap_SL_REPL = Ymacs_Keymap.define("slip_repl", {
     "C-c Enter" : "sl_macroexpand_1",
     "M-p && C-ArrowUp" : "sl_repl_history_back",
     "M-n && C-ArrowDown" : "sl_repl_history_forward",
-    "C-Delete" : "sl_repl_kill_input",
+    "M-C-Delete" : "sl_repl_kill_input",
     "Tab" : "sl_repl_complete_symbol",
     "C-c M-p": "sl_repl_set_package",
     "Home && C-a" : "sl_repl_beginning_of_input",
@@ -723,7 +713,7 @@ Ymacs_Buffer.newMode("sl_repl_mode", function(){
     this.setTokenizer(new Ymacs_Tokenizer({ type: "sl_lisp_repl", buffer: this }));
     this.pushKeymap(Ymacs_Keymap_SL_REPL);
     this.setq("modeline_custom_handler", null);
-    var history = this.ymacs.ls_getFileContents("~/.sl-lisp-history", true) || "[]";
+    var history = localStorage.getItem(HISTORY_KEY) || "[]";
     this.setq("sl_repl_history", JSON.parse(history));
     return function() {
         this.popKeymap(Ymacs_Keymap_SL_REPL);
@@ -735,17 +725,19 @@ var THE_EDITOR;
 
 function get_repl_buffer() {
     var ed = THE_EDITOR;
-    var out = ed.getBuffer("*sl-repl*");
-    if (!out) {
+    var repl = ed.getBuffer("*sl-repl*");
+    if (!repl) {
         var frame = ed.getActiveFrame(), buf = ed.getActiveBuffer();
-        out = ed.createBuffer({ name: "*sl-repl*" });
-        out.setCode(";; Hacks and glory await!\n");
-        out.cmd("end_of_buffer");
-        out.cmd("sl_repl_mode");
+        repl = ed.createBuffer({ name: "*sl-repl*" });
+        repl.dirty = () => false;
+        repl.setCode(";; Hacks and glory await!\n");
+        repl.cmd("end_of_buffer");
+        repl.cmd("sl_repl_mode");
         buf.cmd("switch_to_buffer", "*sl-repl*");
+        repl.cmd("sl_repl_prompt");
         ed.setActiveFrame(frame);
     }
-    return out;
+    return repl;
 };
 
 function load(url, cont) {
@@ -767,7 +759,7 @@ export function make_desktop(load_files = []) {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
         ymacs.setColorTheme([ "ef-elea-dark" ]);
     } else {
-        ymacs.setColorTheme([ "ef-cyprus" ]);
+        ymacs.setColorTheme([ "ef-duo-light" ]);
     }
     ymacs.addClass("Ymacs-hl-line");
     ymacs.getActiveBuffer().cmd("sl_mode");
@@ -780,7 +772,7 @@ export function make_desktop(load_files = []) {
     load_files.forEach(name => {
         let buf = get_repl_buffer();
         buf.cmd("split_frame_horizontally");
-        buf.cmd("webdav_load_file_buffer", name);
+        buf.cmd("find_file", name);
     });
 
     // hook on *standard-output*, *error-output* and *trace-output*
@@ -818,6 +810,6 @@ export function make_desktop(load_files = []) {
 
     setTimeout(function(){
         ymacs.focus();
-        get_repl_buffer().cmd("sl_repl_prompt");
+        get_repl_buffer();
     }, 10);
 };

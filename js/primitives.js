@@ -1235,6 +1235,19 @@
         if (cont !== null) checktype(cont, LispClosure);
         var url = m.pop();
         checktype(url, LispString);
+
+        if (!/^https?:\/\//i.test(url)) {
+            // local storage takes priority
+            let content = ls_get_file_contents(url);
+            if (content != null) {
+                if (cont) {
+                    return m._callnext(cont, new LispCons(content, null));
+                } else {
+                    return content;
+                }
+            }
+        }
+
         var xhr = new XMLHttpRequest();
         url += "?killCache=" + Date.now(); // is this a good idea?
         if (cont) {
@@ -1250,6 +1263,168 @@
             return cont ? null : xhr.status == 200 ? xhr.responseText : null;
         }
     });
+
+    /* -----[ local storage ]----- */
+
+    let LOCAL_STORE = null;
+
+    function ls_get() {
+        return LOCAL_STORE || (
+            LOCAL_STORE = JSON.parse(localStorage.getItem(".slip") || "{}")
+        );
+    }
+
+    function ls_set(store) {
+        LOCAL_STORE = store;
+        localStorage.setItem(".slip", JSON.stringify(store));
+        let event = new Event("ymacs-reset-local-storage");
+        event.store = store;
+        document.dispatchEvent(event);
+    }
+
+    function ls_normalize_path(path) {
+        path = path.replace(/^[~\x2f]+/, "").split(/\x2f+/);
+        var ret = [];
+        while (path.length > 0) {
+            var x = path.shift();
+            if (x != ".") {
+                if (x == "..") {
+                    ret.pop();
+                } else if (x == "~") {
+                    ret = [];
+                } else {
+                    ret.push(x);
+                }
+            }
+        }
+        return ret.join("/");
+    }
+
+    function ls_get_file_contents(path) {
+        let dir = ls_get();
+        path = ls_normalize_path(path).split("/");
+        while (dir != null && path.length > 1) {
+            dir = dir[path.shift()];
+        }
+        return dir ? dir[path[0]] : null;
+    }
+
+    function ls_set_file_contents(path, content) {
+        let store = ls_get();
+        let dir = store;
+        path = ls_normalize_path(path).split("/");
+        for (let i = 0; i < path.length - 1; ++i) {
+            let cur = path[i];
+            let dive = dir[cur];
+            if (dive == null) {
+                dir = dir[cur] = {};
+            } else if (typeof dive == "string") {
+                error(`${cur} is not a directory`);
+            } else {
+                dir = dive;
+            }
+        }
+        dir[path.at(-1)] = content;
+        ls_set(store);
+    }
+
+    function ls_delete(path) {
+        let store = ls_get();
+        let dir = store;
+        path = ls_normalize_path(path).split("/");
+        while (path.length > 1) dir = dir[path.shift()];
+        delete dir[path[0]];
+        ls_set(store);
+    }
+
+    function ls_webdav_save_all(prefix = "./") {
+        let store = ls_get();
+        (function dig(prefix, store){
+            for (let [ key, val ] of Object.entries(store)) {
+                if (/^\./.test(key)) continue;
+                if (typeof val == "string") {
+                    let filename = prefix + key;
+                    let xhr = new XMLHttpRequest();
+                    xhr.open("PUT", filename, false); // XXX: sync is deprecated
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState == 4) {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                console.log(`Saved ${filename}`);
+                            } else {
+                                console.error(`Couldn't save ${filename} (${xhr.status})`);
+                            }
+                        }
+                    };
+                    xhr.send(val);
+                } else if (val != null) {
+                    dig(prefix + key + "/", val);
+                }
+            }
+        })(prefix, store);
+    }
+
+    function ls_clear() {
+        let store = ls_get();
+        Object.keys(store).forEach(key => {
+            if (!/^\./.test(key)) delete store[key];
+        });
+        ls_set(store);
+    }
+
+    function ls_dump() {
+        let json = JSON.stringify(ls_get(), null, 2);
+        let blob = new Blob([ json ], { type: "application/json" });
+        let url = URL.createObjectURL(blob);
+        window.open(url);
+    }
+
+    LispMachine.ls_get_file_contents = ls_get_file_contents;
+    LispMachine.ls_set_file_contents = ls_set_file_contents;
+
+    defp("%ls-get-file-contents", false, function(m, nargs){
+        checknargs(nargs, 1, 1);
+        let path = m.pop();
+        checktype(path, LispString);
+        return ls_get_file_contents(path) ?? null;
+    });
+
+    defp("%ls-set-file-contents", true, function(m, nargs){
+        checknargs(nargs, 1, 2);
+        let content = m.pop();
+        let path = m.pop();
+        checktype(path, LispString);
+        checktype(content, LispString);
+        ls_set_file_contents(path, content);
+    });
+
+    defp("%ls-delete-path", true, function(m, nargs){
+        checknargs(nargs, 1, 1);
+        let path = m.pop();
+        checktype(path, LispString);
+        ls_delete(path);
+    });
+
+    defp("%ls-clear-store", true, function(m, nargs){
+        checknargs(nargs, 0, 0);
+        ls_clear();
+    });
+
+    defp("%ls-dump-store", true, function(m, nargs){
+        checknargs(nargs, 0, 0);
+        ls_dump();
+    });
+
+    defp("%ls-webdav-save-all", true, function(m, nargs){
+        checknargs(nargs, 0, 1);
+        let prefix;
+        if (nargs > 0) {
+            prefix = m.pop();
+            checktype(prefix, LispString);
+        }
+        ls_webdav_save_all(prefix);
+    });
+
+    /* -----[ /local storage ]----- */
 
     defp("%input-stream-p", false, function(m, nargs){
         checknargs(nargs, 1, 1);
