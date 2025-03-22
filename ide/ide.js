@@ -5,7 +5,9 @@
 import { Ymacs, Ymacs_Keymap, Ymacs_Buffer,
          Ymacs_Interactive, Ymacs_Tokenizer,
          Ymacs_Lang_Lisp,
-         Ymacs_Exception } from "./ymacs/ymacs.mjs";
+         Ymacs_Exception } from
+//"../../ymacs/src/index.js";
+"./ymacs/ymacs.mjs";
 
 function MACHINE() {
     return window.MACHINE;
@@ -148,6 +150,12 @@ class Ymacs_SL extends Ymacs {
         var thread = MACHINE().eval_string("YMACS", "*THREAD*");
         thread.sendmsg(thread, what, window.LispCons.fromArray(args));
     }
+    ls_set(src) {
+        super.ls_set(src);
+        let event = new Event("slip-reset-local-storage");
+        event.store = src;
+        document.dispatchEvent(event);
+    }
     fs_getFileContents(name, nothrow, cont) {
         name = this.fs_normalizePath(name);
         let code = this.ls_getFileContents(name, true);
@@ -156,7 +164,7 @@ class Ymacs_SL extends Ymacs {
                 if (error) {
                     code = null;
                 } else {
-                    this.ls_setFileContents(name, code);
+                    //this.ls_setFileContents(name, code);
                 }
                 cont(code, code);
             });
@@ -248,23 +256,25 @@ function find_package(buffer, start) {
 };
 
 function sl_log(txt, { newline = true } = {}) {
-    var output = get_repl_buffer();
+    let output = get_repl_buffer();
+    let m = output.getq("sl_repl_marker");
     output.preventUpdates();
-    output.cmd("end_of_buffer");
-    output._disableUndo(() => {
-        var pos = output._positionToRowCol(output.point());
-        if (pos.col > 0)
-            output.cmd("newline");
-        output.cmd("insert", txt);
-        if (newline) {
-            output.cmd("newline");
-        }
+    output._saveExcursion(() => {
+        output.cmd("goto_char", m);
+        output.cmd("beginning_of_line");
+        output._disableUndo(() => {
+            output.cmd("insert", txt);
+            if (newline) {
+                output.cmd("newline");
+            }
+        });
     });
     output.forAllFrames(function(frame){
         frame.ensureCaretVisible();
         frame.redrawModelineWithTimer();
     });
     output.resumeUpdates();
+    output.tokenizer.start();
 };
 
 Ymacs_Buffer.newCommands({
@@ -306,8 +316,9 @@ Ymacs_Buffer.newCommands({
     },
     sl_repl_eval_or_copy_sexp: Ymacs_Interactive("d", function(point){
         var m = this.getq("sl_repl_marker").getPosition();
-        if (point >= m) this.cmd("sl_repl_eval");
-        else if (point < m) {
+        if (point >= m) {
+            this.cmd("sl_repl_eval");
+        } else if (point < m) {
             var exp = find_toplevel_sexp(this, false, true);
             if (exp && point >= exp[0] && point <= exp[1]) {
                 set_repl_input(this, this.cmd("buffer_substring", exp[0], exp[1]));
@@ -464,10 +475,11 @@ Ymacs_Buffer.newCommands({
             h.unshift(code);
             localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 1000)));
         }
+        self.cmd("goto_char", expr.end);
+        self.cmd("sl_repl_prompt");
         self.ymacs.run_lisp("READ-EVAL-PRINT", code, function(ret){
             if (typeof ret != "string") ret = MACHINE().dump(ret);
             sl_log(ret);
-            self.cmd("sl_repl_prompt");
         });
     }),
     sl_repl_history_back: Ymacs_Interactive(function(){
@@ -740,16 +752,6 @@ function get_repl_buffer() {
     return repl;
 };
 
-function load(url, cont) {
-    var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function(){
-        if (this.readyState == 4 && this.status == 200)
-            cont(this.responseText);
-    };
-    xhr.open("GET", url + "?kc=" + new Date().getTime());
-    xhr.send();
-};
-
 export function make_desktop(load_files = []) {
     window.addEventListener("beforeunload", ev => {
         ev.preventDefault();
@@ -762,18 +764,7 @@ export function make_desktop(load_files = []) {
         ymacs.setColorTheme([ "ef-duo-light" ]);
     }
     ymacs.addClass("Ymacs-hl-line");
-    ymacs.getActiveBuffer().cmd("sl_mode");
     document.body.appendChild(ymacs.getElement());
-
-    load("./ide/scratch.lisp", function(code){
-        ymacs.getBuffer("*scratch*").setCode(code);
-    });
-
-    load_files.forEach(name => {
-        let buf = get_repl_buffer();
-        buf.cmd("split_frame_horizontally");
-        buf.cmd("find_file", name);
-    });
 
     // hook on *standard-output*, *error-output* and *trace-output*
     [ "*STANDARD-OUTPUT*",
@@ -798,7 +789,7 @@ export function make_desktop(load_files = []) {
                 });
                 out.resumeUpdates();
             });
-            var m = /^(.*?)\n(.*)$/s.exec(str);
+            var m = /^(.*)\n(.*)$/s.exec(str);
             if (m) {
                 sl_log(buffer_for_repl + m[1]);
                 buffer_for_repl = m[2];
@@ -810,6 +801,15 @@ export function make_desktop(load_files = []) {
 
     setTimeout(function(){
         ymacs.focus();
-        get_repl_buffer();
+        let buf = get_repl_buffer();
+        if (load_files.length == 0) {
+            load_files = [ "ide/info.md" ];
+        }
+        load_files.forEach(name => {
+            buf.cmd("split_frame_horizontally");
+            buf.cmd("other_frame");
+            ymacs.listenOnce("onBufferSwitch", (buf) => buf.cmd("other_frame"));
+            buf.cmd("find_file", name);
+        });
     }, 10);
 };

@@ -591,7 +591,7 @@ var LispProcess = DEFTYPE("process", function(D, P){
         while (Date.now() - start_time < 100) {
             if (QUEUE.length == 0) break;
             var p = QUEUE.shift();
-            if (D.is(p)) {
+            if (p instanceof D) {
                 p.run(200);
             }
             else if (p instanceof Message) {

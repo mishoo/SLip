@@ -1236,7 +1236,7 @@
         var url = m.pop();
         checktype(url, LispString);
 
-        if (!/^https?:\/\//i.test(url)) {
+        if (!/^(?:https?:)?\/\//i.test(url)) {
             // local storage takes priority
             let content = ls_get_file_contents(url);
             if (content != null) {
@@ -1254,7 +1254,7 @@
             xhr.open("GET", url, true);
             xhr.onreadystatechange = function() {
                 if (xhr.readyState == 4)
-                    m.call(cont, new LispCons(xhr.status == 200 ? xhr.responseText : null, null));
+                    m._call(cont, new LispCons(xhr.status == 200 ? xhr.responseText : null, null));
             };
             xhr.send(null);
         } else {
@@ -1267,6 +1267,10 @@
     /* -----[ local storage ]----- */
 
     let LOCAL_STORE = null;
+
+    document.addEventListener("slip-reset-local-storage", ev => {
+        LOCAL_STORE = ev.store;
+    });
 
     function ls_get() {
         return LOCAL_STORE || (
@@ -2091,6 +2095,13 @@
         checktype(func, LispNativeFunction);
         checktype(args, LispArray);
         return boxit(func.apply(instance, args));
+    });
+
+    defp("%js-closure", false, function(m, nargs){
+        checknargs(nargs, 1, 1);
+        var closure = m.pop();
+        checktype(closure, LispClosure);
+        return (...args) => m.atomic_call(closure, args.map(boxit));
     });
 
     defp("%js-camelcase-name", true, function(m, nargs){

@@ -8,6 +8,7 @@
 (in-package :ymacs)
 
 (import '(sl-ffi:defun-js))
+(export '(make-dialog))
 
 (defun grep (list pred)
   (when list
@@ -23,6 +24,10 @@
 
 (defun-js %send-ymacs-notify (what value) "
   YMACS.callHooks('onLispNotify', what, value);
+")
+
+(defun-js make-dialog (width height) "
+  return YMACS.makeDialog({ width, height, closable: true, draggable: true });
 ")
 
 (defun send-ymacs-notify (what value)

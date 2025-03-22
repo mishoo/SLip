@@ -81,27 +81,17 @@
         (circle (* r 0.03))
         sec))))
 
-(let ((running nil))
-  (defun start-clock ()
-    (setf running t)
-    (clear)
-    (animate-clock))
-  (defun stop-clock ()
-    (setf running nil))
-  (defun clock-running ()
-    running))
-
-(defparameter iii 0)
-
 (defun rect-spiral (max)
   (save-excursion
    (loop for n below max by 2 do
          (forward n)
          (left 89.7))))
 
+(defparameter iii 0)
+
 (defun animate-clock ()
-  (when (clock-running)
-    (without-interrupts
+  (without-interrupts
+    (when *canvas*
       (clear)
       (save-excursion
        (set-color "#aba")
@@ -111,8 +101,10 @@
       (clock (+ 160 (* 30 (sin (incf iii 0.05)))))
       (set-timeout 16 #'animate-clock))))
 
-(make-thread
- (lambda ()
-   (init-canvas 500 500)
-   (hide-turtle)
-   (start-clock)))
+(with-canvas
+  (let ((iii 0))
+    (make-thread
+     (lambda ()
+       (init-canvas 500 500)
+       (hide-turtle)
+       (animate-clock)))))

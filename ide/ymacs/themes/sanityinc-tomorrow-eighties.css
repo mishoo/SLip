@@ -1,2 +1,193 @@
-.Ymacs-Theme-sanityinc-tomorrow-eighties{--ymacs-cursor-bg:#f2777a;--ymacs-cursor-fg:#2d2d2d;--ymacs-modeline-in-bg:#393939;--ymacs-modeline-ac-bg:#515151;color:#ccc;background-color:#2d2d2d}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_SplitCont>.bar{background-color:#969896}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_SplitCont.horiz>.bar{border-top:1px solid #515151;border-bottom:1px solid #515151}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_SplitCont.vert>.bar{border-left:1px solid #515151;border-right:1px solid #515151}.Ymacs-Theme-sanityinc-tomorrow-eighties.Ymacs-hl-line .Ymacs_Frame-active div.line:has(.Ymacs-caret){background-color:#39393963}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs-frame-content div.line:before{color:#999}.Ymacs-Theme-sanityinc-tomorrow-eighties.Ymacs-hl-line .Ymacs_Frame-active div.line:has(.Ymacs-caret):before{color:#ccc;font-weight:700}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs-frame-content:before{color:#999;background-color:#333}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Popup{--ymacs-popup-bg:#515151;--ymacs-popup-fg:#ccc;--ymacs-popup-scrollbar-thumb:var(--ymacs-popup-fg)}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item:hover,.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item.selected,.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item.selected:hover{background-color:#999}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Overlay.selection div{background-color:#515151}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Overlay.isearch div{color:#2d2d2d;background-color:#fc6}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Overlay.isearch-lazy div{color:#2d2d2d;background-color:#6cc}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Overlay.match-paren div{color:#000;background-color:#32cd32}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Modeline{color:#999;background-color:#393939;border:1px solid #515151}.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Frame-active .Ymacs_Modeline{color:#ccc;background-color:#515151;border:1px solid #515151}.Ymacs-Theme-sanityinc-tomorrow-eighties .minibuffer-prompt{color:#69c}.Ymacs-Theme-sanityinc-tomorrow-eighties .mode-line-buffer-id,.Ymacs-Theme-sanityinc-tomorrow-eighties .directive{color:#c9c}.Ymacs-Theme-sanityinc-tomorrow-eighties .type{color:#69c}.Ymacs-Theme-sanityinc-tomorrow-eighties .builtin{color:#c9c}.Ymacs-Theme-sanityinc-tomorrow-eighties .function-name{color:#f99157}.Ymacs-Theme-sanityinc-tomorrow-eighties .variable-name{color:#fc6}.Ymacs-Theme-sanityinc-tomorrow-eighties .constant{color:#69c}.Ymacs-Theme-sanityinc-tomorrow-eighties .string,.Ymacs-Theme-sanityinc-tomorrow-eighties .string-starter,.Ymacs-Theme-sanityinc-tomorrow-eighties .string-stopper,.Ymacs-Theme-sanityinc-tomorrow-eighties .regexp,.Ymacs-Theme-sanityinc-tomorrow-eighties .regexp-starter,.Ymacs-Theme-sanityinc-tomorrow-eighties .regexp-stopper,.Ymacs-Theme-sanityinc-tomorrow-eighties .regexp-modifier{color:#6cc}.Ymacs-Theme-sanityinc-tomorrow-eighties .keyword{color:#9c9}.Ymacs-Theme-sanityinc-tomorrow-eighties .comment,.Ymacs-Theme-sanityinc-tomorrow-eighties .mcomment,.Ymacs-Theme-sanityinc-tomorrow-eighties .comment-starter,.Ymacs-Theme-sanityinc-tomorrow-eighties .mcomment-starter,.Ymacs-Theme-sanityinc-tomorrow-eighties .mcomment-stopper{color:#999}.Ymacs-Theme-sanityinc-tomorrow-eighties .number{color:#69c}.Ymacs-Theme-sanityinc-tomorrow-eighties .operator{color:#f99157}.Ymacs-Theme-sanityinc-tomorrow-eighties .error{color:#f2777a;font-weight:700}.Ymacs-Theme-sanityinc-tomorrow-eighties .isearch-fail{color:#2d2d2d;background-color:#f2777a;font-weight:700}.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-open-tag,.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-close-tag{color:#f99157}.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-attribute{color:#fc6}.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-entity-starter,.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-entity-stopper,.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-entity{color:#69c}.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-open-bracket,.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-close-bracket,.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-closetag-slash,.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-cdata,.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-cdata-starter,.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-cdata-stopper{color:#ccc}.Ymacs-Theme-sanityinc-tomorrow-eighties .block-starter,.Ymacs-Theme-sanityinc-tomorrow-eighties .block-stopper,.Ymacs-Theme-sanityinc-tomorrow-eighties .exp-starter,.Ymacs-Theme-sanityinc-tomorrow-eighties .exp-stopper,.Ymacs-Theme-sanityinc-tomorrow-eighties .lisp-keyword{color:#c9c}.Ymacs-Theme-sanityinc-tomorrow-eighties .heading1{font-size:1.414em;font-weight:700}.Ymacs-Theme-sanityinc-tomorrow-eighties .heading2{font-size:1.18em;font-weight:700}.Ymacs-Theme-sanityinc-tomorrow-eighties .heading3{color:#f99157;font-weight:700}.Ymacs-Theme-sanityinc-tomorrow-eighties .heading4{color:#c9c;font-weight:700}.Ymacs-Theme-sanityinc-tomorrow-eighties .markdown-blockquote,.Ymacs-Theme-sanityinc-tomorrow-eighties .markdown-blockquote1,.Ymacs-Theme-sanityinc-tomorrow-eighties .markdown-blockquote2,.Ymacs-Theme-sanityinc-tomorrow-eighties .markdown-blockquote3{color:#999}.Ymacs-Theme-sanityinc-tomorrow-eighties.Ymacs-line-numbers .Ymacs-frame-content:before{border-right:1px solid #202020}.Ymacs-Theme-sanityinc-tomorrow-eighties.Ymacs-line-numbers .Ymacs_Frame-active .Ymacs-frame-content:before{box-shadow:3px 0 7px -3px #0004}
+.Ymacs-Theme-sanityinc-tomorrow-eighties {
+  --ymacs-cursor-bg: #f2777a;
+  --ymacs-cursor-fg: #2d2d2d;
+  --ymacs-modeline-in-bg: #393939;
+  --ymacs-modeline-ac-bg: #515151;
+  color: #ccc;
+  background-color: #2d2d2d;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_SplitCont > .bar {
+  background-color: #969896;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_SplitCont.horiz > .bar {
+  border-top: 1px solid #515151;
+  border-bottom: 1px solid #515151;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_SplitCont.vert > .bar {
+  border-left: 1px solid #515151;
+  border-right: 1px solid #515151;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties.Ymacs-hl-line .Ymacs_Frame-active div.line:has(.Ymacs-caret) {
+  background-color: #39393963;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs-frame-content div.line:before {
+  color: #999;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties.Ymacs-hl-line .Ymacs_Frame-active div.line:has(.Ymacs-caret):before {
+  color: #ccc;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs-frame-content:before {
+  color: #999;
+  background-color: #333;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Popup {
+  --ymacs-popup-bg: #515151;
+  --ymacs-popup-fg: #ccc;
+  --ymacs-popup-scrollbar-thumb: var(--ymacs-popup-fg);
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item:hover, .Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item.selected, .Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Popup .Ymacs_Menu .Ymacs_Menu_Item.selected:hover {
+  background-color: #999;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Overlay.selection div {
+  background-color: #515151;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Overlay.isearch div {
+  color: #2d2d2d;
+  background-color: #fc6;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Overlay.isearch-lazy div {
+  color: #2d2d2d;
+  background-color: #6cc;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Overlay.match-paren div {
+  color: #000;
+  background-color: #32cd32;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Modeline {
+  color: #999;
+  background-color: #393939;
+  border: 1px solid #515151;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .Ymacs_Frame-active .Ymacs_Modeline {
+  color: #ccc;
+  background-color: #515151;
+  border: 1px solid #515151;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .minibuffer-prompt {
+  color: #69c;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .mode-line-buffer-id, .Ymacs-Theme-sanityinc-tomorrow-eighties .directive {
+  color: #c9c;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .type {
+  color: #69c;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .builtin {
+  color: #c9c;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .function-name {
+  color: #f99157;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .variable-name {
+  color: #fc6;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .constant {
+  color: #69c;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .string, .Ymacs-Theme-sanityinc-tomorrow-eighties .string-starter, .Ymacs-Theme-sanityinc-tomorrow-eighties .string-stopper, .Ymacs-Theme-sanityinc-tomorrow-eighties .regexp, .Ymacs-Theme-sanityinc-tomorrow-eighties .regexp-starter, .Ymacs-Theme-sanityinc-tomorrow-eighties .regexp-stopper, .Ymacs-Theme-sanityinc-tomorrow-eighties .regexp-modifier {
+  color: #6cc;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .keyword {
+  color: #9c9;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .comment, .Ymacs-Theme-sanityinc-tomorrow-eighties .mcomment, .Ymacs-Theme-sanityinc-tomorrow-eighties .comment-starter, .Ymacs-Theme-sanityinc-tomorrow-eighties .mcomment-starter, .Ymacs-Theme-sanityinc-tomorrow-eighties .mcomment-stopper {
+  color: #999;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .number {
+  color: #69c;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .operator {
+  color: #f99157;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .error {
+  color: #f2777a;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .isearch-fail {
+  color: #2d2d2d;
+  background-color: #f2777a;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-open-tag, .Ymacs-Theme-sanityinc-tomorrow-eighties .xml-close-tag {
+  color: #f99157;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-attribute {
+  color: #fc6;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-entity-starter, .Ymacs-Theme-sanityinc-tomorrow-eighties .xml-entity-stopper, .Ymacs-Theme-sanityinc-tomorrow-eighties .xml-entity {
+  color: #69c;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .xml-open-bracket, .Ymacs-Theme-sanityinc-tomorrow-eighties .xml-close-bracket, .Ymacs-Theme-sanityinc-tomorrow-eighties .xml-closetag-slash, .Ymacs-Theme-sanityinc-tomorrow-eighties .xml-cdata, .Ymacs-Theme-sanityinc-tomorrow-eighties .xml-cdata-starter, .Ymacs-Theme-sanityinc-tomorrow-eighties .xml-cdata-stopper {
+  color: #ccc;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .block-starter, .Ymacs-Theme-sanityinc-tomorrow-eighties .block-stopper, .Ymacs-Theme-sanityinc-tomorrow-eighties .exp-starter, .Ymacs-Theme-sanityinc-tomorrow-eighties .exp-stopper, .Ymacs-Theme-sanityinc-tomorrow-eighties .lisp-keyword {
+  color: #c9c;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .heading1 {
+  font-size: 1.414em;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .heading2 {
+  font-size: 1.18em;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .heading3 {
+  color: #f99157;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .heading4 {
+  color: #c9c;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties .markdown-blockquote, .Ymacs-Theme-sanityinc-tomorrow-eighties .markdown-blockquote1, .Ymacs-Theme-sanityinc-tomorrow-eighties .markdown-blockquote2, .Ymacs-Theme-sanityinc-tomorrow-eighties .markdown-blockquote3 {
+  color: #999;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties.Ymacs-line-numbers .Ymacs-frame-content:before {
+  border-right: 1px solid #202020;
+}
+
+.Ymacs-Theme-sanityinc-tomorrow-eighties.Ymacs-line-numbers .Ymacs_Frame-active .Ymacs-frame-content:before {
+  box-shadow: 3px 0 7px -3px #0004;
+}
 /*# sourceMappingURL=sanityinc-tomorrow-eighties.css.map */

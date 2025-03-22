@@ -29,9 +29,8 @@
           set-rotation
           set-scale))
 
-(import '(sl-ffi:defun-js))
+(import '(sl-ffi:defun-js sl-ffi:lambda-js))
 
-(defparameter *canvas-id* "thy-canvas")
 (defparameter *position* (cons 0 0))
 (defparameter *orientation* 90)
 (defparameter *pen* t)
@@ -41,23 +40,15 @@
 (defparameter *turtle-context* nil)
 (defparameter *show-turtle* t)
 
-(defun-js %dom-create-canvas (id width height bg)
-  "var tmp = document.getElementById(id);
-   if (tmp) tmp.parentNode.removeChild(tmp);
-   tmp = document.createElement('canvas');
-   tmp.id = id;
-   tmp.width = width;
-   tmp.height = height;
-   tmp.style.border = '1px solid red';
-   tmp.style.padding = '1px';
+(defun-js %dom-create-canvas (dlg)
+  "var parent = dlg.getElement();
+   var tmp = document.createElement('canvas');
+   tmp.width = parent.clientWidth;
+   tmp.height = parent.clientHeight;
    tmp.style.position = 'absolute';
-   tmp.style.boxShadow = '0 0 10px #999';
-   if (bg) tmp.style.background = bg;
-   tmp.style.right = '10px';
-   tmp.style.bottom = '10px';
-   document.body.appendChild(tmp);
+   parent.appendChild(tmp);
    var ctx = tmp.getContext('2d');
-   ctx.translate(width / 2, height / 2);
+   ctx.translate(tmp.width / 2, tmp.height / 2);
    ctx.scale(1, -1);
    return tmp;")
 
@@ -126,11 +117,31 @@
    context.stroke();")
 
 (defun init-canvas (width height)
-  (setf *canvas* (%dom-create-canvas *canvas-id* width height "#ffffffd0")
-        *context* (%dom-canvas-context *canvas*)
-        *turtle-canvas* (%dom-create-canvas (%:strcat *canvas-id* "-turtle") width height)
-        *turtle-context* (%dom-canvas-context *turtle-canvas*))
-  (when *show-turtle* (draw-turtle)))
+  (let ((dlg (ymacs:make-dialog width height)))
+    ((lambda-js (dlg close-handler) "
+        let el = dlg.getElement();
+        el.style.right = '10px';
+        el.style.bottom = '10px';
+        dlg.addEventListener('onClose', close_handler);
+    ") dlg (%:%js-closure
+            (lambda ()
+              (setf *canvas* nil
+                    *context* nil
+                    *turtle-canvas* nil
+                    *turtle-context* nil)
+              (format *error-output* "Canvas closed~%"))))
+    (setf *canvas* (%dom-create-canvas dlg)
+          *context* (%dom-canvas-context *canvas*)
+          *turtle-canvas* (%dom-create-canvas dlg)
+          *turtle-context* (%dom-canvas-context *turtle-canvas*))
+    (when *show-turtle* (draw-turtle))))
+
+(defmacro with-canvas (&body body)
+  `(let ((*canvas* nil)
+         (*context* nil)
+         (*turtle-canvas* nil)
+         (*turtle-context* nil))
+     ,@body))
 
 (defglobal +PI+ (%:%js-eval "Math.PI"))
 (defglobal +PI2+ (/ +PI+ 2))
