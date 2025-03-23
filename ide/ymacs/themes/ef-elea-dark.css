@@ -86,6 +86,43 @@
   font-weight: bold;
 }
 
+.Ymacs-Theme-ef-elea-dark .heading1 {
+  color: #eba8a8;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-ef-elea-dark .heading2 {
+  color: #a9c99f;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-ef-elea-dark .heading3 {
+  color: #60d5c2;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-ef-elea-dark .heading4 {
+  color: #cfaaff;
+  font-weight: bold;
+}
+
+.Ymacs-Theme-ef-elea-dark .markdown-blockquote, .Ymacs-Theme-ef-elea-dark .markdown-blockquote1, .Ymacs-Theme-ef-elea-dark .markdown-blockquote2, .Ymacs-Theme-ef-elea-dark .markdown-blockquote3 {
+  color: #99bfcf;
+  font-style: italic;
+}
+
+.Ymacs-Theme-ef-elea-dark .markdown-pre {
+  color: #60d5c2;
+}
+
+.Ymacs-Theme-ef-elea-dark .markdown-code, .Ymacs-Theme-ef-elea-dark .markdown-code-starter, .Ymacs-Theme-ef-elea-dark .markdown-code-stopper {
+  color: #f59acf;
+}
+
+.Ymacs-Theme-ef-elea-dark .markdown-ref {
+  color: #7fca5a;
+}
+
 .Ymacs-Theme-ef-elea-dark .directive {
   color: #fa90ea;
 }
@@ -169,29 +206,8 @@
   font-weight: bold;
 }
 
-.Ymacs-Theme-ef-elea-dark .heading1 {
-  color: #eba8a8;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-ef-elea-dark .heading2 {
-  color: #a9c99f;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-ef-elea-dark .heading3 {
-  color: #60d5c2;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-ef-elea-dark .heading4 {
-  color: #cfaaff;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-ef-elea-dark .markdown-blockquote, .Ymacs-Theme-ef-elea-dark .markdown-blockquote1, .Ymacs-Theme-ef-elea-dark .markdown-blockquote2, .Ymacs-Theme-ef-elea-dark .markdown-blockquote3 {
-  color: #cac89f;
-  font-style: italic;
+.Ymacs-Theme-ef-elea-dark .hyperlink {
+  color: #7fca5a;
 }
 
 .Ymacs-Theme-ef-elea-dark.Ymacs-line-numbers .Ymacs-frame-content:before {

@@ -82,7 +82,35 @@
   color: #883e96;
 }
 
-.Ymacs-Theme-base16-apathy .directive {
+.Ymacs-Theme-base16-apathy .heading1 {
+  color: #96883e;
+}
+
+.Ymacs-Theme-base16-apathy .heading2 {
+  color: #3e9688;
+}
+
+.Ymacs-Theme-base16-apathy .heading3 {
+  color: #4c963e;
+}
+
+.Ymacs-Theme-base16-apathy .heading4 {
+  color: #2b685e;
+}
+
+.Ymacs-Theme-base16-apathy .markdown-blockquote, .Ymacs-Theme-base16-apathy .markdown-blockquote1, .Ymacs-Theme-base16-apathy .markdown-blockquote2, .Ymacs-Theme-base16-apathy .markdown-blockquote3 {
+  color: #5f9c92;
+}
+
+.Ymacs-Theme-base16-apathy .markdown-pre {
+  color: #2b685e;
+}
+
+.Ymacs-Theme-base16-apathy .markdown-code, .Ymacs-Theme-base16-apathy .markdown-code-starter, .Ymacs-Theme-base16-apathy .markdown-code-stopper {
+  color: #3e4c96;
+}
+
+.Ymacs-Theme-base16-apathy .markdown-ref, .Ymacs-Theme-base16-apathy .directive {
   color: #96883e;
 }
 
@@ -155,27 +183,8 @@
   color: #963e4c;
 }
 
-.Ymacs-Theme-base16-apathy .heading1 {
-  font-size: 1.703em;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-base16-apathy .heading2 {
-  font-size: 1.414em;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-base16-apathy .heading3 {
-  font-size: 1.18em;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-base16-apathy .heading4 {
-  font-weight: bold;
-}
-
-.Ymacs-Theme-base16-apathy .markdown-blockquote, .Ymacs-Theme-base16-apathy .markdown-blockquote1, .Ymacs-Theme-base16-apathy .markdown-blockquote2, .Ymacs-Theme-base16-apathy .markdown-blockquote3 {
-  color: #2b685e;
+.Ymacs-Theme-base16-apathy .hyperlink {
+  color: #96883e;
 }
 
 .Ymacs-Theme-base16-apathy.Ymacs-line-numbers .Ymacs-frame-content:before {

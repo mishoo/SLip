@@ -477,9 +477,15 @@ Ymacs_Buffer.newCommands({
         }
         self.cmd("goto_char", expr.end);
         self.cmd("sl_repl_prompt");
+        var pak1 = MACHINE().eval_string(null, "%::*PACKAGE*");
         self.ymacs.run_lisp("READ-EVAL-PRINT", code, function(ret){
             if (typeof ret != "string") ret = MACHINE().dump(ret);
             sl_log(ret);
+            var pak2 = MACHINE().eval_string(null, "%::*PACKAGE*");
+            if (pak1 !== pak2) {
+                self.cmd("sl_repl_prompt");
+                sl_log(";; package changed.");
+            }
         });
     }),
     sl_repl_history_back: Ymacs_Interactive(function(){

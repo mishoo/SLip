@@ -84,6 +84,34 @@
   font-weight: bold;
 }
 
+.Ymacs-Theme-whiteboard .heading1 {
+  color: #0000cd;
+}
+
+.Ymacs-Theme-whiteboard .heading2 {
+  color: #1e90ff;
+}
+
+.Ymacs-Theme-whiteboard .heading3 {
+  color: #4682b4;
+}
+
+.Ymacs-Theme-whiteboard .heading4 {
+  color: #4169e1;
+}
+
+.Ymacs-Theme-whiteboard .markdown-blockquote, .Ymacs-Theme-whiteboard .markdown-blockquote1, .Ymacs-Theme-whiteboard .markdown-blockquote2, .Ymacs-Theme-whiteboard .markdown-blockquote3 {
+  color: peru;
+}
+
+.Ymacs-Theme-whiteboard .markdown-pre, .Ymacs-Theme-whiteboard .markdown-code, .Ymacs-Theme-whiteboard .markdown-code-starter, .Ymacs-Theme-whiteboard .markdown-code-stopper {
+  color: #b3b3b3;
+}
+
+.Ymacs-Theme-whiteboard .markdown-ref {
+  color: #0ff;
+}
+
 .Ymacs-Theme-whiteboard .directive {
   color: #cdad00;
 }
@@ -156,27 +184,8 @@
   color: #cd6600;
 }
 
-.Ymacs-Theme-whiteboard .heading1 {
-  font-size: 1.703em;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-whiteboard .heading2 {
-  font-size: 1.414em;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-whiteboard .heading3 {
-  font-size: 1.18em;
-  font-weight: bold;
-}
-
-.Ymacs-Theme-whiteboard .heading4 {
-  font-weight: bold;
-}
-
-.Ymacs-Theme-whiteboard .markdown-blockquote, .Ymacs-Theme-whiteboard .markdown-blockquote1, .Ymacs-Theme-whiteboard .markdown-blockquote2, .Ymacs-Theme-whiteboard .markdown-blockquote3 {
-  color: #7f7f7f;
+.Ymacs-Theme-whiteboard .hyperlink {
+  color: #0ff;
 }
 
 .Ymacs-Theme-whiteboard.Ymacs-line-numbers .Ymacs-frame-content:before {

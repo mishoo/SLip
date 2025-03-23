@@ -94,7 +94,7 @@
     (when *canvas*
       (clear)
       (save-excursion
-       (set-color "#aba")
+       (set-color "#abba")
        (left (* iii 20))
        (rect-spiral 700))
       (left (* 10 (cos iii)))
