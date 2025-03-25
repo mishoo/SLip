@@ -2053,7 +2053,7 @@
         // we push two instructions to do it.  we need to copy the
         // code in order to not include these two instructions in the
         // return value.
-        code.push.apply(code, LispMachine.assemble([
+        code.push(...LispMachine.assemble([
             [ "CONST", [...code] ],
             [ "RET" ]
         ]));

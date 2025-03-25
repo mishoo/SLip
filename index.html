@@ -7,8 +7,12 @@
     <script src="js/os.js"></script>
     <script src="js/types.js"></script>
     <script src="js/list.js"></script>
-    <script src="js/machine.js"></script>
-    <script src="js/primitives.js"></script>
+    <!-- <script src="js/machine.js"></script> -->
+    <script type="module">
+     import { LispMachine } from "./js/machine2.js";
+     window.LispMachine = LispMachine;
+    </script>
+    <script type="module" src="js/primitives.js"></script>
     <script src="ide/boot-ide.js" type="module"></script>
   </body>
 </html>

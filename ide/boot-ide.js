@@ -15,7 +15,7 @@ import { make_desktop } from "./ide.js";
         "ide/ide.lisp",
     ];
 
-    LispMachine.extend({
+    Object.assign(LispMachine.prototype, {
         read: function(pak, str) {
             var f = LispSymbol.get("EXEC-READ", LispPackage.get("YMACS")).func();
             return this.atomic_call(f, [ pak, str ]);

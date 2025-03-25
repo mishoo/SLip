@@ -102,7 +102,7 @@ In addition to the above, the following key bindings are available in the REPL:
 - to search history, type what you want to search at the prompt, and then
   `M-p` or `M-n`.
 
-- `M-C-Delete` -- kill input, return to prompt.
+- `M-C-Delete` -- delete input, return to prompt.
 
 - `Tab` -- complete current symbol.
 
