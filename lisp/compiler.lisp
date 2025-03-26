@@ -582,10 +582,12 @@
                         (t (comp-var x env val? more?))))
          ((atom x) (comp-const x val? more?))
          (t (case (car x)
-              (quote (arg-count x 1 1)
+              (quote
+               (arg-count x 1 1)
                (comp-const (cadr x) val? more?))
               (progn (comp-seq (cdr x) env val? more?))
-              (setq (arg-count x 2 2)
+              (setq
+               (arg-count x 2 2)
                (assert (symbolp (cadr x)) "Only symbols can be SETQ")
                (%seq (comp (caddr x) env t t)
                      (gen-set (cadr x) env)
@@ -593,13 +595,15 @@
                      (unless more? (gen "RET"))))
               (if (arg-count x 2 3)
                   (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
-              (not (arg-count x 1 1)
+              (not
+               (arg-count x 1 1)
                (if val?
                    (%seq (comp (cadr x) env t t)
                          (gen "NOT")
                          (if more? nil (gen "RET")))
                    (comp (cadr x) env val? more?)))
-              (c/c (arg-count x 0 0)
+              (c/c
+               (arg-count x 0 0)
                (if val? (gen "CC")))
               (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
@@ -609,7 +613,8 @@
               (lambda (if val?
                           (%seq (comp-lambda nil (cadr x) (cddr x) env)
                                 (if more? nil (gen "RET")))))
-              (function (arg-count x 1 1)
+              (function
+               (arg-count x 1 1)
                (let ((sym (cadr x)))
                  (assert (symbolp sym) "FUNCTION requires a symbol")
                  (let ((local (find-func sym env)))
@@ -625,7 +630,8 @@
                      (%seq (if val? (comp-lambda (cadr x) (caddr x) (cdddr x) env))
                            (if more? nil (gen "RET")))))
               (tagbody (comp-tagbody (cdr x) env val? more?))
-              (go (arg-count x 1 1)
+              (go
+               (arg-count x 1 1)
                (comp-go (cadr x) env))
               (block (comp-block (cadr x) (cddr x) env val? more?))
               (return-from (arg-count x 1 2) (comp-return (cadr x) (caddr x) env))

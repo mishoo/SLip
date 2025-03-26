@@ -1,4 +1,4 @@
-# SLip - A Lisp system in JavaScript
+# SLip - A Lisp system in the browser
 
     © Mihai Bazon 2012-2025
     https://lisperator.net/slip/
