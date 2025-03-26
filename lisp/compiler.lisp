@@ -727,8 +727,10 @@
          (let* ((tbody (find-tagbody (caddr pos) env))
                 (i (car tbody))
                 (j (cadr tbody)))
-           (%seq (gen "LVAR" i j)
-                 (gen "LJUMP" (cadddr pos))))))
+           (if (zerop i)
+               (%seq (gen "JUMP" (cadddr pos)))
+               (%seq (gen "LVAR" i j)
+                     (gen "LJUMP" (cadddr pos)))))))
 
      (comp-if (pred then else env val? more?)
        (cond
