@@ -302,7 +302,7 @@ var optimize = (function(){
                 code[i] = code[idx + 1];
                 return true;
             }
-          case "CALLJ":
+          case "CALL":
           case "RET":
             for (var j = i; ++j < code.length;) {
                 if (code[j] instanceof LispSymbol) {
@@ -528,7 +528,7 @@ function disassemble(code) {
             let opcode = OP_REV[op];
             switch (op) {
               case OP.FN:
-                opcode = "λ:" + code[i + 1];
+                opcode = "FN " + code[i + 1];
                 data = "\n" + disassemble(code[i], level + 1);
                 break;
               case OP.PRIM:
@@ -543,7 +543,7 @@ function disassemble(code) {
                     break;
                 }
                 data = code.slice(i, i + OP_LEN[op]).map(el =>
-                    pad_string(serialize_const(el), 8)).join("");
+                    pad_string(dump(el), 8)).join("");
             }
             var line = pad_string(l, INDENT_LEVEL)
                 + indent(level)

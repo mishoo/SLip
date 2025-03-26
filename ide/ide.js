@@ -6,8 +6,8 @@ import { Ymacs, Ymacs_Keymap, Ymacs_Buffer,
          Ymacs_Interactive, Ymacs_Tokenizer,
          Ymacs_Lang_Lisp,
          Ymacs_Exception } from
-//"../../ymacs/src/index.js";
-"./ymacs/ymacs.mjs";
+"../../ymacs/src/index.js";
+//"./ymacs/ymacs.mjs";
 
 function MACHINE() {
     return window.MACHINE;

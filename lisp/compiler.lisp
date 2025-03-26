@@ -664,8 +664,7 @@
               (body (let ((*comp-blocks* (cons usage *comp-blocks*)))
                       (comp-seq forms (extenv env :lex (list (list name :block label))) val? t))))
          (if (zerop (cdr usage))
-             (%seq (comp-seq forms env val? t) ;; XXX: MUST RECOMPILE because different :lex env!
-                   (if more? nil (gen "RET")))
+             (comp-seq forms env val? more?) ;; XXX: MUST RECOMPILE because different :lex env!
              (%seq (gen "BLOCK")
                    body
                    (gen "UNFR" 1 0)
