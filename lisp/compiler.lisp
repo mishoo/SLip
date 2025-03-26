@@ -667,8 +667,8 @@
              (comp-seq forms env val? more?) ;; XXX: MUST RECOMPILE because different :lex env!
              (%seq (gen "BLOCK")
                    body
-                   (gen "UNFR" 1 0)
                    #( label )
+                   (gen "UNFR" 1 0)
                    (if more? nil (gen "RET"))))))
 
      (comp-return (name value env)
