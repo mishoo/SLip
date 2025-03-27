@@ -1330,6 +1330,9 @@
         }
         dir[path.at(-1)] = content;
         ls_set(store);
+        if (/\.fasl$/.test(path) && window.SLIP_COMMIT) {
+            localStorage.setItem(".slip_commit", window.SLIP_COMMIT);
+        }
     }
 
     function ls_delete(path) {
@@ -1382,8 +1385,23 @@
         window.open(url);
     }
 
+    function ls_purge_fasls() {
+        let cleanup = (store) => {
+            if (store) for (let [ key, val ] of Object.entries(store)) {
+                if (typeof val == "object") {
+                    cleanup(val);
+                } else if (/\.fasl$/i.test(key)) {
+                    delete store[key];
+                }
+            }
+            return store;
+        };
+        ls_set(cleanup(ls_get()));
+    }
+
     LispMachine.ls_get_file_contents = ls_get_file_contents;
     LispMachine.ls_set_file_contents = ls_set_file_contents;
+    LispMachine.ls_purge_fasls = ls_purge_fasls;
 
     defp("%ls-get-file-contents", false, function(m, nargs){
         checknargs(nargs, 1, 1);
@@ -1411,6 +1429,11 @@
     defp("%ls-clear-store", true, function(m, nargs){
         checknargs(nargs, 0, 0);
         ls_clear();
+    });
+
+    defp("%ls-purge-fasls", true, function(m, nargs){
+        checknargs(nargs, 0, 0);
+        ls_purge_fasls();
     });
 
     defp("%ls-dump-store", true, function(m, nargs){

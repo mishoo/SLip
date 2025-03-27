@@ -146,6 +146,8 @@ exactly Common Lisp, but that's what I'm dreaming.
   a JSON dump of your localStorage files saved from this page. Feel free to
   send it over (censor it first, if necessary).
 
+- `(%:%ls-purge-fasls)` -- discard object files (.fasl) from your local storage.
+
 - `(%:%ls-clear-store)` -- purge all SLip files saved into your localStorage.
   This will not affect your REPL history, as it's saved on another key (check
   local storage in your browser's developer console).

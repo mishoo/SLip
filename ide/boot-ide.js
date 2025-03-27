@@ -30,9 +30,17 @@ import { make_desktop } from "./ide.js";
         },
     });
 
+    function outdated(url) {
+        if (/\.fasl$/.test(url)) {
+            if (window.SLIP_COMMIT && window.SLIP_COMMIT != localStorage.getItem(".slip_commit")) {
+                return true;
+            }
+        }
+    }
+
     function load(url, callback) {
         var xhr = new XMLHttpRequest();
-        if (!/^https?:\/\//i.test(url)) {
+        if (!/^https?:\/\//i.test(url) && !outdated(url)) {
             // local storage takes priority
             let content = LispMachine.ls_get_file_contents(url);
             if (content != null) {

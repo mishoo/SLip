@@ -6,8 +6,8 @@ import { Ymacs, Ymacs_Keymap, Ymacs_Buffer,
          Ymacs_Interactive, Ymacs_Tokenizer,
          Ymacs_Lang_Lisp,
          Ymacs_Exception } from
-"../../ymacs/src/index.js";
-//"./ymacs/ymacs.mjs";
+//"../../ymacs/src/index.js";
+"./ymacs/ymacs.mjs";
 
 function MACHINE() {
     return window.MACHINE;
@@ -741,6 +741,21 @@ Ymacs_Buffer.newMode("sl_repl_mode", function(){
 
 var THE_EDITOR;
 
+function list_local_fasls() {
+    let store = THE_EDITOR.ls_get();
+    let fasls = [];
+    (function dive(prefix, store){
+        if (store) for (let [ key, val ] of Object.entries(store)) {
+            if (typeof val == "object") {
+                dive(prefix + key + "/", val);
+            } else if (/\.fasl$/.test(key)) {
+                fasls.push(prefix + key);
+            }
+        }
+    })("", store);
+    return fasls;
+}
+
 function get_repl_buffer() {
     var ed = THE_EDITOR;
     var repl = ed.getBuffer("*sl-repl*");
@@ -748,8 +763,25 @@ function get_repl_buffer() {
         var frame = ed.getActiveFrame(), buf = ed.getActiveBuffer();
         repl = ed.createBuffer({ name: "*sl-repl*" });
         repl.dirty = () => false;
-        repl.setCode(";; Hacks and glory await!\n");
+        repl.setCode(`\
+;; SLip build ${window.SLIP_COMMIT ?? '(unavailable)'} ${window.SLIP_DATE ?? ''}
+;; Hacks and glory await!
+\n`);
         repl.cmd("end_of_buffer");
+
+        let fasls = list_local_fasls();
+        if (fasls.length > 0 && window.SLIP_COMMIT && window.SLIP_COMMIT != localStorage.getItem(".slip_commit")) {
+            repl.cmd("insert", `\
+;; There are FASL files in your local storage, but the server
+;; build tag changed since the last time you saved them.
+;;
+${fasls.map(f => `;;     - ${f}\n`).join("")}\
+;;
+;; They have been ignored at load time.
+;; I recommend you to run (%:%ls-purge-fasls) to discard them.
+\n`);
+        }
+
         repl.cmd("sl_repl_mode");
         buf.cmd("switch_to_buffer", "*sl-repl*");
         repl.cmd("sl_repl_prompt");
