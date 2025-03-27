@@ -684,9 +684,12 @@
               (label (caddr block)))
          (let ((usage (%assq name *comp-blocks*)))
            (rplacd usage (1+ (cdr usage))))
-         (%seq (comp value env t t)
-               (gen "LVAR" (car block) (cadr block))
-               (gen "LRET" label))))
+         (if (zerop (car block))
+             (%seq (comp value env t t)
+                   (gen "JUMP" label))
+             (%seq (comp value env t t)
+                   (gen "LVAR" (car block) (cadr block))
+                   (gen "LRET" label)))))
 
      (comp-tagbody (forms env val? more?)
        ;; a TAGBODY introduces a single return point in the lexical

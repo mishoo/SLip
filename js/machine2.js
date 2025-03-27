@@ -304,6 +304,7 @@ var optimize = (function(){
             }
           case "CALL":
           case "RET":
+          case "LRET":
             for (var j = i; ++j < code.length;) {
                 if (code[j] instanceof LispSymbol) {
                     break;
