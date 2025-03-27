@@ -345,7 +345,7 @@ Ymacs_Buffer.newCommands({
                 );
             } catch(ex) {};
             if (debug) debug = [...debug].filter(function(stuff){
-                switch (stuff[0]) {
+                switch (stuff[0].name ?? stuff[0]) {
                   case "DEFMACRO":
                   case "DEFUN":
                   case "DEFPARAMETER":

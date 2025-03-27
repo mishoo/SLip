@@ -135,7 +135,7 @@
          (%fn defmacro (name args . body)
               (if (%primitivep name)
                   (error (strcat "Cannot DEFMACRO on primitive " name)))
-              (maybe-xref-info name "DEFMACRO")
+              (maybe-xref-info name 'defmacro)
               (list '%macro!
                     (list 'quote name)
                     (list* '%fn name args body))))
@@ -158,7 +158,7 @@
   `((progn ,f) ,@args))
 
 (defmacro defun (name args . body)
-  (maybe-xref-info name "DEFUN")
+  (maybe-xref-info name 'defun)
   `(set-symbol-function! ',name (%fn ,name ,args ,@body)))
 
 (defun error (msg)

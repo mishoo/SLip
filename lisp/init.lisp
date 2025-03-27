@@ -159,7 +159,7 @@
   (%fn-destruct args values body))
 
 (defmacro defmacro (name lambda-list . body)
-  (%::maybe-xref-info name "DEFMACRO")
+  (%::maybe-xref-info name 'defmacro)
   (if (%primitivep name)
       (error (strcat "We shall not DEFMACRO on " name " (primitive function)")))
   (let ((args (gensym "ARGS")))
@@ -221,13 +221,13 @@
 
 (def-emac defparameter (name val)
   (%special! name)
-  (%::maybe-xref-info name "DEFPARAMETER")
+  (%::maybe-xref-info name 'defparameter)
   `(progn (%special! ',name)
           (setq ,name ,val)))
 
 (def-emac defglobal (name val)
   (%global! name)
-  (%::maybe-xref-info name "DEFGLOBAL")
+  (%::maybe-xref-info name 'defglobal)
   `(progn (%global! ',name)
           (setq ,name ,val)))
 
@@ -276,7 +276,7 @@
 
 (defsetf symbol-function (sym) (func)
   `(progn
-     (%::maybe-xref-info ,sym "DEFUN")
+     (%::maybe-xref-info ,sym 'defun)
      (set-symbol-function! ,sym ,func)))
 
 (defsetf getf (place indicator) (value)
