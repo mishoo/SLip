@@ -113,16 +113,16 @@
     /* -----[ conditionals ]----- */
 
     function eq(a, b) {
-        return (a === S_NIL && b === null) ||
-            (a === null && b === S_NIL) ||
-            (a === S_T && b === true) ||
-            (a === true && b === S_T) ||
-            a === b ? true : null;
+        return (a === S_NIL && b == null)
+            || (a == null && b === S_NIL)
+            || (a === S_T && b === true)
+            || (a === true && b === S_T)
+            || a === b ? true : null;
     };
 
     function equal(a, b) {
         if (LispList.is(a) && LispList.is(b)) {
-            while (a !== null && b !== null) {
+            while (a != null && b != null) {
                 if (!equal(a.car, b.car)) return null;
                 a = a.cdr;
                 b = b.cdr;

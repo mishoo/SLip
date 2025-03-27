@@ -755,8 +755,7 @@
                 (ecode (comp else env val? more?)))
             (cond
               ((equal tcode ecode)
-               (%seq (comp pcode env nil t)
-                     ecode))
+               (%seq pcode ecode))
               ((zerop (length tcode))
                (let ((l2 (mklabel)))
                  (%seq pcode (gen "TJUMP" l2) ecode
