@@ -653,22 +653,22 @@ function set_repl_input(buf, text) {
 function eval_lisp(buf, expr, pack) {
     if (!pack) pack = null;
     var start = new Date().getTime();
+    get_repl_buffer().deleteOverlay("match-paren");
     buf.ymacs.run_lisp("EVAL-STRING", pack, expr, function(val){
         var end = new Date().getTime();
         if (typeof val != "string") val = MACHINE().dump(val);
         sl_log(val + "\n;; <== in " + ((end - start) / 1000).toFixed(3) + "s");
-        get_repl_buffer().cmd("sl_repl_prompt");
     });
 };
 
 function compile_lisp(buf, code) {
     var start = new Date().getTime();
+    get_repl_buffer().deleteOverlay("match-paren");
     buf.ymacs.run_lisp("COMPILE-STRING", code, buf.name, function(val){
         var end = new Date().getTime();
         // sl_log(val);
         window.last_fasl = val;
         sl_log(`;; ${buf.name} compiled in ` + ((end - start) / 1000).toFixed(3) + "s");
-        get_repl_buffer().cmd("sl_repl_prompt");
     });
 };
 

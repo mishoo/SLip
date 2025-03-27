@@ -911,6 +911,10 @@ export class LispMachine {
         return err;
     }
 
+    dump(expr) {
+        return dump(expr);
+    }
+
 }
 
 function frame(env, i) {
