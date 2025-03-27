@@ -733,8 +733,8 @@
                 (i (car tbody))
                 (j (cadr tbody)))
            (if (zerop i)
-               (%seq (gen "JUMP" (cadddr pos)))
-               (%seq (gen "LJUMP2" (cadddr pos) i))))))
+               (gen "JUMP" (cadddr pos))
+               (gen "LJUMP2" (cadddr pos) i)))))
 
      (comp-if (pred then else env val? more?)
        (cond
@@ -755,20 +755,24 @@
                 (ecode (comp else env val? more?)))
             (cond
               ((equal tcode ecode)
-               (%seq (comp pcode env nil t) ecode))
-              ((zerop (length tcode)) (let ((l2 (mklabel)))
-                                        (%seq pcode (gen "TJUMP" l2) ecode
-                                              #( l2 )
-                                              (if more? nil (gen "RET")))))
-              ((zerop (length ecode)) (let ((l1 (mklabel)))
-                                        (%seq pcode (gen "FJUMP" l1) tcode
-                                              #( l1 )
-                                              (if more? nil (gen "RET")))))
-              (t (let ((l1 (mklabel))
-                       (l2 (if more? (mklabel))))
-                   (%seq pcode (gen "FJUMP" l1) tcode
-                         (if more? (gen "JUMP" l2))
-                         #( l1 ) ecode (if more? #( l2 ))))))))))
+               (%seq (comp pcode env nil t)
+                     ecode))
+              ((zerop (length tcode))
+               (let ((l2 (mklabel)))
+                 (%seq pcode (gen "TJUMP" l2) ecode
+                       #( l2 )
+                       (if more? nil (gen "RET")))))
+              ((zerop (length ecode))
+               (let ((l1 (mklabel)))
+                 (%seq pcode (gen "FJUMP" l1) tcode
+                       #( l1 )
+                       (if more? nil (gen "RET")))))
+              (t
+               (let ((l1 (mklabel))
+                     (l2 (if more? (mklabel))))
+                 (%seq pcode (gen "FJUMP" l1) tcode
+                       (if more? (gen "JUMP" l2))
+                       #( l1 ) ecode (if more? #( l2 ))))))))))
 
      (comp-funcall (f args env val? more?)
        (labels ((mkret (the-function)
@@ -825,7 +829,9 @@
      (comp-lambda (name args body env)
        (gen "FN"
             (%seq (when args (gen-simple-args args 0))
-                  (let (dyn (i 0) (args (make-true-list args)))
+                  (let ((dyn '())
+                        (i 0)
+                        (args (make-true-list args)))
                     (foreach args (lambda (x)
                                     (when (%specialp x)
                                       (push #("BIND" x i) dyn))
@@ -926,7 +932,7 @@
                     (vals (cadr bindings))
                     (specials (cadddr bindings))
                     (i 0)
-                    newargs)
+                    (newargs '()))
                (mapcar (lambda (name x)
                          (<< (comp x env t t)
                              (unless newargs (gen "FRAME"))

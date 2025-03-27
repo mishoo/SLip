@@ -8,3 +8,8 @@
                  (format t "Unreachable~%"))))
         (bar 5))
     (format t "~A~%" (list foo bar))))
+
+(defun test-block2 ()
+  (lambda (x)
+    (when x
+      (return-from test-block2 'stuff))))

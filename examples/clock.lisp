@@ -89,16 +89,19 @@
 
 (defparameter iii 0)
 
+(defun draw-clock-frame ()
+  (clear)
+  (save-excursion
+   (set-color "#abba")
+   (left (* iii 20))
+   (rect-spiral 700))
+  (left (* 10 (cos iii)))
+  (clock (+ 160 (* 30 (sin (incf iii 0.05))))))
+
 (defun animate-clock ()
   (without-interrupts
     (when *canvas*
-      (clear)
-      (save-excursion
-       (set-color "#abba")
-       (left (* iii 20))
-       (rect-spiral 700))
-      (left (* 10 (cos iii)))
-      (clock (+ 160 (* 30 (sin (incf iii 0.05)))))
+      (draw-clock-frame)
       (set-timeout 16 #'animate-clock))))
 
 (with-canvas
