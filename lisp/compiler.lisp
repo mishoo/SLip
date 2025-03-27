@@ -19,7 +19,8 @@
            '*current-file*
            '*current-pos*
            '*url-prefix*
-           '*defining-functions*
+           '*unknown-functions*
+           '*unknown-variables*
            '*xref-info*
            '*comp-blocks*)
 
@@ -481,9 +482,6 @@
 (defmacro return (val)
   `(return-from nil ,val))
 
-(defun defun-en-course (name)
-  (member name *defining-functions*))
-
 (labels
     ((assert (p msg)
        (if p p (error msg)))
@@ -553,7 +551,7 @@
            (aif (find-var name env)
                 (gen "LVAR" (car it) (cadr it))
                 (progn
-                  (warn (strcat "Undefined variable " name))
+                  (unknown-variable name)
                   (gen "GVAR" name)))))
 
      (gen-set (name env)
@@ -562,7 +560,7 @@
            (aif (find-var name env)
                 (gen "LSET" (car it) (cadr it))
                 (progn
-                  (warn (strcat "Undefined variable " name))
+                  (unknown-variable name)
                   (gen "GSET" name)))))
 
      (mklabel ()
@@ -572,6 +570,14 @@
        (aif (find-macrolet sym env)
             (caddr it)
             (%macro sym)))
+
+     (unknown-function (sym)
+       (unless (member sym *unknown-functions*)
+         (push sym *unknown-functions*)))
+
+     (unknown-variable (sym)
+       (unless (member sym *unknown-variables*)
+         (push sym *unknown-variables*)))
 
      (comp (x env val? more?)
        (cond
@@ -621,14 +627,12 @@
                    (%seq (when val? (if local
                                         (gen "LVAR" (car local) (cadr local))
                                         (progn
-                                          (unless (or (symbol-function sym)
-                                                      (defun-en-course sym))
-                                            (warn (strcat "Undefined function " sym)))
+                                          (unless (symbol-function sym)
+                                            (unknown-function sym))
                                           (gen "FGVAR" sym))))
                          (if more? nil (gen "RET"))))))
-              (%fn (let ((*defining-functions* (cons (cadr x) *defining-functions*)))
-                     (%seq (if val? (comp-lambda (cadr x) (caddr x) (cdddr x) env))
-                           (if more? nil (gen "RET")))))
+              (%fn (%seq (if val? (comp-lambda (cadr x) (caddr x) (cdddr x) env))
+                         (if more? nil (gen "RET"))))
               (tagbody (comp-tagbody (cdr x) env val? more?))
               (go
                (arg-count x 1 1)
@@ -801,9 +805,8 @@
                            (if val? nil (gen "POP"))
                            (if more? nil (gen "RET")))))
                 (t
-                 (unless (or (symbol-function f)
-                             (defun-en-course f))
-                   (warn (strcat "Undefined function " f)))
+                 (unless (symbol-function f)
+                   (unknown-function f))
                  (mkret (gen "FGVAR" f))))))
            ((and (consp f)
                  (eq (car f) 'lambda)
@@ -1024,21 +1027,43 @@
   (let ((reader (lisp-reader str 'EOF)))
     #( (cdr (funcall reader 'next)) (funcall reader 'pos) )))
 
+(defun %with-undefined-warnings (thunk)
+  (let ((*unknown-functions* nil)
+        (*unknown-variables* nil)
+        (result nil))
+    (setq result (funcall thunk))
+    (foreach *unknown-functions*
+             (lambda (sym)
+               (unless (symbol-function sym)
+                 (warn (strcat "Unknown function: " sym)))))
+    (foreach *unknown-variables*
+             (lambda (sym)
+               (unless (or (%globalp sym)
+                           (%specialp sym))
+                 (warn (strcat "Undefined variable: " sym)))))
+    result))
+
+(defmacro with-undefined-warnings body
+  `(%with-undefined-warnings (lambda () ,@body)))
+
 (defun eval (expr)
-  ((compile (list 'lambda nil expr))))
+  (with-undefined-warnings
+    ((compile (list 'lambda nil expr)))))
 
 (defun eval-string (str)
-  (let ((reader (lisp-reader str 'EOF)))
-    (labels ((rec (last expr)
-               (if (eq expr 'EOF) last
-                   (rec ((compile (list 'lambda nil expr)))
-                        (cdr (funcall reader 'next))))))
-      (rec nil (cdr (funcall reader 'next))))))
+  (with-undefined-warnings
+    (let ((reader (lisp-reader str 'EOF)))
+      (labels ((rec (last expr)
+                 (if (eq expr 'EOF) last
+                     (rec ((compile (list 'lambda nil expr)))
+                          (cdr (funcall reader 'next))))))
+        (rec nil (cdr (funcall reader 'next)))))))
 
 (defun %load (url)
   (let ((code (%get-file-contents (make-url url))))
     (unless code (error (strcat "Unable to load file: " url)))
-    (compile-string code url)))
+    (with-undefined-warnings
+      (compile-string code url))))
 
 (defun make-url (url)
   (if *url-prefix*
