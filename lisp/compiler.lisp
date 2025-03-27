@@ -21,10 +21,7 @@
            '*url-prefix*
            '*unknown-functions*
            '*unknown-variables*
-           '*xref-info*
-           '*comp-blocks*)
-
-(%global! '*comp-blocks*)
+           '*xref-info*)
 
 ;; (defmacro cond cases
 ;;   (if cases
@@ -669,25 +666,21 @@
 
      (comp-block (name forms env val? more?)
        (assert (symbolp name) (strcat "BLOCK expects a symbol, got " name))
-       (let* ((label (gensym "block"))
-              (usage (cons name 0))
-              (body (let ((*comp-blocks* (cons usage *comp-blocks*)))
-                      (comp-seq forms (extenv env :lex (list (list name :block label))) val? t))))
-         (if (zerop (cdr usage))
-             (comp-seq forms env val? more?) ;; XXX: MUST RECOMPILE because different :lex env!
-             (%seq (gen "BLOCK2" label)
-                   body
-                   #( label )
-                   (gen "UNFR" 1 0)
-                   (if more? nil (gen "RET"))))))
+       (let ((body (catch name
+                     (comp-seq forms env val? more?))))
+         (or body
+             (let ((label (gensym "block")))
+               (%seq (gen "BLOCK2" label)
+                     (comp-seq forms (extenv env :lex (list (list name :block label))) val? t)
+                     #( label )
+                     (gen "UNFR" 1 0)
+                     (if more? nil (gen "RET")))))))
 
      (comp-return (name value env)
        (assert (symbolp name) "RETURN-FROM expects a symbol")
-       (let* ((block (assert (find-block name env)
-                             (strcat "BLOCK " name " not found")))
+       (let* ((block (or (find-block name env)
+                         (throw name)))
               (label (caddr block)))
-         (let ((usage (%assq name *comp-blocks*)))
-           (rplacd usage (1+ (cdr usage))))
          (if (zerop (car block))
              (%seq (comp value env t t)
                    (gen "JUMP" label))
