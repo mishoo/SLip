@@ -671,7 +671,7 @@
                       (comp-seq forms (extenv env :lex (list (list name :block label))) val? t))))
          (if (zerop (cdr usage))
              (comp-seq forms env val? more?) ;; XXX: MUST RECOMPILE because different :lex env!
-             (%seq (gen "BLOCK")
+             (%seq (gen "BLOCK2" label)
                    body
                    #( label )
                    (gen "UNFR" 1 0)
@@ -688,8 +688,7 @@
              (%seq (comp value env t t)
                    (gen "JUMP" label))
              (%seq (comp value env t t)
-                   (gen "LVAR" (car block) (cadr block))
-                   (gen "LRET" label)))))
+                   (gen "LRET2" (car block))))))
 
      (comp-tagbody (forms env val? more?)
        ;; a TAGBODY introduces a single return point in the lexical
@@ -738,8 +737,7 @@
                 (j (cadr tbody)))
            (if (zerop i)
                (%seq (gen "JUMP" (cadddr pos)))
-               (%seq (gen "LVAR" i j)
-                     (gen "LJUMP" (cadddr pos)))))))
+               (%seq (gen "LJUMP2" (cadddr pos) i))))))
 
      (comp-if (pred then else env val? more?)
        (cond

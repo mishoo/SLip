@@ -75,17 +75,86 @@ const OP = Object.freeze({
     CDDADR: 68,
     CDDDAR: 69,
     CDDDDR: 70,
+    BLOCK2: 71,
+    LRET2: 72,
+    LJUMP2: 73,
 });
 
 const OP_LEN = Object.freeze([
-    0,
-    2, 2, 1, 1, 2, 1, 1, 0, 1, 1,
-    1, 1, 0, 1, 1, 0, 0, 1, 0, 1,
-    1, 0, 0, 1, 0, 1, 1, 1, 0, 0,
-    1, 2, 2, 2, 0, 0, 0, 1, 1, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0 /* NOP */,
+    2 /* LVAR */,
+    2 /* LSET */,
+    1 /* GVAR */,
+    1 /* GSET */,
+    2 /* BIND */,
+    1 /* FGVAR */,
+    1 /* FGSET */,
+    0 /* POP */,
+    1 /* CONST */,
+    1 /* JUMP */,
+    1 /* TJUMP */,
+    1 /* FJUMP */,
+    0 /* BLOCK */,
+    1 /* LJUMP */,
+    1 /* LRET */,
+    0 /* NOT */,
+    0 /* SETCC */,
+    1 /* SAVE */,
+    0 /* RET */,
+    1 /* CALL */,
+    1 /* UPOPEN */,
+    0 /* UPEXIT */,
+    0 /* UPCLOSE */,
+    1 /* CATCH */,
+    0 /* THROW */,
+    1 /* LET */,
+    1 /* ARGS */,
+    1 /* ARG_ */,
+    0 /* FRAME */,
+    0 /* VAR */,
+    1 /* VARS */,
+    2 /* UNFR */,
+    2 /* FN */,
+    2 /* PRIM */,
+    0 /* NIL */,
+    0 /* T */,
+    0 /* CONS */,
+    1 /* LIST */,
+    1 /* LIST_ */,
+    0 /* CC */,
+    0 /* CAR */,
+    0 /* CDR */,
+    0 /* CAAR */,
+    0 /* CADR */,
+    0 /* CDAR */,
+    0 /* CDDR */,
+    0 /* CAAAR */,
+    0 /* CAADR */,
+    0 /* CADAR */,
+    0 /* CADDR */,
+    0 /* CDAAR */,
+    0 /* CDADR */,
+    0 /* CDDAR */,
+    0 /* CDDDR */,
+    0 /* CAAAAR */,
+    0 /* CAAADR */,
+    0 /* CAADAR */,
+    0 /* CAADDR */,
+    0 /* CADAAR */,
+    0 /* CADADR */,
+    0 /* CADDAR */,
+    0 /* CADDDR */,
+    0 /* CDAAAR */,
+    0 /* CDAADR */,
+    0 /* CDADAR */,
+    0 /* CDADDR */,
+    0 /* CDDAAR */,
+    0 /* CDDADR */,
+    0 /* CDDDAR */,
+    0 /* CDDDDR */,
+    1 /* BLOCK2 */,
+    1 /* LRET2 */,
+    2 /* LJUMP2 */,
 ]);
 
 // normal RET context
@@ -123,16 +192,17 @@ class LispCleanup {
 // return context for TAGBODY and BLOCK
 class LispLongRet {
     static #NO_RET = {};
-    constructor(m) {
+    constructor(m, exit) {
         this.f = m.f;
         this.code = m.code;
         this.env = m.env;
         this.denv = m.denv;
         this.slen = m.stack.length;
         this.n_args = m.n_args;
+        this.exit = exit;
         //if (m.trace) this.trace = m.trace.slice();
     }
-    unwind(m, addr) {
+    unwind(m, addr = this.exit) {
         m.f = this.f;
         m.code = this.code;
         m.env = this.env;
@@ -142,7 +212,7 @@ class LispLongRet {
         m.n_args = this.n_args;
         //if (this.trace) m.trace = this.trace;
     }
-    run(m, addr, val = LispLongRet.#NO_RET) {
+    run(m, addr = this.exit, val = LispLongRet.#NO_RET) {
         // figure out if we need to execute cleanup hooks
         let doit;
         (doit = () => {
@@ -305,6 +375,7 @@ var optimize = (function(){
           case "CALL":
           case "RET":
           case "LRET":
+          case "LRET2":
             for (var j = i; ++j < code.length;) {
                 if (code[j] instanceof LispSymbol) {
                     break;
@@ -428,6 +499,8 @@ function is_jump_instruction(op) {
       case OP.UPOPEN:
       case OP.SAVE:
       case OP.CATCH:
+      case OP.BLOCK2:
+      case OP.LJUMP2:
         return true;
     }
 }
@@ -1283,5 +1356,29 @@ function vmrun(m) {
       case OP.CDDDDR:
         m.push(LispCons.cddddr(m.pop_list(error)));
         return;
+
+      case OP.BLOCK2: {
+          let exit = m.code[m.pc++];
+          let frame = [];
+          m.env = new LispCons(frame, m.env);
+          frame[0] = new LispLongRet(m, exit);
+          return;
+      }
+
+      case OP.LJUMP2: {
+          let addr = m.code[m.pc++];
+          let fr = m.code[m.pc++];
+          frame(m.env, fr)[0].run(m, addr);
+          return;
+      }
+
+      case OP.LRET2: {
+          let fr = m.code[m.pc++];
+          let val = m.pop();
+          frame(m.env, fr)[0].run(m);
+          m.push(val);
+          return;
+      }
+
     }
 }
