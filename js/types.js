@@ -1,4 +1,4 @@
-import { LispMachine } from "./machine2.js";
+import { LispMachine } from "./machine.js";
 
 export class LispType {
     static is(x) { return x instanceof LispType }

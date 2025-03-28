@@ -1,117 +1,707 @@
-var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
-    var BASE_PACK = LispPackage.get("%");
+import { LispCons } from "./list.js";
+import { LispType, LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
+import { repeat_string, pad_string } from "./utils.js";
 
-    // normal RET context
-    class LispRet {
-        constructor(m, pc) {
-            this.f = m.f;
-            this.code = m.code;
-            this.pc = pc;
-            this.env = m.env;
-            this.denv = m.denv;
-            this.n_args = m.n_args;
-            //if (m.trace) this.trace = m.trace.slice();
-        }
-        run(m) {
-            m.f = this.f;
-            m.code = this.code;
-            m.pc = this.pc;
-            m.env = this.env;
-            m.denv = this.denv;
-            m.n_args = this.n_args;
-            //if (this.trace) m.trace = this.trace;
-        }
+let BASE_PACK = LispPackage.get("%");
+let S_QUOTE = LispSymbol.get("QUOTE");
+let S_NIL = LispSymbol.get("NIL");
+let S_T = LispSymbol.get("T");
+
+const OP = Object.freeze({
+    NOP: 0,
+    LVAR: 1,
+    LSET: 2,
+    GVAR: 3,
+    GSET: 4,
+    BIND: 5,
+    FGVAR: 6,
+    FGSET: 7,
+    POP: 8,
+    CONST: 9,
+    JUMP: 10,
+    TJUMP: 11,
+    FJUMP: 12,
+    BLOCK: 13,
+    LJUMP: 14,
+    LRET: 15,
+    NOT: 16,
+    SETCC: 17,
+    SAVE: 18,
+    RET: 19,
+    CALL: 20,
+    UPOPEN: 21,
+    UPEXIT: 22,
+    UPCLOSE: 23,
+    CATCH: 24,
+    THROW: 25,
+    LET: 26,
+    ARGS: 27,
+    ARG_: 28,
+    FRAME: 29,
+    VAR: 30,
+    VARS: 31,
+    UNFR: 32,
+    FN: 33,
+    PRIM: 34,
+    NIL: 35,
+    T: 36,
+    CONS: 37,
+    LIST: 38,
+    LIST_: 39,
+    CC: 40,
+    CAR: 41,
+    CDR: 42,
+    CAAR: 43,
+    CADR: 44,
+    CDAR: 45,
+    CDDR: 46,
+    CAAAR: 47,
+    CAADR: 48,
+    CADAR: 49,
+    CADDR: 50,
+    CDAAR: 51,
+    CDADR: 52,
+    CDDAR: 53,
+    CDDDR: 54,
+    CAAAAR: 55,
+    CAAADR: 56,
+    CAADAR: 57,
+    CAADDR: 58,
+    CADAAR: 59,
+    CADADR: 60,
+    CADDAR: 61,
+    CADDDR: 62,
+    CDAAAR: 63,
+    CDAADR: 64,
+    CDADAR: 65,
+    CDADDR: 66,
+    CDDAAR: 67,
+    CDDADR: 68,
+    CDDDAR: 69,
+    CDDDDR: 70,
+    BLOCK2: 71,
+    LRET2: 72,
+    LJUMP2: 73,
+});
+
+const OP_LEN = Object.freeze([
+    0 /* NOP */,
+    2 /* LVAR */,
+    2 /* LSET */,
+    1 /* GVAR */,
+    1 /* GSET */,
+    2 /* BIND */,
+    1 /* FGVAR */,
+    1 /* FGSET */,
+    0 /* POP */,
+    1 /* CONST */,
+    1 /* JUMP */,
+    1 /* TJUMP */,
+    1 /* FJUMP */,
+    0 /* BLOCK */,
+    1 /* LJUMP */,
+    1 /* LRET */,
+    0 /* NOT */,
+    0 /* SETCC */,
+    1 /* SAVE */,
+    0 /* RET */,
+    1 /* CALL */,
+    1 /* UPOPEN */,
+    0 /* UPEXIT */,
+    0 /* UPCLOSE */,
+    1 /* CATCH */,
+    0 /* THROW */,
+    1 /* LET */,
+    1 /* ARGS */,
+    1 /* ARG_ */,
+    0 /* FRAME */,
+    0 /* VAR */,
+    1 /* VARS */,
+    2 /* UNFR */,
+    2 /* FN */,
+    2 /* PRIM */,
+    0 /* NIL */,
+    0 /* T */,
+    0 /* CONS */,
+    1 /* LIST */,
+    1 /* LIST_ */,
+    0 /* CC */,
+    0 /* CAR */,
+    0 /* CDR */,
+    0 /* CAAR */,
+    0 /* CADR */,
+    0 /* CDAR */,
+    0 /* CDDR */,
+    0 /* CAAAR */,
+    0 /* CAADR */,
+    0 /* CADAR */,
+    0 /* CADDR */,
+    0 /* CDAAR */,
+    0 /* CDADR */,
+    0 /* CDDAR */,
+    0 /* CDDDR */,
+    0 /* CAAAAR */,
+    0 /* CAAADR */,
+    0 /* CAADAR */,
+    0 /* CAADDR */,
+    0 /* CADAAR */,
+    0 /* CADADR */,
+    0 /* CADDAR */,
+    0 /* CADDDR */,
+    0 /* CDAAAR */,
+    0 /* CDAADR */,
+    0 /* CDADAR */,
+    0 /* CDADDR */,
+    0 /* CDDAAR */,
+    0 /* CDDADR */,
+    0 /* CDDDAR */,
+    0 /* CDDDDR */,
+    1 /* BLOCK2 */,
+    1 /* LRET2 */,
+    2 /* LJUMP2 */,
+]);
+
+// normal RET context
+class LispRet {
+    constructor(m, pc) {
+        this.f = m.f;
+        this.code = m.code;
+        this.pc = pc;
+        this.env = m.env;
+        this.denv = m.denv;
+        this.n_args = m.n_args;
+        //if (m.trace) this.trace = m.trace.slice();
     }
-
-    class LispCleanup {
-        constructor(ret, addr) {
-            this.ret = ret;
-            this.addr = addr;
-        }
-        run(m) {
-            this.ret.unwind(m, this.addr);
-        }
+    run(m) {
+        m.f = this.f;
+        m.code = this.code;
+        m.pc = this.pc;
+        m.env = this.env;
+        m.denv = this.denv;
+        m.n_args = this.n_args;
+        //if (this.trace) m.trace = this.trace;
     }
+}
 
-    // return context for TAGBODY and BLOCK
-    class LispLongRet {
-        static #NO_RET = {};
-        constructor(m) {
-            this.f = m.f;
-            this.code = m.code;
-            this.env = m.env;
-            this.denv = m.denv;
-            this.slen = m.stack.length;
-            this.n_args = m.n_args;
-            //if (m.trace) this.trace = m.trace.slice();
-        }
-        unwind(m, addr) {
-            m.f = this.f;
-            m.code = this.code;
-            m.env = this.env;
-            m.denv = this.denv;
-            m.stack.length = this.slen;
-            m.pc = addr;
-            m.n_args = this.n_args;
-            //if (this.trace) m.trace = this.trace;
-        }
-        run(m, addr, val = LispLongRet.#NO_RET) {
-            // figure out if we need to execute cleanup hooks
-            let doit;
-            (doit = () => {
-                var p = m.denv;
-                while (p && p !== this.denv) {
-                    var c = p.car;
-                    if (c instanceof LispCleanup) {
-                        m.after_cleanup = doit;
-                        c.run(m);
-                        return;
-                    }
-                    p = p.cdr;
+class LispCleanup {
+    constructor(ret, addr) {
+        this.ret = ret;
+        this.addr = addr;
+    }
+    run(m) {
+        this.ret.unwind(m, this.addr);
+    }
+}
+
+// return context for TAGBODY and BLOCK
+class LispLongRet {
+    static #NO_RET = {};
+    constructor(m, exit) {
+        this.f = m.f;
+        this.code = m.code;
+        this.env = m.env;
+        this.denv = m.denv;
+        this.slen = m.stack.length;
+        this.n_args = m.n_args;
+        this.exit = exit;
+        //if (m.trace) this.trace = m.trace.slice();
+    }
+    unwind(m, addr = this.exit) {
+        m.f = this.f;
+        m.code = this.code;
+        m.env = this.env;
+        m.denv = this.denv;
+        m.stack.length = this.slen;
+        m.pc = addr;
+        m.n_args = this.n_args;
+        //if (this.trace) m.trace = this.trace;
+    }
+    run(m, addr = this.exit, val = LispLongRet.#NO_RET) {
+        // figure out if we need to execute cleanup hooks
+        let doit;
+        (doit = () => {
+            var p = m.denv;
+            while (p && p !== this.denv) {
+                var c = p.car;
+                if (c instanceof LispCleanup) {
+                    m.after_cleanup = doit;
+                    c.run(m);
+                    return;
                 }
-                this.unwind(m, addr);
-                if (val !== LispLongRet.#NO_RET) m.push(val);
-            })();
+                p = p.cdr;
+            }
+            this.unwind(m, addr);
+            if (val !== LispLongRet.#NO_RET) m.push(val);
+        })();
+    }
+}
+
+// continuations
+class LispCC {
+    constructor(m) {
+        this.stack = [ ...m.stack ];
+        this.denv = m.denv;
+        //if (m.trace) this.trace = m.trace.slice();
+    }
+    run(m) {
+        m.stack = [ ...this.stack ];
+        m.denv = this.denv;
+        //if (this.trace) m.trace = this.trace.slice();
+    }
+}
+
+// dynamic bindings
+class LispBinding {
+    constructor(symbol, value) {
+        this.symbol = symbol;
+        this.value = value;
+    }
+}
+
+class LispCatch {
+    constructor(m, addr, tag) {
+        this.ret = new LispLongRet(m);
+        this.addr = addr;
+        this.tag = tag;
+    }
+    run(m, retval) {
+        this.ret.run(m, this.addr, retval);
+    }
+}
+
+var optimize = (function(){
+    function find_target(code, label) {
+        return code.indexOf(label);
+    };
+    function used_label(code, label) {
+        for (var i = code.length; --i >= 0;) {
+            var el = code[i];
+            if (!(el instanceof LispSymbol)) {
+                if (el[1] === label)
+                    return true;
+                if (el[0] === "FN" && used_label(el[1], label))
+                    return true;
+            }
+        }
+    };
+    function optimize1(code, i) {
+        var el = code[i];
+        if (el instanceof LispSymbol) {
+            if (!used_label(code, el)) {
+                code.splice(i, 1);
+                return true;
+            }
+            return false;
+        }
+        switch (el[0]) {
+          case "VARS":
+            if (el[1] == 1) {
+                code.splice(i, 1, [ "VAR" ]);
+                return true;
+            }
+            break;
+          case "JUMP":
+          case "TJUMP":
+          case "FJUMP":
+            for (var j = i + 1; j < code.length && code[j] instanceof LispSymbol; ++j) {
+                if (el[1] === code[j]) {
+                    if (el[0] == "JUMP") code.splice(i, 1);
+                    else code.splice(i, 1, [ "POP" ]);
+                    return true;
+                }
+            }
+            break;
+          case "LVAR":
+          case "GVAR":
+            if (i < code.length - 1 && code[i+1][0] == "POP") {
+                code.splice(i, 2);
+                return true;
+            }
+            break;
+          case "PRIM":
+            if (el[1].pak === BASE_PACK) {
+                if (/^C[AD]{1,4}R$/.test(el[1].name)) {
+                    code.splice(i, 1, [ el[1].name ]);
+                    return true;
+                }
+                switch (el[1].name) {
+                  case "CONS":
+                    code.splice(i, 1, [ "CONS" ]);
+                    return true;
+                  case "LIST":
+                    code.splice(i, 1, [ "LIST", el[2] ]);
+                    return true;
+                  case "LIST*":
+                    code.splice(i, 1, [ "LIST_", el[2] ]);
+                    return true;
+                }
+            }
+        }
+        switch (el[0]) {
+          case "GSET":
+          case "GVAR":
+            if (i < code.length - 2 &&
+                code[i+1][0] == "POP" &&
+                code[i+2][0] == "GVAR" &&
+                code[i+2][1] == el[1]) {
+                code.splice(i + 1, 2);
+                return true;
+            }
+            break;
+          case "LSET":
+          case "LVAR":
+            if (i < code.length - 2 &&
+                code[i+1][0] == "POP" &&
+                code[i+2][0] == "LVAR" &&
+                code[i+2][1] == el[1] &&
+                code[i+2][2] == el[2]) {
+                code.splice(i + 1, 2);
+                return true;
+            }
+            break;
+          case "SAVE":
+          case "FJUMP":
+          case "TJUMP":
+            // SAVE L1; ... L1: JUMP L2 --> SAVE L2
+            var idx = find_target(code, el[1]);
+            if (idx >= 0 && idx < code.length - 1 && code[idx + 1][0] == "JUMP") {
+                el[1] = code[idx + 1][1];
+                return true;
+            }
+            break;
+          case "JUMP":
+            var idx = find_target(code, el[1]);
+            if (idx >= 0 && idx < code.length - 1 &&
+                (code[idx + 1][0] == "JUMP" || code[idx + 1][0] == "RET")) {
+                code[i] = code[idx + 1];
+                return true;
+            }
+          case "CALL":
+          case "RET":
+          case "LRET":
+          case "LRET2":
+            for (var j = i; ++j < code.length;) {
+                if (code[j] instanceof LispSymbol) {
+                    break;
+                }
+            }
+            if (j - i - 1 > 0) {
+                code.splice(i + 1, j - i - 1);
+                return true;
+            }
+            break;
+          case "UNFR":
+            if (i < code.length - 1) {
+                if (code[i+1][0] == "UNFR") {
+                    code[i][1] += code[i+1][1];
+                    code[i][2] += code[i+1][2];
+                    code.splice(i + 1, 1);
+                    return true;
+                }
+                if (code[i+1][0] == "RET") {
+                    code.splice(i, 1);
+                    return true;
+                }
+            }
+            break;
+        }
+        if (i < code.length - 1) {
+            if ((el[0] == "CONST" && el[1] === null) || el[0] == "NIL") {
+                switch (code[i+1][0]) {
+                  case "FJUMP":
+                    code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                    return true;
+                  case "TJUMP":
+                    code.splice(i, 2);
+                    return true;
+                  case "NOT":
+                    code.splice(i, 2, [ "T" ]);
+                    return true;
+                }
+                if (el[0] == "CONST" && el[1] === null) {
+                    code.splice(i, 1, [ "NIL" ]);
+                    return true;
+                }
+            }
+            if ((el[0] == "CONST" && constantp(el[1])) || el[0] == "T") {
+                switch (code[i+1][0]) {
+                  case "FJUMP":
+                    code.splice(i, 2);
+                    return true;
+                  case "TJUMP":
+                    code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                    return true;
+                  case "NOT":
+                    code.splice(i, 2, [ "NIL" ]);
+                    return true;
+                }
+                if (el[0] == "CONST" && el[1] === true) {
+                    code.splice(i, 1, [ "T" ]);
+                    return true;
+                }
+            }
+        }
+        switch (el[0]) {
+          case "NIL":
+            if (i < code.length - 1) {
+                if (code[i+1][0] == "CONS") {
+                    code.splice(i, 2, [ "LIST", 1 ]);
+                    return true;
+                }
+            }
+            break;
+          case "LIST":
+          case "LIST_":
+            if (i < code.length - 1) {
+                if (code[i+1][0] == "CONS") {
+                    code.splice(i, 2, [ el[0], el[1] + 1 ]);
+                    return true;
+                }
+                if (code[i+1][0] == "LIST_") {
+                    code.splice(i, 2, [ el[0], el[1] + code[i+1][1] - 1 ]);
+                    return true;
+                }
+            }
+            break;
+          case "CONS":
+            if (i < code.length - 1) {
+                if (code[i+1][0] == "CONS") {
+                    code.splice(i, 2, [ "LIST_", 3 ]);
+                    return true;
+                }
+            }
+            break;
+        }
+    };
+    return function optimize(code) {
+        while (true) {
+            var changed = false;
+            for (var i = 0; i < code.length; ++i)
+                if (optimize1(code, i)) changed = true;
+            if (!changed) break;
+        }
+    };
+})();
+
+function constantp(x) {
+    return x === true
+        || x === null
+        || typeof x == "number"
+        || typeof x == "string"
+        || x instanceof RegExp
+        || x instanceof LispChar
+        || x instanceof LispSymbol;
+}
+
+function is_jump_instruction(op) {
+    switch (op) {
+      case OP.JUMP:
+      case OP.TJUMP:
+      case OP.FJUMP:
+      case OP.LRET:
+      case OP.LJUMP:
+      case OP.UPOPEN:
+      case OP.SAVE:
+      case OP.CATCH:
+      case OP.BLOCK2:
+      case OP.LJUMP2:
+        return true;
+    }
+}
+
+function assemble(code) {
+    optimize(code);
+    let ret = [];
+    for (let i = 0; i < code.length; ++i) {
+        let el = code[i];
+        if (el instanceof LispSymbol) {
+            el.value = ret.length;
+        } else {
+            let op = OP[el[0]];
+            let args = el.slice(1);
+            if (args.length != OP_LEN[op]) {
+                console.log("FUCKED UP");
+                debugger;
+            }
+            ret.push(op, ...args);
         }
     }
-
-    // continuations
-    class LispCC {
-        constructor(m) {
-            this.stack = [ ...m.stack ];
-            this.denv = m.denv;
-            //if (m.trace) this.trace = m.trace.slice();
+    for (let i = 0; i < ret.length;) {
+        let op = ret[i++];
+        switch (op) {
+          case OP.FN:
+            ret[i] = assemble(ret[i]);
+            break;
+          default:
+            if (is_jump_instruction(op))
+                ret[i] = ret[i].value;
         }
-        run(m) {
-            m.stack = [ ...this.stack ];
-            m.denv = this.denv;
-            //if (this.trace) m.trace = this.trace.slice();
-        }
+        i += OP_LEN[op];
     }
+    return ret;
+}
 
-    // dynamic bindings
-    class LispBinding {
-        constructor(symbol, value) {
-            this.symbol = symbol;
-            this.value = value;
-        }
+function relocate(code, offset) {
+    for (let i = 0; i < code.length;) {
+        let op = code[i++];
+        if (is_jump_instruction(op))
+            code[i] += offset;
+        i += OP_LEN[op];
     }
+    return code;
+}
 
-    class LispCatch {
-        constructor(m, addr, tag) {
-            this.ret = new LispLongRet(m);
-            this.addr = addr;
-            this.tag = tag;
+let INDENT_LEVEL = 8;
+
+function indent(level) {
+    return repeat_string(' ', level * INDENT_LEVEL);
+}
+
+function dump(thing) {
+    if (thing === null) return "NIL";
+    if (thing === true) return "T";
+    if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
+    if (thing instanceof LispCons) {
+        if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
+            return "'" + dump(LispCons.cadr(thing));
+        var ret = "(", first = true;
+        while (thing !== null) {
+            if (!first) ret += " ";
+            else first = false;
+            ret += dump(LispCons.car(thing));
+            thing = LispCons.cdr(thing);
+            if (!LispCons.isList(thing)) {
+                ret += " . " + dump(thing);
+                break;
+            }
         }
-        run(m, retval) {
-            this.ret.run(m, this.addr, retval);
-        }
+        return ret + ")";
     }
+    if (thing instanceof LispType) return thing.print();
+    return thing + "";
+}
 
-    D.XREF = {};            // store per-file cross-reference information
+const OP_REV = Object.keys(OP);
 
-    /// constructor
-    P.INIT = function(pm) {
+function disassemble(code) {
+    let lab = 0;
+    function disassemble(code, level) {
+        let labels = Object.create(null);
+        for (let i = 0; i < code.length;) {
+            let op = code[i++];
+            if (is_jump_instruction(op)) {
+                let addr = code[i];
+                if (!labels[addr]) {
+                    labels[addr] = "L" + (++lab);
+                }
+            }
+            i += OP_LEN[op];
+        }
+        let output = "";
+        for (let i = 0; i < code.length;) {
+            let l = labels[i] || "";
+            let op = code[i++];
+            if (l) l += ":";
+            let data;
+            let opcode = OP_REV[op];
+            switch (op) {
+              case OP.FN:
+                opcode = "FN " + code[i + 1];
+                data = "\n" + disassemble(code[i], level + 1);
+                break;
+              case OP.PRIM:
+                data = code[i] + " " + code[i + 1];
+                break;
+              case OP.CONST:
+                data = dump(code[i]);
+                break;
+              default:
+                if (is_jump_instruction(op)) {
+                    data = labels[code[i]];
+                    break;
+                }
+                data = code.slice(i, i + OP_LEN[op]).map(el =>
+                    pad_string(dump(el), 8)).join("");
+            }
+            var line = pad_string(l, INDENT_LEVEL)
+                + indent(level)
+                + pad_string(opcode, INDENT_LEVEL)
+                + data;
+            if (output) output += "\n";
+            output += line;
+            i += OP_LEN[op];
+        }
+        return output;
+    };
+    return disassemble(code, 0);
+}
+
+function serialize_const(val, cache) {
+    return function dump(val) {
+        if (val === null || val === true) return val + "";
+        if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar) return val.serialize(cache);
+        if (val instanceof RegExp) return val.toString();
+        if (val instanceof LispCons) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
+        if (val instanceof Array) return "[" + val.map(dump).join(",") + "]";
+        if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
+        return val + "";
+    }(val);
+}
+
+function serialize(code, strip, cache) {
+    code = code.map(x => serialize_const(x, cache)).join(",");
+    return strip ? code : "[" + code + "]";
+}
+
+function unserialize(code) {
+    var names = [], values = [], cache = [];
+    names.push("s"); values.push(function(name, pak){
+        if (arguments.length == 1 && typeof name == "number") {
+            return cache[name];
+        }
+        let sym;
+        if (pak != null) {
+            pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
+            sym = LispSymbol.get(name, pak);
+        } else {
+            sym = new LispSymbol(name);
+        }
+        cache.push(sym);
+        return sym;
+    });
+    names.push("p"); values.push(function(name){
+        if (arguments.length == 1 && typeof name == "number") {
+            return cache[name];
+        }
+        let pak = LispPackage.get(name);
+        cache.push(pak);
+        return pak;
+    });
+    names.push("l"); values.push(function(...args){
+        return LispCons.fromArray(args);
+    });
+    names.push("c"); values.push(function(char){
+        return LispChar.get(char);
+    });
+    names.push("DOT"); values.push(LispCons.DOT);
+    var func = new Function("return function(" + names.join(",") + "){return Object.freeze([" + code + "])}")();
+    code = func.apply(null, values);
+    return code;
+}
+
+export class LispMachine {
+
+    static XREF = {};            // store per-file cross-reference information
+    static assemble = assemble;
+    static constantp = constantp;
+    static relocate = relocate;
+    static disassemble = disassemble;
+    static serialize = serialize;
+    static unserialize = unserialize;
+    static serialize_const = serialize_const;
+    static dump = dump;
+
+    constructor(pm) {
         this.code = null;
         this.pc = null;
         this.stack = null;
@@ -124,8 +714,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         this.f = null;
         this.after_cleanup = null;
         //this.trace = [];
-    };
-    P.find_dvar = function(symbol) {
+    }
+
+    find_dvar(symbol) {
         if (symbol.special()) {
             var p = this.denv;
             while (p != null) {
@@ -136,22 +727,27 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
             }
         }
         return symbol;
-    };
-    P.gvar = function(symbol) {
+    }
+
+    gvar(symbol) {
         return this.find_dvar(symbol).value;
-    };
-    P.gset = function(symbol, val) {
+    }
+
+    gset(symbol, val) {
         this.find_dvar(symbol).value = val;
-    };
-    P.dynpush = function(thing) {
+    }
+
+    dynpush(thing) {
         this.denv = new LispCons(thing, this.denv);
-    };
-    P.bind = function(symbol, i) {
+    }
+
+    bind(symbol, i) {
         let frame = this.env.car;
         this.dynpush(new LispBinding(symbol, frame[i]));
         frame[i] = null;
-    };
-    P.push = function(v) {
+    }
+
+    push(v) {
         // XXX: we should limit the stack; otherwise cases of infinite
         // non-tail recursion are close to impossible to debug. I'm
         // not decided on a proper maximum size though.
@@ -159,46 +755,57 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         // if (this.stack.length > 20000) debugger;
 
         this.stack.push(v);
-    };
-    P.pop = function() {
+    }
+
+    pop() {
         return this.stack.pop();
-    };
-    P.pop_frame = function(n) {
+    }
+
+    pop_frame(n) {
         return this.stack.splice(this.stack.length - n, n);
-    };
-    P.pop_number = function(error) {
+    }
+
+    pop_number(error) {
         var n = this.pop();
         if (typeof n == "number") return n;
-        return error("Number expected, got " + this.dump(n), n);
-    };
-    P.pop_list = function(error) {
+        return error("Number expected, got " + dump(n), n);
+    }
+
+    pop_list(error) {
         var cell = this.pop();
         if (cell == null || cell === S_NIL || cell instanceof LispCons) return cell;
-        return error("List expected, got " + this.dump(cell), cell);
-    };
-    P.mkret = function(pc) {
+        return error("List expected, got " + dump(cell), cell);
+    }
+
+    mkret(pc) {
         return new LispRet(this, pc);
-    };
-    P.unret = function(ret) {
+    }
+
+    unret(ret) {
         ret.run(this);
-    };
-    P.mkcont = function() {
+    }
+
+    mkcont() {
         return new LispCC(this);
-    };
-    P.uncont = function(cont) {
+    }
+
+    uncont(cont) {
         cont.run(this);
-    };
-    P.top = function() {
+    }
+
+    top() {
         return this.stack.at(-1);
-    };
-    P.loop = function() {
+    }
+
+    loop() {
         while (this.pc < this.code.length) {
-            this.code[this.pc++].run(this);
+            vmrun(this);
             if (this.pc == null) break;
         }
         return this.pop();
-    };
-    P.atomic_call = function(closure, args) {
+    }
+
+    atomic_call(closure, args) {
         if (!args) args = [];
         // stop the world, call closure, resume the world
         var save_code = this.code;
@@ -228,16 +835,18 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
             this.env = save_env;
             this.code = save_code;
         }
-    };
-    P._exec = function(code) {
+    }
+
+    _exec(code) {
         this.code = code;
         this.env = null;
         this.stack = [];
         this.pc = 0;
         this.f = null;
         return this.loop();
-    };
-    P._call = function(closure, args) {
+    }
+
+    _call(closure, args) {
         args = LispCons.toArray(args);
         this.stack = [ new LispRet(this, null) ].concat(args);
         this.code = closure.code;
@@ -247,11 +856,11 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         this.f = closure;
         while (true) {
             if (this.pc == null) return this.pop();
-            this.code[this.pc++].run(this);
+            vmrun(this);
         }
-    };
+    }
 
-    P._callnext = function(closure, args) {
+    _callnext(closure, args) {
         this.stack.push(this.mkret(this.pc));
         //if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
         this.code = closure.code;
@@ -266,9 +875,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         this.pc = 0;
         this.f = closure;
         return false;
-    };
+    }
 
-    P.set_closure = function(closure, ...args) {
+    set_closure(closure, ...args) {
         this.stack = [ new LispRet(this, null) ].concat(args);
         this.code = closure.code;
         this.env = closure.env;
@@ -276,9 +885,9 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
         this.pc = 0;
         this.f = closure;
         //if (this.trace) this.trace = [ closure, args ];
-    };
+    }
 
-    P.run = function(quota) {
+    run(quota) {
         var err = null;
         try {
             while (quota-- > 0) {
@@ -286,7 +895,7 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
                     this.status = "finished";
                     break;
                 }
-                this.code[this.pc++].run(this);
+                vmrun(this);
                 if (this.status != "running")
                     break;
             }
@@ -304,779 +913,480 @@ var LispMachine = DEFCLASS("LispMachine", null, function(D, P){
             err = this.error = ex;
         }
         return err;
-    };
-
-    var OPS = {};
-
-    var optimize = (function(){
-        function find_target(code, label) {
-            return code.indexOf(label);
-        };
-        function used_label(code, label) {
-            for (var i = code.length; --i >= 0;) {
-                var el = code[i];
-                if (!(el instanceof LispSymbol)) {
-                    if (el[1] === label)
-                        return true;
-                    if (el[0] === "FN" && used_label(el[1], label))
-                        return true;
-                }
-            }
-        };
-        function optimize1(code, i) {
-            var el = code[i];
-            if (el instanceof LispSymbol) {
-                if (!used_label(code, el)) {
-                    code.splice(i, 1);
-                    return true;
-                }
-                return false;
-            }
-            switch (el[0]) {
-              case "VARS":
-                if (el[1] == 1) {
-                    code.splice(i, 1, [ "VAR" ]);
-                    return true;
-                }
-                break;
-              case "JUMP":
-              case "TJUMP":
-              case "FJUMP":
-                for (var j = i + 1; j < code.length && code[j] instanceof LispSymbol; ++j) {
-                    if (el[1] === code[j]) {
-                        if (el[0] == "JUMP") code.splice(i, 1);
-                        else code.splice(i, 1, [ "POP" ]);
-                        return true;
-                    }
-                }
-                break;
-              case "LVAR":
-              case "GVAR":
-                if (i < code.length - 1 && code[i+1][0] == "POP") {
-                    code.splice(i, 2);
-                    return true;
-                }
-                break;
-              case "PRIM":
-                if (el[1].pak === BASE_PACK) {
-                    if (/^C[AD]{1,4}R$/.test(el[1].name)) {
-                        code.splice(i, 1, [ el[1].name ]);
-                        return true;
-                    }
-                    switch (el[1].name) {
-                      case "CONS":
-                        code.splice(i, 1, [ "CONS" ]);
-                        return true;
-                      case "LIST":
-                        code.splice(i, 1, [ "LIST", el[2] ]);
-                        return true;
-                      case "LIST*":
-                        code.splice(i, 1, [ "LIST_", el[2] ]);
-                        return true;
-                    }
-                }
-            }
-            switch (el[0]) {
-              case "GSET":
-              case "GVAR":
-                if (i < code.length - 2 &&
-                    code[i+1][0] == "POP" &&
-                    code[i+2][0] == "GVAR" &&
-                    code[i+2][1] == el[1]) {
-                    code.splice(i + 1, 2);
-                    return true;
-                }
-                break;
-              case "LSET":
-              case "LVAR":
-                if (i < code.length - 2 &&
-                    code[i+1][0] == "POP" &&
-                    code[i+2][0] == "LVAR" &&
-                    code[i+2][1] == el[1] &&
-                    code[i+2][2] == el[2]) {
-                    code.splice(i + 1, 2);
-                    return true;
-                }
-                break;
-              case "SAVE":
-              case "FJUMP":
-              case "TJUMP":
-                // SAVE L1; ... L1: JUMP L2 --> SAVE L2
-                var idx = find_target(code, el[1]);
-                if (idx >= 0 && idx < code.length - 1 && code[idx + 1][0] == "JUMP") {
-                    el[1] = code[idx + 1][1];
-                    return true;
-                }
-                break;
-              case "JUMP":
-                var idx = find_target(code, el[1]);
-                if (idx >= 0 && idx < code.length - 1 &&
-                    (code[idx + 1][0] == "JUMP" || code[idx + 1][0] == "RET")) {
-                    el[0] = code[idx + 1][0];
-                    el[1] = code[idx + 1][1];
-                    return true;
-                }
-              case "CALLJ":
-              case "RET":
-                for (var j = i; ++j < code.length;) {
-                    if (code[j] instanceof LispSymbol) {
-                        break;
-                    }
-                }
-                if (j - i - 1 > 0) {
-                    code.splice(i + 1, j - i - 1);
-                    return true;
-                }
-                break;
-              case "UNFR":
-                if (i < code.length - 1) {
-                    if (code[i+1][0] == "UNFR") {
-                        code[i][1] += code[i+1][1];
-                        code[i][2] += code[i+1][2];
-                        code.splice(i + 1, 1);
-                        return true;
-                    }
-                    if (code[i+1][0] == "RET") {
-                        code.splice(i, 1);
-                        return true;
-                    }
-                }
-                break;
-            }
-            if (i < code.length - 1) {
-                if ((el[0] == "CONST" && el[1] === null) || el[0] == "NIL") {
-                    switch (code[i+1][0]) {
-                      case "FJUMP":
-                        code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
-                        return true;
-                      case "TJUMP":
-                        code.splice(i, 2);
-                        return true;
-                      case "NOT":
-                        code.splice(i, 2, [ "T" ]);
-                        return true;
-                    }
-                    if (el[0] == "CONST" && el[1] === null) {
-                        code.splice(i, 1, [ "NIL" ]);
-                        return true;
-                    }
-                }
-                if ((el[0] == "CONST" && constantp(el[1])) || el[0] == "T") {
-                    switch (code[i+1][0]) {
-                      case "FJUMP":
-                        code.splice(i, 2);
-                        return true;
-                      case "TJUMP":
-                        code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
-                        return true;
-                      case "NOT":
-                        code.splice(i, 2, [ "NIL" ]);
-                        return true;
-                    }
-                    if (el[0] == "CONST" && el[1] === true) {
-                        code.splice(i, 1, [ "T" ]);
-                        return true;
-                    }
-                }
-            }
-            switch (el[0]) {
-              case "NIL":
-                if (i < code.length - 1) {
-                    if (code[i+1][0] == "CONS") {
-                        code.splice(i, 2, [ "LIST", 1 ]);
-                        return true;
-                    }
-                }
-                break;
-              case "LIST":
-              case "LIST_":
-                if (i < code.length - 1) {
-                    if (code[i+1][0] == "CONS") {
-                        code.splice(i, 2, [ el[0], el[1] + 1 ]);
-                        return true;
-                    }
-                    if (code[i+1][0] == "LIST_") {
-                        code.splice(i, 2, [ el[0], el[1] + code[i+1][1] - 1 ]);
-                        return true;
-                    }
-                }
-                break;
-              case "CONS":
-                if (i < code.length - 1) {
-                    if (code[i+1][0] == "CONS") {
-                        code.splice(i, 2, [ "LIST_", 3 ]);
-                        return true;
-                    }
-                }
-                break;
-            }
-        };
-        return function optimize(code) {
-            while (true) {
-                var changed = false;
-                for (var i = 0; i < code.length; ++i)
-                    if (optimize1(code, i)) changed = true;
-                if (!changed) break;
-            }
-        };
-    })();
-
-    function constantp(x) {
-        return x === true
-            || x === null
-            || typeof x == "number"
-            || typeof x == "string"
-            || x instanceof RegExp
-            || x instanceof LispChar
-            || x instanceof LispSymbol;
-    };
-
-    function is_jump_instruction(op) {
-        switch (op) {
-          case "JUMP":
-          case "TJUMP":
-          case "FJUMP":
-          case "LRET":
-          case "LJUMP":
-          case "UPOPEN":
-          case "SAVE":
-          case "CATCH":
-            return true;
-        }
-    };
-
-    function assemble(code) {
-        optimize(code);
-        var ret = [];
-        for (var i = 0; i < code.length; ++i) {
-            var el = code[i];
-            if (el instanceof LispSymbol) el.value = ret.length;
-            else ret.push(el);
-        }
-        for (var i = ret.length; --i >= 0;) {
-            var el = ret[i];
-            switch (el[0]) {
-              case "FN":
-                ret[i] = OPS.FN.make(assemble(el[1]), el[2]);
-                break;
-              default:
-                if (is_jump_instruction(el[0]))
-                    el[1] = el[1].value;
-                ret[i] = OPS[el[0]].make.apply(null, el.slice(1));
-            }
-        }
-        return ret;
-    };
-
-    function relocate(code, addr) {
-        for (var i = code.length; --i >= 0;) {
-            var op = code[i];
-            if (is_jump_instruction(op._name))
-                op.addr += addr;
-        }
-        return code;
-    };
-
-    D.assemble = assemble;
-    D.constantp = constantp;
-    D.relocate = relocate;
-
-    ////// <disassemble>
-
-    var INDENT_LEVEL = 8;
-
-    function indent(level) {
-        return repeat_string(' ', level * INDENT_LEVEL);
-    };
-
-    D.disassemble = function(code) {
-        var lab = 0;
-        function disassemble(code, level) {
-            var labels = Object.create(null);
-            code.forEach(function(op){
-                if (is_jump_instruction(op._name))
-                    if (!labels[op.addr])
-                        labels[op.addr] = "L" + (++lab);
-            });
-            return code.map(function(op, i){
-                var l = labels[i] || "";
-                if (l) l += ":";
-                var data;
-                var opcode = op._name;
-                switch (opcode) {
-                  case "FN":
-                    opcode = "λ:" + op.name;
-                    data = "\n" + disassemble(op.code, level + 1);
-                    break;
-                  case "PRIM":
-                    data = op.name + " " + op.nargs;
-                    break;
-                  case "CONST":
-                    data = LispMachine.dump(op.val);
-                    break;
-                  default:
-                    if (is_jump_instruction(opcode)) {
-                        data = labels[op.addr];
-                        break;
-                    }
-                    data = op._args.map(function(el){
-                        return pad_string(
-                            LispMachine.serialize_const(op[el]),
-                            8
-                        );
-                    }).join("");
-                }
-                var line = pad_string(l, INDENT_LEVEL)
-                    + indent(level)
-                    + pad_string(opcode, INDENT_LEVEL)
-                    + data;
-                return line;
-            }).join("\n");
-        };
-        return disassemble(code, 0);
-    };
-
-    ///// </disassemble>
-
-    D.serialize = function(code, strip, cache) {
-        code = code.map(function(op){
-            return op._disp(cache);
-        }).join(",");
-        return strip ? code : "[" + code + "]";
-    };
-
-    D.unserialize = function(code) {
-        var names = [], values = [], cache = [];
-        for (var i in OPS) if (Object.hasOwn(OPS, i)) {
-            var op = OPS[i];
-            names.push(i);
-            values.push(op.make);
-        }
-        names.push("s"); values.push(function(name, pak){
-            if (arguments.length == 1 && typeof name == "number") {
-                return cache[name];
-            }
-            let sym;
-            if (pak != null) {
-                pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
-                sym = LispSymbol.get(name, pak);
-            } else {
-                sym = new LispSymbol(name);
-            }
-            cache.push(sym);
-            return sym;
-        });
-        names.push("p"); values.push(function(name){
-            if (arguments.length == 1 && typeof name == "number") {
-                return cache[name];
-            }
-            let pak = LispPackage.get(name);
-            cache.push(pak);
-            return pak;
-        });
-        names.push("l"); values.push(function(...args){
-            return LispCons.fromArray(args);
-        });
-        names.push("c"); values.push(function(char){
-            return LispChar.get(char);
-        });
-        names.push("DOT"); values.push(LispCons.DOT);
-        var func = new Function("return function(" + names.join(",") + "){return[" + code + "]}")();
-        code = func.apply(null, values);
-        return code;
-    };
-
-    function serialize_const(val, cache) {
-        return function dump(val) {
-            if (val === null || val === true) return val + "";
-            if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar) return val.serialize(cache);
-            if (val instanceof RegExp) return val.toString();
-            if (val instanceof LispCons) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
-            if (val instanceof Array) return "[" + val.map(dump).join(",") + "]";
-            if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
-            return val + "";
-        }(val);
-    };
-
-    D.serialize_const = serialize_const;
-
-    var OP = DEFCLASS("NOP", null, function(D, P){
-        P._disp = function(cache) {
-            var self = this;
-            return self._name + "(" + self._args.map(function(el){
-                return serialize_const(self[el], cache);
-            }).join(",") + ")";
-        };
-    });
-
-    function defop(name, args, proto) {
-        args = args ? args.split(" ") : [];
-        var ctor = new Function(
-            "return function " + name + "(" + args.join(", ") + "){ " +
-                args.map(function(arg){
-                    return "this." + arg + " = " + arg;
-                }).join("; ") + "; this.INIT() };"
-        )();
-        ctor.prototype = new OP;
-        ctor.make = new Function(
-            "OP",
-            "return function(" + args.join(",") + "){return new OP(" + args.join(",") + ")}"
-        )(ctor);
-        proto._name = name;
-        proto._args = args;
-        for (var i in proto) if (Object.hasOwn(proto, i)) {
-            ctor.prototype[i] = proto[i];
-        }
-        return OPS[name] = ctor;
-    };
-
-    function frame(env, i) {
-        while (i-- > 0) env = env.cdr;
-        return env.car;
-    };
-
-    function rewind(env, i) {
-        while (i-- > 0) env = env.cdr;
-        return env;
-    };
-
-    var S_NIL = LispSymbol.get("NIL");
-    var S_T = LispSymbol.get("T");
-    function eq(a, b) {
-        return (a === S_NIL && b === null) ||
-            (a === null && b === S_NIL) ||
-            (a === S_T && b === true) ||
-            (a === true && b === S_T) ||
-            a === b ? true : null;
-    };
-
-    [
-        //// local vars namespace
-        ["LVAR", "i j", {
-            run: function(m) {
-                m.push(frame(m.env, this.i)[this.j]);
-            }
-        }],
-        ["LSET", "i j", {
-            run: function(m) {
-                frame(m.env, this.i)[this.j] = m.top();
-            }
-        }],
-        //// global/dynamic vars namespace
-        ["GVAR", "name", {
-            run: function(m) {
-                m.push(m.gvar(this.name));
-            }
-        }],
-        ["GSET", "name", {
-            run: function(m) {
-                m.gset(this.name, m.top());
-            }
-        }],
-        ["BIND", "name i", {
-            run: function(m) {
-                m.bind(this.name, this.i);
-            }
-        }],
-        //// global functions namespace
-        ["FGVAR", "name", {
-            run: function(m) {
-                var f = this.name.func();
-                if (!f) {
-                    //console.error("Undefined function", this.name);
-                    throw new LispPrimitiveError(`Undefined function ${D.dump(this.name)}`);
-                }
-                m.push(f);
-            }
-        }],
-        ["FGSET", "name", {
-            run: function(m) {
-                this.name.setv("function", m.top());
-            }
-        }],
-        ////
-        ["POP", 0, {
-            run: function(m) {
-                m.pop();
-            }
-        }],
-        ["CONST", "val", {
-            run: function(m) {
-                m.push(this.val);
-            }
-        }],
-        ["JUMP", "addr", {
-            run: function(m) {
-                m.pc = this.addr;
-            }
-        }],
-        ["TJUMP", "addr", {
-            run: function(m) {
-                if (m.pop() !== null) m.pc = this.addr;
-            }
-        }],
-        ["FJUMP", "addr", {
-            run: function(m) {
-                if (m.pop() === null) m.pc = this.addr;
-            }
-        }],
-        ["BLOCK", 0, {
-            run: function(m) {
-                // this is moderately tricky: we can't do
-                //   m.env = new LispCons([ new LispLongRet(m) ], m.env);
-                // I'll let you figure out why.
-                var frame = [];
-                m.env = new LispCons(frame, m.env);
-                frame[0] = new LispLongRet(m);
-            }
-        }],
-        ["LJUMP", "addr", {
-            run: function(m) {
-                m.pop().run(m, this.addr);
-            }
-        }],
-        ["LRET", "addr", {
-            run: function(m) {
-                var bret = m.pop(), val = m.pop();
-                bret.run(m, this.addr);
-                m.push(val);
-            }
-        }],
-        ["NOT", 0, {
-            run: function(m) {
-                m.push(m.pop() === null ? true : null);
-            }
-        }],
-        ["SETCC", 0, {
-            run: function(m) {
-                m.uncont(m.top());
-            }
-        }],
-        ["SAVE", "addr", {
-            run: function(m) {
-                m.push(m.mkret(this.addr));
-            }
-        }],
-        ["RET", 0, {
-            run: function(m) {
-                var noval = m.f.noval;
-                var val = m.pop();
-                m.unret(m.pop());
-                if (!noval) m.push(val);
-            }
-        }],
-        ["CALL", "count", {
-            run: function(m){
-                var closure = m.pop();
-                //if (m.trace) m.trace.push([ closure, m.stack.slice(-this.count) ]);
-                m.n_args = this.count;
-                m.code = closure.code;
-                m.env = closure.env;
-                m.pc = 0;
-                m.f = closure;
-            }
-        }],
-        /// <unwind-protect>
-        ["UPOPEN", "addr", {
-            // push the cleanup code
-            run: function(m) {
-                var c = new LispCleanup(new LispLongRet(m), this.addr);
-                m.dynpush(c);
-            }
-        }],
-        ["UPEXIT", 0, {
-            // normal exit, we should run the cleanup code
-            // that's guaranteed to be at the top of denv
-            run: function(m){
-                // no need to run it, we're already in
-                // the right place.  just discard.
-                m.denv = m.denv.cdr;
-                m.after_cleanup = null;
-            }
-        }],
-        ["UPCLOSE", 0, {
-            // this instruction is closing the cleanup
-            // code of an unwind-protect.  If we got here
-            // as a result of a long jump, top of stack
-            // will contain a LispCleanup object that
-            // resumes the jump.
-            run: function(m){
-                if (m.after_cleanup) m.after_cleanup(m);
-            }
-        }],
-        /// </unwind-protect>
-        /// <throw,catch>
-        ["CATCH", "addr", {
-            run: function(m) {
-                var c = new LispCatch(m, this.addr, m.pop());
-                m.dynpush(c);
-            }
-        }],
-        ["THROW", 0, {
-            run: function(m) {
-                var val = m.pop();
-                var tag = m.pop();
-                var p = m.denv;
-                while (p) {
-                    var el = p.car;
-                    if (el instanceof LispCatch && eq(el.tag, tag)) {
-                        el.run(m, val);
-                        return;
-                    }
-                    p = p.cdr;
-                }
-                throw new LispPrimitiveError("CATCH tag not found " + LispMachine.dump(tag));
-            }
-        }],
-        /// </throw,catch>
-        ["LET", "count", {
-            run: function(m){
-                m.env = new LispCons(m.pop_frame(this.count), m.env);
-            }
-        }],
-        ["ARGS", "count", {
-            run: function(m){
-                var count = this.count;
-                if (count != m.n_args) {
-                    console.error(m.f);
-                    throw new LispPrimitiveError("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
-                }
-                m.env = new LispCons(m.pop_frame(this.count), m.env);
-            }
-        }],
-        ["ARG_", "count", {
-            run: function(m) {
-                var count = this.count;
-                var passed = m.n_args;
-                if (passed < count) {
-                    console.error(m.f);
-                    throw new LispPrimitiveError("Insufficient number of arguments");
-                }
-                var p = null;
-                while (passed-- > count) p = new LispCons(m.pop(), p);
-                var frame = m.pop_frame(count);
-                frame.push(p);
-                m.env = new LispCons(frame, m.env);
-            }
-        }],
-        ["FRAME", 0, {
-            run: function(m) {
-                m.env = new LispCons([], m.env);
-            }
-        }],
-        ["VAR", 0, {
-            run: function(m) {
-                m.env.car.push(m.pop());
-            }
-        }],
-        ["VARS", "count", {
-            run: function(m) {
-                var count = this.count, a = m.env.car, n = a.length;
-                while (--count >= 0) a[n + count] = m.pop();
-            }
-        }],
-        ["UNFR", "lex spec", {
-            run: function(m) {
-                if (this.lex) m.env = rewind(m.env, this.lex);
-                if (this.spec) m.denv = rewind(m.denv, this.spec);
-            }
-        }],
-        ["FN", "code name", {
-            run: function(m) {
-                m.push(new LispClosure(this.code, this.name, m.env));
-            },
-            _disp: function(cache) {
-                return "FN(" + D.serialize(this.code, false, cache) +
-                    (this.name ? "," + D.serialize_const(this.name, cache) : "")
-                    + ")";
-            }
-        }],
-        ["PRIM", "name nargs", {
-            run: function(m) {
-                var n = this.nargs;
-                if (n == -1) n = m.n_args;
-                var ret = this.name.primitive()(m, n);
-                if (ret !== false) m.push(ret ?? null);
-            }
-        }],
-        ["NIL", 0, { run: function(m) { m.push(null) } }],
-        ["T", 0, { run: function(m) { m.push(true) } }],
-        ["CONS", 0, {
-            run: function(m) {
-                var b = m.pop(), a = m.pop();
-                m.push(new LispCons(a, b));
-            }
-        }],
-        ["LIST", "count", {
-            run: function(m) {
-                var p = null, n = this.count;
-                if (n == -1) n = m.n_args;
-                while (n-- > 0) p = new LispCons(m.pop(), p);
-                m.push(p);
-            }
-        }],
-        ["LIST_", "count", {
-            run: function(m) {
-                var p = m.pop(), n = this.count;
-                if (n == -1) n = m.n_args;
-                while (--n > 0) p = new LispCons(m.pop(), p);
-                m.push(p);
-            }
-        }]
-
-    ].map(function(_){ defop(_[0], _[1], _[2]) });
-
-    defop("CC", 0, {
-        run: function(cc){
-            return function(m) {
-                m.push(new LispClosure(cc, null, new LispCons([ m.mkcont() ])));
-            };
-        }(assemble([
-            ["ARGS", 1],
-            ["LVAR", 1, 0],
-            ["SETCC"],
-            ["LVAR", 0, 0],
-            ["RET"]
-        ]))
-    });
-
-    function error(msg) {
-        throw new LispPrimitiveError(msg);
     }
 
-    for (let i in LispCons) {
-        if (Object.hasOwn(LispCons, i) && /^c[ad]+r$/.test(i)) {
-            let func = LispCons[i];
-            defop(i.toUpperCase(), 0, {
-                run(m) { m.push(func(m.pop_list(error))) }
-            });
-        }
+    dump(expr) {
+        return dump(expr);
     }
 
-    var S_QUOTE = LispSymbol.get("QUOTE");
+}
 
-    P.dump = D.dump = function(thing) {
-        if (thing === null) return "NIL";
-        if (thing === true) return "T";
-        if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
-        if (thing instanceof LispCons) {
-            if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
-                return "'" + D.dump(LispCons.cadr(thing));
-            var ret = "(", first = true;
-            while (thing !== null) {
-                if (!first) ret += " ";
-                else first = false;
-                ret += D.dump(LispCons.car(thing));
-                thing = LispCons.cdr(thing);
-                if (!LispCons.isList(thing)) {
-                    ret += " . " + D.dump(thing);
-                    break;
-                }
-            }
-            return ret + ")";
-        }
-        if (thing instanceof LispType) return thing.print();
-        return thing + "";
-    };
+function frame(env, i) {
+    while (i-- > 0) env = env.cdr;
+    return env.car;
+};
 
-});
+function rewind(env, i) {
+    while (i-- > 0) env = env.cdr;
+    return env;
+};
+
+function eq(a, b) {
+    return (a === S_NIL && b === null)
+        || (a === null && b === S_NIL)
+        || (a === S_T && b === true)
+        || (a === true && b === S_T)
+        || a === b ? true : null;
+};
+
+let CC_CODE = assemble([
+    ["ARGS", 1],
+    ["LVAR", 1, 0],
+    ["SETCC"],
+    ["LVAR", 0, 0],
+    ["RET"]
+]);
+
+function error(msg) {
+    throw new LispPrimitiveError(msg);
+}
+
+function vmrun(m) {
+    switch (m.code[m.pc++]) {
+      case OP.LVAR: {
+          let i = m.code[m.pc++];
+          let j = m.code[m.pc++];
+          m.push(frame(m.env, i)[j]);
+          return;
+      }
+
+      case OP.LSET: {
+          let i = m.code[m.pc++];
+          let j = m.code[m.pc++];
+          frame(m.env, i)[j] = m.top();
+          return;
+      }
+
+      case OP.GVAR: {
+          let name = m.code[m.pc++];
+          m.push(m.gvar(name));
+          return;
+      }
+
+      case OP.GSET: {
+          let name = m.code[m.pc++];
+          m.gset(name, m.top());
+          return;
+      }
+
+      case OP.BIND: {
+          let name = m.code[m.pc++];
+          let i = m.code[m.pc++];
+          m.bind(name, i);
+          return;
+      }
+
+      case OP.FGVAR: {
+          let name = m.code[m.pc++];
+          let f = name.func();
+          if (!f) {
+              //console.error("Undefined function", name);
+              throw new LispPrimitiveError(`Undefined function ${dump(name)}`);
+          }
+          m.push(f);
+          return;
+      }
+
+      case OP.FGSET: {
+          let name = m.code[m.pc++];
+          name.setv("function", m.top());
+          return;
+      }
+
+      case OP.POP: {
+          m.pop();
+          return;
+      }
+
+      case OP.CONST: {
+          let val = m.code[m.pc++];
+          m.push(val);
+          return;
+      }
+
+      case OP.JUMP: {
+          let addr = m.code[m.pc++];
+          m.pc = addr;
+          return;
+      }
+
+      case OP.TJUMP: {
+          let addr = m.code[m.pc++];
+          if (m.pop() !== null) m.pc = addr;
+          return;
+      }
+
+      case OP.FJUMP: {
+          let addr = m.code[m.pc++];
+          if (m.pop() === null) m.pc = addr;
+          return;
+      }
+
+      case OP.BLOCK: {
+          // this is moderately tricky: we can't do
+          //   m.env = new LispCons([ new LispLongRet(m) ], m.env);
+          // I'll let you figure out why.
+          let frame = [];
+          m.env = new LispCons(frame, m.env);
+          frame[0] = new LispLongRet(m);
+          return;
+      }
+
+      case OP.LJUMP: {
+          let addr = m.code[m.pc++];
+          m.pop().run(m, addr);
+          return;
+      }
+
+      case OP.LRET: {
+          let addr = m.code[m.pc++];
+          let bret = m.pop(), val = m.pop();
+          bret.run(m, addr);
+          m.push(val);
+          return;
+      }
+
+      case OP.NOT: {
+          m.push(m.pop() === null ? true : null);
+          return;
+      }
+
+      case OP.SETCC: {
+          m.uncont(m.top());
+          return;
+      }
+
+      case OP.SAVE: {
+          let addr = m.code[m.pc++];
+          m.push(m.mkret(addr));
+          return;
+      }
+
+      case OP.RET: {
+          let noval = m.f.noval;
+          let val = m.pop();
+          m.unret(m.pop());
+          if (!noval) m.push(val);
+          return;
+      }
+
+      case OP.CALL: {
+          let count = m.code[m.pc++];
+          let closure = m.pop();
+          //if (m.trace) m.trace.push([ closure, m.stack.slice(-count) ]);
+          m.n_args = count;
+          m.code = closure.code;
+          m.env = closure.env;
+          m.pc = 0;
+          m.f = closure;
+          return;
+      }
+
+      case OP.UPOPEN: {
+          let addr = m.code[m.pc++];
+          let c = new LispCleanup(new LispLongRet(m), addr);
+          m.dynpush(c);
+          return;
+      }
+
+      case OP.UPEXIT: {
+          // no need to run it, we're already in
+          // the right place.  just discard.
+          m.denv = m.denv.cdr;
+          m.after_cleanup = null;
+          return;
+      }
+
+      case OP.UPCLOSE: {
+          if (m.after_cleanup) m.after_cleanup(m);
+          return;
+      }
+
+      case OP.CATCH: {
+          let addr = m.code[m.pc++];
+          let c = new LispCatch(m, addr, m.pop());
+          m.dynpush(c);
+          return;
+      }
+
+      case OP.THROW: {
+          let val = m.pop();
+          let tag = m.pop();
+          let p = m.denv;
+          while (p) {
+              let el = p.car;
+              if (el instanceof LispCatch && eq(el.tag, tag)) {
+                  el.run(m, val);
+                  return;
+              }
+              p = p.cdr;
+          }
+          throw new LispPrimitiveError("CATCH tag not found " + dump(tag));
+          return;
+      }
+
+      case OP.LET: {
+          let count = m.code[m.pc++];
+          m.env = new LispCons(m.pop_frame(count), m.env);
+          return;
+      }
+
+      case OP.ARGS: {
+          let count = m.code[m.pc++];
+          if (count != m.n_args) {
+              console.error(m.f);
+              throw new LispPrimitiveError("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
+          }
+          m.env = new LispCons(m.pop_frame(count), m.env);
+          return;
+      }
+
+      case OP.ARG_: {
+          let count = m.code[m.pc++];
+          let passed = m.n_args;
+          if (passed < count) {
+              console.error(m.f);
+              throw new LispPrimitiveError("Insufficient number of arguments");
+          }
+          let p = null;
+          while (passed-- > count) p = new LispCons(m.pop(), p);
+          let frame = m.pop_frame(count);
+          frame.push(p);
+          m.env = new LispCons(frame, m.env);
+          return;
+      }
+
+      case OP.FRAME: {
+          m.env = new LispCons([], m.env);
+          return;
+      }
+
+      case OP.VAR: {
+          m.env.car.push(m.pop());
+          return;
+      }
+
+      case OP.VARS: {
+          let count = m.code[m.pc++];
+          let a = m.env.car, n = a.length;
+          while (--count >= 0) a[n + count] = m.pop();
+          return;
+      }
+
+      case OP.UNFR: {
+          let lex = m.code[m.pc++];
+          let spec = m.code[m.pc++];
+          if (lex) m.env = rewind(m.env, lex);
+          if (spec) m.denv = rewind(m.denv, spec);
+          return;
+      }
+
+      case OP.FN: {
+          let code = m.code[m.pc++];
+          let name = m.code[m.pc++];
+          m.push(new LispClosure(code, name, m.env));
+          return;
+      }
+
+      case OP.PRIM: {
+          let name = m.code[m.pc++];
+          let nargs = m.code[m.pc++];
+          if (nargs == -1) nargs = m.n_args;
+          let ret = name.primitive()(m, nargs);
+          if (ret !== false) m.push(ret ?? null);
+          return;
+      }
+
+      case OP.NIL: {
+          m.push(null);
+          return;
+      }
+
+      case OP.T: {
+          m.push(true);
+          return;
+      }
+
+      case OP.CONS: {
+          let b = m.pop(), a = m.pop();
+          m.push(new LispCons(a, b));
+          return;
+      }
+
+      case OP.LIST: {
+          let count = m.code[m.pc++];
+          let p = null, n = count;
+          if (n == -1) n = m.n_args;
+          while (n-- > 0) p = new LispCons(m.pop(), p);
+          m.push(p);
+          return;
+      }
+
+      case OP.LIST_: {
+          let count = m.code[m.pc++];
+          let p = m.pop(), n = count;
+          if (n == -1) n = m.n_args;
+          while (--n > 0) p = new LispCons(m.pop(), p);
+          m.push(p);
+          return;
+      }
+
+      case OP.CC:
+        m.push(new LispClosure(CC_CODE, null, new LispCons([ m.mkcont() ])));
+        return;
+
+      case OP.CAR:
+        m.push(LispCons.car(m.pop_list(error)));
+        return;
+
+      case OP.CDR:
+        m.push(LispCons.cdr(m.pop_list(error)));
+        return;
+
+      case OP.CAAR:
+        m.push(LispCons.caar(m.pop_list(error)));
+        return;
+
+      case OP.CADR:
+        m.push(LispCons.cadr(m.pop_list(error)));
+        return;
+
+      case OP.CDAR:
+        m.push(LispCons.cdar(m.pop_list(error)));
+        return;
+
+      case OP.CDDR:
+        m.push(LispCons.cddr(m.pop_list(error)));
+        return;
+
+      case OP.CAAAR:
+        m.push(LispCons.caaar(m.pop_list(error)));
+        return;
+
+      case OP.CAADR:
+        m.push(LispCons.caadr(m.pop_list(error)));
+        return;
+
+      case OP.CADAR:
+        m.push(LispCons.cadar(m.pop_list(error)));
+        return;
+
+      case OP.CADDR:
+        m.push(LispCons.caddr(m.pop_list(error)));
+        return;
+
+      case OP.CDAAR:
+        m.push(LispCons.cdaar(m.pop_list(error)));
+        return;
+
+      case OP.CDADR:
+        m.push(LispCons.cdadr(m.pop_list(error)));
+        return;
+
+      case OP.CDDAR:
+        m.push(LispCons.cddar(m.pop_list(error)));
+        return;
+
+      case OP.CDDDR:
+        m.push(LispCons.cdddr(m.pop_list(error)));
+        return;
+
+      case OP.CAAAAR:
+        m.push(LispCons.caaaar(m.pop_list(error)));
+        return;
+
+      case OP.CAAADR:
+        m.push(LispCons.caaadr(m.pop_list(error)));
+        return;
+
+      case OP.CAADAR:
+        m.push(LispCons.caadar(m.pop_list(error)));
+        return;
+
+      case OP.CAADDR:
+        m.push(LispCons.caaddr(m.pop_list(error)));
+        return;
+
+      case OP.CADAAR:
+        m.push(LispCons.cadaar(m.pop_list(error)));
+        return;
+
+      case OP.CADADR:
+        m.push(LispCons.cadadr(m.pop_list(error)));
+        return;
+
+      case OP.CADDAR:
+        m.push(LispCons.caddar(m.pop_list(error)));
+        return;
+
+      case OP.CADDDR:
+        m.push(LispCons.cadddr(m.pop_list(error)));
+        return;
+
+      case OP.CDAAAR:
+        m.push(LispCons.cdaaar(m.pop_list(error)));
+        return;
+
+      case OP.CDAADR:
+        m.push(LispCons.cdaadr(m.pop_list(error)));
+        return;
+
+      case OP.CDADAR:
+        m.push(LispCons.cdadar(m.pop_list(error)));
+        return;
+
+      case OP.CDADDR:
+        m.push(LispCons.cdaddr(m.pop_list(error)));
+        return;
+
+      case OP.CDDAAR:
+        m.push(LispCons.cddaar(m.pop_list(error)));
+        return;
+
+      case OP.CDDADR:
+        m.push(LispCons.cddadr(m.pop_list(error)));
+        return;
+
+      case OP.CDDDAR:
+        m.push(LispCons.cdddar(m.pop_list(error)));
+        return;
+
+      case OP.CDDDDR:
+        m.push(LispCons.cddddr(m.pop_list(error)));
+        return;
+
+      case OP.BLOCK2: {
+          let exit = m.code[m.pc++];
+          let frame = [];
+          m.env = new LispCons(frame, m.env);
+          frame[0] = new LispLongRet(m, exit);
+          return;
+      }
+
+      case OP.LJUMP2: {
+          let addr = m.code[m.pc++];
+          let fr = m.code[m.pc++];
+          frame(m.env, fr)[0].run(m, addr);
+          return;
+      }
+
+      case OP.LRET2: {
+          let fr = m.code[m.pc++];
+          let val = m.pop();
+          frame(m.env, fr)[0].run(m);
+          m.push(val);
+          return;
+      }
+
+    }
+}

@@ -1,7 +1,7 @@
 import { LispCons } from "./list.js";
 import { LispSymbol, LispPackage, LispChar } from "./types.js";
-import { LispMachine } from "./machine2.js";
-import { UNICODE } from "./os.js";
+import { LispMachine } from "./machine.js";
+import { UNICODE } from "./utils.js";
 
 // basic stream
 

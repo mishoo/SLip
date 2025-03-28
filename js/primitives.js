@@ -1,7 +1,7 @@
 import { LispCons } from "./list.js";
 import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
-import { LispMachine } from "./machine2.js";
-import { repeat_string, UNICODE } from "./os.js";
+import { LispMachine } from "./machine.js";
+import { repeat_string, UNICODE } from "./utils.js";
 
 let BASE_PACK = LispPackage.BASE_PACK;
 let KEYWORD_PACK = LispPackage.get("KEYWORD");
