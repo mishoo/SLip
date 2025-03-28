@@ -1,3 +1,7 @@
+import { LispCons } from "./list.js";
+import { LispType, LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
+import { repeat_string, pad_string } from "./os.js";
+
 let BASE_PACK = LispPackage.get("%");
 let S_QUOTE = LispSymbol.get("QUOTE");
 let S_NIL = LispSymbol.get("NIL");

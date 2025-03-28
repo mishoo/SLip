@@ -1,4 +1,7 @@
+import { LispMachine } from "../js/machine2.js";
+import { LispSymbol, LispPackage } from "../js/types.js";
 import { make_desktop } from "./ide.js";
+import "../js/primitives.js";
 
 (function(window){
 

@@ -1,20 +1,36 @@
-var LispCons = DEFTYPE("cons", function(D, P){
-    var DOT = {
-        toString: function(){ return "DOT" }
-    };
-    function listp(thing) {
-        return thing === null || thing instanceof D;
-    };
-    function check_list(list, func) {
-        if (!listp(list)) throw new LispPrimitiveError("Non-list (improper list?) argument in " + func);
-    };
-    P.INIT = function(a, b) {
+import { LispType, LispPrimitiveError } from "./types.js";
+
+function listp(thing) {
+    return thing === null || thing instanceof LispCons;
+}
+
+function check_list(list, func) {
+    if (!listp(list)) throw new LispPrimitiveError("Non-list (improper list?) argument in " + func);
+}
+
+function car(cell) {
+    return cell === null ? null : cell.car;
+}
+
+function cdr(cell) {
+    return cell === null ? null : cell.cdr;
+}
+
+const DOT = {
+    toString() { return "DOT" }
+};
+
+export class LispCons extends LispType {
+    static type = "cons";
+    static is(x) { return x instanceof LispCons }
+    static DOT = DOT;
+    static isList = listp;
+    constructor(a, b) {
+        super();
         this.car = a;
         this.cdr = b;
-    };
-    D.DOT = DOT;
-    D.isList = listp;
-    D.forEach = function(p, callback) {
+    }
+    static forEach(p, callback) {
         var i = 0;
         while (p !== null) {
             callback(p.car, i++);
@@ -24,26 +40,26 @@ var LispCons = DEFTYPE("cons", function(D, P){
                 break;
             }
         }
-    };
-    D.map = function(list, callback) {
+    }
+    static map(list, callback) {
         var ret = null, p;
-        D.forEach(list, function(el, i, dot){
-            var cell = new D(null, null);
+        LispCons.forEach(list, function(el, i, dot){
+            var cell = new LispCons(null, null);
             cell.car = callback(el, i, dot, cell);
             if (ret) p.cdr = cell;
             else ret = cell;
             p = cell;
         });
         return ret;
-    };
-    D.last = function(list) {
+    }
+    static last(list) {
         while (list && cdr(list)) {
             check_list(list, "LAST");
             list = cdr(list);
         }
         return list;
-    };
-    D.reverse = function(list) {
+    }
+    static reverse(list) {
         var a = null;
         while (list != null) {
             check_list(list, "REVERSE");
@@ -51,8 +67,8 @@ var LispCons = DEFTYPE("cons", function(D, P){
             list = cdr(list);
         }
         return a;
-    };
-    D.nreverse = function(list) {
+    }
+    static nreverse(list) {
         if (list === null || cdr(list) === null) return list;
         var p = null;
         while (true) {
@@ -63,8 +79,8 @@ var LispCons = DEFTYPE("cons", function(D, P){
             if (next === null) return list;
             list = next;
         }
-    };
-    D.append = function(lists) {
+    }
+    static append(lists) {
         if (lists.length == 0) return null;
         var ret = null, p = null;
         while (lists.length > 1) {
@@ -83,8 +99,8 @@ var LispCons = DEFTYPE("cons", function(D, P){
             return ret;
         }
         return lists[0];
-    };
-    D.nconc = function(lists) {
+    }
+    static nconc(lists) {
         var ret = null, p = null;
         for (var i = 0; i < lists.length; ++i) {
             var l = lists[i];
@@ -92,18 +108,18 @@ var LispCons = DEFTYPE("cons", function(D, P){
             if (!l) continue;
             if (!ret) ret = l;
             if (p) p.cdr = l;
-            p = D.last(l);
+            p = LispCons.last(l);
         }
         return ret;
-    };
-    D.nreconc = function(list, tail) {
+    }
+    static nreconc(list, tail) {
         if (list === null) return tail;
         var tmp = list;
-        list = D.nreverse(list);
+        list = LispCons.nreverse(list);
         tmp.cdr = tail;
         return list;
-    };
-    D.revappend = function(list, tail) {
+    }
+    static revappend(list, tail) {
         if (list === null) return tail;
         var a = null, last = null;
         while (list != null) {
@@ -114,16 +130,16 @@ var LispCons = DEFTYPE("cons", function(D, P){
         }
         last.cdr = tail;
         return a;
-    };
-    D.fromArray = function(a) {
-        var ret = null, dot = false;
+    }
+    static fromArray(a) {
+        var ret = null, p = null, dot = false;
         a.forEach(function(el){
             if (el === DOT) {
                 dot = true;
             } else {
                 if (dot) p.cdr = el;
                 else {
-                    var cell = new D(el, null);
+                    var cell = new LispCons(el, null);
                     if (ret) p.cdr = cell;
                     else ret = cell;
                     p = cell;
@@ -131,27 +147,27 @@ var LispCons = DEFTYPE("cons", function(D, P){
             }
         });
         return ret;
-    };
-    D.len = function(list) {
+    }
+    static len(list) {
         var len = 0;
         while (list !== null) {
             ++len;
             list = list.cdr;
         }
         return len;
-    };
-    D.toArray = function(list) {
+    }
+    static toArray(list) {
         var a = [];
-        D.forEach(list, function(el, i, dot){
+        LispCons.forEach(list, function(el, i, dot){
             if (dot) a.push(DOT);
             a.push(el);
         });
         return a;
-    };
-    D.cons = function(a, b) {
-        return new D(a, b);
-    };
-    D.isDotted = function(x) {
+    }
+    static cons(a, b) {
+        return new LispCons(a, b);
+    }
+    static isDotted(x) {
         var i = 0;
         while (x !== null) {
             if (!listp(x)) return i;
@@ -159,56 +175,49 @@ var LispCons = DEFTYPE("cons", function(D, P){
             i++;
         }
         return false;
-    };
-    D.elt = function(list, i) {
+    }
+    static elt(list, i) {
         var p = list;
         while (p !== null && i-- > 0) {
             p = cdr(p);
         }
         return car(p);
-    };
-    D.find = function(list, item, cmp) {
+    }
+    static find(list, item, cmp) {
         while (list !== null && !cmp(list.car, item))
             list = list.cdr;
         return list;
-    };
+    }
 
-    function car(cell) {
-        return cell === null ? null : cell.car;
-    };
-    function cdr(cell) {
-        return cell === null ? null : cell.cdr;
-    };
+    static car = car;
+    static cdr = cdr;
 
-    D.car = car;
-    D.cdr = cdr;
-
-    D.caar = function(l){return car(car(l))};
-    D.cadr = function(l){return car(cdr(l))};
-    D.cdar = function(l){return cdr(car(l))};
-    D.cddr = function(l){return cdr(cdr(l))};
-    D.caaar = function(l){return car(car(car(l)))};
-    D.caadr = function(l){return car(car(cdr(l)))};
-    D.cadar = function(l){return car(cdr(car(l)))};
-    D.caddr = function(l){return car(cdr(cdr(l)))};
-    D.cdaar = function(l){return cdr(car(car(l)))};
-    D.cdadr = function(l){return cdr(car(cdr(l)))};
-    D.cddar = function(l){return cdr(cdr(car(l)))};
-    D.cdddr = function(l){return cdr(cdr(cdr(l)))};
-    D.caaaar = function(l){return car(car(car(car(l))))};
-    D.caaadr = function(l){return car(car(car(cdr(l))))};
-    D.caadar = function(l){return car(car(cdr(car(l))))};
-    D.caaddr = function(l){return car(car(cdr(cdr(l))))};
-    D.cadaar = function(l){return car(cdr(car(car(l))))};
-    D.cadadr = function(l){return car(cdr(car(cdr(l))))};
-    D.caddar = function(l){return car(cdr(cdr(car(l))))};
-    D.cadddr = function(l){return car(cdr(cdr(cdr(l))))};
-    D.cdaaar = function(l){return cdr(car(car(car(l))))};
-    D.cdaadr = function(l){return cdr(car(car(cdr(l))))};
-    D.cdadar = function(l){return cdr(car(cdr(car(l))))};
-    D.cdaddr = function(l){return cdr(car(cdr(cdr(l))))};
-    D.cddaar = function(l){return cdr(cdr(car(car(l))))};
-    D.cddadr = function(l){return cdr(cdr(car(cdr(l))))};
-    D.cdddar = function(l){return cdr(cdr(cdr(car(l))))};
-    D.cddddr = function(l){return cdr(cdr(cdr(cdr(l))))};
-});
+    static caar(l){return car(car(l))}
+    static cadr(l){return car(cdr(l))}
+    static cdar(l){return cdr(car(l))}
+    static cddr(l){return cdr(cdr(l))}
+    static caaar(l){return car(car(car(l)))}
+    static caadr(l){return car(car(cdr(l)))}
+    static cadar(l){return car(cdr(car(l)))}
+    static caddr(l){return car(cdr(cdr(l)))}
+    static cdaar(l){return cdr(car(car(l)))}
+    static cdadr(l){return cdr(car(cdr(l)))}
+    static cddar(l){return cdr(cdr(car(l)))}
+    static cdddr(l){return cdr(cdr(cdr(l)))}
+    static caaaar(l){return car(car(car(car(l))))}
+    static caaadr(l){return car(car(car(cdr(l))))}
+    static caadar(l){return car(car(cdr(car(l))))}
+    static caaddr(l){return car(car(cdr(cdr(l))))}
+    static cadaar(l){return car(cdr(car(car(l))))}
+    static cadadr(l){return car(cdr(car(cdr(l))))}
+    static caddar(l){return car(cdr(cdr(car(l))))}
+    static cadddr(l){return car(cdr(cdr(cdr(l))))}
+    static cdaaar(l){return cdr(car(car(car(l))))}
+    static cdaadr(l){return cdr(car(car(cdr(l))))}
+    static cdadar(l){return cdr(car(cdr(car(l))))}
+    static cdaddr(l){return cdr(car(cdr(cdr(l))))}
+    static cddaar(l){return cdr(cdr(car(car(l))))}
+    static cddadr(l){return cdr(cdr(car(cdr(l))))}
+    static cdddar(l){return cdr(cdr(cdr(car(l))))}
+    static cddddr(l){return cdr(cdr(cdr(cdr(l))))}
+}

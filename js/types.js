@@ -1,20 +1,18 @@
-var LispType = DEFCLASS("LispType", null, function(D, P){
-    P.print = function() {
-        return "<" + this.type + ">";
-    };
-});
+import { LispMachine } from "./machine2.js";
 
-function DEFTYPE(name, func, base) {
-    return DEFCLASS(name.replace(/-/g, "_"), base || LispType, function(D, P){
-        P.type = D.type = name;
-        var ret = func ? func(D, P) : null;
-        return ret;
-    }, true);
-};
+export class LispType {
+    static is(x) { return x instanceof LispType }
+    print() {
+        return "<" + this.constructor.type + ">";
+    }
+}
 
-var LispChar = DEFTYPE("char", function(D, P){
+export class LispChar extends LispType {
+    static type = "char";
+    static is(x) { return x instanceof LispChar }
+
     // TODO: this table should be really long.
-    var NAMES_TO = Object.assign(Object.create(null), {
+    static #NAMES_TO = Object.assign(Object.create(null), {
         " "      : "SPACE",
         "\t"     : "TAB",
         "\r"     : "RETURN",
@@ -23,93 +21,125 @@ var LispChar = DEFTYPE("char", function(D, P){
         "\x08"   : "BACKSPACE",
         "\u2028" : "LINE_SEPARATOR",
         "\u2029" : "PARAGRAPH_SEPARATOR",
-        "\xA0"   : "NO-BREAK_SPACE"
+        "\xA0"   : "NO-BREAK_SPACE",
     });
-    var NAMES_FROM = (function(h){
-        for (var i in NAMES_TO)
-            h[NAMES_TO[i]] = i;
+
+    static #NAMES_FROM = ((h) => {
+        for (var i in this.#NAMES_TO)
+            h[this.#NAMES_TO[i]] = i;
         h.LINEFEED = "\n";
         return h;
     })(Object.create(null));
-    var OBJECTS = {};
-    D.fromName = function(name) {
+
+    static #OBJECTS = Object.create(null);
+
+    static fromName(name) {
         if (name.length == 1)
-            return D.get(name); // hack
+            return LispChar.get(name); // hack
         name = name.toUpperCase();
-        if (Object.hasOwn(NAMES_FROM, name))
-            return D.get(NAMES_FROM[name]);
+        if (Object.hasOwn(LispChar.#NAMES_FROM, name))
+            return LispChar.get(LispChar.#NAMES_FROM[name]);
         return null;
-    };
-    D.fromCode = function(code) {
-        return new D(String.fromCharCode(code));
-    };
-    D.get = function(char) {
-        return OBJECTS[char] || (
-            OBJECTS[char] = new LispChar(char)
+    }
+
+    static fromCode(code) {
+        return new LispChar(String.fromCharCode(code));
+    }
+
+    static get(char) {
+        return LispChar.#OBJECTS[char] || (
+            LispChar.#OBJECTS[char] = new LispChar(char)
         );
-    };
-    D.sanitize = function(val) {
+    }
+
+    static sanitize(val) {
         return val.replace(/[\u0000\u00ad\u0600\u0604\u070f\u17b4\u17b5\u200c\u200f\u2028\u2029\u202f\u2060\u206f\ufeff\ufff0-\uffff]/g, function(s){
             var v = s.charCodeAt(0).toString(16);
             while (v.length < 4) v = "0" + v;
             return "\\u" + v;
         });
-    };
-    P.INIT = function(val){ this.value = val };
-    P.valueOf = P.toString = function(){ return this.value };
-    P.name = function() {
-        return NAMES_TO[this.value] || this.value;
-    };
-    P.code = function() {
-        return this.value.charCodeAt(0);
-    };
-    P.print = function() {
-        var ch = this.value;
-        return "#\\" + (Object.hasOwn(NAMES_TO, ch) ? NAMES_TO[ch] : ch);
-    };
-    P.serialize = function() {
-        var ch = D.sanitize(JSON.stringify(this.value));
-        return "c(" + ch + ")";
-    };
-});
+    }
 
-var LispClosure = DEFTYPE("closure", function(D, P){
-    P.INIT = function(code, name, env) {
+    constructor(val) {
+        super();
+        this.value = val;
+    };
+
+    valueOf() {
+        return this.value;
+    }
+
+    toString() {
+        return this.value;
+    }
+
+    name() {
+        return LispChar.#NAMES_TO[this.value] || this.value;
+    }
+
+    code() {
+        return this.value.charCodeAt(0);
+    }
+
+    print() {
+        var ch = this.value;
+        return "#\\" + (LispChar.#NAMES_TO[ch] || ch);
+    }
+
+    serialize() {
+        var ch = LispChar.sanitize(JSON.stringify(this.value));
+        return "c(" + ch + ")";
+    }
+}
+
+export class LispClosure extends LispType {
+    static type = "function";
+    static is(x) { return x instanceof LispClosure }
+    constructor(code, name, env) {
+        super();
         this.code = code;
         this.name = name || null;
         this.env = env || null;
         this.noval = false;
-    };
-    P.copy = function() {
-        return new D(this.code, this.name, this.env);
-    };
-    P.print = function() {
+    }
+    copy() {
+        return new LispClosure(this.code, this.name, this.env);
+    }
+    print() {
         return "<function" + (this.name ? " " + this.name : "") + ">";
-    };
-});
+    }
+}
 
-var LispPrimitiveError = DEFTYPE("primitive-error", function(D, P){
-    P.INIT = function(msg) {
+export class LispPrimitiveError extends LispType {
+    static type = "primitive-error";
+    static is(x) { return x instanceof LispPrimitiveError }
+    constructor(msg) {
+        super();
         this.message = msg;
-    };
-});
+    }
+}
 
-var LispStream = DEFTYPE("stream", function(D, P){
-    P.INIT = function(text) {
+export class LispStream extends LispType {
+    static type = "stream";
+    static is(x) { return x instanceof LispStream }
+    constructor(text) {
+        super();
         this.text = text || "";
         this.line = 1;
         this.col = 0;
         this.pos = 0;
-    };
-});
+    }
+}
 
-var LispInputStream = DEFTYPE("input-stream", function(D, P){
-    P.peek = function() {
+export class LispInputStream extends LispStream {
+    static type = "input-stream";
+    static is(x) { return x instanceof LispInputStream }
+    peek() {
         return this.pos < this.text.length
             ? LispChar.get(this.text.charAt(this.pos))
             : null;
-    };
-    P.next = function() {
+    }
+    next() {
         if (this.pos < this.text.length) {
             var ch = this.text.charAt(this.pos++);
             if (ch == "\n") ++this.line, this.col = 0;
@@ -117,32 +147,34 @@ var LispInputStream = DEFTYPE("input-stream", function(D, P){
             return LispChar.get(ch);
         }
         return null;
-    };
-    P.prev = function() {
+    }
+    prev() {
         if (this.pos > 0) {
             var ch = this.text.charAt(--this.pos);
             if (this.col-- == 0) this._resetPos();
             return LispChar.get(ch);
         }
         return null;
-    };
-    P.skip_to = function(ch) {
+    }
+    skip_to(ch) {
         var pos = this.text.indexOf(ch, this.pos);
         if (pos <= 0) pos = this.text.length;
         var diff = pos - this.pos;
         this.pos = pos;
         return diff;
-    };
-    P._resetPos = function() {
+    }
+    _resetPos() {
         var a = this.text.substr(0, this.pos).split(/\r?\n/);
         this.line = a.length;
         this.col = a[this.line - 1].length;
-    };
-}, LispStream);
+    }
+}
 
-var LispOutputStream = DEFTYPE("output-stream", function(D, P){
-    P.onData = function(){};
-    P.put = function(str) {
+export class LispOutputStream extends LispStream {
+    static type = "output-stream";
+    static is(x) { return x instanceof LispOutputStream }
+    onData(){}
+    put(str) {
         var lines = str.split(/\r?\n/);
         this.line += lines.length - 1;
         this.col = lines.length > 1
@@ -152,28 +184,31 @@ var LispOutputStream = DEFTYPE("output-stream", function(D, P){
         this.text += str;
         this.onData(this, str);
         return this.text;
-    };
-    P.get = function() {
+    }
+    get() {
         return this.text;
-    };
-}, LispStream);
+    }
+}
 
-var LispHash = DEFTYPE("simple-hash", function(D, P){
-    D.fromObject = function(obj) {
+export class LispHash extends LispType {
+    static type = "simple-hash";
+    static is(x) { return x instanceof LispHash }
+    static fromObject(obj) {
         var hash = new LispHash;
         hash.data = new Map(Object.entries(obj));
         return hash;
-    };
-    P.toObject = function() {
+    }
+    constructor(parent = null) {
+        super();
+        this.data = new Map();
+        this.parent = parent;
+    }
+    toObject() {
         let obj = Object.create(null);
         this.data.entries().forEach(([ key, val ]) => obj[key] = val);
         return obj;
-    };
-    P.INIT = function(parent = null) {
-        this.data = new Map();
-        this.parent = parent;
-    };
-    P.get = function(key) {
+    }
+    get(key) {
         let hash = this;
         while (hash) {
             if (hash.data.has(key))
@@ -181,15 +216,15 @@ var LispHash = DEFTYPE("simple-hash", function(D, P){
             hash = hash.parent;
         }
         return null;
-    };
-    P.set = function(name, val) {
+    }
+    set(name, val) {
         this.data.set(name, val);
         return val;
-    };
-    P.delete = function(name) {
+    }
+    delete(name) {
         this.data.delete(name);
-    };
-    P.has = function(key) {
+    }
+    has(key) {
         let hash = this;
         while (hash) {
             if (hash.data.has(key))
@@ -197,87 +232,108 @@ var LispHash = DEFTYPE("simple-hash", function(D, P){
             hash = hash.parent;
         }
         return null;
-    };
-    P.size = function() {
+    }
+    size() {
         return this.data.size;
-    };
-    P.serialize = function() {
+    }
+    serialize() {
         return "h(" + LispChar.sanitize(JSON.stringify(this.toObject())) + ")";
-    };
-    P.copy = function() {
+    }
+    copy() {
         return new LispHash(this);
-    };
-    P.keys = function() {
+    }
+    keys() {
         return [ ...this.data.keys() ];
-    };
-    P.values = function() {
+    }
+    values() {
         return [ ...this.data.values() ];
-    };
-    P.iterator = P[Symbol.iterator] = function() {
+    }
+    iterator() {
         return this.data.entries();
-    };
-});
+    }
+    [Symbol.iterator]() {
+        return this.data.entries();
+    }
+}
 
-var LispObject = DEFTYPE("object", function(D, P){
-    P.print = function() {
+export class LispObject extends LispType {
+    static type = "object";
+    static is(x) { return x instanceof LispObject }
+    print() {
         return "<object " + this.vector[0].vector[2] + ">";
-    };
-    P.INIT = function(size) {
+    }
+    constructor(size) {
+        super();
         var a = this.vector = new Array(size);
         while (--size >= 0) a[size] = null;
-    };
-});
+    }
+}
 
-var LispPackage = DEFTYPE("package", function(D, P){
-    var PACKAGES = Object.create(null);
-    P.INIT = function(name) {
+export class LispPackage extends LispType {
+    static type = "package";
+    static is(x) { return x instanceof LispPackage }
+    static #PACKAGES = Object.create(null);
+    static all() {
+        return LispPackage.#PACKAGES;
+    };
+    static get(name) {
+        return LispPackage.#PACKAGES[name] || (
+            LispPackage.#PACKAGES[name] = new LispPackage(name)
+        );
+    }
+    static get_existing(name) {
+        return LispPackage.#PACKAGES[name] || null;
+    }
+    static BASE_PACK = LispPackage.get("%");
+    constructor(name) {
+        super();
         this.name = name + "";
         this.symbols = new LispHash();
         this.exports = [];
         this.uses = [];
-    };
-    P.toString = function() { return this.name };
-    P.print = function() { return "<package " + this.name + ">" };
-    P.serialize = function(cache) {
+    }
+    toString() { return this.name }
+    print() { return "<package " + this.name + ">" }
+    serialize(cache) {
         if (cache) {
             let id = cache.get(this);
             if (id != null) return `p(${id})`;
             cache.set(this, cache.size());
         }
         return "p(" + JSON.stringify(this.name) + ")";
-    };
-    P.intern = function(name) {
+    }
+    intern(name) {
         let sym = this.symbols.get(name);
         if (!sym) {
             sym = this.symbols.set(name, new LispSymbol(name, this));
-            if (this === D.BASE_PACK) {
+            if (this === LispPackage.BASE_PACK) {
                 this.exports.push(sym);
             }
         }
         return sym;
-    };
-    P.unintern = function(name) {
+    }
+    unintern(name) {
         this.symbols.delete(name);
-    };
-    P.export = function(sym) {
+    }
+    export(sym) {
         sym = this.find(LispSymbol.symname(sym));
         if (sym && this.exports.indexOf(sym) < 0) {
             this.exports.push(sym);
             return true;
         }
         return null;
-    };
-    P.import = function(sym) {
+    }
+    import(sym) {
         this.symbols.set(LispSymbol.symname(sym), sym);
-    };
-    P.shadow = function(name) {
+    }
+    shadow(name) {
         var sym = this.symbols.get(name);
         if (sym && sym.pak === this) return sym;
         sym = new LispSymbol(name, this);
         this.symbols.set(name, sym);
         return sym;
-    };
-    P.find_exported = function(name) {
+    }
+    find_exported(name) {
         var a = this.exports;
         for (var i = a.length; --i >= 0;) {
             var sym = a[i];
@@ -285,11 +341,11 @@ var LispPackage = DEFTYPE("package", function(D, P){
                 return sym;
         }
         return null;
-    };
-    P.find_internal = function(name) {
+    }
+    find_internal(name) {
         return this.symbols.get(name);
-    };
-    P.find_accessible = function(name) {
+    }
+    find_accessible(name) {
         var sym = this.find_exported(name);
         if (!sym) {
             var a = this.uses;
@@ -299,22 +355,22 @@ var LispPackage = DEFTYPE("package", function(D, P){
             }
         }
         return sym;
-    };
-    P.all_accessible = function() {
+    }
+    all_accessible() {
         var ret = this.symbols.values();
         var a = this.uses;
         for (var i = a.length; --i >= 0;) {
             ret.push.apply(ret, a[i].exports);
         }
         return ret;
-    };
-    P.all_exported = function() {
+    }
+    all_exported() {
         return [ ...this.exports ];
-    };
-    P.all_interned = function() {
+    }
+    all_interned() {
         return this.symbols.values();
-    };
-    P.find = function(name) {
+    }
+    find(name) {
         var sym = this.symbols.get(name);
         if (sym) return sym;
         for (var i = this.uses.length; --i >= 0;) {
@@ -322,55 +378,52 @@ var LispPackage = DEFTYPE("package", function(D, P){
             if (sym) return sym;
         }
         return null;
-    };
-    P.find_or_intern = function(name) {
+    }
+    find_or_intern(name) {
         return this.find(name) || this.intern(name);
-    };
-    P.external = function(sym) {
+    }
+    external(sym) {
         return this.exports.indexOf(sym) >= 0;
-    };
-    P.alias = function(nickname) {
-        PACKAGES[nickname] = this;
-    };
-    P.use = function(pak) {
+    }
+    alias(nickname) {
+        LispPackage.#PACKAGES[nickname] = this;
+    }
+    use(pak) {
         if (this.uses.indexOf(pak) < 0) {
             this.uses.push(pak);
             return pak;
         }
         return null;
-    };
-    D.get = function(name) {
-        return PACKAGES[name] || (
-            PACKAGES[name] = new D(name)
-        );
-    };
-    D.get_existing = function(name) {
-        return PACKAGES[name] || null;
-    };
-    D.all = function() {
-        return PACKAGES;
-    };
-});
+    }
+}
 
-var LispSymbol = DEFTYPE("symbol", function(D, P){
-    var SYMBOLS = Object.create(null);
-    var BASE_PACK = LispPackage.BASE_PACK = LispPackage.get("%");
-    D.symname = function(sym) {
+export class LispSymbol extends LispType {
+    static type = "symbol";
+    static #SYMBOLS = Object.create(null);
+    static symname(sym) {
         return sym === null ? "NIL" : sym === true ? "T" : sym.name;
-    };
-    D.is = function(thing) {
-        return thing === true || thing === null || thing instanceof D;
-    };
-    P.INIT = function(name, pak) {
+    }
+    static is(x) {
+        return x === true || x === null || x instanceof LispSymbol;
+    }
+    static get(name, pak) {
+        if (pak == null) pak = LispPackage.BASE_PACK;
+        var ret = pak ? pak.intern(name) : (LispSymbol.#SYMBOLS[name] || (
+            LispSymbol.#SYMBOLS[name] = new LispSymbol(name)
+        ));
+        return ret;
+    }
+    constructor(name, pak) {
+        super();
         if (name) {
             this.name = name + "";
             this.pak = pak || null;
             this.value = null;
             this.vlist = Object.create(null);
         }
-    };
-    P.toString = function() { return this.name };
-    P.serialize = function(cache) {
+    }
+    toString() { return this.name }
+    serialize(cache) {
         if (cache) {
             let id = cache.get(this);
             if (id != null) return `s(${id})`;
@@ -384,41 +437,34 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
         // the package.
         if (cache) cache.set(this, cache.size());
         return code;
-    };
-    P.setv = function(key, val) {
+    }
+    setv(key, val) {
         return this.vlist[key] = val;
-    };
-    P.getv = function(key) {
+    }
+    getv(key) {
         return key in this.vlist ? this.vlist[key] : null;
-    };
-    P.macro = function() {
+    }
+    macro() {
         return this.getv("macro");
-    };
-    P.special = function() {
+    }
+    special() {
         return this.getv("special");
-    };
-    P.global = function() {
+    }
+    global() {
         return this.getv("global");
-    };
-    P.primitive = function() {
+    }
+    primitive() {
         return this.getv("primitive");
-    };
-    P.func = function() {
+    }
+    func() {
         return this.getv("function");
-    };
-    D.get = function(name, pak) {
-        if (pak == null) pak = BASE_PACK;
-        var ret = pak ? pak.intern(name) : (SYMBOLS[name] || (
-            SYMBOLS[name] = new D(name)
-        ));
-        return ret;
-    };
-    P.print = function() {
+    }
+    print() {
         if (this.pak?.name == "KEYWORD")
             return ":" + this.name;
         return this.name;
-    };
-});
+    }
+}
 
 (function(BASE_PACK){
     var pak = BASE_PACK.intern("*PACKAGE*");
@@ -427,13 +473,16 @@ var LispSymbol = DEFTYPE("symbol", function(D, P){
     BASE_PACK.PACKAGE_VAR = pak;
 })(LispPackage.get("%"));
 
-var LispMutex = DEFTYPE("mutex", function(D, P){
-    P.INIT = function(name) {
+export class LispMutex extends LispType {
+    static type = "mutex";
+    static is(x) { return x instanceof LispMutex }
+    constructor(name) {
+        super();
         this.name = name || null;
         this.waiters = [];
         this.locked = null;
-    };
-    P.acquire = function(process) {
+    }
+    acquire(process) {
         if (!this.locked) {
             this.locked = process;
             return process;
@@ -442,8 +491,8 @@ var LispMutex = DEFTYPE("mutex", function(D, P){
             process.m.status = "locked";
             return null;
         }
-    };
-    P.release = function() {
+    }
+    release() {
         if (!this.locked) return null;
         if (this.waiters.length > 0) {
             var process = this.waiters.shift();
@@ -454,49 +503,73 @@ var LispMutex = DEFTYPE("mutex", function(D, P){
             this.locked = null;
             return true;
         }
-    };
-});
-
-var LispProcess = DEFTYPE("process", function(D, P){
-
-    // many ideas from http://norstrulde.org/ilge10/ — Kudos Eric Bergstrome!
-
-    class Message {
-        constructor(sender, target, signal, args) {
-            this.sender = sender;
-            this.target = target;
-            this.signal = signal;
-            this.args = args;
-        }
     }
+}
 
-    var PID = 0;
-    var QUEUE = [];
-    P.INIT = function(parent_machine, closure) {
+// many ideas from http://norstrulde.org/ilge10/ — Kudos Eric Bergstrome!
+
+class Message {
+    constructor(sender, target, signal, args) {
+        this.sender = sender;
+        this.target = target;
+        this.signal = signal;
+        this.args = args;
+    }
+}
+
+let PID = 0;
+let QUEUE = [];
+
+const run = () => {
+    var start_time = Date.now();
+    while (Date.now() - start_time < 100) {
+        if (QUEUE.length == 0) break;
+        var p = QUEUE.shift();
+        if (p instanceof LispProcess) {
+            p.run(200);
+        }
+        else if (p instanceof Message) {
+            p.target.handle(p);
+        }
+        else throw new Error("Unknown object in scheduler queue");
+    }
+    if (QUEUE.length > 0) setTimeout(run, 0);
+};
+
+const start = () => {
+    setTimeout(run, 0);
+};
+
+export class LispProcess extends LispType {
+    static type = "process";
+    static is(x) { return x instanceof LispProcess }
+
+    constructor(parent_machine, closure) {
+        super();
         var pid = this.pid = ++PID;
         var m = this.m = new LispMachine(parent_machine);
         this.receivers = null;
         this.mailbox = [];
-        this.timeouts = {};
+        this.timeouts = Object.create(null);
         this.noint = null;
         m.process = this;
         m.set_closure(closure);
         this.resume();
-    };
+    }
 
-    P.print = function() {
+    print() {
         return "<process " + this.pid + ">";
-    };
+    }
 
-    P.resume = function(at_start) {
+    resume(at_start) {
         this.receivers = null;
         this.m.status = "running";
         if (at_start) QUEUE.unshift(this);
         else QUEUE.push(this);
         start();
-    };
+    }
 
-    P.run = function(quota) {
+    run(quota) {
         var m = this.m, err;
         do {
             if (m.status == "running") err = m.run(quota);
@@ -518,35 +591,35 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 break;
             }
         }
-    };
+    }
 
-    P.sendmsg = function(target, signal, args) {
+    sendmsg(target, signal, args) {
         QUEUE.push(new Message(this, target, signal, args));
         start();
         return target;
-    };
+    }
 
-    D.sendmsg = function(target, signal, args) {
+    sendmsg(target, signal, args) {
         QUEUE.push(new Message(null, target, signal, args));
         start();
         return target;
-    };
+    }
 
-    P.receive = function(receivers) {
+    receive(receivers) {
         if (this.m.status != "running")
             throw new Error("Process not running");
         this.receivers = receivers;
         this.m.status = "waiting";
         return false;
-    };
+    }
 
-    P.handle = function(msg) {
+    handle(msg) {
         this.mailbox.push(msg);
         if (this.m.status == "waiting")
             this.checkmail();
-    };
+    }
 
-    P.checkmail = function() {
+    checkmail() {
         if (this.mailbox.length > 0) {
             var msg = this.mailbox.shift();
             var f = this.receivers.get(msg.signal);
@@ -557,48 +630,28 @@ var LispProcess = DEFTYPE("process", function(D, P){
                 console.warn("No receiver for message ", msg, " in process ", this.pid);
             }
         }
-    };
+    }
 
-    P.has_timeouts = function() {
+    has_timeouts() {
         for (var i in this.timeouts) if (Object.hasOwn(this.timeouts, i)) return true;
         return null;
-    };
+    }
 
-    P.set_timeout = function(timeout, closure) {
-        var self = this;
+    set_timeout(timeout, closure) {
         closure = closure.copy();
         closure.noval = true;
-        var tm = setTimeout(function(){
-            delete self.timeouts[tm];
-            self.m._callnext(closure, null);
-            self.resume(true);
+        var tm = setTimeout(() => {
+            delete this.timeouts[tm];
+            this.m._callnext(closure, null);
+            this.resume(true);
         }, timeout);
-        self.timeouts[tm] = true;
+        this.timeouts[tm] = true;
         return tm;
-    };
+    }
 
-    P.clear_timeout = function(tm) {
+    clear_timeout(tm) {
         delete this.timeouts[tm];
         clearTimeout(tm);
         return null;
-    };
-
-    function start() {
-        setTimeout(run, 0);
-    };
-    function run() {
-        var start_time = Date.now();
-        while (Date.now() - start_time < 100) {
-            if (QUEUE.length == 0) break;
-            var p = QUEUE.shift();
-            if (p instanceof D) {
-                p.run(200);
-            }
-            else if (p instanceof Message) {
-                p.target.handle(p);
-            }
-            else throw new Error("Unknown object in scheduler queue");
-        }
-        if (QUEUE.length > 0) setTimeout(run, 0);
-    };
-});
+    }
+}

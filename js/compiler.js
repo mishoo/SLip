@@ -1,3 +1,8 @@
+import { LispCons } from "./list.js";
+import { LispSymbol, LispPackage, LispChar } from "./types.js";
+import { LispMachine } from "./machine2.js";
+import { UNICODE } from "./os.js";
+
 // basic stream
 
 function InputStream(text) {
@@ -524,7 +529,7 @@ function lisp_reader(code) {
         return seq(
             is_labels ? gen("FRAME") : [],
             seq.apply(null, b.names.map(function(name, i){
-                return comp_lambda(name, car(b.vals[i]), cdr(b.vals[i]), env)
+                return comp_lambda(name, car(b.vals[i]), cdr(b.vals[i]), env);
             })),
             is_labels ? [] : gen("FRAME"),
             b.len > 1 ? gen("VARS", b.len) : gen("VAR"),
@@ -617,20 +622,18 @@ function lisp_reader(code) {
         return comp_seq(x, new Environment(), true, true);
     };
 
-    var Environment = DEFCLASS("Environment", null, function(D, P){
-        P.INIT = function() {
+    class Environment {
+        constructor() {
             this.stuff = [];
-        };
-        P.extend = function(type, val) {
+        }
+        extend(type, val) {
             var env = new Environment();
-            env.stuff = [ val.map(function(name){
-                return { name: name, type: type };
-            }) ].concat(this.stuff);
+            env.stuff = [ val.map(name => ({ name, type })) ].concat(this.stuff);
             return env;
-        };
-        P.add = function(name, type) {
+        }
+        add(name, type) {
             this.stuff[0].push({ name: name, type: type });
-        };
-    });
+        }
+    }
 
 })(LispCons);

@@ -2,6 +2,7 @@
 // This is a mess that works.
 //----------------------------
 
+import { LispCons } from "../js/list.js";
 import { Ymacs, Ymacs_Keymap, Ymacs_Buffer,
          Ymacs_Interactive, Ymacs_Tokenizer,
          Ymacs_Lang_Lisp,
@@ -148,7 +149,7 @@ class Ymacs_SL extends Ymacs {
             };
         }
         var thread = MACHINE().eval_string("YMACS", "*THREAD*");
-        thread.sendmsg(thread, what, window.LispCons.fromArray(args));
+        thread.sendmsg(thread, what, LispCons.fromArray(args));
     }
     ls_set(src) {
         super.ls_set(src);
@@ -560,7 +561,7 @@ Ymacs_Buffer.newCommands({
             this.cmd("indent_line");
     }),
     sl_get_symbol_completions: function(query) {
-        return window.LispCons.toArray(MACHINE().eval_string(
+        return LispCons.toArray(MACHINE().eval_string(
             find_package(this),
             "(ymacs::exec-list-symbol-completions " + JSON.stringify(query) + ")"
         ));
