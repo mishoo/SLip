@@ -43,82 +43,79 @@
 ;; props to http://norstrulde.org/ilge10/ - pasting here the original version,
 ;; because it's small and beautiful and it's the heart of quasiquotation:
 ;;
-;; (set-symbol-function!
-;;  'qq
-;;  (labels ((qq (x)
-;;             (if (consp x)
-;;                 (if (eq 'qq-unquote (car x))
-;;                     (cadr x)
-;;                     (if (eq 'quasiquote (car x))
-;;                         (qq (qq (cadr x)))
-;;                         (if (consp (car x))
-;;                             (if (eq 'qq-splice (caar x))
-;;                                 (list 'append (cadar x) (qq (cdr x)))
-;;                                 (list 'cons (qq (car x)) (qq (cdr x))))
-;;                             (list 'cons (qq (car x)) (qq (cdr x))))))
-;;                 (list 'quote x))))
-;;    #'qq))
-;;
-;; The version below has a bunch of optimizations and uses `cond'.
 (set-symbol-function!
  'qq
- (labels
-     ((opt-splice (x)
-        (cond
-          ((cdr x)
-           (let ((rest (qq (cdr x))))
-             (if (if (consp rest) (eq 'append (car rest)))
-                 (list* 'append (cadar x) (cdr rest))
-                 (list 'append (cadar x) rest))))
-          (t
-           (cadar x))))
-
-      (opt-list (first second rest)
-        (cond
-          ((not rest)
-           (list 'list first second))
-          ((not (consp rest))
-           (list 'list* first second rest))
-          ((eq 'list* (car rest))
-           (list* 'list* first second (cdr rest)))
-          ((eq 'list (car rest))
-           (list* 'list first second (cdr rest)))
-          (t
-           (list 'list* first second rest))))
-
-      (opt-cons (x)
-        (let ((first (qq (car x)))
-              (second (qq (cdr x))))
-          (cond
-            ((not second)
-             (list 'list first))
-            ((not (consp second))
-             (list 'cons first second))
-            ((eq 'list (car second))
-             (list* 'list first (cdr second)))
-            ((eq 'cons (car second))
-             (opt-list first (cadr second) (caddr second)))
-            (t
-             (list 'cons first second)))))
-
-      (qq (x)
-        (cond
-          ((numberp x) x)
-          ((stringp x) x)
-          ((regexpp x) x)
-          ((not (consp x))
-           (if x (list 'quote x)))
-          ((eq 'qq-unquote (car x))
-           (cadr x))
-          ((eq 'quasiquote (car x))
-           (qq (qq (cadr x))))
-          ((consp (car x))
-           (if (eq 'qq-splice (caar x))
-               (opt-splice x)
-               (opt-cons x)))
-          (t
-           (opt-cons x)))))
+ (labels ((qq (x)
+            (if (consp x)
+                (if (eq 'qq-unquote (car x))
+                    (cadr x)
+                    (if (eq 'quasiquote (car x))
+                        (qq (qq (cadr x)))
+                        (if (consp (car x))
+                            (if (eq 'qq-splice (caar x))
+                                (list 'append (cadar x) (qq (cdr x)))
+                                (list 'cons (qq (car x)) (qq (cdr x))))
+                            (list 'cons (qq (car x)) (qq (cdr x))))))
+                (list 'quote x))))
    #'qq))
+;;
+;; The version below has a bunch of optimizations and uses `cond'.
+;; (set-symbol-function!
+;;  'qq
+;;  (labels
+;;      ((opt-splice (x)
+;;         (cond
+;;           ((cdr x)
+;;            (let ((rest (qq (cdr x))))
+;;              (if (if (consp rest) (eq 'append (car rest)))
+;;                  (list* 'append (cadar x) (cdr rest))
+;;                  (list 'append (cadar x) rest))))
+;;           (t
+;;            (cadar x))))
+;;       (opt-list (first second rest)
+;;         (cond
+;;           ((not rest)
+;;            (list 'list first second))
+;;           ((not (consp rest))
+;;            (list 'list* first second rest))
+;;           ((eq 'list* (car rest))
+;;            (list* 'list* first second (cdr rest)))
+;;           ((eq 'list (car rest))
+;;            (list* 'list first second (cdr rest)))
+;;           (t
+;;            (list 'list* first second rest))))
+;;       (opt-cons (x)
+;;         (let ((first (qq (car x)))
+;;               (second (qq (cdr x))))
+;;           (cond
+;;             ((not second)
+;;              (list 'list first))
+;;             ((not (consp second))
+;;              (list 'cons first second))
+;;             ((eq 'list (car second))
+;;              (list* 'list first (cdr second)))
+;;             ((eq 'cons (car second))
+;;              (opt-list first (cadr second) (caddr second)))
+;;             (t
+;;              (list 'cons first second)))))
+;;       (qq (x)
+;;         (cond
+;;           ((numberp x) x)
+;;           ((stringp x) x)
+;;           ((regexpp x) x)
+;;           ((not (consp x))
+;;            (if x (list 'quote x)))
+;;           ((eq 'qq-unquote (car x))
+;;            (cadr x))
+;;           ((eq 'quasiquote (car x))
+;;            (qq (qq (cadr x))))
+;;           ((consp (car x))
+;;            (if (eq 'qq-splice (caar x))
+;;                (opt-splice x)
+;;                (opt-cons x)))
+;;           (t
+;;            (opt-cons x)))))
+;;    #'qq))
 
 (set-symbol-function!
  'maybe-xref-info
@@ -610,6 +607,8 @@
                (if val? (gen "CC")))
               (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
+              (%::%let (comp-let2 (cadr x) (cddr x) env val? more?))
+              (%::%let* (comp-let*2 (cadr x) (cddr x) env val? more?))
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
               (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
               (macrolet (comp-macrolet (cadr x) (cddr x) env val? more?))
@@ -949,6 +948,70 @@
                    (gen "UNFR" 1 (length specials))
                    (if more? nil (gen "RET")))))
            (comp-seq body env val? more?)))
+
+     ;;;; attempt to fix tail recursion
+
+     (comp-let2 (bindings body env val? more?)
+       (if bindings
+           (if (symbolp bindings)
+               (let* ((looop bindings)
+                      (bindings (car body))
+                      (body (cdr body))
+                      (names (map (lambda (x)
+                                    (if (consp x) (car x) x))
+                                  bindings)))
+                 (comp `(labels ((,looop ,names
+                                   ,@body))
+                          (,looop ,@(map (lambda (x)
+                                           (if (consp x) (cadr x)))
+                                         bindings)))
+                       env val? more?))
+               (with-seq-output <<
+                 (let* ((bindings (get-bindings bindings t))
+                        (names (car bindings))
+                        (vals (cadr bindings))
+                        (len (caddr bindings))
+                        (specials (cadddr bindings)))
+                   (foreach vals (lambda (x)
+                                   (<< (comp x env t t))))
+                   (<< (gen "LET" len))
+                   (foreach specials (lambda (x)
+                                       (<< (gen "BIND" (car x) (cdr x)))))
+                   (if more?
+                       (<< (comp-seq body (extenv env :lex (map (lambda (name) (list name :var)) names)) val? t)
+                           (gen "UNFR" 1 (length specials)))
+                       (<< (comp-seq body (extenv env :lex (map (lambda (name) (list name :var)) names)) val? nil))))))
+           (comp-seq body env val? more?)))
+
+     (comp-let*2 (bindings body env val? more?)
+       (if bindings
+           (with-seq-output <<
+             (let* ((bindings (get-bindings bindings t))
+                    (names (car bindings))
+                    (vals (cadr bindings))
+                    (specials (cadddr bindings))
+                    (i 0)
+                    (newargs '()))
+               (mapcar (lambda (name x)
+                         (<< (unless newargs (gen "FRAME"))
+                             (comp x env t t)
+                             (gen "VAR")
+                             (when (%specialp name)
+                               (gen "BIND" name i)))
+                         (%incf i)
+                         (let ((cell (list (list name :var))))
+                           (if newargs
+                               (rplacd newargs cell)
+                               (setq env (extenv env :lex cell)))
+                           (setq newargs cell)))
+                       names vals)
+               (if more?
+                   (<< (comp-seq body env val? t)
+                       (gen "UNFR" 1 (length specials)))
+                   (<< (comp-seq body env val? nil)))))
+           (comp-seq body env val? more?)))
+
+     ;;;; /tail-recursion
 
      (comp-catch (tag body env val? more?)
        (if body

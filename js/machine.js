@@ -510,7 +510,7 @@ function is_jump_instruction(op) {
 }
 
 function assemble(code) {
-    optimize(code);
+    //optimize(code);
     let ret = [];
     for (let i = 0; i < code.length; ++i) {
         let el = code[i];
