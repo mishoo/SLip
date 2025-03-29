@@ -46,79 +46,79 @@
 ;; props to http://norstrulde.org/ilge10/ - pasting here the original version,
 ;; because it's small and beautiful and it's the heart of quasiquotation:
 ;;
-(set-symbol-function!
- 'qq
- (labels ((qq (x)
-            (if (consp x)
-                (if (eq 'qq-unquote (car x))
-                    (cadr x)
-                    (if (eq 'quasiquote (car x))
-                        (qq (qq (cadr x)))
-                        (if (consp (car x))
-                            (if (eq 'qq-splice (caar x))
-                                (list 'append (cadar x) (qq (cdr x)))
-                                (list 'cons (qq (car x)) (qq (cdr x))))
-                            (list 'cons (qq (car x)) (qq (cdr x))))))
-                (list 'quote x))))
-   #'qq))
-;;
-;; The version below has a bunch of optimizations and uses `cond'.
 ;; (set-symbol-function!
 ;;  'qq
-;;  (labels
-;;      ((opt-splice (x)
-;;         (cond
-;;           ((cdr x)
-;;            (let ((rest (qq (cdr x))))
-;;              (if (if (consp rest) (eq 'append (car rest)))
-;;                  (list* 'append (cadar x) (cdr rest))
-;;                  (list 'append (cadar x) rest))))
-;;           (t
-;;            (cadar x))))
-;;       (opt-list (first second rest)
-;;         (cond
-;;           ((not rest)
-;;            (list 'list first second))
-;;           ((not (consp rest))
-;;            (list 'list* first second rest))
-;;           ((eq 'list* (car rest))
-;;            (list* 'list* first second (cdr rest)))
-;;           ((eq 'list (car rest))
-;;            (list* 'list first second (cdr rest)))
-;;           (t
-;;            (list 'list* first second rest))))
-;;       (opt-cons (x)
-;;         (let ((first (qq (car x)))
-;;               (second (qq (cdr x))))
-;;           (cond
-;;             ((not second)
-;;              (list 'list first))
-;;             ((not (consp second))
-;;              (list 'cons first second))
-;;             ((eq 'list (car second))
-;;              (list* 'list first (cdr second)))
-;;             ((eq 'cons (car second))
-;;              (opt-list first (cadr second) (caddr second)))
-;;             (t
-;;              (list 'cons first second)))))
-;;       (qq (x)
-;;         (cond
-;;           ((numberp x) x)
-;;           ((stringp x) x)
-;;           ((regexpp x) x)
-;;           ((not (consp x))
-;;            (if x (list 'quote x)))
-;;           ((eq 'qq-unquote (car x))
-;;            (cadr x))
-;;           ((eq 'quasiquote (car x))
-;;            (qq (qq (cadr x))))
-;;           ((consp (car x))
-;;            (if (eq 'qq-splice (caar x))
-;;                (opt-splice x)
-;;                (opt-cons x)))
-;;           (t
-;;            (opt-cons x)))))
+;;  (labels ((qq (x)
+;;             (if (consp x)
+;;                 (if (eq 'qq-unquote (car x))
+;;                     (cadr x)
+;;                     (if (eq 'quasiquote (car x))
+;;                         (qq (qq (cadr x)))
+;;                         (if (consp (car x))
+;;                             (if (eq 'qq-splice (caar x))
+;;                                 (list 'append (cadar x) (qq (cdr x)))
+;;                                 (list 'cons (qq (car x)) (qq (cdr x))))
+;;                             (list 'cons (qq (car x)) (qq (cdr x))))))
+;;                 (list 'quote x))))
 ;;    #'qq))
+;;
+;; The version below has a bunch of optimizations and uses `cond'.
+(set-symbol-function!
+ 'qq
+ (labels
+     ((opt-splice (x)
+        (cond
+          ((cdr x)
+           (let ((rest (qq (cdr x))))
+             (if (if (consp rest) (eq 'append (car rest)))
+                 (list* 'append (cadar x) (cdr rest))
+                 (list 'append (cadar x) rest))))
+          (t
+           (cadar x))))
+      (opt-list (first second rest)
+        (cond
+          ((not rest)
+           (list 'list first second))
+          ((not (consp rest))
+           (list 'list* first second rest))
+          ((eq 'list* (car rest))
+           (list* 'list* first second (cdr rest)))
+          ((eq 'list (car rest))
+           (list* 'list first second (cdr rest)))
+          (t
+           (list 'list* first second rest))))
+      (opt-cons (x)
+        (let ((first (qq (car x)))
+              (second (qq (cdr x))))
+          (cond
+            ((not second)
+             (list 'list first))
+            ((not (consp second))
+             (list 'cons first second))
+            ((eq 'list (car second))
+             (list* 'list first (cdr second)))
+            ((eq 'cons (car second))
+             (opt-list first (cadr second) (caddr second)))
+            (t
+             (list 'cons first second)))))
+      (qq (x)
+        (cond
+          ((numberp x) x)
+          ((stringp x) x)
+          ((regexpp x) x)
+          ((not (consp x))
+           (if x (list 'quote x)))
+          ((eq 'qq-unquote (car x))
+           (cadr x))
+          ((eq 'quasiquote (car x))
+           (qq (qq (cadr x))))
+          ((consp (car x))
+           (if (eq 'qq-splice (caar x))
+               (opt-splice x)
+               (opt-cons x)))
+          (t
+           (opt-cons x)))))
+   #'qq))
 
 (set-symbol-function!
  'maybe-xref-info
@@ -795,7 +795,6 @@
                                    (gen "CALL" (length args))
                                    #( k )
                                    (unless val? (gen "POP")))))
-
                     (t (%seq (comp-list args env)
                              the-function
                              (gen "CALL" (length args)))))))
@@ -880,17 +879,14 @@
                     (funcs (cadr bindings))
                     (len (caddr bindings)))
                (flet ((extenv ()
-                        (extenv env :lex (map (lambda (name) (list name :func)) names))))
-                 (when labels?
-                   (setq env (extenv))
-                   (<< (gen "FRAME")))
+                        (setq env (extenv env :lex (map (lambda (name) (list name :func)) names)))
+                        (<< (gen "FRAME"))))
+                 (when labels? (extenv))
                  (mapcar (lambda (name func)
                            (<< (comp-lambda name (car func) (cdr func) env)))
                          names funcs)
-                 (unless labels? (<< (gen "FRAME")))
+                 (unless labels? (extenv))
                  (<< (if (> len 1) (gen "VARS" len) (gen "VAR")))
-                 (unless labels?
-                   (setq env (extenv)))
                  (cond
                    (more?
                     (<< (comp-seq body env val? t)

@@ -4,6 +4,12 @@
 (in-package :%)
 " ;; hack for Ymacs
 
+;; XXX: for some reason setting this badly affects the compiler, so
+;; LET expressions in the compiler won't have proper tail calls. It's
+;; still good that we can set it here, but I Just Don't Understand why
+;; the compiler breaks with it!! :-/
+(setq %:*let-tco* t)
+
 (let ((main (make-package "SL"))
       (boot (find-package "%"))
       (user (make-package "SL-USER"))
