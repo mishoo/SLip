@@ -24,7 +24,7 @@
            '*xref-info*
            '*let-tco*)
 
-(setq *let-tco* t)
+;; (setq *let-tco* t)
 
 ;; (defmacro cond cases
 ;;   (if cases
