@@ -605,7 +605,7 @@
                    (%seq (comp (cadr x) env t t)
                          (gen "NOT")
                          (if more? nil (gen "RET")))
-                   (comp (cadr x) env val? more?)))
+                   (comp (cadr x) env nil more?)))
               (c/c
                (arg-count x 0 0)
                (if val? (gen "CC")))
@@ -620,23 +620,25 @@
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
               (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
               (macrolet (comp-macrolet (cadr x) (cddr x) env val? more?))
-              (lambda (if val?
-                          (%seq (comp-lambda nil (cadr x) (cddr x) env)
-                                (if more? nil (gen "RET")))))
+              (lambda (when val?
+                        (%seq (comp-lambda nil (cadr x) (cddr x) env)
+                              (unless more? (gen "RET")))))
               (function
                (arg-count x 1 1)
                (let ((sym (cadr x)))
                  (assert (symbolp sym) "FUNCTION requires a symbol")
-                 (let ((local (find-func sym env)))
-                   (%seq (when val? (if local
-                                        (gen "LVAR" (car local) (cadr local))
-                                        (progn
-                                          (unless (symbol-function sym)
-                                            (unknown-function sym))
-                                          (gen "FGVAR" sym))))
-                         (if more? nil (gen "RET"))))))
-              (%fn (%seq (if val? (comp-lambda (cadr x) (caddr x) (cdddr x) env))
-                         (if more? nil (gen "RET"))))
+                 (when val?
+                   (let ((local (find-func sym env)))
+                     (%seq (if local
+                               (gen "LVAR" (car local) (cadr local))
+                               (progn
+                                 (unless (symbol-function sym)
+                                   (unknown-function sym))
+                                 (gen "FGVAR" sym)))
+                           (unless more? (gen "RET")))))))
+              (%fn (when val?
+                     (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
+                           (unless more? (gen "RET")))))
               (tagbody (comp-tagbody (cdr x) env val? more?))
               (go
                (arg-count x 1 1)
@@ -652,12 +654,14 @@
                      (comp-funcall (car x) (cdr x) env val? more?)))))))
 
      (comp-const (x val? more?)
-       (if val? (%seq (gen "CONST" x)
-                      (if more? nil (gen "RET")))))
+       (when val?
+         (%seq (gen "CONST" x)
+               (if more? nil (gen "RET")))))
 
      (comp-var (x env val? more?)
-       (if val? (%seq (gen-var x env)
-                      (if more? nil (gen "RET")))))
+       (when val?
+         (%seq (gen-var x env)
+               (if more? nil (gen "RET")))))
 
      (comp-seq (exps env val? more?)
        (cond
@@ -737,8 +741,7 @@
        (let ((pos (find-tag tag env)))
          (assert pos (strcat "TAG " tag " not found"))
          (let* ((tbody (find-tagbody (caddr pos) env))
-                (i (car tbody))
-                (j (cadr tbody)))
+                (i (car tbody)))
            (if (zerop i)
                (gen "JUMP" (cadddr pos))
                (gen "LJUMP2" (cadddr pos) i)))))
@@ -762,23 +765,31 @@
                 (ecode (comp else env val? more?)))
             (cond
               ((equal tcode ecode)
-               (%seq pcode ecode))
+               (%seq (comp pred env nil t) ecode))
               ((zerop (length tcode))
                (let ((l2 (mklabel)))
-                 (%seq pcode (gen "TJUMP" l2) ecode
+                 (%seq pcode
+                       (gen "TJUMP" l2)
+                       ecode
                        #( l2 )
                        (if more? nil (gen "RET")))))
               ((zerop (length ecode))
                (let ((l1 (mklabel)))
-                 (%seq pcode (gen "FJUMP" l1) tcode
+                 (%seq pcode
+                       (gen "FJUMP" l1)
+                       tcode
                        #( l1 )
                        (if more? nil (gen "RET")))))
               (t
                (let ((l1 (mklabel))
                      (l2 (if more? (mklabel))))
-                 (%seq pcode (gen "FJUMP" l1) tcode
+                 (%seq pcode
+                       (gen "FJUMP" l1)
+                       tcode
                        (if more? (gen "JUMP" l2))
-                       #( l1 ) ecode (if more? #( l2 ))))))))))
+                       #( l1 )
+                       ecode
+                       (if more? #( l2 ))))))))))
 
      (comp-funcall (f args env val? more?)
        (labels ((mkret (the-function)
@@ -789,7 +800,7 @@
                                    the-function
                                    (gen "CALL" (length args))
                                    #( k )
-                                   (if val? nil (gen "POP")))))
+                                   (unless val? (gen "POP")))))
 
                     (t (%seq (comp-list args env)
                              the-function
@@ -805,8 +816,8 @@
                      (comp-seq args env nil more?)
                      (%seq (comp-list args env)
                            (gen "PRIM" f (length args))
-                           (if val? nil (gen "POP"))
-                           (if more? nil (gen "RET")))))
+                           (unless val? (gen "POP"))
+                           (unless more? (gen "RET")))))
                 (t
                  (unless (symbol-function f)
                    (unknown-function f))
@@ -927,7 +938,7 @@
                                        (<< (gen "BIND" (car x) (cdr x)))))
                    (<< (comp-seq body (extenv env :lex (map (lambda (name) (list name :var)) names)) val? t)
                        (gen "UNFR" 1 (length specials))
-                       (if more? nil (gen "RET"))))))
+                       (unless more? (gen "RET"))))))
            (comp-seq body env val? more?)))
 
      (comp-let* (bindings body env val? more?)
@@ -954,10 +965,10 @@
                        names vals)
                (<< (comp-seq body env val? t)
                    (gen "UNFR" 1 (length specials))
-                   (if more? nil (gen "RET")))))
+                   (unless more? (gen "RET")))))
            (comp-seq body env val? more?)))
 
-     ;;;; attempt to fix tail recursion
+;;;; attempt to fix tail recursion
 
      (comp-let2 (bindings body env val? more?)
        (if bindings
@@ -1019,7 +1030,7 @@
                    (<< (comp-seq body env val? nil)))))
            (comp-seq body env val? more?)))
 
-     ;;;; /tail-recursion
+;;;; /tail-recursion
 
      (comp-catch (tag body env val? more?)
        (if body
