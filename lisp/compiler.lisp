@@ -21,7 +21,10 @@
            '*url-prefix*
            '*unknown-functions*
            '*unknown-variables*
-           '*xref-info*)
+           '*xref-info*
+           '*let-tco*)
+
+(setq *let-tco* t)
 
 ;; (defmacro cond cases
 ;;   (if cases
@@ -574,6 +577,7 @@
          (push sym *unknown-variables*)))
 
      (comp (x env val? more?)
+       ;; (console.log x)
        (cond
          ((symbolp x) (cond
                         ((eq x nil) (comp-const nil val? more?))
@@ -605,10 +609,14 @@
               (c/c
                (arg-count x 0 0)
                (if val? (gen "CC")))
-              (let (comp-let (cadr x) (cddr x) env val? more?))
-              (let* (comp-let* (cadr x) (cddr x) env val? more?))
-              (%::%let (comp-let2 (cadr x) (cddr x) env val? more?))
-              (%::%let* (comp-let*2 (cadr x) (cddr x) env val? more?))
+              (let
+                  (if *let-tco*
+                      (comp-let2 (cadr x) (cddr x) env val? more?)
+                      (comp-let (cadr x) (cddr x) env val? more?)))
+              (let*
+                  (if *let-tco*
+                      (comp-let*2 (cadr x) (cddr x) env val? more?)
+                      (comp-let* (cadr x) (cddr x) env val? more?)))
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
               (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
               (macrolet (comp-macrolet (cadr x) (cddr x) env val? more?))
@@ -993,8 +1001,8 @@
                     (i 0)
                     (newargs '()))
                (mapcar (lambda (name x)
-                         (<< (unless newargs (gen "FRAME"))
-                             (comp x env t t)
+                         (<< (comp x env t t)
+                             (unless newargs (gen "FRAME"))
                              (gen "VAR")
                              (when (%specialp name)
                                (gen "BIND" name i)))

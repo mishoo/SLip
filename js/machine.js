@@ -1049,10 +1049,11 @@ function vmrun(m) {
       }
 
       case OP.LRET: {
+          let noval = m.f.noval;
           let addr = m.code[m.pc++];
           let bret = m.pop(), val = m.pop();
           bret.run(m, addr);
-          m.push(val);
+          if (!noval) m.push(val);
           return;
       }
 
