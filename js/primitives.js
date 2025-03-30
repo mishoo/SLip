@@ -100,6 +100,7 @@ function checknargs(n, min, max) {
 
 function checktype(x, type) {
     if (!type.is(x)) error("Invalid type, expecting " + type.type + ", got: " + LispMachine.dump(x));
+    return x;
 };
 
 function as_string(thing) {
@@ -173,37 +174,27 @@ defp("equalp", false, function(m, nargs){
     return equal(a, b);
 });
 
-defp("/=", false, function(m, nargs){
-    checknargs(nargs, 1);
-    var a = [];
-    while (nargs-- > 0) a.push(m.pop_number(error));
+function all_different(a) {
     for (var i = a.length; --i >= 0;) {
         for (var j = i; --j >= 0;) {
             if (a[i] == a[j]) return null;
         }
     }
     return true;
+}
+
+defp("/=", false, function(m, nargs){
+    checknargs(nargs, 1);
+    var a = [];
+    while (nargs-- > 0) a.push(m.pop_number(error));
+    return all_different(a);
 });
 
-(function(defcmp){
-    defcmp("=", new Function("a", "b", "return a==b"));
-    defcmp("<=");
-    defcmp(">=");
-    defcmp("<");
-    defcmp(">");
-})(function(name, cmp){
-    if (!cmp) cmp = new Function("a", "b", "return a" + name + "b");
-    defp(name, false, function(m, nargs){
-        checknargs(nargs, 1);
-        var prev = m.pop_number(error);
-        var ret = true;
-        while (--nargs > 0) {
-            var el = m.pop_number(error);
-            if (ret && !cmp(el, prev)) ret = null;
-            prev = el;
-        }
-        return ret;
-    });
+defp("char/=", false, function(m, nargs){
+    checknargs(nargs, 1);
+    var a = [];
+    while (nargs-- > 0) a.push(checktype(m.pop(), LispChar));
+    return all_different(a);
 });
 
 defp("null", false, function(m, nargs){
@@ -795,36 +786,54 @@ defp("letterp", false, function(m, nargs){
     return UNICODE.letter.test(ch.value) ? true : null;
 });
 
-// string/char comparators
-(function(defcmp){
-    defcmp("=", new Function("a", "b", "return a==b"));
-    defcmp("<=");
-    defcmp(">=");
-    defcmp("<");
-    defcmp(">");
-    defcmp("-equal", new Function("a", "b", "return a.toLowerCase()==b.toLowerCase()"));
-})(function(name, cmp){
-    if (!cmp) cmp = new Function("a", "b", "return a" + name + "b");
-    defp("char" + name, false, function(m, nargs){
-        checknargs(nargs, 1);
-        var prev = m.pop();
-        checktype(prev, LispChar);
-        var ret = true;
-        while (--nargs > 0) {
-            var el = m.pop();
-            checktype(el, LispChar);
-            if (ret && !cmp(el.value, prev.value)) ret = null;
-            prev = el;
-        }
-        return ret;
-    });
+// number/string/char comparators
+(defcmp => {
+    defcmp("="  , (a, b) => a == b);
+    defcmp("/=" , (a, b) => a != b);
+    defcmp("<=" , (a, b) => a <= b);
+    defcmp(">=" , (a, b) => a >= b);
+    defcmp("<"  , (a, b) => a < b);
+    defcmp(">"  , (a, b) => a > b);
+    defcmp("-equal", (a, b) => a.toLowerCase() == b.toLowerCase());
+})((name, cmp) => {
+    if (name != "-equal" && name != "/=") {
+        // numeric ops; numeric /= is defined elsewhere
+        defp(name, false, function(m, nargs){
+            checknargs(nargs, 1);
+            let prev = m.pop_number(error);
+            let ret = true;
+            while (--nargs > 0) {
+                let el = m.pop_number(error);
+                if (ret && !cmp(el, prev)) ret = null;
+                prev = el;
+            }
+            return ret;
+        });
+    }
+    if (name != "/=") {
+        // char ops; char/= is defined elsewhere
+        defp("char" + name, false, function(m, nargs){
+            checknargs(nargs, 1);
+            let prev = m.pop();
+            checktype(prev, LispChar);
+            let ret = true;
+            while (--nargs > 0) {
+                let el = m.pop();
+                checktype(el, LispChar);
+                if (ret && !cmp(el.value, prev.value)) ret = null;
+                prev = el;
+            }
+            return ret;
+        });
+    }
     defp("string" + name, false, function(m, nargs){
+        // string ops
         checknargs(nargs, 1);
-        var prev = m.pop();
+        let prev = m.pop();
         checktype(prev, LispString);
-        var ret = true;
+        let ret = true;
         while (--nargs > 0) {
-            var el = m.pop();
+            let el = m.pop();
             checktype(el, LispString);
             if (ret && !cmp(el, prev)) ret = null;
             prev = el;

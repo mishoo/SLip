@@ -27,8 +27,8 @@
           *package* *read-table*
           elt rplaca rplacd nthcdr last reverse nreverse append nconc nreconc revappend
           char-name char-code name-char code-char upcase downcase
-          charp char-equal char= char< char<= char> char>= letterp digitp
-          stringp string-equal string= string< string<= string> string>=
+          charp char-equal char= char< char<= char> char>= char/= letterp digitp
+          stringp string-equal string= string< string<= string> string>= string/=
           make-regexp regexp-test regexp-exec replace-regexp quote-regexp regexpp
           vectorp vector vector-ref vector-set vector-push vector-pop make-vector
           getf
