@@ -168,3 +168,6 @@
 (loop for el in '(1 2 7 4 5 3 2 1 4)
       find the el which minimizes (/ 1 el) into (best-el best-val)
       finally (return (list best-el best-val)))
+
+(defun foo ()
+  (1 2 3 4))

@@ -338,7 +338,7 @@
          (read-symbol ()
            (let ((str (read-symbol-name)))
              (when (zerop (length str))
-               (error ("Bad character (or reader bug) in read-symbol: " (peek))))
+               (error (strcat "Bad character (or reader bug) in read-symbol: " (peek))))
              (aif (and (regexp-test #/^-?[0-9]*\.?[0-9]*$/ str)
                        (parse-number str))
                   it
@@ -800,6 +800,14 @@
                              the-function
                              (gen "CALL" (length args)))))))
          (cond
+           ((or (numberp f)
+                (stringp f)
+                (regexpp f)
+                (charp f)
+                (vectorp f)
+                (eq f t)
+                (eq f nil))
+            (error (strcat f " is not a function")))
            ((symbolp f)
             (let ((localfun (find-func f env)))
               (cond
@@ -893,7 +901,7 @@
                     (<< (comp-seq body env val? t)
                         (gen "UNFR" 1 0)))
                    (t ;; *let-tco*
-                    (<< (comp-seq body env val? nil)))
+                      (<< (comp-seq body env val? nil)))
                    (t
                     (<< (comp-seq body env val? t)
                         (gen "RET")))))))
@@ -974,7 +982,7 @@
                   (<< (comp-seq body env val? t)
                       (gen "UNFR" 1 (length specials))))
                  (t ;; *let-tco*
-                  (<< (comp-seq body env val? nil)))
+                    (<< (comp-seq body env val? nil)))
                  (t
                   (<< (comp-seq body env val? t)
                       (gen "RET"))))))
