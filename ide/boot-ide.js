@@ -84,15 +84,16 @@ import "../js/primitives.js";
     function load_fasls(files, cont) {
         var count = files.length;
         var fasls = [];
+        files = files.map(filename => filename.replace(/(\.lisp)?$/, ".fasl"));
         files.forEach(function(filename, i){
-            filename = filename.replace(/(\.lisp)?$/, ".fasl");
             log("Loading: " + filename);
             load(filename, function(code){
                 fasls[i] = LispMachine.unserialize(code);
                 if (--count == 0) {
-                    fasls.forEach(function(code){
-                        machine._exec(code);
-                    });
+                    console.time("Boot");
+                    fasls.forEach(code => machine._exec(code));
+                    console.timeEnd("Boot");
+                    console.log("Loaded " + files.join(", "));
                     cont();
                 }
             });

@@ -76,7 +76,6 @@ function boxit(stuff) {
 function defp(name, seff, func) {
     name = name.toUpperCase();
     var sym = BASE_PACK.intern(name);
-    BASE_PACK.export(sym);
     sym.setv("primitive", func);
     sym.setv("primitive-side-effects", seff);
     sym.setv("function", new LispClosure(LispMachine.assemble([
