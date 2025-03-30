@@ -63,7 +63,7 @@ import "../js/primitives.js";
     function save(url, content, callback) {
         if (!/^https?:\/\//i.test(url)) {
             // save to localStorage as well
-            //LispMachine.ls_set_file_contents(url, content);
+            LispMachine.ls_set_file_contents(url, content);
         }
         var xhr = new XMLHttpRequest();
         xhr.open("PUT", url, true);

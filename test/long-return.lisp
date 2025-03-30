@@ -13,3 +13,26 @@
   (lambda (x)
     (when x
       (return-from test-block2 'stuff))))
+
+(defun stuff ()
+  (format t "In stuff~%")
+  (throw 'foo "result")
+  (format t "Unreachable~%"))
+
+(defun test-catch ()
+  (catch 'foo (stuff)))
+
+(defun problematic-catch ()
+  (catch 'foo
+    (format t "The inner catch returns ~s.~%"
+            (catch 'foo
+              (unwind-protect (throw 'foo :first-throw)
+                (throw 'foo :second-throw))))
+    ;; :outer-catch
+    ))
+
+(defun problematic-catch2 ()
+  (catch 'a
+    (catch 'b
+      (unwind-protect (throw 'a 1)
+        (throw 'b 2)))))

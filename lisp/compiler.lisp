@@ -234,7 +234,7 @@
     (labels ((looop (ret tails)
                (if (finished tails)
                    (nreverse ret)
-                   (looop (cons (%apply f (map #'car tails)) ret)
+                   (looop (cons (apply f (map #'car tails)) ret)
                           (map #'cdr tails)))))
       (looop nil lists))))
 
@@ -337,6 +337,8 @@
 
          (read-symbol ()
            (let ((str (read-symbol-name)))
+             (when (zerop (length str))
+               (error ("Bad character (or reader bug) in read-symbol: " (peek))))
              (aif (and (regexp-test #/^-?[0-9]*\.?[0-9]*$/ str)
                        (parse-number str))
                   it
@@ -384,7 +386,6 @@
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
 
          (read-quote ()
-           (skip #\')
            `(quote ,(read-token)))
 
          (read-quasiquote ()
@@ -441,7 +442,7 @@
              (#\# (read-sharp))
              (#\` (read-quasiquote))
              (#\, (read-comma))
-             (#\' (read-quote))
+             ((#\' #\’) (next) (read-quote))
              (nil eof)
              (otherwise (read-symbol))))
 
@@ -906,7 +907,7 @@
        (comp-seq body env val? more?))
 
      (comp-macroexpand (sym args env val? more?)
-       (comp (%apply (macro sym env) args) env val? more?))
+       (comp (apply (macro sym env) args) env val? more?))
 
      (comp-let (bindings body env val? more?)
        (if bindings

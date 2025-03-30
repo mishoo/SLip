@@ -54,7 +54,7 @@
        (let ((,generic (make-generic)))
          (setf (find-generic ',name) ,generic)
          (defun ,name args
-           (%apply (%get-entity-proc ,generic) args))))))
+           (apply (%get-entity-proc ,generic) args))))))
 
 (def-efun make-instance (class . initargs)
   (apply #'make (if (symbolp class)
@@ -137,9 +137,9 @@
                                     (rec (class-direct-supers (car sups))
                                          (cons (car sups) so-far)))))
                        (rec dsupers (list new))))
-                (slots (%apply #'append
-                               (cons dslots
-                                     (map #'class-direct-slots (cdr cpl)))))
+                (slots (apply #'append
+                              (cons dslots
+                                    (map #'class-direct-slots (cdr cpl)))))
                 (nfields 0)
                 (field-initializers '())
                 (allocator (lambda (init)
@@ -276,9 +276,9 @@
   (labels ((chase (supers)
              (append supers (chase-1 supers)))
            (chase-1 (supers)
-             (%apply #'append
-                     (mapcar #'chase
-                             (mapcar #'class-direct-supers supers)))))
+             (apply #'append
+                    (mapcar #'chase
+                            (mapcar #'class-direct-supers supers)))))
     (remove-duplicates (cons class (chase (class-direct-supers class)))
                        :from-end t)))
 
@@ -360,9 +360,9 @@
                 (lambda args
                   (if (and (%memq generic *generic-invocation-generics*)
                            (%memq (car args) *generic-invocation-generics*))
-                      (%apply (method-procedure
-                               (car (last (generic-methods generic))))
-                              (cons nil args))
+                      (apply (method-procedure
+                              (car (last (generic-methods generic))))
+                             (cons nil args))
                       ((compute-apply-methods generic)
                        ((compute-methods generic) args)
                        args))))))
@@ -419,8 +419,8 @@
                                      (lambda ()
                                        (if (not tail)
                                            (error "No applicable methods/next methods")
-                                           (%apply (method-procedure (car tail))
-                                                   (cons (funcall one-step (cdr tail)) args))))))
+                                           (apply (method-procedure (car tail))
+                                                  (cons (funcall one-step (cdr tail)) args))))))
                     ((funcall one-step methods)))))))
 
 (defun applicable? (c arg)
@@ -535,10 +535,10 @@
                                                          t))
                                                    (cdr to-process))))
                                  (collect remaining-to-process
-                                          (cons (append current (%apply #'append (map #'cdr others)))
+                                          (cons (append current (apply #'append (map #'cdr others)))
                                                 result))))))
-                  (collect (%apply #'append (map #'class-direct-slots
-                                                 (class-cpl class)))
+                  (collect (apply #'append (map #'class-direct-slots
+                                                (class-cpl class)))
                            '())))))
 
 (add-method

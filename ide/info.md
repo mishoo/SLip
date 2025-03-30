@@ -17,15 +17,15 @@ immediately.
 (In fact, I should say that if you're not familiar with Emacs you probably
 won't enjoy this anyway; I'm sorry about that.)
 
-One thing to be aware of: both Chrome and Firefox (the only browsers I test
-this with) disallow pages to catch `Ctrl-w`, `Ctrl-t` and `Ctrl-n`. In Emacs,
-we use `C-w` for “kill region”, but browser makers decided it should kill the
-tab instead. Given that this action is malign (and I've done it accidentally a
-zillion times, while typing in this editor), I've installed an annoying popup
-that warns you before closing the tab/window.
+Note about some common Emacs key bindings: both Chrome and Firefox (the only
+browsers I test this with) disallow pages to catch `Ctrl-w`, `Ctrl-t` and
+`Ctrl-n`. In Emacs, we use `C-w` for “kill region”, but browser makers decided
+it should kill the tab instead. Given that this action is malign (and I've
+done it accidentally a zillion times, while typing in this editor), I've
+installed an annoying popup that warns you before closing the tab/window.
 
 I found a workaround for Firefox [1], but it's not very easy to setup. On the
-bright side, once done it's been somewhat stable in the face of upgrades (it
+good side, once done it's been somewhat stable in the face of upgrades (it
 only broke once).
 
 Chrome permits the keybindings if you are in full-screen mode, which you can
@@ -52,8 +52,8 @@ bindings; to get a crude list of all of them, press `C-h m`):
 
 - `C-c s s` -- at any time this switches to the output buffer. This is where
   text sent to `*standard-output*`, `*error-output*` and `*trace-output*`
-  goes. Note that the output goes to the REPL buffer as well, just above the
-  prompt, but it's buffered until newline.
+  goes. Output goes to the REPL buffer as well, just above the prompt, but
+  it's buffered until newline.
 
 - `M-.` -- go to definition of symbol at point (after which you can use `M-,`
   to go back). Note that some symbols lack xref info (e.g. primitive
@@ -129,10 +129,11 @@ except that instead of localStorage, on my own laptop the IDE is saving files
 directly to disk via HTTP PUT requests; obviously, I can't enable this on my
 server).
 
-One thing to be aware of: the FASL-s from your local store will be purged if
-the build tag (git commit) on the server changed since your last visit. This
-is just a safety measure, in case there were incompatible changes in the VM.
-Any other files will remain, so you can just recompile them.
+One thing to be aware of: the FASL-s from your local store will be ignored if
+the build tag (git commit) on the server changed since your last visit. You
+should get a notice in the REPL if that's the case. This is just a safety
+precaution, in case there were incompatible changes in the VM. Lisp files will
+remain, so you can just recompile them.
 
 ## Lisp stuff
 

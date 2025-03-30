@@ -317,7 +317,7 @@
   (def-efun every (test . lists)
     (let scan ((tails lists))
       (if (finished tails) t
-          (and (%apply test (map #'car tails))
+          (and (apply test (map #'car tails))
                (scan (map #'cdr tails))))))
 
   ;; some returns the first non-nil value which is returned by an
@@ -328,7 +328,7 @@
   (def-efun some (test . lists)
     (let scan ((tails lists))
       (if (finished tails) nil
-          (or (%apply test (map #'car tails))
+          (or (apply test (map #'car tails))
               (scan (map #'cdr tails))))))
 
   ;; notany returns false as soon as any invocation of predicate
@@ -338,7 +338,7 @@
   (def-efun notany (test . lists)
     (let scan ((tails lists))
       (if (finished tails) t
-          (if (%apply test (map #'car tails))
+          (if (apply test (map #'car tails))
               nil
               (scan (map #'cdr tails))))))
 
@@ -349,7 +349,7 @@
   (def-efun notevery (test . lists)
     (let scan ((tails lists))
       (if (finished tails) nil
-          (if (%apply test (map #'car tails))
+          (if (apply test (map #'car tails))
               (scan (map #'cdr tails))
               t)))))
 

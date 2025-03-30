@@ -125,7 +125,7 @@
   (let (solutions)
     (with-cc *amb-fail*
       (labels ((required-sum? (numbers)
-                 (= sum (%apply #'+ numbers)))
+                 (= sum (apply #'+ numbers)))
                (rec (numbers next)
                  (if (= next 0)
                      (progn

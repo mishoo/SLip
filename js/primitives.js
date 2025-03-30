@@ -1322,6 +1322,12 @@ function ls_get_file_contents(path) {
 }
 
 function ls_set_file_contents(path, content) {
+    if (/\.fasl$/.test(path) && window.SLIP_COMMIT) {
+        if (window.SLIP_COMMIT != localStorage.getItem(".slip_commit")) {
+            ls_purge_fasls();
+            localStorage.setItem(".slip_commit", window.SLIP_COMMIT);
+        }
+    }
     let store = ls_get();
     let dir = store;
     path = ls_normalize_path(path).split("/");
@@ -1338,9 +1344,6 @@ function ls_set_file_contents(path, content) {
     }
     dir[path.at(-1)] = content;
     ls_set(store);
-    if (/\.fasl$/.test(path) && window.SLIP_COMMIT) {
-        localStorage.setItem(".slip_commit", window.SLIP_COMMIT);
-    }
 }
 
 function ls_delete(path) {
@@ -1526,29 +1529,6 @@ defp("apply", true, function(m, nargs){
     var func = m.pop();
     checktype(func, LispClosure);
     return m._callnext(func, args);
-});
-
-defp("%apply", true, function(m, nargs){
-    checknargs(nargs, 2, 2);
-    var args = m.pop();
-    checktype(args, LispList);
-    var func = m.pop();
-    checktype(func, LispClosure);
-    return m._callnext(func, args);
-});
-
-defp("%prim-apply", true, function(m, nargs){
-    checknargs(nargs, 2, 2);
-    var args = m.pop(), name = m.pop();
-    checktype(name, LispSymbol);
-    nargs = 0;
-    while (args !== null) {
-        checktype(args, LispCons);
-        m.push(args.car);
-        args = args.cdr;
-        ++nargs;
-    }
-    return name.primitive()(m, nargs);
 });
 
 defp("%primitivep", false, function(m, nargs){
