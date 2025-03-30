@@ -11,6 +11,7 @@
           upfrom downfrom being each the of using hash-key hash-keys hash-value
           hash-values present-symbol present-symbols symbol symbols external-symbol
           external-symbols while until initially always never thereis to downto upto
+          find maximizes minimizes that which
           below above))
 
 (defpackage :sl-loop
@@ -477,6 +478,43 @@
   (list-add *loop-body* `(let ((obj ,(pop args)))
                            (when obj
                              (return-from ,*loop-block-name* obj))))
+  args)
+
+;; Wish CL LOOP had something like this:
+;;
+;;   (loop for el in '(1 2 7 4) find el minimizing (/ 1 el))
+;;
+;;   (loop for el in '(1 2 7 4)
+;;         find the el which minimizes (/ 1 el) into (best-el best-val)
+;;         finally (return (list best-el best-val)))
+;;
+;; Let's just do it, it's simple:
+(defparser find args
+  (when (iskw (car args) 'the)
+    (pop args))
+  (let ((el (pop args))
+        kind form name op)
+    (when (iskw (car args) '(that which))
+      (pop args))
+    (setf kind (pop args))
+    (case kind
+      ((minimizing minimizes) (setf op '<))
+      ((maximizing maximizes) (setf op '>)))
+    (assert op "Unsupported kind of FIND in LOOP: ~A" kind)
+    (setf form (pop args)
+          name (maybe-into "find-val"))
+    (let ((best (if (consp name)
+                    (prog1 (cadr name)
+                      (setf name (car name)))
+                    (gensym "best"))))
+      (list-append *loop-variables* (list best name))
+      (list-add *loop-body* `(let ((val ,form))
+                               (when (or (not ,best)
+                                         (,op val ,best))
+                                 (setf ,best val
+                                       ,name ,el)))))
+    (unless (symbol-package name)
+      (list-add *loop-finish* name)))
   args)
 
 (defun expand-loop (args)
