@@ -63,7 +63,7 @@ export class LispChar extends LispType {
     constructor(val) {
         super();
         this.value = val;
-    };
+    }
 
     valueOf() {
         return this.value;

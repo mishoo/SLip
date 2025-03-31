@@ -847,7 +847,7 @@
 
      (comp-lambda (name args body env)
        (gen "FN"
-            (%seq (when args (gen-simple-args args 0))
+            (%seq (gen-simple-args args 0)
                   (let ((dyn '())
                         (i 0)
                         (args (make-true-list args)))

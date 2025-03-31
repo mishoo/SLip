@@ -401,14 +401,14 @@ var optimize = (function(){
             }
             break;
           case "UNFR":
-            if (i < code.length - 1) {
+            if (i+1 < code.length) {
                 if (code[i+1][0] == "UNFR") {
                     code[i][1] += code[i+1][1];
                     code[i][2] += code[i+1][2];
                     code.splice(i + 1, 1);
                     return true;
                 }
-                if (code[i+1][0] == "RET") {
+                if ([ "RET", "LRET", "LRET2", "LJUMP", "LJUMP2" ].includes(code[i+1][0])) {
                     code.splice(i, 1);
                     return true;
                 }
@@ -827,7 +827,7 @@ export class LispMachine {
         var save_f = this.f;
         //var save_trace = this.trace;
         this.code = closure.code;
-        this.env = null;
+        this.env = closure.env;
         this.stack = [ new LispRet(this, null) ].concat(args);
         this.n_args = args.length;
         this.pc = 0;
@@ -1158,7 +1158,7 @@ function vmrun(m) {
               console.error(m.f);
               throw new LispPrimitiveError("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
           }
-          m.env = new LispCons(m.pop_frame(count), m.env);
+          if (count) m.env = new LispCons(m.pop_frame(count), m.env);
           return;
       }
 
