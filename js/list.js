@@ -131,21 +131,22 @@ export class LispCons extends LispType {
         last.cdr = tail;
         return a;
     }
-    static fromArray(a) {
-        var ret = null, p = null, dot = false;
-        a.forEach(function(el){
+    static fromArray(array, start = 0, end = array.length) {
+        let ret = null, p = null, dot = false;
+        for (let i = start; i < end; ++i) {
+            let el = array[i];
             if (el === DOT) {
                 dot = true;
             } else {
                 if (dot) p.cdr = el;
                 else {
-                    var cell = new LispCons(el, null);
+                    let cell = new LispCons(el, null);
                     if (ret) p.cdr = cell;
                     else ret = cell;
                     p = cell;
                 }
             }
-        });
+        }
         return ret;
     }
     static len(list) {
