@@ -486,7 +486,8 @@
      t)))
 
 (defun parse-lambda-list (args)
-  (let ((required nil)
+  (let ((all nil)
+        (required nil)
         (optional nil)
         (rest nil)
         (key nil)
@@ -501,6 +502,14 @@
                 (not (eq x t))
                 (not (lambda-keyword-p x))))
 
+         (add (name)
+           (when (member name all)
+             (error (strcat "Duplicate name in lambda list " name)))
+           (unless (symp name)
+             (error (strcat "Invalid name in lambda list " name)))
+           (push name all)
+           name)
+
          (rec (args)
            (cond
              ((null args))
@@ -513,10 +522,10 @@
                 (otherwise
                  (rec (cdr args))
                  (assert (symp (car args)) "Symbol expected in lambda list")
-                 (push (car args) required))))
+                 (push (add (car args)) required))))
              ((symp args)
               (assert (not rest) "&rest already given")
-              (setq rest args))
+              (setq rest (add args)))
              (t
               (error "Bad lambda list"))))
 
@@ -527,7 +536,7 @@
                (&aux (rec-aux (cddr args)))
                (otherwise
                 (error "Bad lambda list after &rest"))))
-           (setq rest (car args)))
+           (setq rest (add (car args))))
 
          (rec-opt (args)
            (case (car args)
@@ -539,18 +548,20 @@
                 (rec-opt (cdr args)))
               (cond
                 ((consp (car args))
-                 (push (car args) optional))
+                 (push (car args) optional)
+                 (add (caar args)))
                 ((symp (car args))
-                 (push (list (car args)) optional))
+                 (push (list (add (car args))) optional))
                 (t
                  (error "Bad &optional parameter"))))))
 
          (key-arg-names (arg)
            (cond
              ((consp arg)
+              (add (cadr arg))
               arg)
              ((symp arg)
-              (list (intern (symbol-name arg) :keyword) arg))
+              (list (intern (symbol-name arg) :keyword) (add arg)))
              (t
               (error "Bad &key argument name"))))
 
@@ -578,9 +589,10 @@
              (rec-aux (cdr args)))
            (cond
              ((consp (car args))
+              (add (caar args))
               (push (car args) aux))
              ((symp (car args))
-              (push (list (car args)) aux))
+              (push (list (add (car args))) aux))
              (t
               (error "Bad &aux parameter in lambda list")))))
 
@@ -946,14 +958,19 @@
             (comp-seq (cddr f) env val? more?))
            (t (mkret (comp f env t t))))))
 
-     (gen-simple-args (args n)
+     (gen-simple-args (args n names)
        (cond
          ((not args) (gen "ARGS" n))
-         ((symbolp args) (gen "ARG_" n))
+         ((symbolp args)
+          (when (member args names)
+            (error (strcat "Duplicate argument " args)))
+          (gen "ARG_" n))
          ((and (consp args) (lambda-keyword-p (car args)))
           (throw '$xargs '$xargs))
          ((and (consp args) (symbolp (car args)))
-          (gen-simple-args (cdr args) (+ n 1)))
+          (when (member (car args) names)
+            (error (strcat "Duplicate argument " (car args))))
+          (gen-simple-args (cdr args) (+ n 1) (cons (car args) names)))
          (t (error "Illegal argument list"))))
 
      (make-true-list (l)
@@ -1025,7 +1042,7 @@
        (gen "FN"
             (let ((code
                    (catch '$xargs
-                     (%seq (gen-simple-args args 0)
+                     (%seq (gen-simple-args args 0 nil)
                            (let ((dyn '())
                                  (i 0)
                                  (args (make-true-list args)))
