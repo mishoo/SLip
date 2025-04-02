@@ -481,9 +481,7 @@
   `(return-from nil ,val))
 
 (defun lambda-keyword-p (sym)
-  (case sym
-    ((&optional &rest &key &aux &allow-other-keys)
-     t)))
+  (member sym '(&optional &rest &key &aux &allow-other-keys)))
 
 (defun parse-lambda-list (args)
   (let ((all nil)
@@ -963,13 +961,13 @@
          ((not args) (gen "ARGS" n))
          ((symbolp args)
           (when (member args names)
-            (error (strcat "Duplicate argument " args)))
+            (error (strcat "Duplicate function argument " args)))
           (gen "ARG_" n))
          ((and (consp args) (lambda-keyword-p (car args)))
           (throw '$xargs '$xargs))
          ((and (consp args) (symbolp (car args)))
           (when (member (car args) names)
-            (error (strcat "Duplicate argument " (car args))))
+            (error (strcat "Duplicate function argument " (car args))))
           (gen-simple-args (cdr args) (+ n 1) (cons (car args) names)))
          (t (error "Illegal argument list"))))
 
@@ -997,13 +995,13 @@
                               (setq env (extenv env :lex new)))
                           (setq envcell new))
                         (%incf index))
-                      (newdef (name defval passed-p)
-                        (unless passed-p
-                          (setq passed-p (gensym (strcat name "-P"))))
-                        (newarg passed-p)
+                      (newdef (name defval supplied-p)
+                        (unless supplied-p
+                          (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
+                        (newarg supplied-p)
                         (when defval
                           (let ((l1 (mklabel)))
-                            (<< (gen "LVAR" 0 (1- index)) ;; passed-p
+                            (<< (gen "LVAR" 0 (1- index)) ;; supplied-p
                                 (gen "TJUMP" l1)          ;; if T then it's passed
                                 (comp defval env t t)     ;; compile default value
                                 (gen "LSET" 0 index)      ;; set arg value in env

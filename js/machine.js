@@ -591,6 +591,7 @@ function dump(thing) {
         }
         return ret + ")";
     }
+    if (Array.isArray(thing)) return `#(${thing.map(dump).join(" ")})`;
     if (thing instanceof LispType) return thing.print();
     return thing + "";
 }
