@@ -51,7 +51,7 @@
           cddar cdddr caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
           cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
 
-          &key &rest &body &whole &optional &aux))
+          &key &rest &body &whole &optional &aux &allow-other-keys))
   (%export exported boot)
   (%export exported main)
   (setq *package* main))

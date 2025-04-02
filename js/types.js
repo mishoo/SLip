@@ -422,7 +422,7 @@ export class LispSymbol extends LispType {
             this.vlist = Object.create(null);
         }
     }
-    toString() { return this.name }
+    toString() { return this.print() }
     serialize(cache) {
         if (cache) {
             let id = cache.get(this);

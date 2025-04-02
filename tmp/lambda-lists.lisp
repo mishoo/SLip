@@ -3,6 +3,11 @@
 
 (in-package :sl-tmp)
 
+(defun lambda-keyword-p (sym)
+  (case sym
+    ((&optional &rest &key &aux &allow-other-keys)
+     t)))
+
 (defun parse-lambda-list (args)
   (let ((required nil)
         (optional nil)
@@ -11,12 +16,13 @@
         (aux nil)
         (allow-other-keys nil))
     (labels
-        ((symp (x)
-           (when (and x (symbolp x) (not (eq x t)))
-             (case x
-               ((&optional &rest &key &aux &allow-other-keys)
-                nil)
-               (t t))))
+        ((assert (p msg)
+           (if p p (error msg)))
+
+         (symp (x)
+           (and x (symbolp x)
+                (not (eq x t))
+                (not (lambda-keyword-p x))))
 
          (rec (args)
            (cond
@@ -33,7 +39,7 @@
                  (push (car args) required))))
              ((symp args)
               (assert (not rest) "&rest already given")
-              (setf rest args))
+              (setq rest args))
              (t
               (error "Bad lambda list"))))
 
@@ -44,7 +50,7 @@
                (&aux (rec-aux (cddr args)))
                (otherwise
                 (error "Bad lambda list after &rest"))))
-           (setf rest (car args)))
+           (setq rest (car args)))
 
          (rec-opt (args)
            (case (car args)
@@ -74,7 +80,7 @@
          (rec-key (args)
            (case (car args)
              (&allow-other-keys
-              (setf allow-other-keys t)
+              (setq allow-other-keys t)
               (when (cdr args)
                 (assert (eq '&aux (cadr args)) "Only &aux can follow in lambda list after &allow-other-keys")
                 (rec-aux (cddr args))))

@@ -480,6 +480,122 @@
 (defmacro return (val)
   `(return-from nil ,val))
 
+(defun lambda-keyword-p (sym)
+  (case sym
+    ((&optional &rest &key &aux &allow-other-keys)
+     t)))
+
+(defun parse-lambda-list (args)
+  (let ((required nil)
+        (optional nil)
+        (rest nil)
+        (key nil)
+        (aux nil)
+        (allow-other-keys nil))
+    (labels
+        ((assert (p msg)
+           (if p p (error msg)))
+
+         (symp (x)
+           (and x (symbolp x)
+                (not (eq x t))
+                (not (lambda-keyword-p x))))
+
+         (rec (args)
+           (cond
+             ((null args))
+             ((consp args)
+              (case (car args)
+                (&optional (rec-opt (cdr args)))
+                (&rest (rec-rest (cdr args)))
+                (&key (rec-key (cdr args)))
+                (&aux (rec-aux (cdr args)))
+                (otherwise
+                 (rec (cdr args))
+                 (assert (symp (car args)) "Symbol expected in lambda list")
+                 (push (car args) required))))
+             ((symp args)
+              (assert (not rest) "&rest already given")
+              (setq rest args))
+             (t
+              (error "Bad lambda list"))))
+
+         (rec-rest (args)
+           (when (cdr args)
+             (case (cadr args)
+               (&key (rec-key (cddr args)))
+               (&aux (rec-aux (cddr args)))
+               (otherwise
+                (error "Bad lambda list after &rest"))))
+           (setq rest (car args)))
+
+         (rec-opt (args)
+           (case (car args)
+             (&rest (rec-rest (cdr args)))
+             (&key (rec-key (cdr args)))
+             (&aux (rec-aux (cdr args)))
+             (otherwise
+              (when (cdr args)
+                (rec-opt (cdr args)))
+              (cond
+                ((consp (car args))
+                 (push (car args) optional))
+                ((symp (car args))
+                 (push (list (car args)) optional))
+                (t
+                 (error "Bad &optional parameter"))))))
+
+         (key-arg-names (arg)
+           (cond
+             ((consp arg)
+              arg)
+             ((symp arg)
+              (list (intern (symbol-name arg) :keyword) arg))
+             (t
+              (error "Bad &key argument name"))))
+
+         (rec-key (args)
+           (case (car args)
+             (&allow-other-keys
+              (setq allow-other-keys t)
+              (when (cdr args)
+                (assert (eq '&aux (cadr args)) "Only &aux can follow in lambda list after &allow-other-keys")
+                (rec-aux (cddr args))))
+             (&aux (rec-aux (cdr args)))
+             (otherwise
+              (when (cdr args)
+                (rec-key (cdr args)))
+              (cond
+                ((consp (car args))
+                 (push (list* (key-arg-names (caar args)) (cdar args)) key))
+                ((symp (car args))
+                 (push (list (key-arg-names (car args))) key))
+                (t
+                 (error "Bad &key parameter in lambda list"))))))
+
+         (rec-aux (args)
+           (when (cdr args)
+             (rec-aux (cdr args)))
+           (cond
+             ((consp (car args))
+              (push (car args) aux))
+             ((symp (car args))
+              (push (list (car args)) aux))
+             (t
+              (error "Bad &aux parameter in lambda list")))))
+
+      (rec args)
+      (list :required required
+            :optional optional
+            :rest rest
+            :key key
+            :aux aux
+            :aok allow-other-keys))))
+
+(defun %log (data)
+  (console.dir data)
+  data)
+
 (labels
     ((assert (p msg)
        (if p p (error msg)))
@@ -578,7 +694,6 @@
          (push sym *unknown-variables*)))
 
      (comp (x env val? more?)
-       ;; (console.log x)
        (cond
          ((symbolp x) (cond
                         ((eq x nil) (comp-const nil val? more?))
@@ -835,6 +950,8 @@
        (cond
          ((not args) (gen "ARGS" n))
          ((symbolp args) (gen "ARG_" n))
+         ((and (consp args) (lambda-keyword-p (car args)))
+          (throw '$xargs '$xargs))
          ((and (consp args) (symbolp (car args)))
           (gen-simple-args (cdr args) (+ n 1)))
          (t (error "Illegal argument list"))))
@@ -845,22 +962,86 @@
              (list l)
              (cons (car l) (make-true-list (cdr l))))))
 
+     (comp-extended-lambda (name args body env)
+       (let ((args (parse-lambda-list args))
+             (envcell nil))
+         (let ((required (getf args :required))
+               (optional (getf args :optional))
+               (rest (getf args :rest))
+               (key (getf args :key))
+               (aux (getf args :aux))
+               (allow-other-keys (getf args :aok))
+               (index 0))
+           (with-seq-output <<
+             (labels ((newarg (name)
+                        (let ((new (list (list name :var))))
+                          (if envcell
+                              (rplacd envcell new)
+                              (setq env (extenv env :lex new)))
+                          (setq envcell new))
+                        (%incf index))
+                      (newdef (name defval passed-p)
+                        (unless passed-p
+                          (setq passed-p (gensym (strcat name "-P"))))
+                        (newarg passed-p)
+                        (when defval
+                          (let ((l1 (mklabel)))
+                            (<< (gen "LVAR" 0 (1- index)) ;; passed-p
+                                (gen "TJUMP" l1)          ;; if T then it's passed
+                                (comp defval env t t)     ;; compile default value
+                                (gen "LSET" 0 index)      ;; set arg value in env
+                                (gen "POP")               ;; discard from stack
+                                #(l1)
+                                (when (%specialp name)    ;; maybe bind special var
+                                  (gen "BIND" name index)))))
+                        (newarg name)))
+               (<< (gen "XARGS"
+                        (length required)
+                        (length optional)
+                        (if rest 1 0)
+                        (as-vector (map #'caar key))
+                        allow-other-keys))
+               (foreach required #'newarg)
+               (foreach optional
+                        (lambda (opt)
+                          (newdef (car opt) (cadr opt) (caddr opt))))
+               (when rest (newarg rest))
+               (foreach key
+                        (lambda (key)
+                          (newdef (cadar key) (cadr key) (caddr key))))
+               (foreach aux
+                        (lambda (aux)
+                          (let ((name (car aux))
+                                (defval (cadr aux)))
+                            (<< (comp defval env t t)
+                                (gen "LSET" 0 index)
+                                (gen "POP")
+                                (when (%specialp name)
+                                  (gen "BIND" name index)))
+                            (newarg name))))
+               (<< (comp-block name body env t nil)))))))
+
      (comp-lambda (name args body env)
        (gen "FN"
-            (%seq (gen-simple-args args 0)
-                  (let ((dyn '())
-                        (i 0)
-                        (args (make-true-list args)))
-                    (foreach args (lambda (x)
-                                    (when (%specialp x)
-                                      (push #("BIND" x i) dyn))
-                                    (%incf i)))
-                    (%seq dyn
-                          (comp-block name body
-                                      (if args
-                                          (extenv env :lex (map (lambda (name) (list name :var)) args))
-                                          env)
-                                      t nil))))
+            (let ((code
+                   (catch '$xargs
+                     (%seq (gen-simple-args args 0)
+                           (let ((dyn '())
+                                 (i 0)
+                                 (args (make-true-list args)))
+                             (foreach args (lambda (x)
+                                             (when (%specialp x)
+                                               (push #("BIND" x i) dyn))
+                                             (%incf i)))
+                             (%seq dyn
+                                   (comp-block name body
+                                               (if args
+                                                   (extenv env :lex (map (lambda (name) (list name :var)) args))
+                                                   env)
+                                               t nil)))))))
+              (if (eq code '$xargs)
+                  (comp-extended-lambda name args body env)
+                  code))
             name))
 
      (get-bindings (bindings vars?)

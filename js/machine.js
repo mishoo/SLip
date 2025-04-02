@@ -3,9 +3,11 @@ import { LispType, LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, Li
 import { repeat_string, pad_string } from "./utils.js";
 
 let BASE_PACK = LispPackage.get("%");
+let KEYWORD_PACK = LispPackage.get("KEYWORD");
 let S_QUOTE = LispSymbol.get("QUOTE");
 let S_NIL = LispSymbol.get("NIL");
 let S_T = LispSymbol.get("T");
+let S_ALLOW_OTHER_KEYS = KEYWORD_PACK.intern("ALLOW-OTHER-KEYS");
 
 const OP = Object.freeze({
     NOP: 0,
@@ -82,6 +84,7 @@ const OP = Object.freeze({
     BLOCK2: 71,
     LRET2: 72,
     LJUMP2: 73,
+    XARGS: 74,
 });
 
 const OP_LEN = Object.freeze([
@@ -159,6 +162,7 @@ const OP_LEN = Object.freeze([
     1 /* BLOCK2 */,
     1 /* LRET2 */,
     2 /* LJUMP2 */,
+    5 /* XARGS */,
 ]);
 
 // normal RET context
@@ -961,6 +965,13 @@ function error(msg) {
     throw new LispPrimitiveError(msg);
 }
 
+function find_key_arg(item, array, start, end) {
+    for (let i = start; i < end; i += 2) {
+        if (eq(item, array[i])) return i;
+    }
+    return null;
+}
+
 function vmrun(m) {
     switch (m.code[m.pc++]) {
       case OP.LVAR: {
@@ -1001,7 +1012,7 @@ function vmrun(m) {
           let f = name.func();
           if (!f) {
               //console.error("Undefined function", name);
-              throw new LispPrimitiveError(`Undefined function ${dump(name)}`);
+              error(`Undefined function ${dump(name)}`);
           }
           m.push(f);
           return;
@@ -1142,7 +1153,7 @@ function vmrun(m) {
               }
               p = p.cdr;
           }
-          throw new LispPrimitiveError("CATCH tag not found " + dump(tag));
+          error("CATCH tag not found " + dump(tag));
           return;
       }
 
@@ -1156,7 +1167,7 @@ function vmrun(m) {
           let count = m.code[m.pc++];
           if (count != m.n_args) {
               console.error(m.f);
-              throw new LispPrimitiveError("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
+              error("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
           }
           if (count) m.env = new LispCons(m.pop_frame(count), m.env);
           return;
@@ -1167,7 +1178,7 @@ function vmrun(m) {
           let passed = m.n_args;
           if (passed < count) {
               console.error(m.f);
-              throw new LispPrimitiveError("Insufficient number of arguments");
+              error("Insufficient number of arguments");
           }
           let p = null;
           while (passed-- > count) p = new LispCons(m.pop(), p);
@@ -1397,6 +1408,73 @@ function vmrun(m) {
           frame(m.env, fr)[0].run(m);
           m.push(val);
           return;
+      }
+
+      case OP.XARGS: {
+          let required = m.code[m.pc++];
+          let optional = m.code[m.pc++];
+          let rest = m.code[m.pc++];
+          let key = m.code[m.pc++];
+          let allow_other_keys = m.code[m.pc++];
+          let kl = key?.length;
+          let n = m.n_args;
+          let frame_len = required + 2*optional + rest + 2*kl;
+          let min = required;
+          let max = rest || kl ? null : required + optional;
+          if (n < required) {
+              error(`Expecting at least ${min} arguments`);
+          }
+          if (max != null && n > max) {
+              error(`Expecting at most ${max} arguments`);
+          }
+          let frame = new Array(frame_len).fill(null);
+          let maxi = m.stack.length;
+          let i = maxi - n;
+          let index = 0;
+          while (required-- > 0) {
+              frame[index++] = m.stack[i++];
+          }
+          while (optional-- > 0 && i < maxi) {
+              frame[index++] = true; // argument-passed-p
+              frame[index++] = m.stack[i++];
+          }
+          if (i < maxi) {
+              if (rest) {
+                  frame[index++] = LispCons.fromArray(m.stack, i, maxi);
+              }
+              if (kl) {
+                  if ((maxi - i) % 2 != 0) {
+                      error("Uneven number of &key arguments");
+                  }
+                  if (!allow_other_keys) {
+                      let pos = find_key_arg(S_ALLOW_OTHER_KEYS, m.stack, i, maxi);
+                      if (pos != null) {
+                          allow_other_keys = m.stack[pos + 1];
+                          m.stack[pos] = false;
+                          if (pos == i) i += 2;
+                      }
+                  }
+                  for (let k = 0; k < kl; k++, index += 2) {
+                      let pos = find_key_arg(key[k], m.stack, i, maxi);
+                      if (pos != null) {
+                          frame[index] = true; // argument-passed-p
+                          frame[index + 1] = m.stack[pos + 1];
+                          m.stack[pos] = false;
+                          if (pos == i) i += 2;
+                      }
+                  }
+                  if (!allow_other_keys) {
+                      while (i < maxi) {
+                          if (m.stack[i] !== false) {
+                              error(`Unknown keyword argument ${dump(m.stack[i])}`);
+                          }
+                          i += 2;
+                      }
+                  }
+              }
+          }
+          m.stack.length -= n;
+          m.env = new LispCons(frame, m.env);
       }
 
     }
