@@ -13,8 +13,7 @@
                        (key #'identity))
   (loop for el in sequence
         for val = (funcall key el)
-        when (funcall test item val)
-        do (return el)))
+        when (funcall test item val) do (return el)))
 
 (defun find (item sequence &rest args)
   (cond

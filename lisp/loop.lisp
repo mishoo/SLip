@@ -499,8 +499,8 @@
     (setf kind (pop args))
     (case kind
       ((minimizing minimizes) (setf op '<))
-      ((maximizing maximizes) (setf op '>)))
-    (assert op "Unsupported kind of FIND in LOOP: ~A" kind)
+      ((maximizing maximizes) (setf op '>))
+      (t (error "Unsupported kind of FIND in LOOP: ~A" kind)))
     (setf form (pop args)
           name (maybe-into "find-val"))
     (let ((best (if (consp name)
