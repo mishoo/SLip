@@ -126,7 +126,7 @@
   args)
 
 (defun parse-for-equal (var args)
-  (list-append *loop-start* (dsetq var (pop args)))
+  (list-append *loop-body* (dsetq var (pop args)))
   (when (iskw (car args) 'then)
     (pop args)
     (list-append *loop-iterate* (dsetq var (pop args))))
