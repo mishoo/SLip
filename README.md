@@ -1,6 +1,6 @@
 A Lisp compiler and environment that runs in a browser.
 
-- [slip.lisperator.net](http://slip.lisperator.net/) for more information.
+- [slip.lisperator.net](https://lisperator.net/slip/) for more information.
 - [A screencast at Vimeo](https://vimeo.com/42070553).
-- [Play with it](http://slip.lisperator.net/s/demo/?ide) (requires popups).
+- [Play with it](https://lisperator.net/s/slip/).
 - [Follow me on Twitter](https://twitter.com/#!/mcbazon)
