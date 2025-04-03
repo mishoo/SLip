@@ -62,9 +62,11 @@
 
 ;;;; destructuring-bind
 
-(defmacro %next (lst)
-  `(prog1 (car ,lst)
-     (setq ,lst (cdr ,lst))))
+(defmacro %next (place)
+  (let ((v (gensym)))
+    `(let ((,v ,place))
+       (setq ,place (cdr ,v))
+       (car ,v))))
 
 (defun %dbind-error-missing-arg (arg)
   (error (strcat "Missing required argument: " arg)))

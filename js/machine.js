@@ -85,6 +85,7 @@ const OP = Object.freeze({
     LRET2: 72,
     LJUMP2: 73,
     XARGS: 74,
+    POPLIST: 75,
 });
 
 const OP_LEN = Object.freeze([
@@ -163,6 +164,7 @@ const OP_LEN = Object.freeze([
     1 /* LRET2 */,
     2 /* LJUMP2 */,
     5 /* XARGS */,
+    2 /* POPLIST */,
 ]);
 
 // normal RET context
@@ -327,8 +329,22 @@ var optimize = (function(){
             break;
           case "LVAR":
           case "GVAR":
-            if (i < code.length - 1 && code[i+1][0] == "POP") {
+            if (i+1 < code.length && code[i+1][0] == "POP") {
                 code.splice(i, 2);
+                return true;
+            }
+            if (i+8 < code.length &&
+                code[i+1][0] == "LET" && code[i+1][1] == 1 &&
+                code[i+2][0] == "LVAR" && code[i+2][1] == 0 && code[i+2][2] == 0 &&
+                code[i+3][0] == "CDR" &&
+                code[i+4][0] == "LSET" && code[i+4][1] == el[1] + 1 && code[i+4][2] == el[2] &&
+                code[i+5][0] == "POP" &&
+                code[i+6][0] == "LVAR" && code[i+6][1] == 0 && code[i+6][2] == 0 &&
+                code[i+7][0] == "CAR" &&
+                code[i+8][0] == "UNFR" && code[i+8][1] == 1 && code[i+8][2] == 0)
+            {
+                el[0] = "POPLIST";
+                code.splice(i + 1, 8);
                 return true;
             }
             break;
@@ -1476,6 +1492,17 @@ function vmrun(m) {
           }
           m.stack.length -= n;
           m.env = new LispCons(frame, m.env);
+          return;
+      }
+
+      case OP.POPLIST: {
+          let i = m.code[m.pc++];
+          let j = m.code[m.pc++];
+          let fr = frame(m.env, i);
+          let lst = fr[j];
+          fr[j] = LispCons.cdr(lst);
+          m.push(LispCons.car(lst));
+          return;
       }
 
     }
