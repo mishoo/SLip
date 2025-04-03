@@ -86,6 +86,7 @@ const OP = Object.freeze({
     LJUMP2: 73,
     XARGS: 74,
     POPLIST: 75,
+    EQ: 76,
 });
 
 const OP_LEN = Object.freeze([
@@ -165,6 +166,7 @@ const OP_LEN = Object.freeze([
     2 /* LJUMP2 */,
     5 /* XARGS */,
     2 /* POPLIST */,
+    0 /* EQ */,
 ]);
 
 // normal RET context
@@ -363,6 +365,10 @@ var optimize = (function(){
                     return true;
                   case "LIST*":
                     code.splice(i, 1, [ "LIST_", el[2] ]);
+                    return true;
+                  case "EQ":
+                  case "EQL":
+                    code.splice(i, 1, [ "EQ" ]);
                     return true;
                 }
             }
@@ -1503,6 +1509,11 @@ function vmrun(m) {
           let lst = fr[j];
           fr[j] = LispCons.cdr(lst);
           m.push(LispCons.car(lst));
+          return;
+      }
+
+      case OP.EQ: {
+          m.push(eq(m.pop(), m.pop()));
           return;
       }
 
