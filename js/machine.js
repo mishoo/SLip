@@ -1420,10 +1420,11 @@ function vmrun(m) {
       }
 
       case OP.LRET2: {
+          let noval = m.f.noval;
           let fr = m.code[m.pc++];
           let val = m.pop();
           frame(m.env, fr)[0].run(m);
-          m.push(val);
+          if (!noval) m.push(val);
           return;
       }
 

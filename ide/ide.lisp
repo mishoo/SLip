@@ -147,7 +147,7 @@
          nil)))))
 
 (define-handler :list-packages ()
-  (apply #'vector (mapcar #'package-name (%list-packages))))
+  (apply #'vector (sort (mapcar #'package-name (%list-packages)) #'string<)))
 
 (define-handler :set-package (name)
   (setf *package* (find-package name)))
