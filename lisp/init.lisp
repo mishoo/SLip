@@ -355,19 +355,18 @@
               (scan (map #'cdr tails))
               t)))))
 
-(def-efun remove-duplicates args
-  (destructuring-bind (list &key (test #'eq) from-end) args
-    (labels ((rmv (list ret)
-               (if list
-                   (let ((current (car list)))
-                     (rmv (collect-if (lambda (x)
-                                        (not (funcall test current x)))
-                                      (cdr list))
-                          (cons current ret)))
-                   ret)))
-      (if from-end
-          (nreverse (rmv list nil))
-          (rmv (reverse list) nil)))))
+(def-efun remove-duplicates (list &key (test #'eql) from-end)
+  (labels ((rmv (list ret)
+             (if list
+                 (let ((current (car list)))
+                   (rmv (collect-if (lambda (x)
+                                      (not (funcall test current x)))
+                                    (cdr list))
+                        (cons current ret)))
+                 ret)))
+    (if from-end
+        (nreverse (rmv list nil))
+        (rmv (reverse list) nil))))
 
 (def-efun last (list)
   (when list
