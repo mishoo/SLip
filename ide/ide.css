@@ -6,9 +6,16 @@
 @import url("./ymacs/themes/ef-duo-dark.css");
 @import url("./ymacs/themes/ef-maris-light.css");
 @import url("./ymacs/themes/ef-maris-dark.css");
+@import url("./ymacs/themes/ef-deuteranopia-light.css");
+@import url("./ymacs/themes/ef-deuteranopia-dark.css");
 @import url("./ymacs/themes/standard-dark.css");
 @import url("./ymacs/themes/standard-light.css");
-@import url("./ymacs/themes/whiteboard.css");
+@import url("./ymacs/themes/material.css");
+@import url("./ymacs/themes/sanityinc-tomorrow-blue.css");
+@import url("./ymacs/themes/sanityinc-tomorrow-bright.css");
+@import url("./ymacs/themes/sanityinc-tomorrow-day.css");
+@import url("./ymacs/themes/sanityinc-tomorrow-eighties.css");
+@import url("./ymacs/themes/sanityinc-tomorrow-night.css");
 
 html, body {
   margin: 0;
