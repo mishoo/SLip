@@ -1,10 +1,16 @@
 (in-package :sl)
 
 (export '(print-object
+          print-object-to-string
           *print-readably*
           *print-escape*
           *print-base*
           *print-radix*))
+
+(defpackage :sl-print
+  (:use :sl :%))
+
+(in-package :sl-print)
 
 (defgeneric print-object)
 
@@ -132,6 +138,6 @@
                    (<< (package-name pak) "::")))))
         (<< (symbol-name symbol)))))
 
-(def-efun print-object-to-string (obj)
+(defun print-object-to-string (obj)
   (with-output-to-string (out)
     (print-object obj out)))

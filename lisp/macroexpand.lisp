@@ -1,16 +1,13 @@
 ;;; based on “Some Useful Lisp Algorithms: Part 2” by Richard C. Waters
 
+(in-package :sl)
+
+(export '(macroexpand-all))
+
 (defpackage :sl-mexp
   (:use :sl :%))
 
 (in-package :sl-mexp)
-
-(import '(macroexpand-all) :sl)
-(export '(macroexpand-all) :sl)
-
-;; forward declarations to avoid warnings
-(defun all-mexp ())
-(defun funcall-mexp ())
 
 (defun mexp (f)
   (let (m)
