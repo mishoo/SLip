@@ -70,11 +70,11 @@
                   (list ,@(mapcar (lambda (x)
                                     (if (consp x) `(find-class ',(cadr x)) <top>))
                                   args))
-                  (lambda (,c-n-m ,@(mapcar (lambda (x)
-                                              (if (consp x) (car x) x))
-                                            args))
-                    (macrolet ((call-next-method args `(funcall ,',c-n-m ,@args)))
-                      ,@body))))))
+                  (%:%fn ,name (,c-n-m ,@(mapcar (lambda (x)
+                                                   (if (consp x) (car x) x))
+                                                 args))
+                         (macrolet ((call-next-method args `(funcall ,',c-n-m ,@args)))
+                           ,@body))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; TinyCLOS
 
