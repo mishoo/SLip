@@ -58,34 +58,36 @@
   (let ((x (car cons))
         (two (and (consp (cdr cons))
                   (not (cddr cons)))))
-    (cond ((and two (eq x 'quote))
-           (<< "'")
-           (print-object (cadr cons) out))
-          ((and two (eq x 'quasiquote))
-           (<< "`")
-           (print-object (cadr cons) out))
-          ((and two (eq x '%::qq-unquote))
-           (<< ",")
-           (print-object (cadr cons) out))
-          ((and two (eq x '%::qq-splice))
-           (<< ",@")
-           (print-object (cadr cons) out))
-          ((and two (eq x '%::function))
-           (<< "#'")
-           (print-object (cadr cons) out))
-          (t (<< "(")
-             (let print-list ((list cons))
-               (when list
-                 (cond
-                   ((consp list)
-                    (print-object (car list) out)
-                    (when (cdr list)
-                      (<< " ")
-                      (print-list (cdr list))))
-                   (t
-                    (<< ". ")
-                    (print-object list out)))))
-             (<< ")")))))
+    (when two
+      (case x
+        (quote
+         (<< "'")
+         (return-from print-object (print-object (cadr cons) out)))
+        (quasiquote
+         (<< "`")
+         (return-from print-object (print-object (cadr cons) out)))
+        (%::qq-unquote
+         (<< ",")
+         (return-from print-object (print-object (cadr cons) out)))
+        (%::qq-splice
+         (<< ",@")
+         (return-from print-object (print-object (cadr cons) out)))
+        (%::function
+         (<< "#'")
+         (return-from print-object (print-object (cadr cons) out)))))
+    (<< "(")
+    (let print-list ((list cons))
+      (when list
+        (cond
+          ((consp list)
+           (print-object (car list) out)
+           (when (cdr list)
+             (<< " ")
+             (print-list (cdr list))))
+          (t
+           (<< ". ")
+           (print-object list out)))))
+    (<< ")")))
 
 (def-print (vector)
   (<< "#(")
