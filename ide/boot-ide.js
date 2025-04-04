@@ -1,22 +1,10 @@
 import { LispMachine } from "../js/machine.js";
 import { LispSymbol, LispPackage } from "../js/types.js";
+import { LispCons } from "../js/list.js";
 import { make_desktop } from "./ide.js";
 import "../js/primitives.js";
 
 (function(window){
-
-    var lisp_files = [
-        "lisp/compiler.lisp",
-        "lisp/init.lisp",
-        "lisp/macroexpand.lisp",
-        "lisp/tiny-clos.lisp",
-        "lisp/printer.lisp",
-        "lisp/format.lisp",
-        "lisp/ffi.lisp",
-        "lisp/conditions.lisp",
-        "lisp/loop.lisp",
-        "ide/ide.lisp",
-    ];
 
     Object.assign(LispMachine.prototype, {
         read: function(pak, str) {
@@ -128,6 +116,8 @@ import "../js/primitives.js";
 
     function recompile_all() {
         load_fasls([ "lisp/compiler.lisp" ], function(){
+            let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
+            lisp_files.unshift("lisp/compiler.lisp");
             compile(lisp_files, function(){
                 log("<span style='color: green'><b>DONE — press ENTER to reload</b></span>");
                 document.addEventListener("keydown", ev => {
@@ -145,11 +135,14 @@ import "../js/primitives.js";
     var startup_files = [];
 
     function init() {
-        load_fasls(lisp_files, function(){
-            window.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
-            [ ...document.querySelectorAll(".lisp-log") ].forEach(el => el.remove());
-            make_desktop(startup_files);
-            compile(startup_files, () => {}, true);
+        load_fasls([ "lisp/compiler.lisp" ], function(){
+            let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
+            load_fasls(lisp_files, function(){
+                window.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
+                [ ...document.querySelectorAll(".lisp-log") ].forEach(el => el.remove());
+                make_desktop(startup_files);
+                compile(startup_files, () => {}, true);
+            });
         });
     };
 

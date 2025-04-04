@@ -1307,6 +1307,18 @@
         (*read-table* *read-table*))
     (%load url)))
 
+(%global! '*core-files*)
+(setq *core-files*
+      '("lisp/init.lisp"
+        "lisp/macroexpand.lisp"
+        "lisp/tiny-clos.lisp"
+        "lisp/printer.lisp"
+        "lisp/format.lisp"
+        "lisp/ffi.lisp"
+        "lisp/conditions.lisp"
+        "lisp/loop.lisp"
+        "ide/ide.lisp"))
+
 ;;;
 
 EOF
