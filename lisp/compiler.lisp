@@ -740,9 +740,9 @@
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
               (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
               (macrolet (comp-macrolet (cadr x) (cddr x) env val? more?))
-              (lambda (when val?
-                        (%seq (comp-lambda nil (cadr x) (cddr x) env)
-                              (unless more? (gen "RET")))))
+              ((lambda λ) (when val?
+                            (%seq (comp-lambda nil (cadr x) (cddr x) env)
+                                  (unless more? (gen "RET")))))
               (function
                (arg-count x 1 1)
                (let ((sym (cadr x)))
@@ -1214,7 +1214,7 @@
 
      (compile (exp)
        (assert (and (consp exp)
-                    (member (car exp) '(%fn lambda)))
+                    (member (car exp) '(%fn lambda λ)))
                "Expecting (LAMBDA (...) ...) in COMPILE")
        (%eval-bytecode (comp exp (make-environment) t nil)))
 

@@ -22,7 +22,7 @@
           error warn without-interrupts
           lisp-reader compile load function unwind-protect
           apply funcall macrolet catch throw
-          quote lambda let let* if progn setq t nil not
+          quote lambda λ let let* if progn setq t nil not
           tagbody go block return return-from
           *package* *read-table*
           elt rplaca rplacd nthcdr last reverse nreverse append nconc nreconc revappend
