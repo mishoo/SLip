@@ -442,7 +442,7 @@ export class LispSymbol extends LispType {
         return this.vlist[key] = val;
     }
     getv(key) {
-        return key in this.vlist ? this.vlist[key] : null;
+        return this.vlist[key] ?? null;
     }
     macro() {
         return this.getv("macro");

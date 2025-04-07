@@ -81,7 +81,7 @@ function defp(name, seff, func) {
         writable: false,
     });
     sym.setv("primitive", func);
-    sym.setv("primitive-side-effects", seff);
+    sym.setv("primitive-side-effects", seff ? true : null);
     sym.setv("function", new LispClosure(LispMachine.assemble([
         [ "PRIM", sym, -1 ],
         [ "RET" ]
@@ -1545,7 +1545,7 @@ defp("%primitivep", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return sym.primitive();
+    return sym.primitive() ? true : null;
 });
 
 defp("%prim-side-effects", false, function(m, nargs){
