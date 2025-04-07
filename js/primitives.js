@@ -76,6 +76,10 @@ function boxit(stuff) {
 function defp(name, seff, func) {
     name = name.toUpperCase();
     var sym = BASE_PACK.intern(name);
+    Object.defineProperty(func, "name", {
+        value: name,
+        writable: false,
+    });
     sym.setv("primitive", func);
     sym.setv("primitive-side-effects", seff);
     sym.setv("function", new LispClosure(LispMachine.assemble([
@@ -525,17 +529,12 @@ defp("list", false, function(m, nargs) {
     return p;
 });
 
-function list_(m, nargs) {
+defp("list*", false, function(m, nargs) {
+    checknargs(nargs, 1);
     var p = m.pop();
-    checktype(p, LispList);
     while (--nargs > 0)
         p = new LispCons(m.pop(), p);
     return p;
-};
-
-defp("list*", false, function(m, nargs) {
-    checknargs(nargs, 1);
-    return list_(m, nargs);
 });
 
 defp("append", false, function(m, nargs) {
@@ -1533,7 +1532,10 @@ defp("disassemble", false, function(m, nargs){
 
 defp("apply", true, function(m, nargs){
     checknargs(nargs, 2);
-    var args = list_(m, nargs - 1);
+    var args = m.pop();
+    checktype(args, LispList);
+    while (--nargs > 1)
+        args = new LispCons(m.pop(), args);
     var func = m.pop();
     checktype(func, LispClosure);
     return m._callnext(func, args);
