@@ -352,14 +352,16 @@ var optimize = (function(){
             break;
           case "PRIM":
             if (el[1].pak === BASE_PACK) {
-                if (/^C[AD]{1,4}R$/.test(el[1].name)) {
+                if (/^C[AD]{1,4}R$/.test(el[1].name) && el[2] == 1) {
                     code.splice(i, 1, [ el[1].name ]);
                     return true;
                 }
                 switch (el[1].name) {
                   case "CONS":
-                    code.splice(i, 1, [ "CONS" ]);
-                    return true;
+                    if (el[2] == 2) {
+                        code.splice(i, 1, [ "CONS" ]);
+                        return true;
+                    }
                   case "LIST":
                     code.splice(i, 1, [ "LIST", el[2] ]);
                     return true;
@@ -368,8 +370,10 @@ var optimize = (function(){
                     return true;
                   case "EQ":
                   case "EQL":
-                    code.splice(i, 1, [ "EQ" ]);
-                    return true;
+                    if (el[2] == 2) {
+                        code.splice(i, 1, [ "EQ" ]);
+                        return true;
+                    }
                 }
             }
         }

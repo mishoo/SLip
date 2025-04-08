@@ -194,18 +194,17 @@
      (prog1 ,exp2 ,@body)))
 
 (defmacro or exps
-  (when exps
-    (let ((x (gensym "OR")))
-      `(let ((,x ,(car exps)))
-         (if ,x ,x (or ,@(cdr exps)))))))
+  (cond
+    ((cdr exps) (let ((x (gensym "OR")))
+                  `(let ((,x ,(car exps)))
+                     (if ,x ,x (or ,@(cdr exps))))))
+    (exps (car exps))))
 
-(defmacro and exprs
-  (if exprs
-      (let ((x (gensym "AND")))
-        `(let ((,x ,(car exprs)))
-           (when ,x
-             ,(if (cdr exprs) `(and ,@(cdr exprs)) x))))
-      t))
+(defmacro and exps
+  (cond
+    ((cdr exps) `(when ,(car exps) (and ,@(cdr exps))))
+    (exps (car exps))
+    (t t)))
 
 (defmacro member (item lst)
   `(%memq ,item ,lst))
