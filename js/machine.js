@@ -87,6 +87,7 @@ const OP = Object.freeze({
     XARGS: 74,
     POPLIST: 75,
     EQ: 76,
+    POPGLIST: 77,
 });
 
 const OP_LEN = Object.freeze([
@@ -167,6 +168,7 @@ const OP_LEN = Object.freeze([
     5 /* XARGS */,
     2 /* POPLIST */,
     0 /* EQ */,
+    1 /* POPGLIST */,
 ]);
 
 // normal RET context
@@ -330,7 +332,6 @@ var optimize = (function(){
             }
             break;
           case "LVAR":
-          case "GVAR":
             if (i+1 < code.length && code[i+1][0] == "POP") {
                 code.splice(i, 2);
                 return true;
@@ -346,6 +347,26 @@ var optimize = (function(){
                 code[i+8][0] == "UNFR" && code[i+8][1] == 1 && code[i+8][2] == 0)
             {
                 el[0] = "POPLIST";
+                code.splice(i + 1, 8);
+                return true;
+            }
+            break;
+          case "GVAR":
+            if (i+1 < code.length && code[i+1][0] == "POP") {
+                code.splice(i, 2);
+                return true;
+            }
+            if (i+8 < code.length &&
+                code[i+1][0] == "LET" && code[i+1][1] == 1 &&
+                code[i+2][0] == "LVAR" && code[i+2][1] == 0 && code[i+2][2] == 0 &&
+                code[i+3][0] == "CDR" &&
+                code[i+4][0] == "GSET" && code[i+4][1] == el[1] &&
+                code[i+5][0] == "POP" &&
+                code[i+6][0] == "LVAR" && code[i+6][1] == 0 && code[i+6][2] == 0 &&
+                code[i+7][0] == "CAR" &&
+                code[i+8][0] == "UNFR" && code[i+8][1] == 1 && code[i+8][2] == 0)
+            {
+                el[0] = "POPGLIST";
                 code.splice(i + 1, 8);
                 return true;
             }
@@ -1518,6 +1539,15 @@ function vmrun(m) {
 
       case OP.EQ: {
           m.push(eq(m.pop(), m.pop()));
+          return;
+      }
+
+      case OP.POPGLIST: {
+          let sym = m.code[m.pc++];
+          let binding = m.find_dvar(sym);
+          let lst = binding.value;
+          m.push(LispCons.car(lst));
+          binding.value = LispCons.cdr(lst);
           return;
       }
 
