@@ -43,7 +43,8 @@ away. Use `C-v` to paste from the OS clipboard (it might ask for permission
 once). Emacs' frame management keys are available (`C-x 2`, `C-x 3`, `C-x 0`
 and `C-x 1`). To quickly move to another frame, use M-ARROWS (for example
 `M-ArrowRight` would focus the frame to the right of the cursor); also, the
-venerable `C-x o` is there (`M-x other_frame`), or just click to focus.
+venerable `C-x o` is there (`M-x other_frame`; alias `M-o`), or just click to
+focus.
 
 Here's a few keybindings you can use in Lisp buffers (there are *many* key
 bindings; to get a crude list of all of them, press `C-h m`):
