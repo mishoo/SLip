@@ -88,6 +88,7 @@ const OP = Object.freeze({
     POPLIST: 75,
     EQ: 76,
     POPGLIST: 77,
+    TJUMPK: 78,
 });
 
 const OP_LEN = Object.freeze([
@@ -169,6 +170,7 @@ const OP_LEN = Object.freeze([
     2 /* POPLIST */,
     0 /* EQ */,
     1 /* POPGLIST */,
+    1 /* TJUMPK */,
 ]);
 
 // normal RET context
@@ -450,6 +452,11 @@ var optimize = (function(){
                 code.splice(i + 1, j - i - 1);
                 return true;
             }
+            if (el[0] == "RET" && i+2 < code.length && code[i+1] instanceof LispSymbol && code[i+2][0] == "RET") {
+                // RET; L1; RET --> L1; RET
+                code.splice(i, 3, code[i+1], el);
+                return true;
+            }
             break;
           case "UNFR":
             if (i+1 < code.length) {
@@ -466,7 +473,7 @@ var optimize = (function(){
             }
             break;
         }
-        if (i < code.length - 1) {
+        if (i+1 < code.length) {
             if ((el[0] == "CONST" && el[1] === null) || el[0] == "NIL") {
                 switch (code[i+1][0]) {
                   case "FJUMP":
@@ -504,7 +511,7 @@ var optimize = (function(){
         }
         switch (el[0]) {
           case "NIL":
-            if (i < code.length - 1) {
+            if (i+1 < code.length) {
                 if (code[i+1][0] == "CONS") {
                     code.splice(i, 2, [ "LIST", 1 ]);
                     return true;
@@ -513,7 +520,7 @@ var optimize = (function(){
             break;
           case "LIST":
           case "LIST_":
-            if (i < code.length - 1) {
+            if (i+1 < code.length) {
                 if (code[i+1][0] == "CONS") {
                     code.splice(i, 2, [ el[0], el[1] + 1 ]);
                     return true;
@@ -566,6 +573,7 @@ function is_jump_instruction(op) {
       case OP.CATCH:
       case OP.BLOCK2:
       case OP.LJUMP2:
+      case OP.TJUMPK:
         return true;
     }
 }
@@ -1548,6 +1556,16 @@ function vmrun(m) {
           let lst = binding.value;
           m.push(LispCons.car(lst));
           binding.value = LispCons.cdr(lst);
+          return;
+      }
+
+      case OP.TJUMPK: {
+          let addr = m.code[m.pc++];
+          if (m.top() === null) {
+              m.pop();
+          } else {
+              m.pc = addr;
+          }
           return;
       }
 

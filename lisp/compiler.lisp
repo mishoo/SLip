@@ -193,17 +193,18 @@
      ,exp1
      (prog1 ,exp2 ,@body)))
 
-(defmacro %or (x exps)
-  (cond
-    ((cdr exps) `(if (setq ,x ,(car exps)) ,x (%or ,x ,(cdr exps))))
-    (exps (car exps))))
-
-(defmacro or exps
-  (cond
-    ((cdr exps) (let ((x (gensym "OR")))
-                  `(let ((,x ,(car exps)))
-                     (if ,x ,x (%or ,x ,(cdr exps))))))
-    (exps (car exps))))
+;; OR is implemented in the compiler now.
+;;
+;; (defmacro %or (x exps)
+;;   (cond
+;;     ((cdr exps) `(if (setq ,x ,(car exps)) ,x (%or ,x ,(cdr exps))))
+;;     (exps (car exps))))
+;; (defmacro or exps
+;;   (cond
+;;     ((cdr exps) (let ((x (gensym "OR")))
+;;                   `(let ((,x ,(car exps)))
+;;                      (if ,x ,x (%or ,x ,(cdr exps))))))
+;;     (exps (car exps))))
 
 (defmacro and exps
   (cond
@@ -729,6 +730,7 @@
                      (unless more? (gen "RET"))))
               (if (arg-count x 2 3)
                   (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
+              (or (comp-or (cdr x) env val? more?))
               (not
                (arg-count x 1 1)
                (if val?
@@ -914,6 +916,22 @@
                        #( l1 )
                        ecode
                        (if more? #( l2 ))))))))))
+
+     (comp-or (exps env val? more?)
+       (cond
+         ((null exps)
+          (%seq (when val? (gen "NIL"))
+                (unless more? (gen "RET"))))
+         ((cdr exps)
+          (let ((l1 (mklabel)))
+            (%seq (comp (car exps) env t t)
+                  (if val?
+                      (gen "TJUMPK" l1)
+                      (gen "TJUMP" l1))
+                  (comp-or (cdr exps) env val? more?)
+                  #( l1 )
+                  (unless more? (gen "RET")))))
+         (t (comp (car exps) env val? more?))))
 
      (comp-funcall (f args env val? more?)
        (labels ((mkret (the-function)
