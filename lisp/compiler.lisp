@@ -193,11 +193,16 @@
      ,exp1
      (prog1 ,exp2 ,@body)))
 
+(defmacro %or (x exps)
+  (cond
+    ((cdr exps) `(if (setq ,x ,(car exps)) ,x (%or ,x ,(cdr exps))))
+    (exps (car exps))))
+
 (defmacro or exps
   (cond
     ((cdr exps) (let ((x (gensym "OR")))
                   `(let ((,x ,(car exps)))
-                     (if ,x ,x (or ,@(cdr exps))))))
+                     (if ,x ,x (%or ,x ,(cdr exps))))))
     (exps (car exps))))
 
 (defmacro and exps
