@@ -420,6 +420,8 @@ export class LispSymbol extends LispType {
             this.pak = pak || null;
             this.value = null;
             this.vlist = Object.create(null);
+            this.primitive = null;
+            this.function = null;
         }
     }
     toString() { return this.print() }
@@ -452,12 +454,6 @@ export class LispSymbol extends LispType {
     }
     global() {
         return this.getv("global");
-    }
-    primitive() {
-        return this.getv("primitive");
-    }
-    func() {
-        return this.getv("function");
     }
     print() {
         if (this.pak?.name == "KEYWORD")

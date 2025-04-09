@@ -24,11 +24,11 @@
         });
 
         function load1_lisp(file) {
-                var func = LispSymbol.get("%LOAD").func();
+                var func = LispSymbol.get("%LOAD").function;
                 return m._call(func, LispCons.fromArray([ file ]));
         };
         function load2_lisp(file) {
-                var func = LispSymbol.get("LOAD").func();
+                var func = LispSymbol.get("LOAD").function;
                 return m._call(func, LispCons.fromArray([ file ]));
         };
 

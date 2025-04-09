@@ -570,7 +570,7 @@ function lisp_reader(code) {
                            VAL ? [] : gen("POP"),
                            MORE ? [] : gen("RET"));
             }
-            if (!f.func()) console.warn("Undefined function", f);
+            if (!f.function) console.warn("Undefined function", f);
             return mkret(gen("FGVAR", f));
         }
         if (LC.is(f) && car(f) === S_LAMBDA && nullp(cadr(f))) {

@@ -80,12 +80,12 @@ function defp(name, seff, func) {
         value: name,
         writable: false,
     });
-    sym.setv("primitive", func);
+    sym.primitive = func;
     sym.setv("primitive-side-effects", seff ? true : null);
-    sym.setv("function", new LispClosure(LispMachine.assemble([
+    sym.function = new LispClosure(LispMachine.assemble([
         [ "PRIM", sym, -1 ],
         [ "RET" ]
-    ]), sym));
+    ]), sym);
     ALL_PRIMITIVES = new LispCons(sym, ALL_PRIMITIVES);
 };
 
@@ -1545,7 +1545,7 @@ defp("%primitivep", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return sym.primitive() ? true : null;
+    return sym.primitive ? true : null;
 });
 
 defp("%prim-side-effects", false, function(m, nargs){
@@ -1561,7 +1561,7 @@ defp("%macro!", true, function(m, nargs){
     checktype(func, LispClosure);
     checktype(sym, LispSymbol);
     sym.setv("macro", func);
-    sym.setv("function", null);
+    sym.function = null;
     return sym;
 });
 
@@ -1846,7 +1846,7 @@ defp("symbol-function", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return sym.func();
+    return sym.function;
 });
 
 defp("set-symbol-function!", true, function(m, nargs){
@@ -1855,7 +1855,7 @@ defp("set-symbol-function!", true, function(m, nargs){
     checktype(sym, LispSymbol);
     checktype(func, LispClosure);
     sym.setv("macro", null);
-    return sym.setv("function", func);
+    return sym.function = func;
 });
 
 defp("%set-symbol-prop", true, function(m, nargs){

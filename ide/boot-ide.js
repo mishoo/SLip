@@ -8,15 +8,15 @@ import "../js/primitives.js";
 
     Object.assign(LispMachine.prototype, {
         read: function(pak, str) {
-            var f = LispSymbol.get("EXEC-READ", LispPackage.get("YMACS")).func();
+            var f = LispSymbol.get("EXEC-READ", LispPackage.get("YMACS")).function;
             return this.atomic_call(f, [ pak, str ]);
         },
         eval: function(expr) {
-            var f = LispSymbol.get("EXEC-EVAL", LispPackage.get("YMACS")).func();
+            var f = LispSymbol.get("EXEC-EVAL", LispPackage.get("YMACS")).function;
             return this.atomic_call(f, [ expr ]);
         },
         eval_string: function(pak, str) {
-            var f = LispSymbol.get("EXEC-EVAL-STRING", LispPackage.get("YMACS")).func();
+            var f = LispSymbol.get("EXEC-EVAL-STRING", LispPackage.get("YMACS")).function;
             return this.atomic_call(f, [ pak, str ]);
         },
     });
@@ -100,7 +100,7 @@ import "../js/primitives.js";
         if (files.length == 0) return cont ? cont() : null;
         var filename = files[0];
         if (!nosave) log("Compiling " + filename);
-        var bytecode = machine.atomic_call(LispSymbol.get("%LOAD").func(), [ filename ]);
+        var bytecode = machine.atomic_call(LispSymbol.get("%LOAD").function, [ filename ]);
         if (!nosave) {
             var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
             save(fasl, bytecode, function(error){

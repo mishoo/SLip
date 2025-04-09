@@ -972,9 +972,9 @@ export class LispMachine {
         } catch(ex) {
             if (ex instanceof LispPrimitiveError) {
                 var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
-                if (pe && pe.func()) {
+                if (pe && pe.function) {
                     // RETHROW as Lisp error.
-                    this._callnext(pe.func(), LispCons.fromArray([ "~A", ex.message ]));
+                    this._callnext(pe.function, LispCons.fromArray([ "~A", ex.message ]));
                     return null;
                 }
             }
@@ -1065,7 +1065,7 @@ function vmrun(m) {
 
       case OP.FGVAR: {
           let name = m.code[m.pc++];
-          let f = name.func();
+          let f = name.function;
           if (!f) {
               //console.error("Undefined function", name);
               error(`Undefined function ${dump(name)}`);
@@ -1076,7 +1076,7 @@ function vmrun(m) {
 
       case OP.FGSET: {
           let name = m.code[m.pc++];
-          name.setv("function", m.top());
+          name.function = m.top();
           return;
       }
 
@@ -1280,7 +1280,7 @@ function vmrun(m) {
           let name = m.code[m.pc++];
           let nargs = m.code[m.pc++];
           if (nargs == -1) nargs = m.n_args;
-          let ret = name.primitive()(m, nargs);
+          let ret = name.primitive(m, nargs);
           if (ret !== false) m.push(ret ?? null);
           return;
       }
