@@ -68,7 +68,9 @@
                  (make-method
                   ;; specializers
                   (list ,@(mapcar (lambda (x)
-                                    (if (consp x) `(find-class ',(cadr x)) <top>))
+                                    (if (consp x)
+                                        `(find-class ',(cadr x))
+                                        '(find-class 'top)))
                                   args))
                   (%:%fn ,name (,c-n-m ,@(mapcar (lambda (x)
                                                    (if (consp x) (car x) x))

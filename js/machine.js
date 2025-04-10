@@ -714,6 +714,10 @@ function serialize_const(val, cache) {
         if (val instanceof LispCons) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
         if (val instanceof Array) return "[" + val.map(dump).join(",") + "]";
         if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
+        if (val + "" == "[object Object]") {
+            console.error("Unsupported value in bytecode serialization", val);
+            error("Unsupported value in bytecode serialization");
+        }
         return val + "";
     }(val);
 }

@@ -9,6 +9,8 @@
 
 (in-package :sl-mexp)
 
+(defparameter *macrolet-defs* nil)
+
 (defun mexp (f)
   (let (m)
     (let rec ((f f)
@@ -21,10 +23,14 @@
              (funcall m f))
             ((not flag)
              (funcall-mexp f))
-            (t (if (and (symbolp (car f))
-                        (%macro (car f)))
-                   (rec (macroexpand-1 f) t)
-                   (rec f nil)))))))
+            ((not (symbolp (car f)))
+             (rec f nil))
+            ((setq m (%:%assq (car f) *macrolet-defs*))
+             (rec (apply (cdr m) (cdr f)) t))
+            ((%macro (car f))
+             (rec (macroexpand-1 f) t))
+            (t
+             (rec f nil))))))
 
 (defun all-mexp (list)
   (let rec ((f list)
@@ -60,10 +66,27 @@
       (list* (car arg) (mexp (cadr arg)) (cddr arg))
       arg))
 
+(defun lambda-list-mexp (lst)
+  (let rec ((lst lst)
+            (ret nil))
+    (cond
+      ((not (consp lst))
+       (nreconc ret lst))
+      (t
+       (rec (cdr lst)
+            (cons (arg-mexp (car lst))
+                  ret))))))
+
 (defun lambda-mexp (f)
   `(,(car f)
-    ,(mapcar #'arg-mexp (cadr f))
+    ,(lambda-list-mexp (cadr f))
     ,@(all-mexp (cddr f))))
+
+(defun fn-mexp (f)
+  `(,(car f)
+    ,(mexp (cadr f))
+    ,(lambda-list-mexp (caddr f))
+    ,@(all-mexp (cdddr f))))
 
 (defun all-lambda-mexp (list)
   (mapcar #'lambda-mexp list))
@@ -73,10 +96,41 @@
     ,(all-lambda-mexp (cadr f))
     ,@(all-mexp (cddr f))))
 
+(defun flatten-progn (forms)
+  (let dig ((forms forms)
+            (result nil)
+            (rest nil))
+    (cond
+      ((null forms)
+       (if rest
+           (dig (car rest) result (cdr rest))
+           (nreverse result)))
+      ((and (consp (car forms))
+            (eq 'progn (caar forms)))
+       (dig (cdar forms)
+            result
+            (cons (cdr forms) rest)))
+      (t
+       (dig (cdr forms)
+            (cons (car forms) result)
+            rest)))))
+
 (defun progn-mexp (f)
   (if (cddr f)
-      `(progn ,@(all-mexp (cdr f)))
+      (flatten-progn `(progn ,@(all-mexp (cdr f))))
       (mexp (cadr f))))
+
+(defun macrolet-mexp (f)
+  (let* ((defs (mapcar (lambda (md)
+                         (let* ((name (car md))
+                                (func (compile `(%:%fn ,name ,(cadr md)
+                                                       ,@(cddr md)))))
+                           (cons name func)))
+                       (cadr f)))
+         (*macrolet-defs* (nreconc defs *macrolet-defs*)))
+    (if (cdddr f)
+        `(progn ,@(all-mexp (cddr f)))
+        (mexp (caddr f)))))
 
 (foreach `((block           ,#'block-mexp)
            (catch           ,#'funcall-mexp)
@@ -86,6 +140,7 @@
            (go              ,#'quote-mexp)
            (if              ,#'funcall-mexp)
            (lambda          ,#'lambda-mexp)
+           (%:%fn           ,#'fn-mexp)
            (let             ,#'let-mexp)
            (let*            ,#'let-mexp)
            (progn           ,#'progn-mexp)
@@ -94,7 +149,8 @@
            (setq            ,#'funcall-mexp)
            (tagbody         ,#'funcall-mexp)
            (throw           ,#'funcall-mexp)
-           (unwind-protect  ,#'funcall-mexp))
+           (unwind-protect  ,#'funcall-mexp)
+           (macrolet        ,#'macrolet-mexp))
          (lambda (x)
            (%set-symbol-prop (car x) "MEXP" (cadr x))))
 

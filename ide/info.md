@@ -65,9 +65,7 @@ bindings; to get a crude list of all of them, press `C-h m`):
 - `C-c C-r` -- evaluate the selection (region).
 
 - `C-c Enter` -- macroexpand-1 the current expression (the cursor must be on
-  the opening paren). The output goes to the REPL. We don't have a pretty
-  printer for now, so it'll be on one line; the way I use to inspect it is to
-  paste it in the Real Slime REPL...
+  the opening paren). The output goes to the REPL.
 
 - `C-c M-m` -- macroexpand-all the current expression.
 
