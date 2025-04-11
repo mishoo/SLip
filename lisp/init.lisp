@@ -258,7 +258,7 @@
        ((listp (car args))
         (destructuring-bind ((sym &rest args1) &rest args2
                              &aux (expander (%get-symbol-prop sym :setf)))
-            args
+            (cons (macroexpand (car args)) (cdr args))
           (unless (functionp expander)
             (error (strcat "Unknown SETF expander for " sym)))
           (funcall expander args1 args2)))
