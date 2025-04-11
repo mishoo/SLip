@@ -349,15 +349,13 @@
   (let ((form (pop args))
         (name (maybe-into "collect"))
         (tail (gensym "tail")))
-    (list-append *loop-variables* `(,name ,tail))
+    (list-append *loop-variables* `((,name (list nil))
+                                    (,tail ,name)))
     (list-add *loop-body*
-              `(let ((cell (cons ,form nil)))
-                 (setf ,tail
-                       (if ,tail
-                           (setf (cdr ,tail) cell)
-                           (setf ,name cell)))))
-    (unless (symbol-package name)
-      (list-add *loop-finish* name)))
+              `(setf ,tail (setf (cdr ,tail) (list ,form))))
+    (list-add *loop-finish* `(setf ,name (cdr ,name)))
+    (when (symbol-package name)
+      (list-add *loop-finish* nil)))
   args)
 
 (defun loop-make-list (append args)
@@ -528,7 +526,7 @@
       (when args
         (rec (parse-clause args))))
     `(block ,*loop-block-name*
-       (let (,@(car *loop-variables*))
+       (let* (,@(car *loop-variables*))
          (tagbody
             ,@(car *loop-start*)
           $loop-next
