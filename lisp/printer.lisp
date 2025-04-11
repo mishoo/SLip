@@ -308,25 +308,25 @@
 
 (def-pretty-print progn (&rest forms)
   (with-indent (%stream-col *pp-stream*)
-    (<< "(progn")
-    (%pp-body-indent forms)
-    (<< ")")))
+    (with-parens
+      (<< (%pp-symbol symbol))
+      (%pp-body-indent forms))))
 
 (def-pretty-print (lambda λ) (args &rest body)
   (with-indent (%stream-col *pp-stream*)
-    (<< "(" (%pp-symbol symbol) " ")
-    (%pp-funargs args)
-    (%pp-body-indent body)
-    (<< ")")))
+    (with-parens
+      (<< (%pp-symbol symbol) " ")
+      (%pp-funargs args)
+      (%pp-body-indent body))))
 
 (def-pretty-print (defun defmacro defmethod %::%fn) (name args &rest body)
   (with-indent (%stream-col *pp-stream*)
-    (<< "(" (%pp-symbol symbol) " ")
-    (%pp-object name)
-    (<< " ")
-    (%pp-funargs args)
-    (%pp-body-indent body)
-    (<< ")")))
+    (with-parens
+      (<< (%pp-symbol symbol) " ")
+      (%pp-object name)
+      (<< " ")
+      (%pp-funargs args)
+      (%pp-body-indent body))))
 
 (def-pretty-print (let let*) (bindings &rest body)
   (with-indent (%stream-col *pp-stream*)
@@ -345,9 +345,9 @@
                         ((and (consp binding)
                               (= 2 (length binding)))
                          (destructuring-bind (name val) binding
-                           (<< "(" (%pp-symbol name) " ")
-                           (%pp-object val)
-                           (<< ")")))
+                           (with-parens
+                             (<< (%pp-symbol name) " ")
+                             (%pp-object val))))
                         (t
                          (%pp-funargs binding)))))))
       (%pp-body-indent body))))
@@ -361,55 +361,47 @@
           (%pp-body bindings
                     (lambda (binding)
                       (destructuring-bind (name args &rest body) binding
-                        (<< "(" (%pp-symbol name) " ")
-                        (%pp-funargs args)
-                        (%pp-body-indent body)
-                        (<< ")"))))))
+                        (with-parens
+                          (<< (%pp-symbol name) " ")
+                          (%pp-funargs args)
+                          (%pp-body-indent body)))))))
       (%pp-body-indent body))))
 
 (def-pretty-print if (cond &optional
                            (then nil then-supplied-p)
                            (else nil else-supplied-p))
   (with-indent (%stream-col *pp-stream*)
-    (<< "(" (%pp-symbol symbol) " ")
-    (with-indent (%stream-col *pp-stream*)
-      (%pp-object cond)
-      (when then-supplied-p
-        (<< #\Newline)
-        (indent)
-        (%pp-object then)
-        (when else-supplied-p
+    (with-parens
+      (<< (%pp-symbol symbol) " ")
+      (with-indent (%stream-col *pp-stream*)
+        (%pp-object cond)
+        (when then-supplied-p
           (<< #\Newline)
           (indent)
-          (%pp-object else))))
-    (<< ")")))
+          (%pp-object then)
+          (when else-supplied-p
+            (<< #\Newline)
+            (indent)
+            (%pp-object else)))))))
 
 (def-pretty-print (cond case ecase typecase etypecase) (&rest cases)
   (with-indent (%stream-col *pp-stream*)
-    (<< "(" (%pp-symbol symbol))
-    (%pp-body-indent cases
-                     (lambda (cs)
-                       (<< "(")
-                       (with-indent (%stream-col *pp-stream*)
-                         (%pp-body cs))
-                       (<< ")")))
-    (<< ")")))
-
-(def-pretty-print (when unless) (cond &rest body)
-  (with-indent (%stream-col *pp-stream*)
-    (<< "(" (%pp-symbol symbol) " ")
-    (%pp-object cond)
-    (%pp-body-indent body)
-    (<< ")")))
+    (with-parens
+      (<< (%pp-symbol symbol))
+      (%pp-body-indent cases
+                       (lambda (cs)
+                         (with-parens
+                           (with-indent (%stream-col *pp-stream*)
+                             (%pp-body cs))))))))
 
 (def-pretty-print tagbody (&rest body)
   (with-indent (%stream-col *pp-stream*)
-    (<< "(" (%pp-symbol symbol))
-    (%pp-body-indent body (lambda (form)
-                            (when (consp form)
-                              (<< "  "))
-                            (%pp-object form)))
-    (<< ")")))
+    (with-parens
+      (<< (%pp-symbol symbol))
+      (%pp-body-indent body (lambda (form)
+                              (when (consp form)
+                                (<< "  "))
+                              (%pp-object form))))))
 
 (def-pretty-print (unwind-protect prog1) (form &rest body)
   (with-indent (%stream-col *pp-stream*)
@@ -417,6 +409,29 @@
       (<< (%pp-symbol symbol))
       (with-indent 2 (%pp-body-indent (list form)))
       (%pp-body-indent body))))
+
+(def-pretty-print (when unless block catch) (thing &rest body)
+  (with-indent (%stream-col *pp-stream*)
+    (with-parens
+      (<< (%pp-symbol symbol) " ")
+      (%pp-object thing)
+      (%pp-body-indent body))))
+
+(def-pretty-print (setq setf) (&rest exps)
+  (with-indent (%stream-col *pp-stream*)
+    (with-parens
+      (<< (%pp-symbol symbol) " ")
+      (with-indent (%stream-col *pp-stream*)
+        (let rec ((exps exps)
+                  (first t))
+          (when exps
+            (unless first
+              (<< #\Newline)
+              (indent))
+            (%pp-object (car exps))
+            (<< " ")
+            (%pp-object (cadr exps))
+            (rec (cddr exps) nil)))))))
 
 (defgeneric pprint-object)
 
