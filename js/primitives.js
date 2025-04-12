@@ -1753,7 +1753,7 @@ defp("find-package", false, function(m, nargs){
 
 defp("%list-packages", false, function(m, nargs){
     checknargs(nargs, 0, 0);
-    return LispCons.fromArray(Object.values(LispPackage.all()));
+    return LispCons.fromArray([...new Set(Object.values(LispPackage.all()))]);
 });
 
 defp("package-name", false, function(m, nargs){
