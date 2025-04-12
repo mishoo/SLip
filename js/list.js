@@ -9,10 +9,12 @@ function check_list(list, func) {
 }
 
 function car(cell) {
+    check_list(cell, "CAR");
     return cell === null ? null : cell.car;
 }
 
 function cdr(cell) {
+    check_list(cell, "CDR");
     return cell === null ? null : cell.cdr;
 }
 
@@ -54,7 +56,6 @@ export class LispCons extends LispType {
     }
     static last(list) {
         while (list && cdr(list)) {
-            check_list(list, "LAST");
             list = cdr(list);
         }
         return list;
@@ -62,7 +63,6 @@ export class LispCons extends LispType {
     static reverse(list) {
         var a = null;
         while (list != null) {
-            check_list(list, "REVERSE");
             a = new LispCons(car(list), a);
             list = cdr(list);
         }
@@ -72,8 +72,7 @@ export class LispCons extends LispType {
         if (list === null || cdr(list) === null) return list;
         var p = null;
         while (true) {
-            check_list(list, "NREVERSE");
-            var next = list.cdr;
+            var next = cdr(list);
             list.cdr = p;
             p = list;
             if (next === null) return list;
@@ -86,8 +85,7 @@ export class LispCons extends LispType {
         while (lists.length > 1) {
             var l = lists.shift();
             while (l !== null) {
-                check_list(l, "APPEND");
-                var cell = new LispCons(l.car, null);
+                var cell = new LispCons(car(l), null);
                 if (p) p.cdr = cell;
                 else ret = cell;
                 p = cell;
@@ -104,8 +102,7 @@ export class LispCons extends LispType {
         var ret = null, p = null;
         for (var i = 0; i < lists.length; ++i) {
             var l = lists[i];
-            check_list(l, "NCONC");
-            if (!l) continue;
+            if (l === null) continue;
             if (!ret) ret = l;
             if (p) p.cdr = l;
             p = LispCons.last(l);
@@ -123,7 +120,6 @@ export class LispCons extends LispType {
         if (list === null) return tail;
         var a = null, last = null;
         while (list != null) {
-            check_list(list, "REVERSE");
             a = new LispCons(car(list), a);
             if (!last) last = a;
             list = cdr(list);

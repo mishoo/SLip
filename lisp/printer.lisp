@@ -367,14 +367,14 @@
                           (%pp-body-indent body)))))))
       (%pp-body-indent body))))
 
-(def-pretty-print if (cond &optional
-                           (then nil then-supplied-p)
-                           (else nil else-supplied-p))
+(def-pretty-print if (condition &optional
+                                (then nil then-supplied-p)
+                                (else nil else-supplied-p))
   (with-indent (%stream-col *pp-stream*)
     (with-parens
       (<< (%pp-symbol symbol) " ")
       (with-indent (%stream-col *pp-stream*)
-        (%pp-object cond)
+        (%pp-object condition)
         (when then-supplied-p
           (<< #\Newline)
           (indent)

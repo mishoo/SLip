@@ -370,7 +370,7 @@ defp("nthcdr", false, function(m, nargs){
     checktype(n, LispInteger);
     var p = list;
     while (p !== null && n-- > 0) {
-        checktype(list, LispList);
+        checktype(p, LispList);
         p = p.cdr;
     }
     return p;
@@ -416,8 +416,8 @@ defp("%memq", false, function(m, nargs){
 defp("%assq", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var list = m.pop(), item = m.pop();
-    checktype(list, LispList);
     while (list !== null) {
+        checktype(list, LispList);
         checktype(list.car, LispCons);
         if (eq(list.car.car, item)) return list.car;
         list = list.cdr;
@@ -483,9 +483,7 @@ defp("%putf", true, function(m, nargs){
 })(function(func){
     return function (m, nargs) {
         checknargs(nargs, 1, 1);
-        var list = m.pop();
-        checktype(list, LispList);
-        return func(list);
+        return func(m.pop());
     };
 });
 
@@ -548,14 +546,12 @@ defp("nconc", true, function(m, nargs){
 defp("revappend", true, function(m, nargs){
     checknargs(nargs, 2, 2);
     var tail = m.pop(), list = m.pop();
-    checktype(list, LispList);
     return LispCons.revappend(list, tail);
 });
 
 defp("nreconc", true, function(m, nargs){
     checknargs(nargs, 2, 2);
     var tail = m.pop(), list = m.pop();
-    checktype(list, LispList);
     return LispCons.nreconc(list, tail);
 });
 

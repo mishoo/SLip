@@ -845,12 +845,6 @@ export class LispMachine {
         return error("Number expected, got " + dump(n), n);
     }
 
-    pop_list(error) {
-        var cell = this.pop();
-        if (cell == null || cell === S_NIL || cell instanceof LispCons) return cell;
-        return error("List expected, got " + dump(cell), cell);
-    }
-
     mkret(pc) {
         return new LispRet(this, pc);
     }
@@ -1328,123 +1322,123 @@ function vmrun(m) {
         return;
 
       case OP.CAR:
-        m.push(LispCons.car(m.pop_list(error)));
+        m.push(LispCons.car(m.pop()));
         return;
 
       case OP.CDR:
-        m.push(LispCons.cdr(m.pop_list(error)));
+        m.push(LispCons.cdr(m.pop()));
         return;
 
       case OP.CAAR:
-        m.push(LispCons.caar(m.pop_list(error)));
+        m.push(LispCons.caar(m.pop()));
         return;
 
       case OP.CADR:
-        m.push(LispCons.cadr(m.pop_list(error)));
+        m.push(LispCons.cadr(m.pop()));
         return;
 
       case OP.CDAR:
-        m.push(LispCons.cdar(m.pop_list(error)));
+        m.push(LispCons.cdar(m.pop()));
         return;
 
       case OP.CDDR:
-        m.push(LispCons.cddr(m.pop_list(error)));
+        m.push(LispCons.cddr(m.pop()));
         return;
 
       case OP.CAAAR:
-        m.push(LispCons.caaar(m.pop_list(error)));
+        m.push(LispCons.caaar(m.pop()));
         return;
 
       case OP.CAADR:
-        m.push(LispCons.caadr(m.pop_list(error)));
+        m.push(LispCons.caadr(m.pop()));
         return;
 
       case OP.CADAR:
-        m.push(LispCons.cadar(m.pop_list(error)));
+        m.push(LispCons.cadar(m.pop()));
         return;
 
       case OP.CADDR:
-        m.push(LispCons.caddr(m.pop_list(error)));
+        m.push(LispCons.caddr(m.pop()));
         return;
 
       case OP.CDAAR:
-        m.push(LispCons.cdaar(m.pop_list(error)));
+        m.push(LispCons.cdaar(m.pop()));
         return;
 
       case OP.CDADR:
-        m.push(LispCons.cdadr(m.pop_list(error)));
+        m.push(LispCons.cdadr(m.pop()));
         return;
 
       case OP.CDDAR:
-        m.push(LispCons.cddar(m.pop_list(error)));
+        m.push(LispCons.cddar(m.pop()));
         return;
 
       case OP.CDDDR:
-        m.push(LispCons.cdddr(m.pop_list(error)));
+        m.push(LispCons.cdddr(m.pop()));
         return;
 
       case OP.CAAAAR:
-        m.push(LispCons.caaaar(m.pop_list(error)));
+        m.push(LispCons.caaaar(m.pop()));
         return;
 
       case OP.CAAADR:
-        m.push(LispCons.caaadr(m.pop_list(error)));
+        m.push(LispCons.caaadr(m.pop()));
         return;
 
       case OP.CAADAR:
-        m.push(LispCons.caadar(m.pop_list(error)));
+        m.push(LispCons.caadar(m.pop()));
         return;
 
       case OP.CAADDR:
-        m.push(LispCons.caaddr(m.pop_list(error)));
+        m.push(LispCons.caaddr(m.pop()));
         return;
 
       case OP.CADAAR:
-        m.push(LispCons.cadaar(m.pop_list(error)));
+        m.push(LispCons.cadaar(m.pop()));
         return;
 
       case OP.CADADR:
-        m.push(LispCons.cadadr(m.pop_list(error)));
+        m.push(LispCons.cadadr(m.pop()));
         return;
 
       case OP.CADDAR:
-        m.push(LispCons.caddar(m.pop_list(error)));
+        m.push(LispCons.caddar(m.pop()));
         return;
 
       case OP.CADDDR:
-        m.push(LispCons.cadddr(m.pop_list(error)));
+        m.push(LispCons.cadddr(m.pop()));
         return;
 
       case OP.CDAAAR:
-        m.push(LispCons.cdaaar(m.pop_list(error)));
+        m.push(LispCons.cdaaar(m.pop()));
         return;
 
       case OP.CDAADR:
-        m.push(LispCons.cdaadr(m.pop_list(error)));
+        m.push(LispCons.cdaadr(m.pop()));
         return;
 
       case OP.CDADAR:
-        m.push(LispCons.cdadar(m.pop_list(error)));
+        m.push(LispCons.cdadar(m.pop()));
         return;
 
       case OP.CDADDR:
-        m.push(LispCons.cdaddr(m.pop_list(error)));
+        m.push(LispCons.cdaddr(m.pop()));
         return;
 
       case OP.CDDAAR:
-        m.push(LispCons.cddaar(m.pop_list(error)));
+        m.push(LispCons.cddaar(m.pop()));
         return;
 
       case OP.CDDADR:
-        m.push(LispCons.cddadr(m.pop_list(error)));
+        m.push(LispCons.cddadr(m.pop()));
         return;
 
       case OP.CDDDAR:
-        m.push(LispCons.cdddar(m.pop_list(error)));
+        m.push(LispCons.cdddar(m.pop()));
         return;
 
       case OP.CDDDDR:
-        m.push(LispCons.cddddr(m.pop_list(error)));
+        m.push(LispCons.cddddr(m.pop()));
         return;
 
       case OP.BLOCK2: {

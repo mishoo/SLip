@@ -97,6 +97,8 @@
              (list 'cons first second))
             ((eq 'list (car second))
              (list* 'list first (cdr second)))
+            ((eq 'list* (car second))
+             (list* 'list* first (cdr second)))
             ((eq 'cons (car second))
              (opt-list first (cadr second) (caddr second)))
             (t
