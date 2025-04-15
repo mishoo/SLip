@@ -24,7 +24,7 @@
            '*xref-info*
            '*let-tco*)
 
-;; (setq *let-tco* t)
+(setq *let-tco* t)
 
 ;; (defmacro cond cases
 ;;   (if cases
@@ -987,9 +987,9 @@
           (when (member args names)
             (error (strcat "Duplicate function argument " args)))
           (gen "ARG_" n))
-         ((and (consp args) (lambda-keyword-p (car args)))
-          (throw '$xargs '$xargs))
          ((and (consp args) (symbolp (car args)))
+          (when (lambda-keyword-p (car args))
+            (throw '$xargs '$xargs))
           (when (member (car args) names)
             (error (strcat "Duplicate function argument " (car args))))
           (gen-simple-args (cdr args) (+ n 1) (cons (car args) names)))
