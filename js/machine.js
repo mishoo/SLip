@@ -1,6 +1,7 @@
 import { LispCons } from "./list.js";
 import { LispType, LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
 import { repeat_string, pad_string } from "./utils.js";
+import { LispStack } from "./stack.js";
 
 let BASE_PACK = LispPackage.get("%");
 let KEYWORD_PACK = LispPackage.get("KEYWORD");
@@ -213,7 +214,7 @@ class LispLongRet {
         this.code = m.code;
         this.env = m.env;
         this.denv = m.denv;
-        this.slen = m.stack.length;
+        this.slen = m.stack.sp;
         this.n_args = m.n_args;
         this.exit = exit;
         //if (m.trace) this.trace = m.trace.slice();
@@ -223,7 +224,7 @@ class LispLongRet {
         m.code = this.code;
         m.env = this.env;
         m.denv = this.denv;
-        m.stack.length = this.slen;
+        m.stack.sp = this.slen;
         m.pc = addr;
         m.n_args = this.n_args;
         //if (this.trace) m.trace = this.trace;
@@ -251,12 +252,12 @@ class LispLongRet {
 // continuations
 class LispCC {
     constructor(m) {
-        this.stack = [ ...m.stack ];
+        this.stack = m.stack.copy();
         this.denv = m.denv;
         //if (m.trace) this.trace = m.trace.slice();
     }
     run(m) {
-        m.stack = [ ...this.stack ];
+        m.stack.restore(this.stack);
         m.denv = this.denv;
         //if (this.trace) m.trace = this.trace.slice();
     }
@@ -836,7 +837,7 @@ export class LispMachine {
     }
 
     pop_frame(n) {
-        return this.stack.splice(this.stack.length - n, n);
+        return this.stack.pop_frame(n);
     }
 
     pop_number(error) {
@@ -862,7 +863,7 @@ export class LispMachine {
     }
 
     top() {
-        return this.stack.at(-1);
+        return this.stack.top();
     }
 
     loop() {
@@ -870,7 +871,7 @@ export class LispMachine {
             vmrun(this);
             if (this.pc == null) break;
         }
-        return this.pop();
+        return this.stack.sp > 0 ? this.pop() : null;
     }
 
     atomic_call(closure, args) {
@@ -886,7 +887,7 @@ export class LispMachine {
         //var save_trace = this.trace;
         this.code = closure.code;
         this.env = closure.env;
-        this.stack = [ new LispRet(this, null) ].concat(args);
+        this.stack = new LispStack().restore([ new LispRet(this, null) ].concat(args));
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
@@ -908,7 +909,7 @@ export class LispMachine {
     _exec(code) {
         this.code = code;
         this.env = null;
-        this.stack = [];
+        this.stack = new LispStack();
         this.pc = 0;
         this.f = null;
         return this.loop();
@@ -916,7 +917,7 @@ export class LispMachine {
 
     _call(closure, args) {
         args = LispCons.toArray(args);
-        this.stack = [ new LispRet(this, null) ].concat(args);
+        this.stack = new LispStack().restore([ new LispRet(this, null) ].concat(args));
         this.code = closure.code;
         this.env = closure.env;
         this.n_args = args.length;
@@ -946,7 +947,7 @@ export class LispMachine {
     }
 
     set_closure(closure, ...args) {
-        this.stack = [ new LispRet(this, null) ].concat(args);
+        this.stack = new LispStack().restore([ new LispRet(this, null) ].concat(args));
         this.code = closure.code;
         this.env = closure.env;
         this.n_args = args.length;
@@ -1487,52 +1488,53 @@ function vmrun(m) {
               error(`Expecting at most ${max} arguments`);
           }
           let frame = new Array(frame_len).fill(null);
-          let maxi = m.stack.length;
+          let stack = m.stack.data;
+          let maxi = m.stack.sp;
           let i = maxi - n;
           let index = 0;
           while (required-- > 0) {
-              frame[index++] = m.stack[i++];
+              frame[index++] = stack[i++];
           }
           while (optional-- > 0 && i < maxi) {
               frame[index++] = true; // argument-passed-p
-              frame[index++] = m.stack[i++];
+              frame[index++] = stack[i++];
           }
           if (i < maxi) {
               if (rest) {
-                  frame[index++] = LispCons.fromArray(m.stack, i, maxi);
+                  frame[index++] = LispCons.fromArray(stack, i, maxi);
               }
               if (kl) {
                   if ((maxi - i) % 2 != 0) {
                       error("Uneven number of &key arguments");
                   }
                   if (!allow_other_keys) {
-                      let pos = find_key_arg(S_ALLOW_OTHER_KEYS, m.stack, i, maxi);
+                      let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, maxi);
                       if (pos != null) {
-                          allow_other_keys = m.stack[pos + 1];
-                          m.stack[pos] = false;
+                          allow_other_keys = stack[pos + 1];
+                          stack[pos] = false;
                           if (pos == i) i += 2;
                       }
                   }
                   for (let k = 0; k < kl; k++, index += 2) {
-                      let pos = find_key_arg(key[k], m.stack, i, maxi);
+                      let pos = find_key_arg(key[k], stack, i, maxi);
                       if (pos != null) {
                           frame[index] = true; // argument-passed-p
-                          frame[index + 1] = m.stack[pos + 1];
-                          m.stack[pos] = false;
+                          frame[index + 1] = stack[pos + 1];
+                          stack[pos] = false;
                           if (pos == i) i += 2;
                       }
                   }
                   if (!allow_other_keys) {
                       while (i < maxi) {
-                          if (m.stack[i] !== false) {
-                              error(`Unknown keyword argument ${dump(m.stack[i])}`);
+                          if (stack[i] !== false) {
+                              error(`Unknown keyword argument ${dump(stack[i])}`);
                           }
                           i += 2;
                       }
                   }
               }
           }
-          m.stack.length -= n;
+          m.stack.sp -= n;
           m.env = new LispCons(frame, m.env);
           return;
       }

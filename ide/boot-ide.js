@@ -80,7 +80,10 @@ import "../js/primitives.js";
                 fasls[i] = LispMachine.unserialize(code);
                 if (--count == 0) {
                     console.time("Boot");
-                    fasls.forEach(code => machine._exec(code));
+                    fasls.forEach((code, i) => {
+                        log("Executing: " + files[i]);
+                        machine._exec(code);
+                    });
                     console.timeEnd("Boot");
                     console.log("Loaded " + files.join(", "));
                     cont();

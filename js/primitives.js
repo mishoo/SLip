@@ -536,11 +536,11 @@ defp("list*", false, function(m, nargs) {
 });
 
 defp("append", false, function(m, nargs) {
-    return nargs == 0 ? null : LispCons.append(m.stack.splice(-nargs));
+    return nargs == 0 ? null : LispCons.append(m.stack.pop_frame(nargs));
 });
 
 defp("nconc", true, function(m, nargs){
-    return nargs == 0 ? null : LispCons.nconc(m.stack.splice(-nargs));
+    return nargs == 0 ? null : LispCons.nconc(m.stack.pop_frame(nargs));
 });
 
 defp("revappend", true, function(m, nargs){
@@ -2042,7 +2042,7 @@ defp("%machine.dynamic-environment", false, function(m, nargs){
 });
 
 defp("%machine.stack", false, function(m, nargs){
-    return [...m.stack];
+    return [...m.stack.data];
 });
 
 defp("%eval-bytecode", true, function(m, nargs){
