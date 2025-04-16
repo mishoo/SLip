@@ -80,9 +80,9 @@
 
 (defun rect-spiral (max)
   (save-excursion
-   (loop for n below max by 2 do
+   (loop for n below max do
          (forward n)
-         (left 89.7))))
+         (left 81))))
 
 (defparameter iii 0)
 
@@ -91,7 +91,7 @@
   (save-excursion
    (set-color "#abba")
    (left (* iii 20))
-   (rect-spiral 700))
+   (rect-spiral 350))
   (left (* 10 (cos iii)))
   (clock (+ 160 (* 30 (sin (incf iii 0.05))))))
 
