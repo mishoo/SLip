@@ -2138,6 +2138,11 @@ defp("%js-camelcase-name", true, function(m, nargs){
     return name;
 });
 
+defp("get-internal-run-time", false, function(m, nargs){
+    checknargs(nargs, 0, 0);
+    return performance.now();
+});
+
 defp("%get-time", false, function(m, nargs){
     checknargs(nargs, 0, 0);
     return Date.now();

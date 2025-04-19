@@ -359,6 +359,6 @@
 
 (def-emac time body
   (let ((t1 (gensym)))
-    `(let ((,t1 (%get-time)))
+    `(let ((,t1 (get-internal-run-time)))
        (prog1 (progn ,@body)
-         (format t "Evaluation time: ~Ams~%" (- (%get-time) ,t1))))))
+         (format t "Evaluation time: ~Ams~%" (- (get-internal-run-time) ,t1))))))

@@ -75,13 +75,13 @@
         (print-object-to-string ret))))
 
 (define-handler :compile-file (filename)
-  (let ((t1 (%get-time)))
+  (let ((t1 (get-internal-run-time)))
     (prog1
         (load filename)
       (send-ymacs-notify :message
                          (strcat ";; " filename
                                  " compiled in "
-                                 (number-fixed (/ (- (%get-time) t1) 1000) 3) " s")))))
+                                 (number-fixed (/ (- (get-internal-run-time) t1) 1000) 3) " s")))))
 
 (define-handler :eval-string (pak str)
   (let ((*package* (or (and pak (find-package pak))
