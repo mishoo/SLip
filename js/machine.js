@@ -1031,547 +1031,425 @@ function find_key_arg(item, array, start, end) {
     return null;
 }
 
-function vmrun(m) {
-    switch (m.code[m.pc++]) {
-      case OP.LVAR: {
-          let i = m.code[m.pc++];
-          let j = m.code[m.pc++];
-          m.push(frame(m.env, i)[j]);
-          return;
-      }
-
-      case OP.LSET: {
-          let i = m.code[m.pc++];
-          let j = m.code[m.pc++];
-          frame(m.env, i)[j] = m.top();
-          return;
-      }
-
-      case OP.GVAR: {
-          let name = m.code[m.pc++];
-          m.push(m.gvar(name));
-          return;
-      }
-
-      case OP.GSET: {
-          let name = m.code[m.pc++];
-          m.gset(name, m.top());
-          return;
-      }
-
-      case OP.BIND: {
-          let name = m.code[m.pc++];
-          let i = m.code[m.pc++];
-          m.bind(name, i);
-          return;
-      }
-
-      case OP.FGVAR: {
-          let name = m.code[m.pc++];
-          let f = name.function;
-          if (!f) {
-              //console.error("Undefined function", name);
-              error(`Undefined function ${dump(name)}`);
-          }
-          m.push(f);
-          return;
-      }
-
-      case OP.FGSET: {
-          let name = m.code[m.pc++];
-          name.function = m.top();
-          return;
-      }
-
-      case OP.POP: {
-          m.pop();
-          return;
-      }
-
-      case OP.CONST: {
-          let val = m.code[m.pc++];
-          m.push(val);
-          return;
-      }
-
-      case OP.JUMP: {
-          let addr = m.code[m.pc++];
-          m.pc = addr;
-          return;
-      }
-
-      case OP.TJUMP: {
-          let addr = m.code[m.pc++];
-          if (m.pop() !== null) m.pc = addr;
-          return;
-      }
-
-      case OP.FJUMP: {
-          let addr = m.code[m.pc++];
-          if (m.pop() === null) m.pc = addr;
-          return;
-      }
-
-      case OP.BLOCK: {
-          // this is moderately tricky: we can't do
-          //   m.env = new LispCons([ new LispLongRet(m) ], m.env);
-          // I'll let you figure out why.
-          let frame = [];
-          m.env = new LispCons(frame, m.env);
-          frame[0] = new LispLongRet(m);
-          return;
-      }
-
-      case OP.LJUMP: {
-          let addr = m.code[m.pc++];
-          m.pop().run(m, addr);
-          return;
-      }
-
-      case OP.LRET: {
-          let noval = m.f.noval;
-          let addr = m.code[m.pc++];
-          let bret = m.pop(), val = m.pop();
-          bret.run(m, addr);
-          if (!noval) m.push(val);
-          return;
-      }
-
-      case OP.NOT: {
-          m.push(m.pop() === null ? true : null);
-          return;
-      }
-
-      case OP.SETCC: {
-          m.uncont(m.top());
-          return;
-      }
-
-      case OP.SAVE: {
-          let addr = m.code[m.pc++];
-          m.push(m.mkret(addr));
-          return;
-      }
-
-      case OP.RET: {
-          let noval = m.f.noval;
-          let val = m.pop();
-          m.unret(m.pop());
-          if (!noval) m.push(val);
-          return;
-      }
-
-      case OP.CALL: {
-          let count = m.code[m.pc++];
-          let closure = m.pop();
-          //if (m.trace) m.trace.push([ closure, m.stack.slice(-count) ]);
-          m.n_args = count;
-          m.code = closure.code;
-          m.env = closure.env;
-          m.pc = 0;
-          m.f = closure;
-          return;
-      }
-
-      case OP.UPOPEN: {
-          let addr = m.code[m.pc++];
-          let c = new LispCleanup(new LispLongRet(m), addr);
-          m.dynpush(c);
-          return;
-      }
-
-      case OP.UPEXIT: {
-          // no need to run it, we're already in
-          // the right place.  just discard.
-          m.denv = m.denv.cdr;
-          m.after_cleanup = null;
-          return;
-      }
-
-      case OP.UPCLOSE: {
-          if (m.after_cleanup) m.after_cleanup(m);
-          return;
-      }
-
-      case OP.CATCH: {
-          let addr = m.code[m.pc++];
-          let c = new LispCatch(m, addr, m.pop());
-          m.dynpush(c);
-          return;
-      }
-
-      case OP.THROW: {
-          let val = m.pop();
-          let tag = m.pop();
-          let p = m.denv;
-          while (p) {
-              let el = p.car;
-              if (el instanceof LispCatch && eq(el.tag, tag)) {
-                  el.run(m, val);
-                  return;
-              }
-              p = p.cdr;
-          }
-          error("CATCH tag not found " + dump(tag));
-          return;
-      }
-
-      case OP.LET: {
-          let count = m.code[m.pc++];
-          m.env = new LispCons(m.pop_frame(count), m.env);
-          return;
-      }
-
-      case OP.ARGS: {
-          let count = m.code[m.pc++];
-          if (count != m.n_args) {
-              console.error(m.f);
-              error("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
-          }
-          if (count) m.env = new LispCons(m.pop_frame(count), m.env);
-          return;
-      }
-
-      case OP.ARG_: {
-          let count = m.code[m.pc++];
-          let passed = m.n_args;
-          if (passed < count) {
-              console.error(m.f);
-              error("Insufficient number of arguments");
-          }
-          let p = null;
-          while (passed-- > count) p = new LispCons(m.pop(), p);
-          let frame = m.pop_frame(count);
-          frame.push(p);
-          m.env = new LispCons(frame, m.env);
-          return;
-      }
-
-      case OP.FRAME: {
-          m.env = new LispCons([], m.env);
-          return;
-      }
-
-      case OP.VAR: {
-          m.env.car.push(m.pop());
-          return;
-      }
-
-      case OP.VARS: {
-          let count = m.code[m.pc++];
-          let a = m.env.car, n = a.length;
-          while (--count >= 0) a[n + count] = m.pop();
-          return;
-      }
-
-      case OP.UNFR: {
-          let lex = m.code[m.pc++];
-          let spec = m.code[m.pc++];
-          if (lex) m.env = rewind(m.env, lex);
-          if (spec) m.denv = rewind(m.denv, spec);
-          return;
-      }
-
-      case OP.FN: {
-          let code = m.code[m.pc++];
-          let name = m.code[m.pc++];
-          m.push(new LispClosure(code, name, m.env));
-          return;
-      }
-
-      case OP.PRIM: {
-          let name = m.code[m.pc++];
-          let nargs = m.code[m.pc++];
-          if (nargs == -1) nargs = m.n_args;
-          let ret = name.primitive(m, nargs);
-          if (ret !== false) m.push(ret ?? null);
-          return;
-      }
-
-      case OP.NIL: {
-          m.push(null);
-          return;
-      }
-
-      case OP.T: {
-          m.push(true);
-          return;
-      }
-
-      case OP.CONS: {
-          let b = m.pop(), a = m.pop();
-          m.push(new LispCons(a, b));
-          return;
-      }
-
-      case OP.LIST: {
-          let count = m.code[m.pc++];
-          let p = null, n = count;
-          if (n == -1) n = m.n_args;
-          while (n-- > 0) p = new LispCons(m.pop(), p);
-          m.push(p);
-          return;
-      }
-
-      case OP.LIST_: {
-          let count = m.code[m.pc++];
-          let p = m.pop(), n = count;
-          if (n == -1) n = m.n_args;
-          while (--n > 0) p = new LispCons(m.pop(), p);
-          m.push(p);
-          return;
-      }
-
-      case OP.CC:
+let OP_RUN = Object.freeze([
+    null,
+    /*OP.LVAR*/ (m) => {
+        let i = m.code[m.pc++];
+        let j = m.code[m.pc++];
+        m.push(frame(m.env, i)[j]);
+    },
+    /*OP.LSET*/ (m) => {
+        let i = m.code[m.pc++];
+        let j = m.code[m.pc++];
+        frame(m.env, i)[j] = m.top();
+    },
+    /*OP.GVAR*/ (m) => {
+        let name = m.code[m.pc++];
+        m.push(m.gvar(name));
+    },
+    /*OP.GSET*/ (m) => {
+        let name = m.code[m.pc++];
+        m.gset(name, m.top());
+    },
+    /*OP.BIND*/ (m) => {
+        let name = m.code[m.pc++];
+        let i = m.code[m.pc++];
+        m.bind(name, i);
+    },
+    /*OP.FGVAR*/ (m) => {
+        let name = m.code[m.pc++];
+        let f = name.function;
+        if (!f) {
+            //console.error("Undefined function", name);
+            error(`Undefined function ${dump(name)}`);
+        }
+        m.push(f);
+    },
+    /*OP.FGSET*/ (m) => {
+        let name = m.code[m.pc++];
+        name.function = m.top();
+    },
+    /*OP.POP*/ (m) => {
+        m.pop();
+    },
+    /*OP.CONST*/ (m) => {
+        let val = m.code[m.pc++];
+        m.push(val);
+    },
+    /*OP.JUMP*/ (m) => {
+        let addr = m.code[m.pc++];
+        m.pc = addr;
+    },
+    /*OP.TJUMP*/ (m) => {
+        let addr = m.code[m.pc++];
+        if (m.pop() !== null) m.pc = addr;
+    },
+    /*OP.FJUMP*/ (m) => {
+        let addr = m.code[m.pc++];
+        if (m.pop() === null) m.pc = addr;
+    },
+    /*OP.BLOCK*/ (m) => {
+        // this is moderately tricky: we can't do
+        //   m.env = new LispCons([ new LispLongRet(m) ], m.env);
+        // I'll let you figure out why.
+        let frame = [];
+        m.env = new LispCons(frame, m.env);
+        frame[0] = new LispLongRet(m);
+    },
+    /*OP.LJUMP*/ (m) => {
+        let addr = m.code[m.pc++];
+        m.pop().run(m, addr);
+    },
+    /*OP.LRET*/ (m) => {
+        let noval = m.f.noval;
+        let addr = m.code[m.pc++];
+        let bret = m.pop(), val = m.pop();
+        bret.run(m, addr);
+        if (!noval) m.push(val);
+    },
+    /*OP.NOT*/ (m) => {
+        m.push(m.pop() === null ? true : null);
+    },
+    /*OP.SETCC*/ (m) => {
+        m.uncont(m.top());
+    },
+    /*OP.SAVE*/ (m) => {
+        let addr = m.code[m.pc++];
+        m.push(m.mkret(addr));
+    },
+    /*OP.RET*/ (m) => {
+        let noval = m.f.noval;
+        let val = m.pop();
+        m.unret(m.pop());
+        if (!noval) m.push(val);
+    },
+    /*OP.CALL*/ (m) => {
+        let count = m.code[m.pc++];
+        let closure = m.pop();
+        //if (m.trace) m.trace.push([ closure, m.stack.slice(-count) ]);
+        m.n_args = count;
+        m.code = closure.code;
+        m.env = closure.env;
+        m.pc = 0;
+        m.f = closure;
+    },
+    /*OP.UPOPEN*/ (m) => {
+        let addr = m.code[m.pc++];
+        let c = new LispCleanup(new LispLongRet(m), addr);
+        m.dynpush(c);
+    },
+    /*OP.UPEXIT*/ (m) => {
+        // no need to run it, we're already in
+        // the right place.  just discard.
+        m.denv = m.denv.cdr;
+        m.after_cleanup = null;
+    },
+    /*OP.UPCLOSE*/ (m) => {
+        if (m.after_cleanup) m.after_cleanup(m);
+    },
+    /*OP.CATCH*/ (m) => {
+        let addr = m.code[m.pc++];
+        let c = new LispCatch(m, addr, m.pop());
+        m.dynpush(c);
+    },
+    /*OP.THROW*/ (m) => {
+        let val = m.pop();
+        let tag = m.pop();
+        let p = m.denv;
+        while (p) {
+            let el = p.car;
+            if (el instanceof LispCatch && eq(el.tag, tag)) {
+                el.run(m, val);
+                return;
+            }
+            p = p.cdr;
+        }
+        error("CATCH tag not found " + dump(tag));
+    },
+    /*OP.LET*/ (m) => {
+        let count = m.code[m.pc++];
+        m.env = new LispCons(m.pop_frame(count), m.env);
+    },
+    /*OP.ARGS*/ (m) => {
+        let count = m.code[m.pc++];
+        if (count != m.n_args) {
+            console.error(m.f);
+            error("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
+        }
+        if (count) m.env = new LispCons(m.pop_frame(count), m.env);
+    },
+    /*OP.ARG_*/ (m) => {
+        let count = m.code[m.pc++];
+        let passed = m.n_args;
+        if (passed < count) {
+            console.error(m.f);
+            error("Insufficient number of arguments");
+        }
+        let p = null;
+        while (passed-- > count) p = new LispCons(m.pop(), p);
+        let frame = m.pop_frame(count);
+        frame.push(p);
+        m.env = new LispCons(frame, m.env);
+    },
+    /*OP.FRAME*/ (m) => {
+        m.env = new LispCons([], m.env);
+    },
+    /*OP.VAR*/ (m) => {
+        m.env.car.push(m.pop());
+    },
+    /*OP.VARS*/ (m) => {
+        let count = m.code[m.pc++];
+        let a = m.env.car, n = a.length;
+        while (--count >= 0) a[n + count] = m.pop();
+    },
+    /*OP.UNFR*/ (m) => {
+        let lex = m.code[m.pc++];
+        let spec = m.code[m.pc++];
+        if (lex) m.env = rewind(m.env, lex);
+        if (spec) m.denv = rewind(m.denv, spec);
+    },
+    /*OP.FN*/ (m) => {
+        let code = m.code[m.pc++];
+        let name = m.code[m.pc++];
+        m.push(new LispClosure(code, name, m.env));
+    },
+    /*OP.PRIM*/ (m) => {
+        let name = m.code[m.pc++];
+        let nargs = m.code[m.pc++];
+        if (nargs == -1) nargs = m.n_args;
+        let ret = name.primitive(m, nargs);
+        if (ret !== false) m.push(ret ?? null);
+    },
+    /*OP.NIL*/ (m) => {
+        m.push(null);
+    },
+    /*OP.T*/ (m) => {
+        m.push(true);
+    },
+    /*OP.CONS*/ (m) => {
+        let b = m.pop(), a = m.pop();
+        m.push(new LispCons(a, b));
+    },
+    /*OP.LIST*/ (m) => {
+        let count = m.code[m.pc++];
+        let p = null, n = count;
+        if (n == -1) n = m.n_args;
+        while (n-- > 0) p = new LispCons(m.pop(), p);
+        m.push(p);
+    },
+    /*OP.LIST_*/ (m) => {
+        let count = m.code[m.pc++];
+        let p = m.pop(), n = count;
+        if (n == -1) n = m.n_args;
+        while (--n > 0) p = new LispCons(m.pop(), p);
+        m.push(p);
+    },
+    /*OP.CC*/ (m) => {
         m.push(new LispClosure(CC_CODE, null, new LispCons([ m.mkcont() ])));
-        return;
-
-      case OP.CAR:
+    },
+    /*OP.CAR*/ (m) => {
         m.push(LispCons.car(m.pop()));
-        return;
-
-      case OP.CDR:
+    },
+    /*OP.CDR*/ (m) => {
         m.push(LispCons.cdr(m.pop()));
-        return;
-
-      case OP.CAAR:
+    },
+    /*OP.CAAR*/ (m) => {
         m.push(LispCons.caar(m.pop()));
-        return;
-
-      case OP.CADR:
+    },
+    /*OP.CADR*/ (m) => {
         m.push(LispCons.cadr(m.pop()));
-        return;
-
-      case OP.CDAR:
+    },
+    /*OP.CDAR*/ (m) => {
         m.push(LispCons.cdar(m.pop()));
-        return;
-
-      case OP.CDDR:
+    },
+    /*OP.CDDR*/ (m) => {
         m.push(LispCons.cddr(m.pop()));
-        return;
-
-      case OP.CAAAR:
+    },
+    /*OP.CAAAR*/ (m) => {
         m.push(LispCons.caaar(m.pop()));
-        return;
-
-      case OP.CAADR:
+    },
+    /*OP.CAADR*/ (m) => {
         m.push(LispCons.caadr(m.pop()));
-        return;
-
-      case OP.CADAR:
+    },
+    /*OP.CADAR*/ (m) => {
         m.push(LispCons.cadar(m.pop()));
-        return;
-
-      case OP.CADDR:
+    },
+    /*OP.CADDR*/ (m) => {
         m.push(LispCons.caddr(m.pop()));
-        return;
-
-      case OP.CDAAR:
+    },
+    /*OP.CDAAR*/ (m) => {
         m.push(LispCons.cdaar(m.pop()));
-        return;
-
-      case OP.CDADR:
+    },
+    /*OP.CDADR*/ (m) => {
         m.push(LispCons.cdadr(m.pop()));
-        return;
-
-      case OP.CDDAR:
+    },
+    /*OP.CDDAR*/ (m) => {
         m.push(LispCons.cddar(m.pop()));
-        return;
-
-      case OP.CDDDR:
+    },
+    /*OP.CDDDR*/ (m) => {
         m.push(LispCons.cdddr(m.pop()));
-        return;
-
-      case OP.CAAAAR:
+    },
+    /*OP.CAAAAR*/ (m) => {
         m.push(LispCons.caaaar(m.pop()));
-        return;
-
-      case OP.CAAADR:
+    },
+    /*OP.CAAADR*/ (m) => {
         m.push(LispCons.caaadr(m.pop()));
-        return;
-
-      case OP.CAADAR:
+    },
+    /*OP.CAADAR*/ (m) => {
         m.push(LispCons.caadar(m.pop()));
-        return;
-
-      case OP.CAADDR:
+    },
+    /*OP.CAADDR*/ (m) => {
         m.push(LispCons.caaddr(m.pop()));
-        return;
-
-      case OP.CADAAR:
+    },
+    /*OP.CADAAR*/ (m) => {
         m.push(LispCons.cadaar(m.pop()));
-        return;
-
-      case OP.CADADR:
+    },
+    /*OP.CADADR*/ (m) => {
         m.push(LispCons.cadadr(m.pop()));
-        return;
-
-      case OP.CADDAR:
+    },
+    /*OP.CADDAR*/ (m) => {
         m.push(LispCons.caddar(m.pop()));
-        return;
-
-      case OP.CADDDR:
+    },
+    /*OP.CADDDR*/ (m) => {
         m.push(LispCons.cadddr(m.pop()));
-        return;
-
-      case OP.CDAAAR:
+    },
+    /*OP.CDAAAR*/ (m) => {
         m.push(LispCons.cdaaar(m.pop()));
-        return;
-
-      case OP.CDAADR:
+    },
+    /*OP.CDAADR*/ (m) => {
         m.push(LispCons.cdaadr(m.pop()));
-        return;
-
-      case OP.CDADAR:
+    },
+    /*OP.CDADAR*/ (m) => {
         m.push(LispCons.cdadar(m.pop()));
-        return;
-
-      case OP.CDADDR:
+    },
+    /*OP.CDADDR*/ (m) => {
         m.push(LispCons.cdaddr(m.pop()));
-        return;
-
-      case OP.CDDAAR:
+    },
+    /*OP.CDDAAR*/ (m) => {
         m.push(LispCons.cddaar(m.pop()));
-        return;
-
-      case OP.CDDADR:
+    },
+    /*OP.CDDADR*/ (m) => {
         m.push(LispCons.cddadr(m.pop()));
-        return;
-
-      case OP.CDDDAR:
+    },
+    /*OP.CDDDAR*/ (m) => {
         m.push(LispCons.cdddar(m.pop()));
-        return;
-
-      case OP.CDDDDR:
+    },
+    /*OP.CDDDDR*/ (m) => {
         m.push(LispCons.cddddr(m.pop()));
-        return;
+    },
+    /*OP.BLOCK2*/ (m) => {
+        let exit = m.code[m.pc++];
+        let frame = [];
+        m.env = new LispCons(frame, m.env);
+        frame[0] = new LispLongRet(m, exit);
+    },
+    /*OP.LRET2*/ (m) => {
+        let noval = m.f.noval;
+        let fr = m.code[m.pc++];
+        let val = m.pop();
+        frame(m.env, fr)[0].run(m);
+        if (!noval) m.push(val);
+    },
+    /*OP.LJUMP2*/ (m) => {
+        let addr = m.code[m.pc++];
+        let fr = m.code[m.pc++];
+        frame(m.env, fr)[0].run(m, addr);
+    },
+    /*OP.XARGS*/ (m) => {
+        let required = m.code[m.pc++];
+        let optional = m.code[m.pc++];
+        let rest = m.code[m.pc++];
+        let key = m.code[m.pc++];
+        let allow_other_keys = m.code[m.pc++];
+        let kl = key?.length;
+        let n = m.n_args;
+        let frame_len = required + 2 * optional + rest + 2 * kl;
+        let min = required;
+        let max = rest || kl ? null : required + optional;
+        if (n < required) {
+            error(`Expecting at least ${min} arguments`);
+        }
+        if (max != null && n > max) {
+            error(`Expecting at most ${max} arguments`);
+        }
+        let frame = new Array(frame_len).fill(null);
+        let stack = m.stack.data;
+        let maxi = m.stack.sp;
+        let i = maxi - n;
+        let index = 0;
+        while (required-- > 0) {
+            frame[index++] = stack[i++];
+        }
+        while (optional-- > 0 && i < maxi) {
+            frame[index++] = true; // argument-passed-p
+            frame[index++] = stack[i++];
+        }
+        if (i < maxi) {
+            if (rest) {
+                frame[index++] = LispCons.fromArray(stack, i, maxi);
+            }
+            if (kl) {
+                if ((maxi - i) % 2 != 0) {
+                    error("Uneven number of &key arguments");
+                }
+                if (!allow_other_keys) {
+                    let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, maxi);
+                    if (pos != null) {
+                        allow_other_keys = stack[pos + 1];
+                        stack[pos] = false;
+                        if (pos == i) i += 2;
+                    }
+                }
+                for (let k = 0; k < kl; k++, index += 2) {
+                    let pos = find_key_arg(key[k], stack, i, maxi);
+                    if (pos != null) {
+                        frame[index] = true; // argument-passed-p
+                        frame[index + 1] = stack[pos + 1];
+                        stack[pos] = false;
+                        if (pos == i) i += 2;
+                    }
+                }
+                if (!allow_other_keys) {
+                    while (i < maxi) {
+                        if (stack[i] !== false) {
+                            error(`Unknown keyword argument ${dump(stack[i])}`);
+                        }
+                        i += 2;
+                    }
+                }
+            }
+        }
+        m.stack.sp -= n;
+        m.env = new LispCons(frame, m.env);
+    },
+    /*OP.POPLIST*/ (m) => {
+        let i = m.code[m.pc++];
+        let j = m.code[m.pc++];
+        let fr = frame(m.env, i);
+        let lst = fr[j];
+        fr[j] = LispCons.cdr(lst);
+        m.push(LispCons.car(lst));
+    },
+    /*OP.EQ*/ (m) => {
+        m.push(eq(m.pop(), m.pop()));
+    },
+    /*OP.POPGLIST*/ (m) => {
+        let sym = m.code[m.pc++];
+        let binding = m.find_dvar(sym);
+        let lst = binding.value;
+        m.push(LispCons.car(lst));
+        binding.value = LispCons.cdr(lst);
+    },
+    /*OP.TJUMPK*/ (m) => {
+        let addr = m.code[m.pc++];
+        if (m.top() === null) {
+            m.pop();
+        } else {
+            m.pc = addr;
+        }
+    },
+]);
 
-      case OP.BLOCK2: {
-          let exit = m.code[m.pc++];
-          let frame = [];
-          m.env = new LispCons(frame, m.env);
-          frame[0] = new LispLongRet(m, exit);
-          return;
-      }
-
-      case OP.LJUMP2: {
-          let addr = m.code[m.pc++];
-          let fr = m.code[m.pc++];
-          frame(m.env, fr)[0].run(m, addr);
-          return;
-      }
-
-      case OP.LRET2: {
-          let noval = m.f.noval;
-          let fr = m.code[m.pc++];
-          let val = m.pop();
-          frame(m.env, fr)[0].run(m);
-          if (!noval) m.push(val);
-          return;
-      }
-
-      case OP.XARGS: {
-          let required = m.code[m.pc++];
-          let optional = m.code[m.pc++];
-          let rest = m.code[m.pc++];
-          let key = m.code[m.pc++];
-          let allow_other_keys = m.code[m.pc++];
-          let kl = key?.length;
-          let n = m.n_args;
-          let frame_len = required + 2*optional + rest + 2*kl;
-          let min = required;
-          let max = rest || kl ? null : required + optional;
-          if (n < required) {
-              error(`Expecting at least ${min} arguments`);
-          }
-          if (max != null && n > max) {
-              error(`Expecting at most ${max} arguments`);
-          }
-          let frame = new Array(frame_len).fill(null);
-          let stack = m.stack.data;
-          let maxi = m.stack.sp;
-          let i = maxi - n;
-          let index = 0;
-          while (required-- > 0) {
-              frame[index++] = stack[i++];
-          }
-          while (optional-- > 0 && i < maxi) {
-              frame[index++] = true; // argument-passed-p
-              frame[index++] = stack[i++];
-          }
-          if (i < maxi) {
-              if (rest) {
-                  frame[index++] = LispCons.fromArray(stack, i, maxi);
-              }
-              if (kl) {
-                  if ((maxi - i) % 2 != 0) {
-                      error("Uneven number of &key arguments");
-                  }
-                  if (!allow_other_keys) {
-                      let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, maxi);
-                      if (pos != null) {
-                          allow_other_keys = stack[pos + 1];
-                          stack[pos] = false;
-                          if (pos == i) i += 2;
-                      }
-                  }
-                  for (let k = 0; k < kl; k++, index += 2) {
-                      let pos = find_key_arg(key[k], stack, i, maxi);
-                      if (pos != null) {
-                          frame[index] = true; // argument-passed-p
-                          frame[index + 1] = stack[pos + 1];
-                          stack[pos] = false;
-                          if (pos == i) i += 2;
-                      }
-                  }
-                  if (!allow_other_keys) {
-                      while (i < maxi) {
-                          if (stack[i] !== false) {
-                              error(`Unknown keyword argument ${dump(stack[i])}`);
-                          }
-                          i += 2;
-                      }
-                  }
-              }
-          }
-          m.stack.sp -= n;
-          m.env = new LispCons(frame, m.env);
-          return;
-      }
-
-      case OP.POPLIST: {
-          let i = m.code[m.pc++];
-          let j = m.code[m.pc++];
-          let fr = frame(m.env, i);
-          let lst = fr[j];
-          fr[j] = LispCons.cdr(lst);
-          m.push(LispCons.car(lst));
-          return;
-      }
-
-      case OP.EQ: {
-          m.push(eq(m.pop(), m.pop()));
-          return;
-      }
-
-      case OP.POPGLIST: {
-          let sym = m.code[m.pc++];
-          let binding = m.find_dvar(sym);
-          let lst = binding.value;
-          m.push(LispCons.car(lst));
-          binding.value = LispCons.cdr(lst);
-          return;
-      }
-
-      case OP.TJUMPK: {
-          let addr = m.code[m.pc++];
-          if (m.top() === null) {
-              m.pop();
-          } else {
-              m.pc = addr;
-          }
-          return;
-      }
-
-    }
+function vmrun(m) {
+    OP_RUN[m.code[m.pc++]](m);
 }
