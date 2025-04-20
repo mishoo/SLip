@@ -126,11 +126,15 @@
   args)
 
 (defun parse-for-equal (var args)
-  (list-append *loop-body* (dsetq var (pop args)))
-  (when (iskw (car args) 'then)
-    (pop args)
-    (list-append *loop-iterate* (dsetq var (pop args))))
-  args)
+  (let ((init (dsetq var (pop args))))
+    (cond
+      ((iskw (car args) 'then)
+       (pop args)
+       (list-append *loop-start* init)
+       (list-append *loop-iterate* (dsetq var (pop args))))
+      (t
+       (list-append *loop-body* init)))
+    args))
 
 (defun check-positive-loop-step (step)
   (assert (> step 0) "LOOP FOR step must be positive"))
