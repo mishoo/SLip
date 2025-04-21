@@ -20,11 +20,11 @@
 (in-package :sl-loop)
 
 (defparameter *clause-parsers* (list))
-(defparameter *loop-body* (cons nil nil))
-(defparameter *loop-variables* (cons nil nil))
-(defparameter *loop-start* (cons nil nil))
-(defparameter *loop-iterate* (cons nil nil))
-(defparameter *loop-finish* (cons nil nil))
+(defparameter *loop-body* nil)
+(defparameter *loop-variables* nil)
+(defparameter *loop-start* nil)
+(defparameter *loop-iterate* nil)
+(defparameter *loop-finish* nil)
 (defparameter *loop-block-name* nil)
 
 (defun parse-clause (args)
@@ -36,18 +36,11 @@
         (error "Unknown loop clause ~A" sym))
       (apply parser (cdr args)))))
 
-(defun list-add (ls thing)
-  (let ((cell (cons thing nil)))
-    (setf (cdr ls)
-          (if (car ls)
-              (setf (cdr (cdr ls)) cell)
-              (setf (car ls) cell)))))
+(defmacro list-add (ls thing)
+  `(setf ,ls (setf (cdr ,ls) (cons ,thing nil))))
 
-(defun list-append (ls elements)
-  (setf (cdr ls)
-        (last (if (car ls)
-                  (setf (cdr (cdr ls)) elements)
-                  (setf (car ls) elements)))))
+(defmacro list-append (ls elements)
+  `(setf ,ls (last (setf (cdr ,ls) ,elements))))
 
 (defun register-parser (name parser)
   (cond
@@ -71,7 +64,7 @@
     (cond
       ((not var))
       ((symbolp var)
-       (unless (member var (car *loop-variables*))
+       (unless (member var (cdr *loop-variables*))
          (list-add *loop-variables* var))
        (when data
          (list `(setf ,var ,data))))
@@ -410,10 +403,10 @@
   (let ((form (pop args))
         (name (maybe-into name)))
     (list-add *loop-variables* name)
-    (list-add *loop-body* `(let ((val ,form))
+    (list-add *loop-body* `(let (($val ,form))
                              (if (or (not ,name)
-                                     (,op val ,name))
-                                 (setf ,name val))))
+                                     (,op $val ,name))
+                                 (setf ,name $val))))
     (unless (symbol-package name)
       (list-add *loop-finish* name)))
   args)
@@ -426,29 +419,33 @@
 
 (defparser when args
   (let ((condition (pop args))
-        (body (let* ((*loop-body* (cons nil nil)))
+        (body (let* ((loop-body (cons nil nil))
+                     (*loop-body* loop-body))
                 (setf args (parse-clause args))
-                (car *loop-body*))))
+                (cdr loop-body))))
     (list-add *loop-body* `(when ,condition ,@body)))
   args)
 
 (defparser unless args
   (let ((condition (pop args))
-        (body (let* ((*loop-body* (cons nil nil)))
+        (body (let* ((loop-body (cons nil nil))
+                     (*loop-body* loop-body))
                 (setf args (parse-clause args))
-                (car *loop-body*))))
+                (cdr loop-body))))
     (list-add *loop-body* `(unless ,condition ,@body)))
   args)
 
 (defparser if args
   (let ((condition (pop args))
-        (then-body (let* ((*loop-body* (cons nil nil)))
+        (then-body (let* ((loop-body (cons nil nil))
+                          (*loop-body* loop-body))
                      (setf args (parse-clause args))
-                     (car *loop-body*)))
+                     (cdr loop-body)))
         (else-body (when (iskw (car args) 'else)
-                     (let* ((*loop-body* (cons nil nil)))
+                     (let* ((loop-body (cons nil nil))
+                            (*loop-body* loop-body))
                        (setf args (parse-clause (cdr args)))
-                       (car *loop-body*)))))
+                       (cdr loop-body)))))
     (list-add *loop-body* `(if ,condition
                                (progn ,@then-body)
                                (progn ,@else-body))))
@@ -477,9 +474,9 @@
   args)
 
 (defparser thereis args
-  (list-add *loop-body* `(let ((obj ,(pop args)))
-                           (when obj
-                             (return-from ,*loop-block-name* obj))))
+  (list-add *loop-body* `(let (($obj ,(pop args)))
+                           (when $obj
+                             (return-from ,*loop-block-name* $obj))))
   args)
 
 ;; Wish CL LOOP had something like this:
@@ -510,35 +507,40 @@
                       (setf name (car name)))
                     (gensym "best"))))
       (list-append *loop-variables* (list best name))
-      (list-add *loop-body* `(let ((val ,form))
+      (list-add *loop-body* `(let (($val ,form))
                                (when (or (not ,best)
-                                         (,op val ,best))
-                                 (setf ,best val
+                                         (,op $val ,best))
+                                 (setf ,best $val
                                        ,name ,el)))))
     (unless (symbol-package name)
       (list-add *loop-finish* name)))
   args)
 
 (defun expand-loop (args)
-  (let ((*loop-body* (cons nil nil))
-        (*loop-variables* (cons nil nil))
-        (*loop-start* (cons nil nil))
-        (*loop-iterate* (cons nil nil))
-        (*loop-finish* (cons nil nil))
+  (let ((loop-body (cons nil nil))
+        (loop-variables (cons nil nil))
+        (loop-start (cons nil nil))
+        (loop-iterate (cons nil nil))
+        (loop-finish (cons nil nil))
         (*loop-block-name* nil))
-    (let rec ((args args))
-      (when args
-        (rec (parse-clause args))))
+    (let ((*loop-body* loop-body)
+          (*loop-variables* loop-variables)
+          (*loop-start* loop-start)
+          (*loop-iterate* loop-iterate)
+          (*loop-finish* loop-finish))
+      (let rec ((args args))
+        (when args
+          (rec (parse-clause args)))))
     `(block ,*loop-block-name*
-       (let* (,@(car *loop-variables*))
+       (let* (,@(cdr loop-variables))
          (tagbody
-            ,@(car *loop-start*)
+            ,@(cdr loop-start)
           $loop-next
-            ,@(car *loop-body*)
-            ,@(car *loop-iterate*)
+            ,@(cdr loop-body)
+            ,@(cdr loop-iterate)
             (go $loop-next)
           $loop-end)
-         ,@(car *loop-finish*)))))
+         ,@(cdr loop-finish)))))
 
 (defmacro loop (&body args)
   (if (symbolp (car args))

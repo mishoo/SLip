@@ -337,7 +337,7 @@ defp("length", false, function(m, nargs){
     if (LispCons.isList(x)) return LispCons.len(x);
     if (LispString.is(x)) return x.length;
     if (LispArray.is(x)) return x.length;
-    error("Unrecognized sequence");
+    error("Unrecognized sequence in length");
 });
 
 defp("elt", false, function(m, nargs){
@@ -347,7 +347,7 @@ defp("elt", false, function(m, nargs){
     if (LispCons.isList(x)) return LispCons.elt(x, i);
     if (LispArray.is(x)) return i < x.length ? x[i] : null;
     if (LispString.is(x)) return i < x.length ? LispChar.get(x.charAt(i)) : null;
-    error("Unrecognized sequence");
+    error("Unrecognized sequence in elt");
 });
 
 defp("rplaca", true, function(m, nargs){
@@ -385,7 +385,7 @@ defp("reverse", false, function(m, nargs){
         for (var i = x.length, ret = ""; --i >= 0;) ret += x.charAt(i);
         return ret;
     }
-    error("Unrecognized sequence");
+    error("Unrecognized sequence in reverse");
 });
 
 defp("nreverse", true, function(m, nargs){
@@ -393,7 +393,7 @@ defp("nreverse", true, function(m, nargs){
     var x = m.pop();
     if (LispList.is(x)) return LispCons.nreverse(x);
     if (LispArray.is(x)) return x.reverse();
-    error("Unrecognized sequence");
+    error("Unrecognized sequence in nreverse");
 });
 
 defp("%memq", false, function(m, nargs){
@@ -410,7 +410,7 @@ defp("%memq", false, function(m, nargs){
         var pos = seq.indexOf(item.value);
         return pos >= 0 ? pos : null;
     }
-    error("Unrecognized sequence");
+    error("Unrecognized sequence in %memq");
 });
 
 defp("%assq", false, function(m, nargs){
