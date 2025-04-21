@@ -12,7 +12,6 @@
   (loop repeat times
         for time = (test1 thunk)
         summing time into total
-        ;; for total = 0 then (+ total time)
         minimizing time into min
         maximizing time into max
         finally (return (list min max (/ total times)))))

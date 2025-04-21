@@ -323,6 +323,20 @@ defp("random", false, function(m, nargs){
     return Math.random();
 });
 
+defp("min", false, function(m, nargs){
+    checknargs(nargs, 1);
+    let args = m.pop_frame(nargs);
+    args.forEach(x => checktype(x, LispNumber));
+    return Math.min(...args);
+});
+
+defp("max", false, function(m, nargs){
+    checknargs(nargs, 1);
+    let args = m.pop_frame(nargs);
+    args.forEach(x => checktype(x, LispNumber));
+    return Math.max(...args);
+});
+
 /* -----[ list/sequence manipulation ]----- */
 
 defp("cons", false, function(m, nargs){
@@ -337,6 +351,7 @@ defp("length", false, function(m, nargs){
     if (LispCons.isList(x)) return LispCons.len(x);
     if (LispString.is(x)) return x.length;
     if (LispArray.is(x)) return x.length;
+    if (LispHash.is(x)) return x.size();
     error("Unrecognized sequence in length");
 });
 
@@ -538,6 +553,11 @@ defp("list*", false, function(m, nargs) {
 defp("last", false, function(m, nargs) {
     checknargs(nargs, 1, 1);
     return LispCons.last(m.pop());
+});
+
+defp("copy-list", false, function(m, nargs){
+    checknargs(nargs, 1);
+    return LispCons.copy(checktype(m.pop(), LispList));
 });
 
 defp("append", false, function(m, nargs) {

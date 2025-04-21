@@ -60,6 +60,18 @@ export class LispCons extends LispType {
         }
         return list;
     }
+    static copy(list) {
+        let copy = new LispCons(null, null), p = copy;
+        while (list != null) {
+            p = p.cdr = new LispCons(car(list), null);
+            list = list.cdr;
+            if (!listp(list)) {
+                p.cdr = list;
+                break;
+            }
+        }
+        return copy.cdr;
+    }
     static reverse(list) {
         var a = null;
         while (list != null) {
