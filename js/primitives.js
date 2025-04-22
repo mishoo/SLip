@@ -535,6 +535,11 @@ defp("list*", false, function(m, nargs) {
     return p;
 });
 
+defp("last", false, function(m, nargs) {
+    checknargs(nargs, 1, 1);
+    return LispCons.last(m.pop());
+});
+
 defp("append", false, function(m, nargs) {
     return nargs == 0 ? null : LispCons.append(m.stack.pop_frame(nargs));
 });

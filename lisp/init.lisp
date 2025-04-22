@@ -370,12 +370,6 @@
         (nreverse (rmv list nil))
         (rmv (reverse list) nil))))
 
-(def-efun last (list)
-  (when list
-    (if (not (cdr list))
-        list
-        (last (cdr list)))))
-
 (defun nhalf-list (a)
   (cons a (when a
             (let rec ((a a)

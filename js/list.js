@@ -55,8 +55,8 @@ export class LispCons extends LispType {
         return ret;
     }
     static last(list) {
-        while (list && cdr(list)) {
-            list = cdr(list);
+        while (list && cdr(list) !== null && listp(list.cdr)) {
+            list = list.cdr;
         }
         return list;
     }
@@ -104,7 +104,10 @@ export class LispCons extends LispType {
             var l = lists[i];
             if (l === null) continue;
             if (!ret) ret = l;
-            if (p) p.cdr = l;
+            if (p) {
+                check_list(p, "nconc");
+                p.cdr = l;
+            }
             p = LispCons.last(l);
         }
         return ret;
