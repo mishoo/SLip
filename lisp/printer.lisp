@@ -56,6 +56,18 @@
     (<< " " (%function-name function)))
   (<< ">"))
 
+(def-print (hash)
+  (<< "<HASH[" (length hash) "]")
+  (let rec ((keys (%:as-list (hash-keys hash)))
+            (vals (%:as-list (hash-values hash))))
+    (when keys
+      (<< " ")
+      (print-object (car keys) out)
+      (<< " ")
+      (print-object (car vals) out)
+      (rec (cdr keys) (cdr vals))))
+  (<< ">"))
+
 (def-print (class)
   (<< "<CLASS")
   (when (class-name class)

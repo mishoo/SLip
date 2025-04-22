@@ -38,7 +38,7 @@
           < <= > >= + - * / = /= null 1+ 1- floor ceiling round mod
           abs sin asin cos acos tan atan exp log sqrt expt random
 
-          make-hash hash-get hash-set hash-add hash-copy hash-keys hash-values
+          make-hash hashp hash-get hash-set hash-add hash-copy hash-keys hash-values
           hash-iterator iterator-next
 
           macroexpand-1 disassemble
