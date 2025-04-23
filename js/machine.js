@@ -307,13 +307,13 @@ var optimize = (function(){
             return false;
         }
         if (i+2 < code.length && code[i][0] == "TJUMP" && code[i+1][0] == "JUMP" && code[i+2] === code[i][1]) {
-            // [TJUMP L1] [JUMP L2] L1 -> [FJUMP L2]
-            code.splice(i, 3, [ "FJUMP", code[i+1][1] ]);
+            // [TJUMP L1] [JUMP L2] L1 -> [FJUMP L2] L1
+            code.splice(i, 2, [ "FJUMP", code[i+1][1] ]);
             return true;
         }
         if (i+2 < code.length && code[i][0] == "FJUMP" && code[i+1][0] == "JUMP" && code[i+2] === code[i][1]) {
-            // [FJUMP L1] [JUMP L2] L1 -> [TJUMP L2]
-            code.splice(i, 3, [ "TJUMP", code[i+1][1] ]);
+            // [FJUMP L1] [JUMP L2] L1 -> [TJUMP L2] L1
+            code.splice(i, 2, [ "TJUMP", code[i+1][1] ]);
             return true;
         }
         switch (el[0]) {
