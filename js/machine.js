@@ -90,6 +90,7 @@ const OP = Object.freeze({
     EQ: 76,
     POPGLIST: 77,
     TJUMPK: 78,
+    FJUMPK: 79,
 });
 
 const OP_LEN = Object.freeze([
@@ -172,6 +173,7 @@ const OP_LEN = Object.freeze([
     0 /* EQ */,
     1 /* POPGLIST */,
     1 /* TJUMPK */,
+    1 /* FJUMPK */,
 ]);
 
 // normal RET context
@@ -297,7 +299,7 @@ var optimize = (function(){
             }
         }
     };
-    function optimize1(code, i) {
+    function optimize1(code, i, pass) {
         var el = code[i];
         if (el instanceof LispSymbol) {
             if (!used_label(code, el)) {
@@ -311,9 +313,19 @@ var optimize = (function(){
             code.splice(i, 2, [ "FJUMP", code[i+1][1] ]);
             return true;
         }
+        if (i+2 < code.length && code[i][0] == "TJUMPK" && code[i+1][0] == "JUMP" && code[i+2] === code[i][1]) {
+            // [TJUMPK L1] [JUMP L2] L1 -> [FJUMPK L2] L1
+            code.splice(i, 2, [ "FJUMPK", code[i+1][1] ]);
+            return true;
+        }
         if (i+2 < code.length && code[i][0] == "FJUMP" && code[i+1][0] == "JUMP" && code[i+2] === code[i][1]) {
             // [FJUMP L1] [JUMP L2] L1 -> [TJUMP L2] L1
             code.splice(i, 2, [ "TJUMP", code[i+1][1] ]);
+            return true;
+        }
+        if (i+2 < code.length && code[i][0] == "FJUMPK" && code[i+1][0] == "JUMP" && code[i+2] === code[i][1]) {
+            // [FJUMPK L1] [JUMP L2] L1 -> [TJUMPK L2] L1
+            code.splice(i, 2, [ "TJUMPK", code[i+1][1] ]);
             return true;
         }
         switch (el[0]) {
@@ -404,17 +416,27 @@ var optimize = (function(){
         switch (el[0]) {
           case "GSET":
           case "GVAR":
-            if (i < code.length - 2 &&
+            if (i+2 < code.length &&
                 code[i+1][0] == "POP" &&
                 code[i+2][0] == "GVAR" &&
                 code[i+2][1] == el[1]) {
                 code.splice(i + 1, 2);
                 return true;
             }
+            if (pass == 2 &&
+                i+2 < code.length &&
+                code[i+1][0] == "FJUMP" &&
+                code[i+2][0] == "GVAR" &&
+                code[i+2][1] == el[1])
+            {
+                code[i+1][0] = "FJUMPK";
+                code.splice(i + 2, 1);
+                return true;
+            }
             break;
           case "LSET":
           case "LVAR":
-            if (i < code.length - 2 &&
+            if (i+2 < code.length &&
                 code[i+1][0] == "POP" &&
                 code[i+2][0] == "LVAR" &&
                 code[i+2][1] == el[1] &&
@@ -422,10 +444,23 @@ var optimize = (function(){
                 code.splice(i + 1, 2);
                 return true;
             }
+            if (pass == 2 &&
+                i+2 < code.length &&
+                code[i+1][0] == "FJUMP" &&
+                code[i+2][0] == "LVAR" &&
+                code[i+2][1] == el[1] &&
+                code[i+2][2] == el[2])
+            {
+                code[i+1][0] = "FJUMPK";
+                code.splice(i + 2, 1);
+                return true;
+            }
             break;
           case "SAVE":
           case "FJUMP":
           case "TJUMP":
+          case "FJUMPK":
+          case "TJUMPK":
             // SAVE L1; ... L1: JUMP L2 --> SAVE L2
             var idx = find_target(code, el[1]);
             if (idx >= 0 && idx < code.length - 1 && code[idx + 1][0] == "JUMP") {
@@ -478,9 +513,11 @@ var optimize = (function(){
             if ((el[0] == "CONST" && el[1] === null) || el[0] == "NIL") {
                 switch (code[i+1][0]) {
                   case "FJUMP":
+                  case "FJUMPK":
                     code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
                     return true;
                   case "TJUMP":
+                  case "TJUMPK":
                     code.splice(i, 2);
                     return true;
                   case "NOT":
@@ -497,8 +534,14 @@ var optimize = (function(){
                   case "FJUMP":
                     code.splice(i, 2);
                     return true;
+                  case "FJUMPK":
+                    code.splice(i + 1, 1);
+                    return true;
                   case "TJUMP":
                     code.splice(i, 2, [ "JUMP", code[i+1][1] ]);
+                    return true;
+                  case "TJUMPK":
+                    code.splice(i + 1, 1, [ "JUMP", code[i+1][1] ]);
                     return true;
                   case "NOT":
                     code.splice(i, 2, [ "NIL" ]);
@@ -546,7 +589,13 @@ var optimize = (function(){
         while (true) {
             var changed = false;
             for (var i = 0; i < code.length; ++i)
-                if (optimize1(code, i)) --i, changed = true;
+                if (optimize1(code, i, 1)) --i, changed = true;
+            if (!changed) break;
+        }
+        while (true) {
+            var changed = false;
+            for (var i = 0; i < code.length; ++i)
+                if (optimize1(code, i, 2)) --i, changed = true;
             if (!changed) break;
         }
     };
@@ -559,7 +608,9 @@ function constantp(x) {
         || typeof x == "string"
         || x instanceof RegExp
         || x instanceof LispChar
-        || x instanceof LispSymbol;
+        || x instanceof LispSymbol
+        || x instanceof LispHash
+        || Array.isArray(x);
 }
 
 function is_jump_instruction(op) {
@@ -575,6 +626,7 @@ function is_jump_instruction(op) {
       case OP.BLOCK2:
       case OP.LJUMP2:
       case OP.TJUMPK:
+      case OP.FJUMPK:
         return true;
     }
 }
@@ -654,7 +706,7 @@ function dump(thing) {
 
 const OP_REV = Object.keys(OP);
 
-function disassemble(code) {
+export function disassemble(code) {
     let lab = 0;
     function disassemble(code, level) {
         let labels = Object.create(null);
@@ -728,7 +780,7 @@ function serialize(code, strip, cache) {
     return strip ? code : "[" + code + "]";
 }
 
-function unserialize(code) {
+export function unserialize(code) {
     var names = [], values = [], cache = [];
     names.push("s"); values.push(function(name, pak){
         if (arguments.length == 1 && typeof name == "number") {
@@ -1445,6 +1497,13 @@ let OP_RUN = Object.freeze([
         if (m.top() === null) {
             m.pop();
         } else {
+            m.pc = addr;
+        }
+    },
+    /*OP.FJUMPK*/ (m) => {
+        let addr = m.code[m.pc++];
+        if (m.top() === null) {
+            m.pop();
             m.pc = addr;
         }
     },
