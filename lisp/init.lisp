@@ -54,6 +54,9 @@
 
           get-internal-run-time
 
+          values multiple-value-bind multiple-value-call values-list
+          multiple-value-list multiple-value-setq multiple-value-prog1
+
           &key &rest &body &whole &optional &aux &allow-other-keys))
   (%export exported boot)
   (%export exported main)
@@ -433,6 +436,29 @@
 
 (def-emac use-package (source &optional (target *package*))
   `(%use-package (find-package ,source) (find-package ,target)))
+
+(defun values-list (list)
+  (apply #'values list))
+
+(defmacro multiple-value-call (fn &rest values)
+  `(apply ,fn (nconc ,@(mapcar (lambda (form)
+                                 `(multiple-value-list ,form))
+                               values))))
+
+(defmacro multiple-value-setq ((&rest vars) value-form)
+  (let ((syms (mapcar (lambda (var)
+                        (gensym (symbol-name var)))
+                      vars)))
+    `(multiple-value-bind ,syms ,value-form
+       ,@(mapcar (lambda (var sym)
+                   `(setf ,var ,sym))
+                 vars syms))))
+
+(defmacro multiple-value-prog1 (form &rest body)
+  (let ((list (gensym "list")))
+    `(let ((,list (multiple-value-list ,form)))
+       ,@body
+       (values-list ,list))))
 
 (defparameter *standard-output* (%make-output-stream))
 (defparameter *error-output* (%make-output-stream))

@@ -91,6 +91,8 @@ const OP = Object.freeze({
     POPGLIST: 77,
     TJUMPK: 78,
     FJUMPK: 79,
+    VALUES: 80,
+    MVB: 81,
 });
 
 const OP_LEN = Object.freeze([
@@ -174,6 +176,8 @@ const OP_LEN = Object.freeze([
     1 /* POPGLIST */,
     1 /* TJUMPK */,
     1 /* FJUMPK */,
+    1 /* VALUES */,
+    1 /* MVB */,
 ]);
 
 // normal RET context
@@ -510,7 +514,7 @@ var optimize = (function(){
             break;
         }
         if (i+1 < code.length) {
-            if ((el[0] == "CONST" && el[1] === null) || el[0] == "NIL") {
+            if ((el[0] == "CONST" && el[1] == null) || el[0] == "NIL") {
                 switch (code[i+1][0]) {
                   case "FJUMP":
                   case "FJUMPK":
@@ -524,7 +528,7 @@ var optimize = (function(){
                     code.splice(i, 2, [ "T" ]);
                     return true;
                 }
-                if (el[0] == "CONST" && el[1] === null) {
+                if (el[0] == "CONST" && el[1] == null) {
                     code.splice(i, 1, [ "NIL" ]);
                     return true;
                 }
@@ -603,7 +607,7 @@ var optimize = (function(){
 
 function constantp(x) {
     return x === true
-        || x === null
+        || x == null
         || typeof x == "number"
         || typeof x == "string"
         || x instanceof RegExp
@@ -680,14 +684,14 @@ function indent(level) {
 }
 
 function dump(thing) {
-    if (thing === null) return "NIL";
+    if (thing == null) return "NIL";
     if (thing === true) return "T";
     if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
     if (thing instanceof LispCons) {
         if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
             return "'" + dump(LispCons.cadr(thing));
         var ret = "(", first = true;
-        while (thing !== null) {
+        while (thing != null) {
             if (!first) ret += " ";
             else first = false;
             ret += dump(LispCons.car(thing));
@@ -761,7 +765,7 @@ export function disassemble(code) {
 
 function serialize_const(val, cache) {
     return function dump(val) {
-        if (val === null || val === true) return val + "";
+        if (val == null || val === true) return val + "";
         if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar) return val.serialize(cache);
         if (val instanceof RegExp) return val.toString();
         if (val instanceof LispCons) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
@@ -840,6 +844,8 @@ export class LispMachine {
         this.process = null;
         this.f = null;
         this.after_cleanup = null;
+        this.values = null;
+        this.values_ptr = null;
         //this.trace = [];
     }
 
@@ -880,16 +886,21 @@ export class LispMachine {
         // not decided on a proper maximum size though.
         //
         // if (this.stack.length > 20000) debugger;
-
         this.stack.push(v);
     }
 
     pop() {
-        return this.stack.pop();
+        let val = this.stack.pop();
+        if (this.stack.sp < this.values_ptr)
+            this.values = this.values_ptr = null;
+        return val;
     }
 
     pop_frame(n) {
-        return this.stack.pop_frame(n);
+        let val = this.stack.pop_frame(n);
+        if (this.stack.sp < this.values_ptr)
+            this.values = this.values_ptr = null;
+        return val;
     }
 
     pop_number(error) {
@@ -982,13 +993,13 @@ export class LispMachine {
     }
 
     _callnext(closure, args) {
-        this.stack.push(this.mkret(this.pc));
+        this.push(this.mkret(this.pc));
         //if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
         this.code = closure.code;
         this.env = closure.env;
         var n = 0;
         while (args != null) {
-            this.stack.push(args.car);
+            this.push(args.car);
             args = args.cdr;
             n++;
         }
@@ -1057,11 +1068,11 @@ function rewind(env, i) {
 };
 
 function eq(a, b) {
-    return (a === S_NIL && b === null)
-        || (a === null && b === S_NIL)
-        || (a === S_T && b === true)
-        || (a === true && b === S_T)
-        || a === b ? true : null;
+    if (a == null) return b == null || b === S_NIL ? true : null;
+    if (b == null) return a == null || a === S_NIL ? true : null;
+    if (a === true) return b === true || b === S_T ? true : null;
+    if (b === true) return a === true || a === S_T ? true : null;
+    return a === b ? true : null;
 };
 
 let CC_CODE = assemble([
@@ -1134,11 +1145,11 @@ let OP_RUN = Object.freeze([
     },
     /*OP.TJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.pop() !== null) m.pc = addr;
+        if (m.pop() != null) m.pc = addr;
     },
     /*OP.FJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.pop() === null) m.pc = addr;
+        if (m.pop() == null) m.pc = addr;
     },
     /*OP.BLOCK*/ (m) => {
         // this is moderately tricky: we can't do
@@ -1160,7 +1171,7 @@ let OP_RUN = Object.freeze([
         if (!noval) m.push(val);
     },
     /*OP.NOT*/ (m) => {
-        m.push(m.pop() === null ? true : null);
+        m.push(m.pop() == null ? true : null);
     },
     /*OP.SETCC*/ (m) => {
         m.uncont(m.top());
@@ -1171,9 +1182,11 @@ let OP_RUN = Object.freeze([
     },
     /*OP.RET*/ (m) => {
         let noval = m.f.noval;
-        let val = m.pop();
-        m.unret(m.pop());
-        if (!noval) m.push(val);
+        // using m.stack directly, rather than m.pop, since we'd like
+        // to keep multiple values around for the caller.
+        let val = m.stack.pop();
+        m.unret(m.stack.pop());
+        if (!noval) m.stack.push(val);
     },
     /*OP.CALL*/ (m) => {
         let count = m.code[m.pc++];
@@ -1398,9 +1411,9 @@ let OP_RUN = Object.freeze([
     /*OP.LRET2*/ (m) => {
         let noval = m.f.noval;
         let fr = m.code[m.pc++];
-        let val = m.pop();
+        let val = m.stack.pop();
         frame(m.env, fr)[0].run(m);
-        if (!noval) m.push(val);
+        if (!noval) m.stack.push(val);
     },
     /*OP.LJUMP2*/ (m) => {
         let addr = m.code[m.pc++];
@@ -1494,7 +1507,7 @@ let OP_RUN = Object.freeze([
     },
     /*OP.TJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.top() === null) {
+        if (m.top() == null) {
             m.pop();
         } else {
             m.pc = addr;
@@ -1502,10 +1515,35 @@ let OP_RUN = Object.freeze([
     },
     /*OP.FJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.top() === null) {
+        if (m.top() == null) {
             m.pop();
             m.pc = addr;
         }
+    },
+    /*OP.VALUES*/ (m) => {
+        let nargs = m.code[m.pc++];
+        if (nargs == 0) {
+            // (values) is tricky.. let's say undefined means "no
+            // value", then let's wait for the bugs to pour.
+            m.push(undefined);
+            m.values = [];
+        } else {
+            // the first value remains on the stack
+            m.values = m.pop_frame(nargs - 1);
+        }
+        // when the stack is popped below this ptr, we need to clear
+        // m.values
+        m.values_ptr = m.stack.sp;
+    },
+    /*OP.MVB*/ (m) => {
+        let n = m.code[m.pc++];
+        let frame = m.values ?? [];
+        let arg = m.pop();
+        if (arg === undefined) frame = [];
+        else frame.unshift(arg);
+        m.env = new LispCons(frame, m.env);
+        while (frame.length < n) frame.push(null);
+        frame.length = n;
     },
 ]);
 

@@ -745,6 +745,8 @@
                (if val? (gen "CC")))
               (let (comp-let (cadr x) (cddr x) env val? more?))
               (let* (comp-let* (cadr x) (cddr x) env val? more?))
+              (multiple-value-bind (comp-mvb (cadr x) (caddr x) (cdddr x) env val? more?))
+              (values (comp-values (cdr x) env val? more?))
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
               (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
               (macrolet (comp-macrolet (cadr x) (cddr x) env val? more?))
@@ -1136,6 +1138,44 @@
 
      (comp-macroexpand (sym args env val? more?)
        (comp (apply (macro sym env) args) env val? more?))
+
+     (comp-mvb (names values-form body env val? more?)
+       (cond
+         ((null body)
+          (comp-seq (list values-form nil) env val? more?))
+         (names
+          (with-seq-output <<
+            (<< (comp values-form env t t)
+                (gen "MVB" (length names)))
+            (let ((specials 0))
+              (let rec ((names names)
+                        (index 0))
+                (when names
+                  (when (%specialp (car names))
+                    (setq specials (1+ specials))
+                    (<< (gen "BIND" (car names) index)))
+                  (rec (cdr names) (1+ index))))
+              (setq env (extenv env :lex (map (lambda (name) (list name :var)) names)))
+              (cond
+                (more?
+                 (<< (comp-seq body env val? t)
+                     (gen "UNFR" 1 specials)))
+                (*let-tco*
+                 (<< (comp-seq body env val? nil)))
+                (t
+                 (<< (comp-seq body env val? t)
+                     (gen "RET")))))))
+         (t
+          (comp-seq (list values-form body) env val? more?))))
+
+     (comp-values (forms env val? more?)
+       (cond
+         (val?
+          (%seq (comp-list forms env)
+                (gen "VALUES" (length forms))
+                (unless more? (gen "RET"))))
+         (t
+          (comp-seq forms env val? more?))))
 
      (comp-let (bindings body env val? more?)
        (if bindings
