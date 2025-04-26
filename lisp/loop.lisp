@@ -368,19 +368,13 @@
         (value (when (iskw (car args) '=)
                  (pop args)
                  (pop args))))
+    (list-nconc *loop-start* (dsetq variable value))
     (cond
-      ((symbolp variable)
-       (list-add *loop-variables* variable)
-       (when value
-         (list-add *loop-start* `(setf ,variable ,value))))
-      (t
-       (list-nconc *loop-start* (dsetq variable value))))
-    (cond
-      ((iskw (car args) 'and)
-       ;; XXX: this is incorrect, AND should produce "parallel" bindings, but
-       ;; it's kinda tricky to implement; I won't bother, at the moment, so
-       ;; just recurse and compile it as WITH.
-       (apply #'parser (cdr args)))
+      ;; ((iskw (car args) 'and)
+      ;;  ;; XXX: this is incorrect, AND should produce "parallel" bindings, but
+      ;;  ;; it's kinda tricky to implement; I won't bother, at the moment, so
+      ;;  ;; just recurse and compile it as WITH.
+      ;;  (apply #'parser (cdr args)))
       (t
        args))))
 
