@@ -385,25 +385,23 @@
                      (setf (cdr a) nil))))))))
 
 (def-efun merge (list1 list2 predicate)
-  (let (ret p)
-    (labels ((add (cell)
-               (if p
-                   (setf (cdr p) cell)
-                   (setf ret cell))
-               (setf p cell))
-             (rec (a b)
-               (cond ((and a b)
-                      (if (funcall predicate (car b) (car a))
-                          (progn
-                            (add (list (car b)))
-                            (rec a (cdr b)))
-                          (progn
-                            (add (list (car a)))
-                            (rec (cdr a) b))))
-                     (a (add a))
-                     (b (add b)))))
-      (rec list1 list2)
-      ret)))
+  (let* ((ret (list nil))
+         (p ret))
+    (macrolet ((add (cell)
+                 `(setf p (setf (cdr p) ,cell))))
+      (let rec ((a list1)
+                (b list2))
+        (cond ((and a b)
+               (if (funcall predicate (car b) (car a))
+                   (progn
+                     (add (list (car b)))
+                     (rec a (cdr b)))
+                   (progn
+                     (add (list (car a)))
+                     (rec (cdr a) b))))
+              (a (add a))
+              (b (add b))))
+      (cdr ret))))
 
 (def-efun stable-sort (list predicate)
   (let sort ((list list))
