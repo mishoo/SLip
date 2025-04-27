@@ -21,6 +21,7 @@
            '*url-prefix*
            '*unknown-functions*
            '*unknown-variables*
+           '*compiler-env*
            '*xref-info*
            '*let-tco*)
 
@@ -274,7 +275,7 @@
            (%stream-next input))
 
          (read-while (pred)
-           (let ((out (%make-output-stream)) rec)
+           (let ((out (%make-output-stream)))
              (labels ((rec (ch)
                         (when (and ch (funcall pred ch))
                           (%stream-put out (next))
@@ -525,8 +526,8 @@
                 (&key (rec-key (cdr args)))
                 (&aux (rec-aux (cdr args)))
                 (otherwise
-                 (rec (cdr args))
                  (assert (symp (car args)) "Symbol expected in lambda list")
+                 (rec (cdr args))
                  (push (add (car args)) required))))
              ((symp args)
               (assert (not rest) "&rest already given")
@@ -613,6 +614,46 @@
   (console.dir data)
   data)
 
+(defun find-in-compiler-env (name type env)
+  (labels ((position (lst i j)
+             (when lst
+               (let ((x (car lst)))
+                 (if (and (eq name (car x))
+                          (eq type (cadr x)))
+                     (list* i j (cddr x))
+                     (position (cdr lst) i (+ j 1))))))
+           (frame (env i)
+             (when env
+               (or (position (car env) i 0)
+                   (frame (cdr env) (+ i 1))))))
+    (frame env 0)))
+
+(defun find-macrolet-in-compiler-env (name &optional (env *compiler-env*))
+  (when env
+    (aif (find-in-compiler-env name :macro (hash-get env :macros))
+         (caddr it))))
+
+(defun make-compiler-env ()
+  ;; :lex should match the runtime lexical environment; both
+  ;; variables and functions are stored there, but the compiler
+  ;; distinguiesh them and will emit different frame,index pairs.
+  ;;
+  ;; :macros and :tags are necessry only at compile-time.
+  (make-hash :lex nil
+             :macros nil
+             :tags nil))
+
+(defun extend-compiler-env (rest &optional (env *compiler-env*))
+  (let ((h (hash-copy env)))
+    (labels ((rec (stuff)
+               (when stuff
+                 (let ((key (car stuff))
+                       (val (cadr stuff)))
+                   (hash-add h key (cons val (hash-get h key)))
+                   (rec (cddr stuff))))))
+      (rec rest))
+    h))
+
 (labels
     ((assert (p msg)
        (if p p (error msg)))
@@ -620,43 +661,17 @@
      (arg-count (x min max)
        (assert (<= min (- (length x) 1) max) "Wrong number of arguments"))
 
-     ;; :lex should match the runtime lexical environment; both
-     ;; variables and functions are stored there, but the compiler
-     ;; distinguiesh them and will emit different frame,index pairs.
-     ;;
-     ;; :macros and :tags are necessry only at compile-time.
      (make-environment ()
-       (make-hash :lex nil
-                  :macros nil
-                  :tags nil))
+       (make-compiler-env))
 
      (extenv (env . rest)
-       (let ((h (hash-copy env)))
-         (labels ((rec (stuff)
-                    (when stuff
-                      (let ((key (car stuff))
-                            (val (cadr stuff)))
-                        (hash-add h key (cons val (hash-get h key)))
-                        (rec (cddr stuff))))))
-           (rec rest))
-         h))
+       (extend-compiler-env rest env))
 
      (gen cmd
        #( (as-vector cmd) ))
 
      (find-in-env (name type env)
-       (labels ((position (lst i j)
-                  (when lst
-                    (let ((x (car lst)))
-                      (if (and (eq name (car x))
-                               (eq type (cadr x)))
-                          (list* i j (cddr x))
-                          (position (cdr lst) i (+ j 1))))))
-                (frame (env i)
-                  (when env
-                    (or (position (car env) i 0)
-                        (frame (cdr env) (+ i 1))))))
-         (frame env 0)))
+       (find-in-compiler-env name type env))
 
      (find-var (name env)
        (find-in-env name :var (hash-get env :lex)))
@@ -674,7 +689,7 @@
        (find-in-env name :block (hash-get env :lex)))
 
      (find-macrolet (name env)
-       (find-in-env name :macro (hash-get env :macros)))
+       (caddr (find-in-env name :macro (hash-get env :macros))))
 
      (gen-var (name env)
        (if (%globalp name)
@@ -698,9 +713,8 @@
        (gensym "label"))
 
      (macro (sym env)
-       (aif (find-macrolet sym env)
-            (caddr it)
-            (%macro sym)))
+       (or (find-macrolet sym env)
+           (%macro sym)))
 
      (unknown-function (sym)
        (unless (member sym *unknown-functions*)
@@ -778,10 +792,10 @@
               (catch (comp-catch (cadr x) (cddr x) env val? more?))
               (throw (comp-throw (cadr x) (caddr x) env))
               (unwind-protect (comp-unwind-protect (cadr x) (cddr x) env val? more?))
-              (t (if (and (symbolp (car x))
-                          (macro (car x) env))
-                     (comp-macroexpand (car x) (cdr x) env val? more?)
-                     (comp-funcall (car x) (cdr x) env val? more?)))))))
+              (t (aif (and (symbolp (car x))
+                           (macro (car x) env))
+                      (comp-macroexpand it (cdr x) env val? more?)
+                      (comp-funcall (car x) (cdr x) env val? more?)))))))
 
      (comp-const (x val? more?)
        (when val?
@@ -1136,8 +1150,9 @@
                                             bindings))))
        (comp-seq body env val? more?))
 
-     (comp-macroexpand (sym args env val? more?)
-       (comp (apply (macro sym env) args) env val? more?))
+     (comp-macroexpand (expander args env val? more?)
+       (let ((*compiler-env* env))
+         (comp (apply expander args) env val? more?)))
 
      (comp-mvb (names values-form body env val? more?)
        (cond

@@ -197,12 +197,22 @@
      (defmacro ,name ,@rest)
      (export ',name)))
 
+(def-efun macroexpand-1 (form)
+  (cond
+    ((atom form) form)
+    ((and (eq 'progn (car form))
+          (null (cdr form)))
+     nil)
+    (t (aif (or (%:find-macrolet-in-compiler-env (car form))
+                (%macro (car form)))
+            (apply it (cdr form))
+            form))))
+
 (def-efun macroexpand (form)
-  (if (and (consp form)
-           (symbolp (car form))
-           (%macro (car form)))
-      (macroexpand (macroexpand-1 form))
-      form))
+  (let ((result (macroexpand-1 form)))
+    (if (eq result form)
+        result
+        (macroexpand result))))
 
 (def-emac defpackage (name &rest options)
   (let ((nicknames nil)
@@ -275,6 +285,28 @@
 
 (def-emac setf args
   `(progn ,@(%setf args)))
+
+(def-emac psetf args
+  (let ((temps nil)
+        (places nil)
+        (values nil))
+    (let rec ((args args))
+      (cond
+        ((null args))
+        ((null (cadr args))
+         (error "Odd number of forms in psetf"))
+        (t
+         (push (gensym "psetf") temps)
+         (push (car args) places)
+         (push (cadr args) values)
+         (rec (cddr args)))))
+    (setf temps (nreverse temps)
+          places (nreverse places)
+          values (nreverse values))
+    `(let ,(mapcar #'list temps values)
+       ,@(mapcar (lambda (var set)
+                   `(setf ,var ,set))
+                 places temps))))
 
 (def-emac incf (place &optional (inc 1))
   `(setf ,place (+ ,place ,inc)))

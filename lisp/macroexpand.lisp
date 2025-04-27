@@ -121,16 +121,21 @@
       (mexp (cadr f))))
 
 (defun macrolet-mexp (f)
-  (let* ((defs (mapcar (lambda (md)
-                         (let* ((name (car md))
-                                (func (compile `(%:%fn ,name ,(cadr md)
-                                                       ,@(cddr md)))))
-                           (cons name func)))
-                       (cadr f)))
-         (*macrolet-defs* (nreconc defs *macrolet-defs*)))
-    (if (cdddr f)
-        `(progn ,@(all-mexp (cddr f)))
-        (mexp (caddr f)))))
+  (let* ((defs (nreverse
+                (mapcar (lambda (md)
+                          (let ((name (car md))
+                                (func (compile (list* '%:%fn md))))
+                            (cons name func)))
+                        (cadr f))))
+         (*macrolet-defs* (append defs *macrolet-defs*)))
+    (let ((%:*compiler-env* (%:extend-compiler-env
+                             (list :macros
+                                   (mapcar (lambda (def)
+                                             (list (car def) :macro (cdr def)))
+                                           defs)))))
+      (if (cdddr f)
+          `(progn ,@(all-mexp (cddr f)))
+          (mexp (caddr f))))))
 
 (foreach `((block           ,#'block-mexp)
            (catch           ,#'funcall-mexp)
@@ -155,4 +160,5 @@
            (%set-symbol-prop (car x) "MEXP" (cadr x))))
 
 (defun macroexpand-all (f)
-  (mexp f))
+  (let ((%:*compiler-env* (%:make-compiler-env)))
+    (mexp f)))

@@ -1526,18 +1526,6 @@ defp("%make-object", false, function(m, nargs){
 
 /* -----[ macros/primitives ]----- */
 
-defp("macroexpand-1", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var form = m.pop();
-    if (!LispCons.is(form)) return form;
-    var first = form.car;
-    if (!LispSymbol.is(first)) return form;
-    if (first === S_PROGN && LispCons.cddr(form) == null)
-        return LispCons.cadr(form);
-    if (!first.macro()) return form;
-    return m._callnext(first.macro(), LispCons.cdr(form));
-});
-
 defp("%macro", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var symbol = m.pop();
