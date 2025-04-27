@@ -9,8 +9,6 @@
 
 (in-package :sl-mexp)
 
-(defparameter *macrolet-defs* nil)
-
 (defun mexp (f)
   (let (m)
     (let rec ((f f)
@@ -25,12 +23,9 @@
              (funcall-mexp f))
             ((not (symbolp (car f)))
              (rec f nil))
-            ((setq m (%:%assq (car f) *macrolet-defs*))
-             (rec (apply (cdr m) (cdr f)) t))
-            ((%macro (car f))
-             (rec (macroexpand-1 f) t))
             (t
-             (rec f nil))))))
+             (let ((exp (macroexpand-1 f)))
+               (rec exp (not (eq exp f)))))))))
 
 (defun all-mexp (list)
   (let rec ((f list)
@@ -121,18 +116,13 @@
       (mexp (cadr f))))
 
 (defun macrolet-mexp (f)
-  (let* ((defs (nreverse
-                (mapcar (lambda (md)
-                          (let ((name (car md))
-                                (func (compile (list* '%:%fn md))))
-                            (cons name func)))
-                        (cadr f))))
-         (*macrolet-defs* (append defs *macrolet-defs*)))
-    (let ((%:*compiler-env* (%:extend-compiler-env
-                             (list :macros
-                                   (mapcar (lambda (def)
-                                             (list (car def) :macro (cdr def)))
-                                           defs)))))
+  (let ((defs (nreverse
+               (mapcar (lambda (md)
+                         (let ((name (car md))
+                               (func (compile (list* '%:%fn md))))
+                           (list name :macro func)))
+                       (cadr f)))))
+    (let ((%:*compiler-env* (%:extend-compiler-env `(:macros ,defs))))
       (if (cdddr f)
           `(progn ,@(all-mexp (cddr f)))
           (mexp (caddr f))))))
