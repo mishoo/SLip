@@ -68,7 +68,7 @@
 
 (defun dsetq (var data)
   (cond
-    ((not var))
+    ((not var) nil)
     ((symbolp var)
      (unless (loop-variable-defined var)
        (list-add *loop-variables* var))

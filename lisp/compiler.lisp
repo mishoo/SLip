@@ -27,22 +27,33 @@
 
 (setq *let-tco* t)
 
-;; (defmacro cond cases
-;;   (if cases
-;;       `(if ,(caar cases)
-;;            (progn ,@(cdar cases))
-;;            (cond ,@(cdr cases)))))
+;; (defmacro cond (clauses)
+;;   (when clauses
+;;     (let ((first (car clauses)))
+;;       (if (cdr first)
+;;           `(if ,(car first)
+;;                (progn ,@(cdr first))
+;;                (cond ,@(cdr clauses)))
+;;           `(or ,(car first)
+;;                (cond ,@(cdr clauses)))))))
 ;;
 ;; Since we don't yet have quasiquote, I've macro-expanded it below. It's
 ;; horrible to write it manually.
 (%macro! 'cond
-         (%fn cond cases
-              (if cases
-                  (cons 'if (cons (caar cases)
-                                  (cons (cons 'progn
-                                              (cdar cases))
-                                        (list (cons 'cond
-                                                    (cdr cases)))))))))
+         (%fn cond clauses
+              (if clauses
+                  (let ((first (car clauses)))
+                    (if (cdr first)
+                        (list 'if
+                              (car first)
+                              (cons 'progn
+                                    (cdr first))
+                              (cons 'cond
+                                    (cdr clauses)))
+                        (list 'or
+                              (car first)
+                              (cons 'cond
+                                    (cdr clauses))))))))
 
 ;; props to http://norstrulde.org/ilge10/ - pasting here the original version,
 ;; because it's small and beautiful and it's the heart of quasiquotation:
@@ -251,10 +262,10 @@
      (if it ,@rest)))
 
 (defmacro %incf (var)
-  `(setq ,var (+ ,var 1)))
+  `(setq ,var (1+ ,var)))
 
 (defmacro %decf (var)
-  `(setq ,var (- ,var 1)))
+  `(setq ,var (1- ,var)))
 
 (defmacro push (obj place)
   `(setq ,place (cons ,obj ,place)))
