@@ -636,7 +636,18 @@
            (frame (env i)
              (when env
                (or (position (car env) i 0)
-                   (frame (cdr env) (+ i 1))))))
+                   (progn
+                     ;; discard symbol-macrolet frames.
+                     ;; XXX: we should only do it for :lex env,
+                     ;; but such frames won't exist in other environments
+                     ;; anyway.
+                     (let* ((first (caar env))
+                            (type (cadr first))
+                            (smac (caddr first)))
+                       (when (and (eq type :var)
+                                  (eq smac :smac))
+                         (%decf i)))
+                     (frame (cdr env) (+ i 1)))))))
     (frame env 0)))
 
 (defun find-macrolet-in-compiler-env (name &optional (env *compiler-env*))
@@ -706,19 +717,21 @@
        (if (%globalp name)
            (gen "GVAR" name)
            (aif (find-var name env)
-                (gen "LVAR" (car it) (cadr it))
+                (if (eq :smac (caddr it))
+                    (comp (cadddr it) env t t) ;; symbol macro expansion
+                    (gen "LVAR" (car it) (cadr it)))
                 (progn
                   (unknown-variable name)
                   (gen "GVAR" name)))))
 
-     (gen-set (name env)
+     (gen-set (name env local)
        (if (%globalp name)
            (gen "GSET" name)
-           (aif (find-var name env)
-                (gen "LSET" (car it) (cadr it))
-                (progn
-                  (unknown-variable name)
-                  (gen "GSET" name)))))
+           (if local
+               (gen "LSET" (car local) (cadr local))
+               (progn
+                 (unknown-variable name)
+                 (gen "GSET" name)))))
 
      (mklabel ()
        (gensym "label"))
@@ -751,10 +764,19 @@
               (setq
                (arg-count x 2 2)
                (assert (symbolp (cadr x)) "Only symbols can be SETQ")
-               (%seq (comp (caddr x) env t t)
-                     (gen-set (cadr x) env)
-                     (unless val? (gen "POP"))
-                     (unless more? (gen "RET"))))
+               (let* ((name (cadr x))
+                      (value (caddr x))
+                      (local (when (not (%globalp name))
+                               (find-var name env))))
+                 (cond
+                   ((and local (eq :smac (caddr local)))
+                    ;; setq on symbol macro should be treated as setf on expansion
+                    (comp `(setf ,(cadddr local) ,value) env val? more?))
+                   (t
+                    (%seq (comp value env t t)
+                          (gen-set name env local)
+                          (unless val? (gen "POP"))
+                          (unless more? (gen "RET")))))))
               (if (arg-count x 2 3)
                   (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
               (or (comp-or (cdr x) env val? more?))
@@ -775,6 +797,7 @@
               (labels (comp-flets (cadr x) (cddr x) env t val? more?))
               (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
               (macrolet (comp-macrolet (cadr x) (cddr x) env val? more?))
+              (symbol-macrolet (comp-symbol-macrolet (cadr x) (cddr x) env val? more?))
               ((lambda λ) (when val?
                             (%seq (comp-lambda nil (cadr x) (cddr x) env)
                                   (unless more? (gen "RET")))))
@@ -1160,6 +1183,14 @@
                                               (list (car def) :macro (compile (list* '%fn def))))
                                             bindings))))
        (comp-seq body env val? more?))
+
+     (comp-symbol-macrolet (bindings body env val? more?)
+       (let ((ext (mapcar (lambda (el)
+                            (let ((name (car el))
+                                  (expansion (cadr el)))
+                              (list name :var :smac expansion)))
+                          bindings)))
+         (comp-seq body (extenv env :lex ext) val? more)))
 
      (comp-macroexpand (expander args env val? more?)
        (let ((*compiler-env* env))

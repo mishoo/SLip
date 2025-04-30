@@ -21,7 +21,7 @@
           prog1 prog2 or and cond member case mapcar with-cc aif it push
           error warn without-interrupts
           lisp-reader compile load function unwind-protect
-          apply funcall macrolet catch throw
+          apply funcall macrolet symbol-macrolet catch throw
           quote lambda λ let let* if progn setq t nil not
           tagbody go block return return-from
           *package* *read-table*
