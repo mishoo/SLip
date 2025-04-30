@@ -452,16 +452,81 @@
 (export '(sort export import))
 
 (def-emac dotimes ((var count-form &optional result-form) &body body)
-  (let ((tag (gensym))
-        (end (gensym)))
+  (let ((count (gensym))
+        (next (gensym "next"))
+        (end (gensym "end")))
     `(block nil
-       (let ((,end ,count-form)
+       (let ((,count ,count-form)
              (,var 0))
          (tagbody
-          ,tag (when (< ,var ,end)
-                 ,@body
-                 (incf ,var)
-                 (go ,tag))))
+          ,next
+          (unless (< ,var ,count)
+            (go ,end))
+          ,@body
+          (incf ,var)
+          (go ,next)
+          ,end))
+       ,result-form)))
+
+(def-emac dolist ((var list-form &optional result-form) &body body)
+  (let ((list (gensym "list"))
+        (next (gensym "next"))
+        (end (gensym "end")))
+    `(block nil
+       (let ((,list ,list-form)
+             (,var))
+         (tagbody
+          ,next
+          (unless ,list
+            (setf ,var nil)
+            (go ,end))
+          (setf ,var (car ,list)
+                ,list (cdr ,list))
+          ,@body
+          (go ,next)
+          ,end)
+         ,result-form))))
+
+;;; do and do* differ by exactly two characters, but oh well... copy-paste FTW.
+
+(def-emac do (vars (end-test-form &optional result-form) &body body)
+  (let ((next (gensym "next"))
+        (end (gensym "end"))
+        (step (apply #'nconc (mapcar (lambda (var)
+                                       (when (> (length var) 2)
+                                         (list (car var) (caddr var))))
+                                     vars))))
+    `(let ,(mapcar (lambda (var)
+                     (list (car var) (cadr var)))
+                   vars)
+       (tagbody
+        ,next
+        (when ,end-test-form
+          (go ,end))
+        ,@body
+        (psetf ,@step)
+        (go ,next)
+        ,end)
+       ,result-form)))
+
+(def-emac do* (vars (end-test-form &optional result-form) &body body)
+  (let ((next (gensym "next"))
+        (end (gensym "end"))
+        (step (apply #'nconc (mapcar (lambda (var)
+                                       (when (> (length var) 2)
+                                         (list (car var) (caddr var))))
+                                     vars))))
+    `(let* ,(mapcar (lambda (var)
+                      (list (car var) (cadr var)))
+                    vars)
+       (tagbody
+        ,next
+        (when ,end-test-form
+          (go ,end))
+        ,@body
+        (setf ,@step)
+        (go ,next)
+        ,end)
        ,result-form)))
 
 (def-emac use-package (source &optional (target *package*))

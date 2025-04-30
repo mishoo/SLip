@@ -812,16 +812,20 @@
               (function
                (arg-count x 1 1)
                (let ((sym (cadr x)))
-                 (assert (symbolp sym) "FUNCTION requires a symbol")
                  (when val?
-                   (let ((local (find-func sym env)))
-                     (%seq (if local
-                               (gen "LVAR" (car local) (cadr local))
-                               (progn
-                                 (unless (symbol-function sym)
-                                   (unknown-function sym))
-                                 (gen "FGVAR" sym)))
-                           (unless more? (gen "RET")))))))
+                   (cond
+                     ((consp sym)
+                      (comp sym env t more?))
+                     (t
+                      (assert (symbolp sym) "FUNCTION requires a symbol")
+                      (let ((local (find-func sym env)))
+                        (%seq (if local
+                                  (gen "LVAR" (car local) (cadr local))
+                                  (progn
+                                    (unless (symbol-function sym)
+                                      (unknown-function sym))
+                                    (gen "FGVAR" sym)))
+                              (unless more? (gen "RET")))))))))
               (%fn (when val?
                      (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
                            (unless more? (gen "RET")))))
