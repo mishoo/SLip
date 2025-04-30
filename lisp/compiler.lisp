@@ -676,6 +676,14 @@
       (rec rest))
     h))
 
+(defmacro with-env body
+  `(let ((*compiler-env* env))
+     ,@body))
+
+(defmacro with-extenv (forms . body)
+  `(let ((env (extenv env ,@forms)))
+     (with-env ,@body)))
+
 (labels
     ((assert (p msg)
        (if p p (error msg)))
@@ -860,7 +868,8 @@
          (or body
              (let ((label (gensym "block")))
                (%seq (gen "BLOCK2" label)
-                     (comp-seq forms (extenv env :lex (list (list name :block label))) val? t)
+                     (with-extenv (:lex (list (list name :block label)))
+                       (comp-seq forms env val? t))
                      #( label )
                      (gen "UNFR" 1 0)
                      (if more? nil (gen "RET")))))))
@@ -901,19 +910,18 @@
                               (rec (cdr forms) cell))
                             (rec (cdr forms) p)))))
              (rec forms nil))
-           (setq env (extenv env
-                             :lex (list (list tbody :tagbody))
-                             :tags tags))
-           (<< (gen "BLOCK"))           ; define the tagbody entry
-           (foreach forms (lambda (x)
-                            (if (symbolp x)
-                                (progn
-                                  (<< #( (cadddr (car tags)) ))
-                                  (setq tags (cdr tags))) ; label
-                                (<< (comp x env nil t)))))
-           (when val? (<< (gen "NIL"))) ; tagbody returns NIL
-           (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
-           (unless more? (<< (gen "RET"))))))
+           (with-extenv (:lex (list (list tbody :tagbody))
+                              :tags tags)
+             (<< (gen "BLOCK"))           ; define the tagbody entry
+             (foreach forms (lambda (x)
+                              (if (symbolp x)
+                                  (progn
+                                    (<< #( (cadddr (car tags)) ))
+                                    (setq tags (cdr tags))) ; label
+                                  (<< (comp x env nil t)))))
+             (when val? (<< (gen "NIL"))) ; tagbody returns NIL
+             (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
+             (unless more? (<< (gen "RET")))))))
 
      (comp-go (tag env)
        (let ((pos (find-tag tag env)))
@@ -1077,7 +1085,8 @@
                           (let ((l1 (mklabel)))
                             (<< (gen "LVAR" 0 (1- index)) ;; supplied-p
                                 (gen "TJUMP" l1)          ;; if T then it's passed
-                                (comp defval env t t)     ;; compile default value
+                                (with-env
+                                  (comp defval env t t))     ;; compile default value
                                 (gen "LSET" 0 index)      ;; set arg value in env
                                 (gen "POP")               ;; discard from stack
                                 #(l1)
@@ -1102,13 +1111,14 @@
                         (lambda (aux)
                           (let ((name (car aux))
                                 (defval (cadr aux)))
-                            (<< (comp defval env t t)
+                            (<< (with-env (comp defval env t t))
                                 (gen "LSET" 0 index)
                                 (gen "POP")
                                 (when (%specialp name)
                                   (gen "BIND" name index)))
                             (newarg name))))
-               (<< (comp-block name body env t nil)))))))
+               (<< (with-env
+                     (comp-block name body env t nil))))))))
 
      (comp-lambda (name args body env)
        (gen "FN"
@@ -1123,11 +1133,10 @@
                                                (push #("BIND" x i) dyn))
                                              (%incf i)))
                              (%seq dyn
-                                   (comp-block name body
-                                               (if args
-                                                   (extenv env :lex (map (lambda (name) (list name :var)) args))
-                                                   env)
-                                               t nil)))))))
+                                   (if args
+                                       (with-extenv (:lex (map (lambda (name) (list name :var)) args))
+                                         (comp-block name body env t nil))
+                                       (comp-block name body env t nil))))))))
               (if (eq code '$xargs)
                   (comp-extended-lambda name args body env)
                   code))
@@ -1162,19 +1171,20 @@
                         (<< (gen "FRAME"))))
                  (when labels? (extenv))
                  (mapcar (lambda (name func)
-                           (<< (comp-lambda name (car func) (cdr func) env)))
+                           (<< (with-env (comp-lambda name (car func) (cdr func) env))))
                          names funcs)
                  (unless labels? (extenv))
                  (<< (if (> len 1) (gen "VARS" len) (gen "VAR")))
-                 (cond
-                   (more?
-                    (<< (comp-seq body env val? t)
-                        (gen "UNFR" 1 0)))
-                   (t ;; *let-tco*
-                      (<< (comp-seq body env val? nil)))
-                   (t
-                    (<< (comp-seq body env val? t)
-                        (gen "RET")))))))
+                 (with-env
+                   (cond
+                     (more?
+                      (<< (comp-seq body env val? t)
+                          (gen "UNFR" 1 0)))
+                     (t ;; *let-tco*
+                        (<< (comp-seq body env val? nil)))
+                     (t
+                      (<< (comp-seq body env val? t)
+                          (gen "RET"))))))))
            (comp-seq body env val? more?)))
 
      (comp-macrolet (bindings body env val? more?)
@@ -1182,7 +1192,7 @@
          (setq env (extenv env :macros (map (lambda (def)
                                               (list (car def) :macro (compile (list* '%fn def))))
                                             bindings))))
-       (comp-seq body env val? more?))
+       (with-env (comp-seq body env val? more?)))
 
      (comp-symbol-macrolet (bindings body env val? more?)
        (let ((ext (mapcar (lambda (el)
@@ -1190,11 +1200,11 @@
                                   (expansion (cadr el)))
                               (list name :var :smac expansion)))
                           bindings)))
-         (comp-seq body (extenv env :lex ext) val? more)))
+         (with-extenv (:lex ext)
+           (comp-seq body env val? more?))))
 
      (comp-macroexpand (expander args env val? more?)
-       (let ((*compiler-env* env))
-         (comp (apply expander args) env val? more?)))
+       (with-env (comp (apply expander args) env val? more?)))
 
      (comp-mvb (names values-form body env val? more?)
        (cond
@@ -1212,16 +1222,16 @@
                     (setq specials (1+ specials))
                     (<< (gen "BIND" (car names) index)))
                   (rec (cdr names) (1+ index))))
-              (setq env (extenv env :lex (map (lambda (name) (list name :var)) names)))
-              (cond
-                (more?
-                 (<< (comp-seq body env val? t)
-                     (gen "UNFR" 1 specials)))
-                (*let-tco*
-                 (<< (comp-seq body env val? nil)))
-                (t
-                 (<< (comp-seq body env val? t)
-                     (gen "RET")))))))
+              (with-extenv (:lex (map (lambda (name) (list name :var)) names))
+                (cond
+                  (more?
+                   (<< (comp-seq body env val? t)
+                       (gen "UNFR" 1 specials)))
+                  (*let-tco*
+                   (<< (comp-seq body env val? nil)))
+                  (t
+                   (<< (comp-seq body env val? t)
+                       (gen "RET"))))))))
          (t
           (comp-seq (list values-form body) env val? more?))))
 
@@ -1260,16 +1270,16 @@
                    (<< (gen "LET" len))
                    (foreach specials (lambda (x)
                                        (<< (gen "BIND" (car x) (cdr x)))))
-                   (setq env (extenv env :lex (map (lambda (name) (list name :var)) names)))
-                   (cond
-                     (more?
-                      (<< (comp-seq body env val? t)
-                          (gen "UNFR" 1 (length specials))))
-                     (*let-tco*
-                      (<< (comp-seq body env val? nil)))
-                     (t
-                      (<< (comp-seq body env val? t)
-                          (gen "RET")))))))
+                   (with-extenv (:lex (map (lambda (name) (list name :var)) names))
+                     (cond
+                       (more?
+                        (<< (comp-seq body env val? t)
+                            (gen "UNFR" 1 (length specials))))
+                       (*let-tco*
+                        (<< (comp-seq body env val? nil)))
+                       (t
+                        (<< (comp-seq body env val? t)
+                            (gen "RET"))))))))
            (comp-seq body env val? more?)))
 
      (comp-let* (bindings body env val? more?)
@@ -1282,7 +1292,7 @@
                     (i 0)
                     (newargs '()))
                (mapcar (lambda (name x)
-                         (<< (comp x env t t)
+                         (<< (with-env (comp x env t t))
                              (unless newargs (gen "FRAME"))
                              (gen "VAR")
                              (when (%specialp name)
@@ -1294,15 +1304,16 @@
                                (setq env (extenv env :lex cell)))
                            (setq newargs cell)))
                        names vals)
-               (cond
-                 (more?
-                  (<< (comp-seq body env val? t)
-                      (gen "UNFR" 1 (length specials))))
-                 (t ;; *let-tco*
-                    (<< (comp-seq body env val? nil)))
-                 (t
-                  (<< (comp-seq body env val? t)
-                      (gen "RET"))))))
+               (with-env
+                 (cond
+                   (more?
+                    (<< (comp-seq body env val? t)
+                        (gen "UNFR" 1 (length specials))))
+                   (t ;; *let-tco*
+                      (<< (comp-seq body env val? nil)))
+                   (t
+                    (<< (comp-seq body env val? t)
+                        (gen "RET")))))))
            (comp-seq body env val? more?)))
 
      (comp-catch (tag body env val? more?)
