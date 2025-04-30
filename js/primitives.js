@@ -2040,14 +2040,31 @@ defp("dom.subscribe", true, function(m, nargs){
 
 defp("%error", true, function(m, nargs){
     checknargs(nargs, 1, 1);
-    // that's a hard error.
-    throw m.pop();
+    let error = m.pop();
+    if (typeof window != "undefined" && window.document) {
+        let event = new Event("ymacs-slip-error", { cancelable: true });
+        event.error = error;
+        if (document.dispatchEvent(event)) {
+            throw error;
+        }
+    } else {
+        throw error;
+    }
 });
 
 defp("%warn", true, function(m, nargs){
-    var a = [];
+    let a = [];
     while (nargs-- > 0) a.unshift(m.pop());
-    console.warn(a.join(" "));
+    let message = a.join(" ");
+    if (typeof window != "undefined" && window.document) {
+        let event = new Event("ymacs-slip-warning", { cancelable: true });
+        event.message = message;
+        if (document.dispatchEvent(event)) {
+            console.warn(message);
+        }
+    } else {
+        console.warn(message);
+    }
     return null;
 });
 

@@ -119,6 +119,13 @@ import "../js/primitives.js";
     };
 
     function recompile_all() {
+        document.addEventListener("ymacs-slip-warning", (ev) => {
+            ev.preventDefault();
+            log(`<span style='color: red'>WARN: ${ev.message}</span>`);
+        });
+        document.addEventListener("ymacs-slip-error", (ev) => {
+            log(`<span style='color: red'>ERROR: ${ev.error}</span>`);
+        });
         load_fasls([ "lisp/compiler.lisp" ], function(){
             let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
             lisp_files.unshift("lisp/compiler.lisp");
