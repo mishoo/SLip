@@ -913,16 +913,8 @@ export class LispMachine {
         return new LispRet(this, pc);
     }
 
-    unret(ret) {
-        ret.run(this);
-    }
-
     mkcont() {
         return new LispCC(this);
-    }
-
-    uncont(cont) {
-        cont.run(this);
     }
 
     top() {
@@ -1176,7 +1168,7 @@ let OP_RUN = Object.freeze([
         m.push(m.pop() == null ? true : null);
     },
     /*OP.SETCC*/ (m) => {
-        m.uncont(m.top());
+        m.stack.top().run(m);
     },
     /*OP.SAVE*/ (m) => {
         let addr = m.code[m.pc++];
@@ -1187,7 +1179,7 @@ let OP_RUN = Object.freeze([
         // using m.stack directly, rather than m.pop, since we'd like
         // to keep multiple values around for the caller.
         let val = m.stack.pop();
-        m.unret(m.stack.pop());
+        m.stack.pop().run(m);
         if (!noval) m.stack.push(val);
     },
     /*OP.CALL*/ (m) => {
