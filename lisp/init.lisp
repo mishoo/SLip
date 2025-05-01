@@ -172,14 +172,28 @@
 (defmacro destructuring-bind (args values . body)
   (%fn-destruct args values body))
 
+(defun ordinary-lambda-list-p (args)
+  (cond
+    ((or (null args)
+         (symbolp args)))
+    ((not (consp args))
+     (error "Bad macro lambda list"))
+    ((not (symbolp (car args)))
+     nil)
+    ((%::lambda-keyword-p (car args))
+     t)
+    ((ordinary-lambda-list-p (cdr args)))))
+
 (defmacro defmacro (name lambda-list . body)
   (%::maybe-xref-info name 'defmacro)
   (if (%primitivep name)
       (error (strcat "We shall not DEFMACRO on " name " (primitive function)")))
-  (let ((args (gensym "ARGS")))
-    `(%macro! ',name (%::%fn ,name ,args
-                             (destructuring-bind ,lambda-list ,args
-                               ,@body)))))
+  (if (ordinary-lambda-list-p lambda-list)
+      `(%macro! ',name (%::%fn ,name ,lambda-list ,@body))
+      (let ((args (gensym "ARGS")))
+        `(%macro! ',name (%::%fn ,name ,args
+                                 (destructuring-bind ,lambda-list ,args
+                                   ,@body))))))
 
 (defmacro import (symbols &optional (package *package*))
   `(%import ,symbols ,package))

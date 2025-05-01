@@ -488,7 +488,7 @@
   `(return-from nil ,val))
 
 (defun lambda-keyword-p (sym)
-  (member sym '(&optional &rest &key &aux &allow-other-keys)))
+  (member sym '(&optional &rest &body &key &aux &allow-other-keys)))
 
 (defun parse-lambda-list (args)
   (let ((all nil)
@@ -521,7 +521,7 @@
              ((consp args)
               (case (car args)
                 (&optional (rec-opt (cdr args)))
-                (&rest (rec-rest (cdr args)))
+                ((&rest &body) (rec-rest (cdr args)))
                 (&key (rec-key (cdr args)))
                 (&aux (rec-aux (cdr args)))
                 (otherwise
@@ -545,7 +545,7 @@
 
          (rec-opt (args)
            (case (car args)
-             (&rest (rec-rest (cdr args)))
+             ((&rest &body) (rec-rest (cdr args)))
              (&key (rec-key (cdr args)))
              (&aux (rec-aux (cdr args)))
              (otherwise
