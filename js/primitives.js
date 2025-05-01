@@ -1540,15 +1540,39 @@ defp("disassemble", false, function(m, nargs){
     return LispMachine.disassemble(func.code);
 });
 
+// defp("apply", true, function(m, nargs){
+//     checknargs(nargs, 2);
+//     var args = m.pop();
+//     checktype(args, LispList);
+//     while (--nargs > 1)
+//         args = new LispCons(m.pop(), args);
+//     var func = m.pop();
+//     checktype(func, LispClosure);
+//     return m._callnext(func, args);
+// });
+
 defp("apply", true, function(m, nargs){
     checknargs(nargs, 2);
-    var args = m.pop();
-    checktype(args, LispList);
-    while (--nargs > 1)
-        args = new LispCons(m.pop(), args);
-    var func = m.pop();
+    var func = m.stack.replace(-nargs, m.mkret(m.pc));
+    if (func instanceof LispSymbol) func = func.function;
     checktype(func, LispClosure);
-    return m._callnext(func, args);
+    var args = m.pop();
+    while (args != null) {
+        m.push(LispCons.car(args));
+        args = args.cdr;
+        nargs++;
+    }
+    m.n_args = nargs - 2;
+    return m._callnext(func, false);
+});
+
+defp("funcall", true, function(m, nargs){
+    checknargs(nargs, 1);
+    var func = m.stack.replace(-nargs, m.mkret(m.pc));
+    if (func instanceof LispSymbol) func = func.function;
+    checktype(func, LispClosure);
+    m.n_args = nargs - 1;
+    return m._callnext(func, false);
 });
 
 defp("values", false, function(m, nargs){

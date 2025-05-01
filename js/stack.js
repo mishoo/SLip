@@ -20,6 +20,22 @@ export class LispStack {
             throw new LispPrimitiveError("top() with an empty stack");
         }
     }
+    at(index) {
+        if (index < 0) index += this.sp;
+        return this.data.at(index);
+    }
+    replace(index, newval) {
+        if (index < 0) index += this.sp;
+        let val = this.data[index];
+        this.data[index] = newval;
+        return val;
+    }
+    remove(index) {
+        if (index < 0) index += this.sp;
+        let val = this.data[index];
+        this.data.copyWithin(index, index + 1, this.sp--);
+        return val;
+    }
     push(val) {
         if (this.sp < this.maxsize) {
             this.data[this.sp++] = val;

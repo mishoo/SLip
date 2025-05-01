@@ -38,6 +38,19 @@
 (defun funcall-mexp (f)
   `(,(car f) ,@(all-mexp (cdr f))))
 
+(defun tagbody-mexp (f)
+  `(,(car f) ,@(let rec ((f (cdr f))
+                         (r '()))
+                 (if (atom f)
+                     (nreconc r f)
+                     (rec (cdr f)
+                          (cons (let ((exp (mexp (car f))))
+                                  (if (or (symbolp exp)
+                                          (numberp exp))
+                                      `(progn ,exp)
+                                      exp))
+                                r))))))
+
 (defun quote-mexp (f)
   f)
 
@@ -142,7 +155,7 @@
            (quote           ,#'quote-mexp)
            (return-from     ,#'block-mexp)
            (setq            ,#'funcall-mexp)
-           (tagbody         ,#'funcall-mexp)
+           (tagbody         ,#'tagbody-mexp)
            (throw           ,#'funcall-mexp)
            (unwind-protect  ,#'funcall-mexp)
            (macrolet        ,#'macrolet-mexp))

@@ -156,18 +156,6 @@
 
 ;;;; let the show begin
 
-;; is there a good reason why CL doesn't allow this syntax?
-;;
-;;   ((progn foo) ...)  ==  (funcall foo ...)
-;;
-;; basically, if a list occurs in function position, then it's
-;; evaluated as an ordinary expression and the returned value is
-;; expected to be a closure, and it's then called.  Makes sense for
-;; (lambda) too, although our compiler intercepts that as a special
-;; case.
-(defmacro funcall (f . args)
-  `((progn ,f) ,@args))
-
 (defmacro defun (name args . body)
   (maybe-xref-info name 'defun)
   `(set-symbol-function! ',name (%fn ,name ,args ,@body)))

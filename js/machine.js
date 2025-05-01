@@ -993,17 +993,19 @@ export class LispMachine {
     }
 
     _callnext(closure, args) {
-        this.push(this.mkret(this.pc));
         //if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
+        if (args !== false) {
+            this.push(this.mkret(this.pc));
+            let n = 0;
+            while (args != null) {
+                this.push(args.car);
+                args = args.cdr;
+                n++;
+            }
+            this.n_args = n;
+        }
         this.code = closure.code;
         this.env = closure.env;
-        var n = 0;
-        while (args != null) {
-            this.push(args.car);
-            args = args.cdr;
-            n++;
-        }
-        this.n_args = n;
         this.pc = 0;
         this.f = closure;
         return false;
