@@ -508,10 +508,10 @@
                 (not (lambda-keyword-p x))))
 
          (add (name)
-           (when (member name all)
-             (error (strcat "Duplicate name in lambda list " name)))
            (unless (symp name)
              (error (strcat "Invalid name in lambda list " name)))
+           (when (member name all)
+             (error (strcat "Duplicate name in lambda list " name)))
            (push name all)
            name)
 
@@ -620,7 +620,7 @@
                  (if (and (eq name (car x))
                           (eq type (cadr x)))
                      (list* i j (cddr x))
-                     (position (cdr lst) i (+ j 1))))))
+                     (position (cdr lst) i (1+ j))))))
            (frame (env i)
              (when env
                (or (position (car env) i 0)
@@ -635,7 +635,7 @@
                        (when (and (eq type :var)
                                   (eq smac :smac))
                          (%decf i)))
-                     (frame (cdr env) (+ i 1)))))))
+                     (frame (cdr env) (1+ i)))))))
     (frame env 0)))
 
 (defun find-macrolet-in-compiler-env (name &optional (env *compiler-env*))
@@ -671,6 +671,17 @@
 (defmacro with-extenv (forms . body)
   `(let ((env (extenv env ,@forms)))
      (with-env ,@body)))
+
+(defun always-true-p (form)
+  (or (eq form t)
+      (numberp form)
+      (stringp form)
+      (regexpp form)
+      (charp form)
+      (vectorp form)
+      (and (listp form)
+           (eq 'quote (car form))
+           (cadr form))))
 
 (labels
     ((assert (p msg)
@@ -927,12 +938,7 @@
      (comp-if (pred then else env val? more?)
        (cond
          ((not pred) (comp else env val? more?))
-         ((or (numberp pred)
-              (stringp pred)
-              (regexpp pred)
-              (charp pred)
-              (vectorp pred)
-              (eq pred t))
+         ((always-true-p pred)
           (comp then env val? more?))
          ((and (consp pred)
                (eq (car pred) 'not))
@@ -975,14 +981,18 @@
           (%seq (when val? (gen "NIL"))
                 (unless more? (gen "RET"))))
          ((cdr exps)
-          (let ((l1 (mklabel)))
-            (%seq (comp (car exps) env t t)
-                  (if val?
-                      (gen "TJUMPK" l1)
-                      (gen "TJUMP" l1))
-                  (comp-or (cdr exps) env val? more?)
-                  #( l1 )
-                  (unless more? (gen "RET")))))
+          (if (always-true-p (car exps))
+              (comp (car exps) env val? more?)
+              (if (not (cadr exps))
+                  (comp-or `(,(car exps) ,@(cddr exps)) env val? more?)
+                  (let ((l1 (mklabel)))
+                    (%seq (comp (car exps) env t t)
+                          (if val?
+                              (gen "TJUMPK" l1)
+                              (gen "TJUMP" l1))
+                          (comp-or (cdr exps) env val? more?)
+                          #( l1 )
+                          (unless more? (gen "RET")))))))
          (t (comp (car exps) env val? more?))))
 
      (comp-funcall (f args env val? more?)
@@ -1042,7 +1052,7 @@
             (throw '$xargs '$xargs))
           (when (member (car args) names)
             (error (strcat "Duplicate function argument " (car args))))
-          (gen-simple-args (cdr args) (+ n 1) (cons (car args) names)))
+          (gen-simple-args (cdr args) (1+ n) (cons (car args) names)))
          (t (error "Illegal argument list"))))
 
      (make-true-list (l)
