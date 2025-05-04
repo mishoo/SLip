@@ -10,7 +10,7 @@ let S_NIL = LispSymbol.get("NIL");
 let S_T = LispSymbol.get("T");
 let S_ALLOW_OTHER_KEYS = KEYWORD_PACK.intern("ALLOW-OTHER-KEYS");
 
-const OP = Object.freeze({
+const OP = {
     NOP: 0,
     LVAR: 1,
     LSET: 2,
@@ -93,9 +93,9 @@ const OP = Object.freeze({
     FJUMPK: 79,
     VALUES: 80,
     MVB: 81,
-});
+};
 
-const OP_LEN = Object.freeze([
+const OP_LEN = [
     0 /* NOP */,
     2 /* LVAR */,
     2 /* LSET */,
@@ -178,7 +178,7 @@ const OP_LEN = Object.freeze([
     1 /* FJUMPK */,
     1 /* VALUES */,
     1 /* MVB */,
-]);
+];
 
 // normal RET context
 class LispRet {
@@ -815,7 +815,7 @@ export function unserialize(code) {
         return LispChar.get(char);
     });
     names.push("DOT"); values.push(LispCons.DOT);
-    var func = new Function("return function(" + names.join(",") + "){return Object.freeze([" + code + "])}")();
+    var func = new Function("return function(" + names.join(",") + "){return [" + code + "]}")();
     code = func.apply(null, values);
     return code;
 }
@@ -1088,7 +1088,7 @@ function find_key_arg(item, array, start, end) {
     return null;
 }
 
-let OP_RUN = Object.freeze([
+let OP_RUN = [
     null,
     /*OP.LVAR*/ (m) => {
         let i = m.code[m.pc++];
@@ -1304,7 +1304,7 @@ let OP_RUN = Object.freeze([
         m.push(p);
     },
     /*OP.CC*/ (m) => {
-        m.push(new LispClosure(CC_CODE, null, new LispCons([ m.mkcont() ])));
+        m.push(new LispClosure(CC_CODE, null, new LispCons([m.mkcont()])));
     },
     /*OP.CAR*/ (m) => {
         m.push(LispCons.car(m.pop()));
@@ -1539,7 +1539,7 @@ let OP_RUN = Object.freeze([
         while (frame.length < n) frame.push(null);
         frame.length = n;
     },
-]);
+];
 
 function vmrun(m) {
     OP_RUN[m.code[m.pc++]](m);
