@@ -269,15 +269,29 @@
   `(progn (%global! ',name)
           (setq ,name ,val)))
 
+(defmacro multiple-value-call (fn &rest values)
+  `(apply ,fn (nconc ,@(mapcar (lambda (form)
+                                 `(multiple-value-list ,form))
+                               values))))
+
 ;; only the long form is supported
 (def-emac defsetf (access-fn lambda-list store-vars &body body)
-  (let ((args1 (gensym))
-        (args2 (gensym)))
-    `(%set-symbol-prop ',access-fn :setf
-                       (lambda (,args1 ,args2)
-                         (destructuring-bind ,lambda-list ,args1
-                           (destructuring-bind ,store-vars ,args2
-                             ,@body))))))
+  (cond
+    ((< 1 (length store-vars))
+     (let ((arg (gensym "setfarg")))
+       `(%set-symbol-prop ',access-fn :setf
+                          (lambda (,@lambda-list)
+                            (lambda (,arg)
+                              (symbol-macrolet
+                                  (,@(mapcar (lambda (sym) (list sym (list 'quote sym)))
+                                             store-vars))
+                                `(multiple-value-bind ,'(,@store-vars) ,,arg
+                                   ,,@body)))))))
+    (t
+     `(%set-symbol-prop ',access-fn :setf
+                        (lambda (,@lambda-list)
+                          (lambda (,@store-vars)
+                            ,@body))))))
 
 (def-efun %setf (args)
   (when args
@@ -286,12 +300,13 @@
     (cons
      (cond
        ((listp (car args))
-        (destructuring-bind ((sym &rest args1) &rest args2
-                             &aux (expander (%get-symbol-prop sym :setf)))
+        (destructuring-bind ((sym &rest args1) value
+                             &aux
+                             (expander (%get-symbol-prop sym :setf)))
             (cons (macroexpand (car args)) (cdr args))
           (unless (functionp expander)
             (error (strcat "Unknown SETF expander for " sym)))
-          (funcall expander args1 args2)))
+          (funcall (apply expander args1) value)))
        ((symbolp (car args))
         `(setq ,(car args) ,(cadr args)))
        (t (error "Unsupported SETF syntax")))
@@ -341,6 +356,23 @@
 
 (defsetf getf (place indicator) (value)
   `(setf ,place (%:%putf ,place ,indicator ,value)))
+
+;; (defmacro defun (name args . body)
+;;   (maybe-xref-info name 'defun)
+;;   (cond
+;;     ((and (consp name)
+;;           (eq 'setf (car name))
+;;           (symbolp (cadr name))
+;;           (null (cddr name)))
+;;      (let* ((setter (intern (strcat "(SETF " (cadr name) ")")))
+;;             (value-arg (car args))
+;;             (rest-args (cdr args)))
+;;        `(progn
+;;           (maybe-xref-info ',setter 'defun)
+;;           (defsetf ,(cadr name) ,rest-args (,value-arg)
+;;             ,@body))))
+;;     (t
+;;      `(set-symbol-function! ',name (%fn ,name ,args ,@body)))))
 
 (def-emac push (obj place)
   `(setf ,place (cons ,obj ,place)))
@@ -548,11 +580,6 @@
 
 (defun values-list (list)
   (apply #'values list))
-
-(defmacro multiple-value-call (fn &rest values)
-  `(apply ,fn (nconc ,@(mapcar (lambda (form)
-                                 `(multiple-value-list ,form))
-                               values))))
 
 (defmacro multiple-value-setq ((&rest vars) value-form)
   (let ((syms (mapcar (lambda (var)

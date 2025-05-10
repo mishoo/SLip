@@ -9,8 +9,9 @@
     (- (get-internal-run-time) t1)))
 
 (defun %test (thunk times)
-  (loop repeat times
+  (loop for i from 1 to times
         for time = (test1 thunk)
+        do (format t "Sample ~D: ~Dms~%" i time)
         summing time into total
         minimizing time into min
         maximizing time into max
