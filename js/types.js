@@ -264,8 +264,7 @@ export class LispObject extends LispType {
     }
     constructor(size) {
         super();
-        var a = this.vector = new Array(size);
-        while (--size >= 0) a[size] = null;
+        this.vector = new Array(size).fill(null);
     }
 }
 
