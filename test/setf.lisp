@@ -28,10 +28,15 @@
       list)))
 
 (defsetf first-pair (lst) (v1 v2)
-  `(values
-    (setf (car ,lst) ,v1)
-    (setf (car (cdr ,lst)) ,v2)))
+  (let ((vlst (gensym)))
+    `(let ((,vlst ,lst))
+       (values
+        (setf (car ,vlst) ,v1)
+        (setf (car (cdr ,vlst)) ,v2)))))
 
 (defparameter x '(a b c d e))
 
 (setf (first-pair x) (floor 100000001 17))
+
+(defun (setf elt) (new-val list index)
+  (setf (car (nthcdr index list)) new-val))

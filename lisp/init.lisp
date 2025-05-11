@@ -283,7 +283,8 @@
                           (lambda (,@lambda-list)
                             (lambda (,arg)
                               (symbol-macrolet
-                                  (,@(mapcar (lambda (sym) (list sym (list 'quote sym)))
+                                  (,@(mapcar (lambda (sym)
+                                               `(,sym ',sym))
                                              store-vars))
                                 `(multiple-value-bind ,'(,@store-vars) ,,arg
                                    ,,@body)))))))
@@ -357,22 +358,28 @@
 (defsetf getf (place indicator) (value)
   `(setf ,place (%:%putf ,place ,indicator ,value)))
 
-;; (defmacro defun (name args . body)
-;;   (maybe-xref-info name 'defun)
-;;   (cond
-;;     ((and (consp name)
-;;           (eq 'setf (car name))
-;;           (symbolp (cadr name))
-;;           (null (cddr name)))
-;;      (let* ((setter (intern (strcat "(SETF " (cadr name) ")")))
-;;             (value-arg (car args))
-;;             (rest-args (cdr args)))
-;;        `(progn
-;;           (maybe-xref-info ',setter 'defun)
-;;           (defsetf ,(cadr name) ,rest-args (,value-arg)
-;;             ,@body))))
-;;     (t
-;;      `(set-symbol-function! ',name (%fn ,name ,args ,@body)))))
+(defmacro defun (name args . body)
+  (maybe-xref-info name 'defun)
+  (cond
+    ((and (consp name)
+          (eq 'setf (car name))
+          (symbolp (cadr name))
+          (null (cddr name)))
+     (let* ((setter (intern (strcat "(SETF " (cadr name) ")")
+                            (symbol-package (cadr name))))
+            (value-arg (car args))
+            (rest-args (cdr args))
+            (rest-sym (gensym)))
+       `(progn
+          (maybe-xref-info ',setter 'defun)
+          (set-symbol-function! ',setter
+                                (%fn ,setter (,value-arg ,@rest-args)
+                                     ,@body))
+          (defsetf ,(cadr name) ,rest-args (,value-arg)
+            `(let ((,',rest-sym (list ,,@rest-args)))
+               (apply #',',setter ,,value-arg ,',rest-sym))))))
+    (t
+     `(set-symbol-function! ',name (%fn ,name ,args ,@body)))))
 
 (def-emac push (obj place)
   `(setf ,place (cons ,obj ,place)))

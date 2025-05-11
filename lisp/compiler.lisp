@@ -814,7 +814,17 @@
                  (when val?
                    (cond
                      ((consp sym)
-                      (comp sym env t more?))
+                      (if (and (eq 'setf (car sym))
+                               (symbolp (cadr sym))
+                               (null (cddr sym)))
+                          ;; Hack to handle #'(SETF STUFF). In CL it seems
+                          ;; that the name of the function is the list
+                          ;; itself (SETF STUFF), but we really need to make
+                          ;; it a symbol. Hope this is sound..
+                          (comp `(function ,(intern (strcat "(SETF " (cadr sym) ")")
+                                                    (symbol-package (cadr sym))))
+                                env t more?)
+                          (comp sym env t more?)))
                      (t
                       (assert (symbolp sym) "FUNCTION requires a symbol")
                       (let ((local (find-func sym env)))
