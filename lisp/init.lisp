@@ -281,18 +281,18 @@
      (let ((arg (gensym "setfarg")))
        `(%set-symbol-prop ',access-fn :setf
                           (lambda (,@lambda-list)
-                            (lambda (,arg)
-                              (symbol-macrolet
-                                  (,@(mapcar (lambda (sym)
-                                               `(,sym ',sym))
-                                             store-vars))
-                                `(multiple-value-bind ,'(,@store-vars) ,,arg
-                                   ,,@body)))))))
+                            (%fn ,access-fn (,arg)
+                                 (symbol-macrolet
+                                     (,@(mapcar (lambda (sym)
+                                                  `(,sym ',sym))
+                                                store-vars))
+                                   `(multiple-value-bind ,'(,@store-vars) ,,arg
+                                      ,,@body)))))))
     (t
      `(%set-symbol-prop ',access-fn :setf
                         (lambda (,@lambda-list)
-                          (lambda (,@store-vars)
-                            ,@body))))))
+                          (%fn ,access-fn (,@store-vars)
+                               ,@body))))))
 
 (def-efun %setf (args)
   (when args
@@ -368,16 +368,14 @@
      (let* ((setter (intern (strcat "(SETF " (cadr name) ")")
                             (symbol-package (cadr name))))
             (value-arg (car args))
-            (rest-args (cdr args))
-            (rest-sym (gensym)))
+            (rest-args (cdr args)))
        `(progn
           (maybe-xref-info ',setter 'defun)
           (set-symbol-function! ',setter
                                 (%fn ,setter (,value-arg ,@rest-args)
                                      ,@body))
           (defsetf ,(cadr name) ,rest-args (,value-arg)
-            `(let ((,',rest-sym (list ,,@rest-args)))
-               (apply #',',setter ,,value-arg ,',rest-sym))))))
+            `(,',setter (%:%ooo ,,value-arg) ,,@rest-args)))))
     (t
      `(set-symbol-function! ',name (%fn ,name ,args ,@body)))))
 

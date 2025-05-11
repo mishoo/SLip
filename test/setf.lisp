@@ -36,7 +36,12 @@
 
 (defparameter x '(a b c d e))
 
-(setf (first-pair x) (floor 100000001 17))
+;; (setf (first-pair x) (floor 100000001 17))
 
 (defun (setf elt) (new-val list index)
   (setf (car (nthcdr index list)) new-val))
+
+(defun tmp ()
+  (setf (elt x 2) (pop x)))
+
+(format t "~A~%~%" (disassemble #'tmp))

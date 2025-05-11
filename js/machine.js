@@ -93,6 +93,7 @@ const OP = {
     FJUMPK: 79,
     VALUES: 80,
     MVB: 81,
+    POPBACK: 82,
 };
 
 const OP_LEN = [
@@ -178,6 +179,7 @@ const OP_LEN = [
     1 /* FJUMPK */,
     1 /* VALUES */,
     1 /* MVB */,
+    1 /* POPBACK */,
 ];
 
 // normal RET context
@@ -1538,6 +1540,10 @@ let OP_RUN = [
         m.env = new LispCons(frame, m.env);
         while (frame.length < n) frame.push(null);
         frame.length = n;
+    },
+    /*OP.POPBACK*/ (m) => {
+        let n = m.code[m.pc++];
+        m.stack.replace(-n-1, m.pop());
     },
 ];
 

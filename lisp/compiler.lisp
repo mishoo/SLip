@@ -871,8 +871,18 @@
 
      (comp-list (exps env)
        (when exps
-         (%seq (comp (car exps) env t t)
-               (comp-list (cdr exps) env))))
+         (cond
+           ((and (cdr exps)
+                 (consp (car exps))
+                 (eq '%ooo (caar exps)))
+            ;; “out-of-order” operator: evaluate this item *after* the rest of
+            ;; the list, but leave values on the stack in the proper order.
+            (%seq (gen "NIL")
+                  (comp-list (cdr exps) env)
+                  (comp (cadar exps) env t t)
+                  (gen "POPBACK" (length (cdr exps)))))
+           ((%seq (comp (car exps) env t t)
+                  (comp-list (cdr exps) env))))))
 
      (comp-block (name forms env val? more?)
        (assert (symbolp name) (strcat "BLOCK expects a symbol, got " name))
