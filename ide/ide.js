@@ -353,6 +353,7 @@ Ymacs_Buffer.newCommands({
                   case "DEFVAR":
                   case "DEFGLOBAL":
                   case "DEFCONSTANT":
+                  case "SETF":
                     return true;
                 }
             });

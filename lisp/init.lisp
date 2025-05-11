@@ -276,6 +276,7 @@
 
 ;; only the long form is supported
 (def-emac defsetf (access-fn lambda-list store-vars &body body)
+  (maybe-xref-info access-fn 'setf)
   (cond
     ((< 1 (length store-vars))
      (let ((arg (gensym "setfarg")))
@@ -359,7 +360,6 @@
   `(setf ,place (%:%putf ,place ,indicator ,value)))
 
 (defmacro defun (name args . body)
-  (maybe-xref-info name 'defun)
   (cond
     ((and (consp name)
           (eq 'setf (car name))
@@ -370,13 +370,13 @@
             (value-arg (car args))
             (rest-args (cdr args)))
        `(progn
-          (maybe-xref-info ',setter 'defun)
           (set-symbol-function! ',setter
                                 (%fn ,setter (,value-arg ,@rest-args)
                                      ,@body))
           (defsetf ,(cadr name) ,rest-args (,value-arg)
             `(,',setter (%:%ooo ,,value-arg) ,,@rest-args)))))
     (t
+     (maybe-xref-info name 'defun)
      `(set-symbol-function! ',name (%fn ,name ,args ,@body)))))
 
 (def-emac push (obj place)
