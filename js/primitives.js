@@ -449,11 +449,9 @@ defp("getf", false, function(m, nargs){
     var item = m.pop(), list = m.pop();
     while (list != null) {
         checktype(list, LispList);
-        if (eq(list.car, item)) {
-            if (!list.cdr) error("Malformed plist");
-            return list.cdr.car;
-        }
         if (!list.cdr) error("Malformed plist");
+        if (eq(list.car, item))
+            return list.cdr.car;
         list = list.cdr.cdr;
     }
     return not_found;
@@ -465,11 +463,8 @@ defp("%putf", true, function(m, nargs){
     var p = list;
     while (p != null) {
         checktype(p, LispList);
-        if (eq(p.car, item)) {
-            if (!p.cdr) error("Malformed plist");
-            break;
-        }
         if (!p.cdr) error("Malformed plist");
+        if (eq(p.car, item)) break;
         p = p.cdr.cdr;
     }
     if (p) {

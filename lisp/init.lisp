@@ -174,8 +174,7 @@
 
 (defun ordinary-lambda-list-p (args)
   (cond
-    ((or (null args)
-         (symbolp args)))
+    ((symbolp args))
     ((not (consp args))
      (error "Bad macro lambda list"))
     ((not (symbolp (car args)))
@@ -185,9 +184,9 @@
     ((ordinary-lambda-list-p (cdr args)))))
 
 (defmacro defmacro (name lambda-list . body)
+  (when (%primitivep name)
+    (error (strcat "We shall not DEFMACRO on " name " (primitive function)")))
   (%::maybe-xref-info name 'defmacro)
-  (if (%primitivep name)
-      (error (strcat "We shall not DEFMACRO on " name " (primitive function)")))
   (if (ordinary-lambda-list-p lambda-list)
       `(%macro! ',name (%::%fn ,name ,lambda-list ,@body))
       (let ((args (gensym "ARGS")))
