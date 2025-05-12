@@ -269,46 +269,52 @@
   `(progn (%global! ',name)
           (setq ,name ,val)))
 
-(defmacro multiple-value-call (fn &rest values)
-  `(apply ,fn (nconc ,@(mapcar (lambda (form)
-                                 `(multiple-value-list ,form))
-                               values))))
+;;; setf
 
-;; only the long form is supported
-(def-emac defsetf (access-fn lambda-list store-vars &body body)
+(def-emac defsetf (access-fn lambda-list &optional store-vars &body body)
   (maybe-xref-info access-fn 'setf)
   (cond
-    ((< 1 (length store-vars))
+    ((symbolp lambda-list)
+     `(%set-symbol-prop ',access-fn :setf ',lambda-list))
+    ((> (length store-vars) 1)
      (let ((arg (gensym "setfarg")))
        `(%set-symbol-prop ',access-fn :setf
-                          (lambda (,@lambda-list)
-                            (%fn ,access-fn (,arg)
-                                 (symbol-macrolet
-                                     (,@(mapcar (lambda (sym)
-                                                  `(,sym ',sym))
-                                                store-vars))
-                                   `(multiple-value-bind ,'(,@store-vars) ,,arg
-                                      ,,@body)))))))
+                          (%fn ,access-fn (,@lambda-list ,arg)
+                               (symbol-macrolet
+                                   (,@(mapcar (lambda (sym)
+                                                `(,sym ',sym))
+                                              store-vars))
+                                 `(multiple-value-bind ,'(,@store-vars) ,,arg
+                                    ,,@body))))))
     (t
      `(%set-symbol-prop ',access-fn :setf
-                        (lambda (,@lambda-list)
-                          (%fn ,access-fn (,@store-vars)
-                               ,@body))))))
+                        (%fn ,access-fn (,@lambda-list ,@store-vars) ,@body)))))
 
-(def-efun %setf (args)
+(defun %get-setf-place (form)
+  (let ((expander (let dig ()
+                    (or (%get-symbol-prop (car form) :setf)
+                        (let ((exp (macroexpand-1 form)))
+                          (unless (eq exp form)
+                            (setq form exp)
+                            (dig)))))))
+    (values expander form)))
+
+(defun %setf (args)
   (when args
     (unless (cdr args)
       (error "Odd number of arguments in SETF"))
     (cons
      (cond
-       ((listp (car args))
-        (destructuring-bind ((sym &rest args1) value
-                             &aux
-                             (expander (%get-symbol-prop sym :setf)))
-            (cons (macroexpand (car args)) (cdr args))
-          (unless (functionp expander)
-            (error (strcat "Unknown SETF expander for " sym)))
-          (funcall (apply expander args1) value)))
+       ((consp (car args))
+        (multiple-value-bind (expander form) (%get-setf-place (car args))
+          (cond
+            ((null expander)
+             (error (strcat "No SETF expander for " (caar args))))
+            ((functionp expander)
+             (apply expander (append (cdr form) (list (cadr args)))))
+            ((symbolp expander)
+             `(,expander ,@(cdr form) ,(cadr args)))
+            ((error (strcat "Unknown SETF expander for " (caar args) ": " expander))))))
        ((symbolp (car args))
         `(setq ,(car args) ,(cadr args)))
        (t (error "Unsupported SETF syntax")))
@@ -351,13 +357,12 @@
 (defsetf cdr (x) (val)
   `(rplacd ,x ,val))
 
-(defsetf symbol-function (sym) (func)
-  `(progn
-     (%::maybe-xref-info ,sym 'defun)
-     (set-symbol-function! ,sym ,func)))
-
 (defsetf getf (place indicator) (value)
-  `(setf ,place (%:%putf ,place ,indicator ,value)))
+  (let ((vval (gensym)))
+    `(let (,vval)
+       (setf ,place (%:%putf ,place ,indicator
+                             (setq ,vval ,value)))
+       ,vval)))
 
 (defmacro defun (name args . body)
   (cond
@@ -379,6 +384,10 @@
      (maybe-xref-info name 'defun)
      `(set-symbol-function! ',name (%fn ,name ,args ,@body)))))
 
+(defun (setf symbol-function) (func sym)
+  (%::maybe-xref-info sym 'defun)
+  (set-symbol-function! sym func))
+
 (def-emac push (obj place)
   `(setf ,place (cons ,obj ,place)))
 
@@ -387,6 +396,8 @@
     `(let ((,v ,place))
        (setf ,place (cdr ,v))
        (car ,v))))
+
+;;; lists
 
 (def-efun collect-if (test list)
   (cond ((not list) nil)
@@ -502,6 +513,8 @@
 (setf (symbol-function 'sort) #'stable-sort)
 (export '(sort export import))
 
+;;; basic looping
+
 (def-emac dotimes ((var count-form &optional result-form) &body body)
   (let ((count (gensym))
         (next (gensym "next"))
@@ -582,6 +595,13 @@
 
 (def-emac use-package (source &optional (target *package*))
   `(%use-package (find-package ,source) (find-package ,target)))
+
+;;; multiple values
+
+(defmacro multiple-value-call (fn &rest values)
+  `(apply ,fn (nconc ,@(mapcar (lambda (form)
+                                 `(multiple-value-list ,form))
+                               values))))
 
 (defun values-list (list)
   (apply #'values list))

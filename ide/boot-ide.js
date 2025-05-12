@@ -103,9 +103,11 @@ import "../js/primitives.js";
     function compile(files, cont, nosave) {
         if (files.length == 0) return cont ? cont() : null;
         var filename = files[0];
-        if (!nosave) log("Compiling " + filename);
+        var time = performance.now();
+        if (!nosave) log(`<b>Compiling ${filename}</b>`);
         var bytecode = machine.atomic_call(LispSymbol.get("%LOAD").function, [ filename ]);
         if (!nosave) {
+            log(`... <span style='color: green'>${performance.now() - time}ms, ${bytecode.length} chars</span>`);
             var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
             save(fasl, bytecode, function(error){
                 if (error) {
