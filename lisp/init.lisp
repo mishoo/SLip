@@ -270,6 +270,9 @@
 
 ;;; setf
 
+(defmacro %mvb-internal (names form &body body)
+  `(multiple-value-bind ,names ,form ,@body))
+
 (def-emac defsetf (access-fn lambda-list &optional store-vars &body body)
   (maybe-xref-info access-fn 'setf)
   (cond
@@ -283,7 +286,7 @@
                                    (,@(mapcar (lambda (sym)
                                                 `(,sym ',sym))
                                               store-vars))
-                                 `(multiple-value-bind ,'(,@store-vars) ,,arg
+                                 `(%mvb-internal ,'(,@store-vars) ,,arg
                                     ,,@body))))))
     (t
      `(%set-symbol-prop ',access-fn :setf
@@ -297,6 +300,35 @@
                             (setq form exp)
                             (dig)))))))
     (values expander form)))
+
+(def-efun get-setf-expansion (form)
+  (cond
+    ((symbolp form)
+     (let ((vals (list (gensym "val"))))
+       (values nil nil vals `(setq ,form ,@vals) form)))
+    ((consp form)
+     (multiple-value-bind (expander form) (%get-setf-place form)
+       (let* ((temps (mapcar (lambda (subform)
+                               (gensym "temp"))
+                             (cdr form)))
+              (vals (list (gensym "new")))
+              (store-form (cond
+                            ((functionp expander)
+                             (apply expander (append temps vals)))
+                            ((symbolp expander)
+                             `(,expander ,@temps ,@vals))
+                            ((error (strcat "Unknown SETF expander " (car form)))))))
+         (when (eq '%mvb-internal (car store-form))
+           ;; hack: for multiple store vars, fetch names directly from
+           ;; the code and unwrap it from the multiple-value-bind.
+           (setq vals (cadr store-form))
+           (setq store-form `(progn ,@(cdddr store-form))))
+         (values temps
+                 (cdr form)
+                 vals
+                 store-form
+                 `(,(car form) ,@temps)))))
+    ((error (strcat "Invalid SETF place " form)))))
 
 (defun %setf (args)
   (when args
@@ -388,7 +420,18 @@
   (set-symbol-function! sym func))
 
 (def-emac push (obj place)
-  `(setf ,place (cons ,obj ,place)))
+  (cond
+    ((symbolp place)
+     `(setf ,place (cons ,obj ,place)))
+    ((multiple-value-bind (temps value-forms store-vars store-form get-form)
+                          (get-setf-expansion place)
+       (let ((item (gensym "item")))
+         `(let ((,item ,obj)
+                ,@(mapcar (lambda (var val)
+                            `(,var ,val))
+                          temps value-forms))
+            (let ((,(car store-vars) (cons ,item ,get-form)))
+              ,store-form)))))))
 
 (def-emac pop (place)
   (let ((v (gensym)))

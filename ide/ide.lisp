@@ -61,18 +61,26 @@
   (let ((ret (eval expr)))
     ret))
 
+(defun ymacs-print (ret)
+  (if (cdr ret)
+      (setf ret (cons 'ymacs-values ret))
+      (setf ret (car ret)))
+  (cond
+    ((stringp ret)
+     ret)
+    ((and (consp ret)
+          (eq 'ymacs-values (car ret)))
+     (format nil "~{~A~^~%~}" (cdr ret)))
+    ((print-object-to-string ret))))
+
 (define-handler :read-eval-print (code)
   (let* ((expr (vector-ref (read1-from-string code) 0))
-         (ret (eval expr)))
-    (if (stringp ret)
-        ret
-        (print-object-to-string ret))))
+         (ret (multiple-value-list (eval expr))))
+    (ymacs-print ret)))
 
 (define-handler :eval-print (expr)
-  (let ((ret (eval expr)))
-    (if (stringp ret)
-        ret
-        (print-object-to-string ret))))
+  (let ((ret (multiple-value-list (eval expr))))
+    (ymacs-print ret)))
 
 (define-handler :compile-file (filename)
   (let ((t1 (get-internal-run-time)))

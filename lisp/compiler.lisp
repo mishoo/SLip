@@ -1415,19 +1415,18 @@
 
 (defun %with-undefined-warnings (thunk)
   (let ((*unknown-functions* nil)
-        (*unknown-variables* nil)
-        (result nil))
-    (setq result (funcall thunk))
-    (foreach *unknown-functions*
-             (lambda (sym)
-               (unless (symbol-function sym)
-                 (warn (strcat "Unknown function: " sym)))))
-    (foreach *unknown-variables*
-             (lambda (sym)
-               (unless (or (%globalp sym)
-                           (%specialp sym))
-                 (warn (strcat "Undefined variable: " sym)))))
-    result))
+        (*unknown-variables* nil))
+    (unwind-protect
+        (funcall thunk)
+      (foreach *unknown-functions*
+               (lambda (sym)
+                 (unless (symbol-function sym)
+                   (warn (strcat "Unknown function: " sym)))))
+      (foreach *unknown-variables*
+               (lambda (sym)
+                 (unless (or (%globalp sym)
+                             (%specialp sym))
+                   (warn (strcat "Undefined variable: " sym))))))))
 
 (defmacro with-undefined-warnings body
   `(%with-undefined-warnings (lambda () ,@body)))
