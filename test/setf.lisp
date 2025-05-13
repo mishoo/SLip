@@ -38,11 +38,14 @@
 
 (setf (first-pair x) (floor 100000001 17))
 
-(defun (setf elt) (new-val list index)
+(defun (setf nth) (new-val list index)
   (setf (car (nthcdr index list)) new-val))
 
+(defun (setf nthcdr) (new-val list index)
+  (setf (cdr (nthcdr index list)) new-val))
+
 (defun tmp ()
-  (setf (elt x 2) (pop x)))
+  (setf (nth x 2) (pop x)))
 
 (format t "~A~%~%" (disassemble #'tmp))
 
@@ -54,3 +57,9 @@
 
 (setf (second (cddr x)) 2
       (third (cddr x)) 3)
+
+(defun popping ()
+  (let ((x `(a b c d e)))
+    (let ((y (list (pop (cdr x))
+                   (pop (cdr x)))))
+      (values x y))))

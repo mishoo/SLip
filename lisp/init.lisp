@@ -428,17 +428,24 @@
                           (get-setf-expansion place)
        (let ((item (gensym "item")))
          `(let ((,item ,obj)
-                ,@(mapcar (lambda (var val)
-                            `(,var ,val))
-                          temps value-forms))
+                ,@(mapcar #'list temps value-forms))
             (let ((,(car store-vars) (cons ,item ,get-form)))
               ,store-form)))))))
 
 (def-emac pop (place)
-  (let ((v (gensym)))
-    `(let ((,v ,place))
-       (setf ,place (cdr ,v))
-       (car ,v))))
+  (let ((v (gensym "place")))
+    (cond
+      ((symbolp place)
+       `(let ((,v ,place))
+          (setf ,place (cdr ,v))
+          (car ,v)))
+      ((multiple-value-bind (temps value-forms store-vars store-form get-form)
+                            (get-setf-expansion place)
+         `(let* (,@(mapcar #'list temps value-forms)
+                 (,v ,get-form)
+                 (,(car store-vars) (cdr ,v)))
+            ,store-form
+            (car ,v)))))))
 
 ;;; lists
 
