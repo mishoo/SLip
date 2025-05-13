@@ -846,8 +846,6 @@ export class LispMachine {
         this.process = null;
         this.f = null;
         this.after_cleanup = null;
-        this.values = null;
-        this.values_ptr = null;
         //this.trace = [];
     }
 
@@ -892,17 +890,11 @@ export class LispMachine {
     }
 
     pop() {
-        let val = this.stack.pop();
-        if (this.stack.sp < this.values_ptr)
-            this.values = this.values_ptr = null;
-        return val;
+        return this.stack.pop();
     }
 
     pop_frame(n) {
-        let val = this.stack.pop_frame(n);
-        if (this.stack.sp < this.values_ptr)
-            this.values = this.values_ptr = null;
-        return val;
+        return this.stack.pop_frame(n);
     }
 
     pop_number(error) {
@@ -1180,9 +1172,13 @@ let OP_RUN = [
         let noval = m.f.noval;
         // using m.stack directly, rather than m.pop, since we'd like
         // to keep multiple values around for the caller.
-        let val = m.stack.pop();
+        let retval = m.stack.pop();
+        let moreval = m.stack.values[m.stack.sp];
         m.stack.pop().run(m);
-        if (!noval) m.stack.push(val);
+        if (!noval) {
+            m.stack.push(retval);
+            m.stack.values[m.stack.sp-1] = moreval;
+        }
     },
     /*OP.CALL*/ (m) => {
         let count = m.code[m.pc++];
@@ -1407,9 +1403,13 @@ let OP_RUN = [
     /*OP.LRET2*/ (m) => {
         let noval = m.f.noval;
         let fr = m.code[m.pc++];
-        let val = m.stack.pop();
+        let retval = m.stack.pop();
+        let moreval = m.stack.values[m.stack.sp];
         frame(m.env, fr)[0].run(m);
-        if (!noval) m.stack.push(val);
+        if (!noval) {
+            m.stack.push(retval);
+            m.stack.values[m.stack.sp-1] = moreval;
+        }
     },
     /*OP.LJUMP2*/ (m) => {
         let addr = m.code[m.pc++];
@@ -1522,21 +1522,15 @@ let OP_RUN = [
             // (values) is tricky.. let's say undefined means "no
             // value", then let's wait for the bugs to pour.
             m.push(undefined);
-            m.values = [];
+            m.stack.set_values(null);
         } else {
             // the first value remains on the stack
-            m.values = m.pop_frame(nargs - 1);
+            m.stack.set_values(m.pop_frame(nargs - 1));
         }
-        // when the stack is popped below this ptr, we need to clear
-        // m.values
-        m.values_ptr = m.stack.sp;
     },
     /*OP.MVB*/ (m) => {
         let n = m.code[m.pc++];
-        let frame = m.values ?? [];
-        let arg = m.pop();
-        if (arg === undefined) frame = [];
-        else frame.unshift(arg);
+        let frame = m.stack.pop_values();
         m.env = new LispCons(frame, m.env);
         while (frame.length < n) frame.push(null);
         frame.length = n;

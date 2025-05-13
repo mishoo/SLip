@@ -5,6 +5,7 @@ export class LispStack {
         this.maxsize = maxsize;
         this.sp = 0;
         this.data = new Array(maxsize);
+        this.values = new Array(maxsize);
     }
     pop() {
         if (this.sp > 0) {
@@ -38,6 +39,7 @@ export class LispStack {
     }
     push(val) {
         if (this.sp < this.maxsize) {
+            this.values[this.sp] = null;
             this.data[this.sp++] = val;
         } else {
             throw new LispPrimitiveError("Stack overflow");
@@ -59,5 +61,19 @@ export class LispStack {
         }
         this.sp = copy.length;
         return this;
+    }
+    set_values(vals) {
+        this.values[this.sp-1] = vals;
+    }
+    pop_values() {
+        let first = this.pop();
+        if (first === undefined) {
+            return [];
+        } else {
+            let vals = this.values[this.sp] || [];
+            vals.unshift(first);
+            this.values[this.sp] = null;
+            return vals;
+        }
     }
 }

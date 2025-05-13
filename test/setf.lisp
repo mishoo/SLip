@@ -50,7 +50,7 @@
   `(car (cdr ,x)))
 
 (defmacro third (x)
-  `(car (cdr (cdr ,x))))
+  `(car (cddr ,x)))
 
-(setf (second x) 2
-      (third x) 3)
+(setf (second (cddr x)) 2
+      (third (cddr x)) 3)

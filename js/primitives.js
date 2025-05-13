@@ -276,9 +276,8 @@ defp("1-", false, function(m, nargs){
         checktype(number, LispNumber);
         checktype(divisor, LispNumber);
         let quot = func(number / divisor);
-        m.values = [ number - quot * divisor ];
         m.push(quot);
-        m.values_ptr = m.stack.sp;
+        m.stack.set_values([ number - quot * divisor ]);
         return false;
     });
 });
@@ -1573,21 +1572,16 @@ defp("funcall", true, function(m, nargs){
 defp("values", false, function(m, nargs){
     if (nargs == 0) {
         m.push(undefined);
-        m.values = [];
+        m.stack.set_values(null);
     } else {
-        m.values = m.pop_frame(nargs - 1);
+        m.stack.set_values(m.pop_frame(nargs - 1));
     }
-    m.values_ptr = m.stack.sp;
     return false;
 });
 
 defp("multiple-value-list", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    let a = m.values ?? [];
-    let arg = m.pop();
-    if (arg === undefined) return null;
-    a.unshift(arg);
-    return LispCons.fromArray(a);
+    return LispCons.fromArray(m.stack.pop_values());
 });
 
 defp("%primitivep", false, function(m, nargs){

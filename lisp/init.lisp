@@ -315,7 +315,8 @@
               (store-form (cond
                             ((functionp expander)
                              (apply expander (append temps vals)))
-                            ((symbolp expander)
+                            ((and expander
+                                  (symbolp expander))
                              `(,expander ,@temps ,@vals))
                             ((error (strcat "Unknown SETF expander " (car form)))))))
          (when (eq '%mvb-internal (car store-form))
@@ -422,7 +423,7 @@
 (def-emac push (obj place)
   (cond
     ((symbolp place)
-     `(setf ,place (cons ,obj ,place)))
+     `(setq ,place (cons ,obj ,place)))
     ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                           (get-setf-expansion place)
        (let ((item (gensym "item")))

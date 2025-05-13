@@ -62,7 +62,8 @@
     ret))
 
 (defun ymacs-print (ret)
-  (if (cdr ret)
+  (if (or (null ret)
+          (cdr ret))
       (setf ret (cons 'ymacs-values ret))
       (setf ret (car ret)))
   (cond
@@ -70,7 +71,9 @@
      ret)
     ((and (consp ret)
           (eq 'ymacs-values (car ret)))
-     (format nil "~{~A~^~%~}" (cdr ret)))
+     (if (cdr ret)
+         (format nil "~{  ~A~^~%~}" (cdr ret))
+         ";; No value"))
     ((print-object-to-string ret))))
 
 (define-handler :read-eval-print (code)
