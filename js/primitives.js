@@ -8,7 +8,6 @@ let KEYWORD_PACK = LispPackage.get("KEYWORD");
 
 var S_NIL = LispSymbol.get("NIL");
 var S_T = LispSymbol.get("T");
-var S_PROGN = LispSymbol.get("PROGN");
 var ALL_PRIMITIVES = null;
 
 var LispList = {
@@ -44,11 +43,6 @@ var LispRegexp = {
 var LispDomElement = {
     is: function(x) { return x instanceof Element },
     type: "dom-element"
-};
-
-var LispDomDocument = {
-    is: function(x) { return x instanceof Document },
-    type: "dom-document"
 };
 
 var LispNativeFunction = {
@@ -180,7 +174,7 @@ defp("equalp", false, function(m, nargs){
 function all_different(a) {
     for (var i = a.length; --i >= 0;) {
         for (var j = i; --j >= 0;) {
-            if (a[i] == a[j]) return null;
+            if (a[i] === a[j]) return null;
         }
     }
     return true;
@@ -201,6 +195,11 @@ defp("char/=", false, function(m, nargs){
 });
 
 defp("null", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return m.pop() == null ? true : null;
+});
+
+defp("not", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return m.pop() == null ? true : null;
 });
@@ -1534,17 +1533,6 @@ defp("disassemble", false, function(m, nargs){
     return LispMachine.disassemble(func.code);
 });
 
-// defp("apply", true, function(m, nargs){
-//     checknargs(nargs, 2);
-//     var args = m.pop();
-//     checktype(args, LispList);
-//     while (--nargs > 1)
-//         args = new LispCons(m.pop(), args);
-//     var func = m.pop();
-//     checktype(func, LispClosure);
-//     return m._callnext(func, args);
-// });
-
 defp("apply", true, function(m, nargs){
     checknargs(nargs, 2);
     var func = m.stack.replace(-nargs, m.mkret(m.pc));
@@ -2252,7 +2240,7 @@ defp("%utc-date", false, function(m, nargs){
  * @return {number} 32-bit positive integer hash
  */
 function murmurhash3_32_gc(key, seed) {
-    var remainder, bytes, h1, h1b, c1, c1b, c2, c2b, k1, i;
+    var remainder, bytes, h1, h1b, c1, c2, k1, i;
     remainder = key.length & 3; // key.length % 4
     bytes = key.length - remainder;
     h1 = seed;

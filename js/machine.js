@@ -416,6 +416,11 @@ var optimize = (function(){
                         code.splice(i, 1, [ "EQ" ]);
                         return true;
                     }
+                  case "NULL":
+                    if (el[2] == 1) {
+                        code.splice(i, 1, [ "NOT" ]);
+                        return true;
+                    }
                 }
             }
         }

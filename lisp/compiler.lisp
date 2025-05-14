@@ -23,7 +23,8 @@
            '*unknown-variables*
            '*compiler-env*
            '*xref-info*
-           '*let-tco*)
+           '*let-tco*
+           '*compiler-macros*)
 
 (setq *let-tco* t)
 
@@ -683,6 +684,12 @@
            (eq 'quote (car form))
            (cadr form))))
 
+(defun compiler-macro-function (name &optional (env *compiler-env*))
+  (unless (and env
+               (or (find-in-compiler-env name :func (hash-get env :lex))
+                   (find-in-compiler-env name :macro (hash-get env :macros))))
+    (getf %:*compiler-macros* name)))
+
 (labels
     ((assert (p msg)
        (if p p (error msg)))
@@ -787,7 +794,7 @@
               (if (arg-count x 2 3)
                   (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
               (or (comp-or (cdr x) env val? more?))
-              (not
+              ((not null)
                (arg-count x 1 1)
                (if val?
                    (%seq (comp (cadr x) env t t)
@@ -847,10 +854,16 @@
               (catch (comp-catch (cadr x) (cddr x) env val? more?))
               (throw (comp-throw (cadr x) (caddr x) env))
               (unwind-protect (comp-unwind-protect (cadr x) (cddr x) env val? more?))
-              (t (aif (and (symbolp (car x))
-                           (macro (car x) env))
-                      (comp-macroexpand it (cdr x) env val? more?)
-                      (comp-funcall (car x) (cdr x) env val? more?)))))))
+              (t (cond
+                   ((aif (and (symbolp (car x))
+                              (compiler-macro-function (car x)))
+                         (let ((form (funcall it x)))
+                           (unless (eq form x)
+                             (comp form env val? more?)))))
+                   ((aif (and (symbolp (car x))
+                              (macro (car x) env))
+                         (comp-macroexpand it (cdr x) env val? more?)
+                         (comp-funcall (car x) (cdr x) env val? more?)))))))))
 
      (comp-const (x val? more?)
        (when val?

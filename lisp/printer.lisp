@@ -364,7 +364,7 @@
                          (%pp-funargs binding)))))))
       (%pp-body-indent body))))
 
-(def-pretty-print (flet labels macrolet) (bindings &rest body)
+(def-pretty-print (flet labels macrolet symbol-macrolet) (bindings &rest body)
   (with-indent (%stream-col *pp-stream*)
     (with-parens
       (<< (%pp-symbol symbol) " ")

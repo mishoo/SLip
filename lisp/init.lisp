@@ -53,6 +53,7 @@
           cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
 
           get-internal-run-time
+          compiler-macro-function
 
           values multiple-value-bind multiple-value-call values-list
           multiple-value-list multiple-value-setq multiple-value-prog1
@@ -377,24 +378,11 @@
                    `(setf ,var ,set))
                  places temps))))
 
-(def-emac incf (place &optional (inc 1))
-  `(setf ,place (+ ,place ,inc)))
-
-(def-emac decf (place &optional (dec 1))
-  `(setf ,place (- ,place ,dec)))
-
 (defsetf car (x) (val)
   `(rplaca ,x ,val))
 
 (defsetf cdr (x) (val)
   `(rplacd ,x ,val))
-
-(defsetf getf (place indicator) (value)
-  (let ((vval (gensym)))
-    `(let (,vval)
-       (setf ,place (%:%putf ,place ,indicator
-                             (setq ,vval ,value)))
-       ,vval)))
 
 (defmacro defun (name args . body)
   (cond
@@ -446,6 +434,103 @@
                  (,(car store-vars) (cdr ,v)))
             ,store-form
             (car ,v)))))))
+
+(defsetf getf (place indicator) (value)
+  (let ((vval (gensym)))
+    (cond
+      ((symbolp place)
+       `(let (,vval)
+          (setf ,place (%:%putf ,place ,indicator (setq ,vval ,value)))
+          ,vval))
+      ((multiple-value-bind (temps value-forms store-vars store-form get-form)
+                            (get-setf-expansion place)
+         `(let* (,vval
+                 ,@(mapcar #'list temps value-forms)
+                 (,(car store-vars) (%:%putf ,get-form ,indicator (setq ,vval ,value))))
+            ,store-form
+            ,vval))))))
+
+(defun (setf compiler-macro-function) (handler name)
+  (setf (getf %:*compiler-macros* name) handler))
+
+(def-emac define-compiler-macro (name args &body body)
+  (%:maybe-xref-info name 'compiler-macro)
+  (let ((form (if (eq '&whole (car args))
+                  (prog1
+                      (cadr args)
+                    (setq args (cddr args)))
+                  (gensym "form"))))
+    `(flet ((,name (,form)
+              (destructuring-bind ,args (if (eq 'funcall (car ,form))
+                                            (cddr ,form)
+                                            (cdr ,form))
+                ,@body)))
+       (setf (compiler-macro-function ',name) #',name))))
+
+(labels
+    ((reduce-form (form)
+       (aif (and (consp form)
+                 (compiler-macro-function (car form)))
+            (funcall it form)
+            form))
+     (reduce-sum (nums)
+       (let ((reduced 0))
+         (let rec ((nums nums)
+                   (ret)
+                   (sum 0))
+           (cond
+             ((null nums)
+              (cond
+                ((when (= 1 (length ret))
+                   (cond
+                     ((zerop sum) (car ret))
+                     ((= sum 1) `(1+ ,@ret))
+                     ((= sum -1) `(1- ,@ret)))))
+                ((> reduced 1)
+                 `(+ ,sum ,@(nreverse ret)))))
+             ((numberp (car nums))
+              (%:%incf reduced)
+              (rec (cdr nums) ret (+ sum (car nums))))
+             ((rec (cdr nums) (cons (car nums) ret) sum))))))
+     (reduce-sub (nums)
+       (cond
+         ((and (null (cdr nums))
+               (numberp (car nums)))
+          (- (car nums)))
+         ((and (null (cddr nums))
+               (numberp (car nums))
+               (numberp (cadr nums)))
+          (- (car nums) (cadr nums)))
+         ((let ((reduced 0))
+            (let rec ((nums (cdr nums))
+                      (ret (list (car nums)))
+                      (sum 0))
+              (cond
+                ((null nums)
+                 (when (> reduced 1)
+                   `(- ,@(nreverse ret) ,sum)))
+                ((numberp (car nums))
+                 (%:%incf reduced)
+                 (rec (cdr nums) ret (+ sum (car nums))))
+                ((rec (cdr nums) (cons (car nums) ret) sum)))))))))
+  (define-compiler-macro + (&whole form &rest nums)
+    (or (reduce-sum (mapcar #'reduce-form nums)) form))
+  (define-compiler-macro - (&whole form &rest nums)
+    (or (reduce-sub (mapcar #'reduce-form nums)) form)))
+
+(def-emac incf (place &optional (inc 1))
+  (symbol-macrolet ((increment `(+ ,place ,inc)))
+    (cond
+      ((symbolp place)
+       `(setq ,place ,increment))
+      ((multiple-value-bind (temps value-forms store-vars store-form place)
+                            (get-setf-expansion place)
+         `(let* (,@(mapcar #'list temps value-forms)
+                 (,(car store-vars) ,increment))
+            ,store-form))))))
+
+(def-emac decf (place &optional (dec 1))
+  `(incf ,place (- ,dec)))
 
 ;;; lists
 

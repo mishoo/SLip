@@ -1,6 +1,11 @@
 (in-package :sl)
 
-(export '(format))
+(export '(format time))
+
+(defpackage :sl-format
+  (:use :sl :%))
+
+(in-package :sl-format)
 
 (defglobal *format-handlers* (make-hash))
 
@@ -357,7 +362,7 @@
            (doit *standard-output*))
           (t (doit stream)))))
 
-(def-emac time body
+(defmacro time body
   (let ((t1 (gensym)))
     `(let ((,t1 (get-internal-run-time)))
        (prog1 (progn ,@body)

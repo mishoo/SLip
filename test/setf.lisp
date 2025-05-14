@@ -9,7 +9,8 @@
 
 (defun sm1 ()
   (let ((y 10))
-    (symbol-macrolet ((x (list foo 'bar y)))
+    (symbol-macrolet ((x (list foo 'bar y))
+                      (moo man))
       (let ((foo 5))
         (format t "~A~%" x)))))
 
