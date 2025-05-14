@@ -73,7 +73,7 @@
           (eq 'ymacs-values (car ret)))
      (if (cdr ret)
          (format nil "~{  ~A~^~%~}" (cdr ret))
-         ";; No value"))
+         "; No value"))
     ((print-object-to-string ret))))
 
 (define-handler :read-eval-print (code)

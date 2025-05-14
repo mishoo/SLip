@@ -7,7 +7,9 @@
 
 (in-package :sl-format)
 
-(defglobal *format-handlers* (make-hash))
+(import 'sl::defun-memoize)
+
+(defparameter *format-handlers* (make-hash))
 
 (defparameter *format-current-args* nil)
 
@@ -64,7 +66,7 @@
                     (croak (strcat "Expecting " ch)))))
          ,@body))))
 
-(defun %parse-format (str)
+(defun-memoize %parse-format (str)
   (with-input str
     (labels
         ((read-sublist (end)

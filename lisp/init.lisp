@@ -4,12 +4,6 @@
 (in-package :%)
 " ;; hack for Ymacs
 
-;; XXX: for some reason setting this badly affects the compiler, so
-;; LET expressions in the compiler won't have proper tail calls. It's
-;; still good that we can set it here, but I Just Don't Understand why
-;; the compiler breaks with it!! :-/
-(setq %:*let-tco* t)
-
 (let ((main (make-package "SL"))
       (boot (find-package "%"))
       (user (make-package "SL-USER"))
@@ -217,10 +211,10 @@
     ((and (eq 'progn (car form))
           (null (cdr form)))
      nil)
-    (t (aif (or (%:find-macrolet-in-compiler-env (car form))
-                (%macro (car form)))
-            (apply it (cdr form))
-            form))))
+    ((aif (or (%:find-macrolet-in-compiler-env (car form))
+              (%macro (car form)))
+          (apply it (cdr form))
+          form))))
 
 (def-efun macroexpand (form)
   (let ((result (macroexpand-1 form)))
@@ -275,7 +269,7 @@
   `(multiple-value-bind ,names ,form ,@body))
 
 (def-emac defsetf (access-fn lambda-list &optional store-vars &body body)
-  (maybe-xref-info access-fn 'setf)
+  (maybe-xref-info access-fn 'defsetf)
   (cond
     ((symbolp lambda-list)
      `(%set-symbol-prop ',access-fn :setf ',lambda-list))
@@ -481,6 +475,8 @@
            (cond
              ((null nums)
               (cond
+                ((null ret)
+                 sum)
                 ((when (= 1 (length ret))
                    (cond
                      ((zerop sum) (car ret))
@@ -766,6 +762,13 @@
          `((%stream-put ,var ,string)))
      ,@body
      (%stream-get ,var)))
+
+(defmacro defun-memoize (name args &body body)
+  (let ((memo (gensym "memo")))
+    `(let ((,memo (make-hash)))
+       (defun ,name ,args
+         (or (hash-get ,memo ,(car args))
+             (hash-add ,memo ,(car args) (progn ,@body)))))))
 
 (export '(*standard-output*
           *error-output*
