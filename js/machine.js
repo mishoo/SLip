@@ -314,6 +314,14 @@ var optimize = (function(){
             }
             return false;
         }
+        if (i+2 < code.length && (code[i][0] == "TJUMPK" || code[i][0] == "FJUMPK")
+            && code[i+1][0] == "NIL"
+            && code[i+2] === code[i][1])
+        {
+            // [[TF]JUMPK L1] [NIL] L1 -> (nothing)
+            code.splice(i, 2);
+            return true;
+        }
         if (i+2 < code.length && code[i][0] == "TJUMP" && code[i+1][0] == "JUMP" && code[i+2] === code[i][1]) {
             // [TJUMP L1] [JUMP L2] L1 -> [FJUMP L2] L1
             code.splice(i, 2, [ "FJUMP", code[i+1][1] ]);
