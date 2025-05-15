@@ -180,6 +180,16 @@
                  ret)))
     (nreverse (rec lst nil))))
 
+(defun map2 (func lst1 lst2)
+  (labels ((rec (lst1 lst2 ret)
+             (if (and lst1 lst2)
+                 (rec (cdr lst1)
+                      (cdr lst2)
+                      (cons (funcall func (car lst1) (car lst2))
+                            ret))
+                 ret)))
+    (nreverse (rec lst1 lst2 nil))))
+
 (defun foreach (lst func)
   (when lst
     (funcall func (car lst))
@@ -234,17 +244,6 @@
                                   (progn ,@(cdar cases))
                                   ,(recur (cdr cases))))))))
           (recur cases)))))
-
-(labels ((finished (tails)
-           (when tails
-             (if (car tails) (finished (cdr tails)) t))))
-  (defun mapcar (f . lists)
-    (labels ((looop (ret tails)
-               (if (finished tails)
-                   (nreverse ret)
-                   (looop (cons (apply f (map1 #'car tails)) ret)
-                          (map1 #'cdr tails)))))
-      (looop nil lists))))
 
 (defmacro aif (cond . rest)
   `(let ((it ,cond))
@@ -1205,9 +1204,9 @@
                         (setq env (extenv env :lex (map1 (lambda (name) (list name :func)) names)))
                         (<< (gen "FRAME"))))
                  (when labels? (extenv))
-                 (mapcar (lambda (name func)
-                           (<< (with-env (comp-lambda name (car func) (cdr func) env))))
-                         names funcs)
+                 (map2 (lambda (name func)
+                         (<< (with-env (comp-lambda name (car func) (cdr func) env))))
+                       names funcs)
                  (unless labels? (extenv))
                  (<< (if (> len 1) (gen "VARS" len) (gen "VAR")))
                  (with-env
@@ -1326,19 +1325,19 @@
                     (specials (cadddr bindings))
                     (i 0)
                     (newargs '()))
-               (mapcar (lambda (name x)
-                         (<< (with-env (comp x env t t))
-                             (unless newargs (gen "FRAME"))
-                             (gen "VAR")
-                             (when (%specialp name)
-                               (gen "BIND" name i)))
-                         (%incf i)
-                         (let ((cell (list (list name :var))))
-                           (if newargs
-                               (rplacd newargs cell)
-                               (setq env (extenv env :lex cell)))
-                           (setq newargs cell)))
-                       names vals)
+               (map2 (lambda (name x)
+                       (<< (with-env (comp x env t t))
+                           (unless newargs (gen "FRAME"))
+                           (gen "VAR")
+                           (when (%specialp name)
+                             (gen "BIND" name i)))
+                       (%incf i)
+                       (let ((cell (list (list name :var))))
+                         (if newargs
+                             (rplacd newargs cell)
+                             (setq env (extenv env :lex cell)))
+                         (setq newargs cell)))
+                     names vals)
                (with-env
                  (cond
                    (more?

@@ -263,6 +263,17 @@
   `(progn (%global! ',name)
           (setq ,name ,val)))
 
+(labels ((finished (tails)
+           (when tails
+             (if (car tails) (finished (cdr tails)) t))))
+  (defun mapcar (f . lists)
+    (labels ((looop (ret tails)
+               (if (finished tails)
+                   (nreverse ret)
+                   (looop (cons (apply f (map1 #'car tails)) ret)
+                          (map1 #'cdr tails)))))
+      (looop nil lists))))
+
 ;;; setf
 
 (defmacro %mvb-internal (names form &body body)
@@ -278,9 +289,9 @@
        `(%set-symbol-prop ',access-fn :setf
                           (%fn ,access-fn (,@lambda-list ,arg)
                                (symbol-macrolet
-                                   (,@(mapcar (lambda (sym)
-                                                `(,sym ',sym))
-                                              store-vars))
+                                   (,@(map1 (lambda (sym)
+                                              `(,sym ',sym))
+                                            store-vars))
                                  `(%mvb-internal ,'(,@store-vars) ,,arg
                                     ,,@body))))))
     (t
@@ -303,9 +314,9 @@
        (values nil nil vals `(setq ,form ,@vals) form)))
     ((consp form)
      (multiple-value-bind (expander form) (%get-setf-place form)
-       (let* ((temps (mapcar (lambda (subform)
-                               (gensym "temp"))
-                             (cdr form)))
+       (let* ((temps (map1 (lambda (subform)
+                             (gensym "temp"))
+                           (cdr form)))
               (vals (list (gensym "new")))
               (store-form (cond
                             ((functionp expander)
@@ -367,10 +378,10 @@
     (setf temps (nreverse temps)
           places (nreverse places)
           values (nreverse values))
-    `(let ,(mapcar #'list temps values)
-       ,@(mapcar (lambda (var set)
-                   `(setf ,var ,set))
-                 places temps))))
+    `(let ,(map2 #'list temps values)
+       ,@(map2 (lambda (var set)
+                 `(setf ,var ,set))
+               places temps))))
 
 (defsetf car (x) (val)
   `(rplaca ,x ,val))
@@ -410,7 +421,7 @@
                           (get-setf-expansion place)
        (let ((item (gensym "item")))
          `(let ((,item ,obj)
-                ,@(mapcar #'list temps value-forms))
+                ,@(map2 #'list temps value-forms))
             (let ((,(car store-vars) (cons ,item ,get-form)))
               ,store-form)))))))
 
@@ -423,7 +434,7 @@
           (car ,v)))
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                             (get-setf-expansion place)
-         `(let* (,@(mapcar #'list temps value-forms)
+         `(let* (,@(map2 #'list temps value-forms)
                  (,v ,get-form)
                  (,(car store-vars) (cdr ,v)))
             ,store-form
@@ -439,7 +450,7 @@
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                             (get-setf-expansion place)
          `(let* (,vval
-                 ,@(mapcar #'list temps value-forms)
+                 ,@(map2 #'list temps value-forms)
                  (,(car store-vars) (%:%putf ,get-form ,indicator (setq ,vval ,value))))
             ,store-form
             ,vval))))))
@@ -460,6 +471,16 @@
                                             (cdr ,form))
                 ,@body)))
        (setf (compiler-macro-function ',name) #',name))))
+
+(define-compiler-macro mapcar (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPCAR"))
+    ((null (cdr lists))
+     `(map1 ,func ,@lists))
+    ((null (cddr lists))
+     `(map2 ,func ,@lists))
+    (form)))
 
 (labels
     ((reduce-form (form)
