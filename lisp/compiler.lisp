@@ -1230,11 +1230,11 @@
        (with-env (comp-seq body env val? more?)))
 
      (comp-symbol-macrolet (bindings body env val? more?)
-       (let ((ext (mapcar (lambda (el)
-                            (let ((name (car el))
-                                  (expansion (cadr el)))
-                              (list name :var :smac expansion)))
-                          bindings)))
+       (let ((ext (map (lambda (el)
+                         (let ((name (car el))
+                               (expansion (cadr el)))
+                           (list name :var :smac expansion)))
+                       bindings)))
          (with-extenv (:lex ext)
            (comp-seq body env val? more?))))
 
