@@ -174,26 +174,26 @@
   `(if ,pred nil (progn ,@body)))
 
 (defun map1 (func lst)
-  (labels ((rec (lst ret)
-             (if lst
-                 (rec (cdr lst) (cons (funcall func (car lst)) ret))
-                 ret)))
-    (nreverse (rec lst nil))))
+  (let rec ((lst lst)
+            (ret nil))
+    (if lst
+        (rec (cdr lst) (cons (funcall func (car lst)) ret))
+        (nreverse ret))))
 
 (defun map2 (func lst1 lst2)
-  (labels ((rec (lst1 lst2 ret)
-             (if (and lst1 lst2)
-                 (rec (cdr lst1)
-                      (cdr lst2)
-                      (cons (funcall func (car lst1) (car lst2))
-                            ret))
-                 ret)))
-    (nreverse (rec lst1 lst2 nil))))
+  (let rec ((lst1 lst1)
+            (lst2 lst2)
+            (ret nil))
+    (if (and lst1 lst2)
+        (rec (cdr lst1) (cdr lst2)
+             (cons (funcall func (car lst1) (car lst2)) ret))
+        (nreverse ret))))
 
 (defun foreach (lst func)
-  (when lst
-    (funcall func (car lst))
-    (foreach (cdr lst) func)))
+  (let rec ((lst lst))
+    (when lst
+      (funcall func (car lst))
+      (rec (cdr lst)))))
 
 (defmacro prog1 (exp . body)
   (let ((ret (gensym)))
@@ -631,9 +631,9 @@
                      ;; anyway.
                      (let* ((first (caar env))
                             (type (cadr first))
-                            (smac (caddr first)))
+                            (arg (caddr first)))
                        (when (and (eq type :var)
-                                  (eq smac :smac))
+                                  (eq arg :smac))
                          (%decf i)))
                      (frame (cdr env) (1+ i)))))))
     (frame env 0)))
@@ -679,7 +679,7 @@
       (regexpp form)
       (charp form)
       (vectorp form)
-      (and (listp form)
+      (and (consp form)
            (eq 'quote (car form))
            (cadr form))))
 
