@@ -132,7 +132,7 @@
                       class
                       (length *the-slots-of-a-class*)))
                 (dsupers (getf initargs 'direct-supers '()))
-                (dslots (map #'list (getf initargs 'direct-slots '())))
+                (dslots (map1 #'list (getf initargs 'direct-slots '())))
                 (cpl (labels ((rec (sups so-far)
                                 (if (not sups)
                                     (nreverse so-far)
@@ -141,7 +141,7 @@
                        (rec dsupers (list new))))
                 (slots (apply #'append
                               (cons dslots
-                                    (map #'class-direct-slots (cdr cpl)))))
+                                    (map1 #'class-direct-slots (cdr cpl)))))
                 (nfields 0)
                 (field-initializers '())
                 (allocator (lambda (init)
@@ -151,9 +151,9 @@
                                      (cons init field-initializers))
                                (list (lambda (o) (%instance-ref o f))
                                      (lambda (o n) (%instance-set o f n))))))
-                (getters-n-setters (map (lambda (s)
-                                          (cons (car s) (funcall allocator (lambda ()))))
-                                        slots)))
+                (getters-n-setters (map1 (lambda (s)
+                                           (cons (car s) (funcall allocator (lambda ()))))
+                                         slots)))
 
            (slot-set new 'name (getf initargs 'name))
            (slot-set new 'direct-supers dsupers)
@@ -245,13 +245,13 @@
 
 (slot-set <class> 'name 'class)
 (slot-set <class> 'direct-supers (list <object>))
-(slot-set <class> 'direct-slots (map #'list *the-slots-of-a-class*))
+(slot-set <class> 'direct-slots (map1 #'list *the-slots-of-a-class*))
 (slot-set <class> 'cpl (list <class> <object> <top>))
-(slot-set <class> 'slots (map #'list *the-slots-of-a-class*))
+(slot-set <class> 'slots (map1 #'list *the-slots-of-a-class*))
 (slot-set <class> 'nfields (length *the-slots-of-a-class*))
-(slot-set <class> 'field-initializers (map (lambda (s)
-                                             (lambda ()))
-                                           *the-slots-of-a-class*))
+(slot-set <class> 'field-initializers (map1 (lambda (s)
+                                              (lambda ()))
+                                            *the-slots-of-a-class*))
 (slot-set <class> 'getters-n-setters '())
 
 (defglobal <procedure-class> (make <class>
@@ -448,9 +448,9 @@
                 (slot-set class 'direct-supers
                           (getf initargs 'direct-supers '()))
                 (slot-set class 'direct-slots
-                          (map (lambda (s)
-                                 (if (consp s) s (list s)))
-                               (getf initargs 'direct-slots '())))
+                          (map1 (lambda (s)
+                                  (if (consp s) s (list s)))
+                                (getf initargs 'direct-slots '())))
                 (slot-set class 'cpl (compute-cpl class))
                 (slot-set class 'slots (compute-slots class))
                 (slot-set class 'name (getf initargs 'name))
@@ -464,10 +464,10 @@
                             (list (lambda (o) (%instance-ref o f))
                                   (lambda (o n) (%instance-set o f n))))))
                        (getters-n-setters
-                        (map (lambda (slot)
-                               (cons (car slot)
-                                     (compute-getter-and-setter class slot allocator)))
-                             (slot-ref class 'slots))))
+                        (map1 (lambda (slot)
+                                (cons (car slot)
+                                      (compute-getter-and-setter class slot allocator)))
+                              (slot-ref class 'slots))))
                   (slot-set class 'nfields nfields)
                   (slot-set class 'field-initializers field-initializers)
                   (slot-set class 'getters-n-setters getters-n-setters)))))
@@ -537,10 +537,10 @@
                                                          t))
                                                    (cdr to-process))))
                                  (collect remaining-to-process
-                                          (cons (append current (apply #'append (map #'cdr others)))
+                                          (cons (append current (apply #'append (map1 #'cdr others)))
                                                 result))))))
-                  (collect (apply #'append (map #'class-direct-slots
-                                                (class-cpl class)))
+                  (collect (apply #'append (map1 #'class-direct-slots
+                                                 (class-cpl class)))
                            '())))))
 
 (add-method

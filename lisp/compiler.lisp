@@ -173,7 +173,7 @@
 (defmacro unless (pred . body)
   `(if ,pred nil (progn ,@body)))
 
-(defun map (func lst)
+(defun map1 (func lst)
   (labels ((rec (lst ret)
              (if lst
                  (rec (cdr lst) (cons (funcall func (car lst)) ret))
@@ -242,8 +242,8 @@
     (labels ((looop (ret tails)
                (if (finished tails)
                    (nreverse ret)
-                   (looop (cons (apply f (map #'car tails)) ret)
-                          (map #'cdr tails)))))
+                   (looop (cons (apply f (map1 #'car tails)) ret)
+                          (map1 #'cdr tails)))))
       (looop nil lists))))
 
 (defmacro aif (cond . rest)
@@ -1132,7 +1132,7 @@
                         (length required)
                         (length optional)
                         (if rest 1 0)
-                        (as-vector (map #'caar key))
+                        (as-vector (map1 #'caar key))
                         allow-other-keys))
                (foreach required #'newarg)
                (foreach optional
@@ -1169,7 +1169,7 @@
                                              (%incf i)))
                              (%seq dyn
                                    (if args
-                                       (with-extenv (:lex (map (lambda (name) (list name :var)) args))
+                                       (with-extenv (:lex (map1 (lambda (name) (list name :var)) args))
                                          (comp-block name body env t nil))
                                        (comp-block name body env t nil))))))))
               (if (eq code '$xargs)
@@ -1202,7 +1202,7 @@
                     (funcs (cadr bindings))
                     (len (caddr bindings)))
                (flet ((extenv ()
-                        (setq env (extenv env :lex (map (lambda (name) (list name :func)) names)))
+                        (setq env (extenv env :lex (map1 (lambda (name) (list name :func)) names)))
                         (<< (gen "FRAME"))))
                  (when labels? (extenv))
                  (mapcar (lambda (name func)
@@ -1224,17 +1224,17 @@
 
      (comp-macrolet (bindings body env val? more?)
        (when bindings
-         (setq env (extenv env :macros (map (lambda (def)
-                                              (list (car def) :macro (compile (list* '%fn def))))
-                                            bindings))))
+         (setq env (extenv env :macros (map1 (lambda (def)
+                                               (list (car def) :macro (compile (list* '%fn def))))
+                                             bindings))))
        (with-env (comp-seq body env val? more?)))
 
      (comp-symbol-macrolet (bindings body env val? more?)
-       (let ((ext (map (lambda (el)
-                         (let ((name (car el))
-                               (expansion (cadr el)))
-                           (list name :var :smac expansion)))
-                       bindings)))
+       (let ((ext (map1 (lambda (el)
+                          (let ((name (car el))
+                                (expansion (cadr el)))
+                            (list name :var :smac expansion)))
+                        bindings)))
          (with-extenv (:lex ext)
            (comp-seq body env val? more?))))
 
@@ -1257,7 +1257,7 @@
                     (setq specials (1+ specials))
                     (<< (gen "BIND" (car names) index)))
                   (rec (cdr names) (1+ index))))
-              (with-extenv (:lex (map (lambda (name) (list name :var)) names))
+              (with-extenv (:lex (map1 (lambda (name) (list name :var)) names))
                 (cond
                   (more?
                    (<< (comp-seq body env val? t)
@@ -1285,14 +1285,14 @@
                (let* ((looop bindings)
                       (bindings (car body))
                       (body (cdr body))
-                      (names (map (lambda (x)
-                                    (if (consp x) (car x) x))
-                                  bindings)))
+                      (names (map1 (lambda (x)
+                                     (if (consp x) (car x) x))
+                                   bindings)))
                  (comp `(labels ((,looop ,names
                                    ,@body))
-                          (,looop ,@(map (lambda (x)
-                                           (if (consp x) (cadr x)))
-                                         bindings)))
+                          (,looop ,@(map1 (lambda (x)
+                                            (if (consp x) (cadr x)))
+                                          bindings)))
                        env val? more?))
                (with-seq-output <<
                  (let* ((bindings (get-bindings bindings t))
@@ -1305,7 +1305,7 @@
                    (<< (gen "LET" len))
                    (foreach specials (lambda (x)
                                        (<< (gen "BIND" (car x) (cdr x)))))
-                   (with-extenv (:lex (map (lambda (name) (list name :var)) names))
+                   (with-extenv (:lex (map1 (lambda (name) (list name :var)) names))
                      (cond
                        (more?
                         (<< (comp-seq body env val? t)

@@ -234,18 +234,18 @@
                  (:use
                   (setq use (append use (cdr opt)))))))
     `(let ((,pak (make-package ',name ',use ',nicknames)))
-       ,@(map (lambda (opt)
-                (case (car opt)
-                  (:export
-                   `(%export (list ,@(cdr opt)) ,pak))
-                  (:import-from
-                   (destructuring-bind (source &rest names) (cdr opt)
-                     (setq source (find-package source))
-                     `(%import ',(map (lambda (name)
-                                        (find-symbol name source))
-                                      names)
-                               ,pak)))))
-              options)
+       ,@(map1 (lambda (opt)
+                 (case (car opt)
+                   (:export
+                    `(%export (list ,@(cdr opt)) ,pak))
+                   (:import-from
+                    (destructuring-bind (source &rest names) (cdr opt)
+                      (setq source (find-package source))
+                      `(%import ',(map1 (lambda (name)
+                                          (find-symbol name source))
+                                        names)
+                                ,pak)))))
+               options)
        ,pak)))
 
 (def-emac in-package (name)
@@ -542,8 +542,8 @@
   (def-efun every (test . lists)
     (let scan ((tails lists))
       (if (finished tails) t
-          (and (apply test (map #'car tails))
-               (scan (map #'cdr tails))))))
+          (and (apply test (map1 #'car tails))
+               (scan (map1 #'cdr tails))))))
 
   ;; some returns the first non-nil value which is returned by an
   ;; invocation of predicate. If the end of a sequence is reached
@@ -553,8 +553,8 @@
   (def-efun some (test . lists)
     (let scan ((tails lists))
       (if (finished tails) nil
-          (or (apply test (map #'car tails))
-              (scan (map #'cdr tails))))))
+          (or (apply test (map1 #'car tails))
+              (scan (map1 #'cdr tails))))))
 
   ;; notany returns false as soon as any invocation of predicate
   ;; returns true. If the end of a sequence is reached, notany returns
@@ -563,9 +563,9 @@
   (def-efun notany (test . lists)
     (let scan ((tails lists))
       (if (finished tails) t
-          (if (apply test (map #'car tails))
+          (if (apply test (map1 #'car tails))
               nil
-              (scan (map #'cdr tails))))))
+              (scan (map1 #'cdr tails))))))
 
   ;; notevery returns true as soon as any invocation of predicate
   ;; returns false. If the end of a sequence is reached, notevery
@@ -574,8 +574,8 @@
   (def-efun notevery (test . lists)
     (let scan ((tails lists))
       (if (finished tails) nil
-          (if (apply test (map #'car tails))
-              (scan (map #'cdr tails))
+          (if (apply test (map1 #'car tails))
+              (scan (map1 #'cdr tails))
               t)))))
 
 (def-efun remove-duplicates (list &key (test #'eql) from-end)

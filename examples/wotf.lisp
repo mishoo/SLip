@@ -16,11 +16,11 @@
   (if alternatives
       `(let ((+prev-amb-fail *amb-fail*))
          (with-cc +sk
-           ,@(map (lambda (alt)
-                    `(with-cc +fk
-                       (setq *amb-fail* +fk)
-                       (funcall +sk ,alt)))
-                  alternatives)
+           ,@(map1 (lambda (alt)
+                     `(with-cc +fk
+                        (setq *amb-fail* +fk)
+                        (funcall +sk ,alt)))
+                   alternatives)
            (setq *amb-fail* +prev-amb-fail)
            (funcall +prev-amb-fail nil)))
       `(funcall *amb-fail* nil)))

@@ -16,7 +16,7 @@
 (defun macroexpand-all (form)
   (if (consp form)
       (let ((form (macroexpand form)))
-        (map macroexpand-all form))
+        (map1 macroexpand-all form))
       form))
 
 (progn
@@ -47,7 +47,7 @@
          (push ,sym ,place)))))
 
 (defmacro flet (defs . body)
-  `(let ,(map (lambda (x)
+  `(let ,(map1 (lambda (x)
                 `(,(car x) (%set-function-name
                             (lambda ,(cadr x) ,@(cddr x))
                             ',(car x)))) defs)
