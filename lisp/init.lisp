@@ -526,20 +526,20 @@
              (reduce-sub (mapcar #'reduce-form nums)))
         form)))
 
-(labels ((make-incrementer (place delta inc)
-           (symbol-macrolet ((increment `(,inc ,place ,delta)))
+(labels ((make-dementor (place delta inc)
+           (symbol-macrolet ((dement `(,inc ,place ,delta)))
              (cond
                ((symbolp place)
-                `(setq ,place ,increment))
+                `(setq ,place ,dement))
                ((multiple-value-bind (temps value-forms store-vars store-form place)
                                      (get-setf-expansion place)
                   `(let* (,@(mapcar #'list temps value-forms)
-                          (,(car store-vars) ,increment))
+                          (,(car store-vars) ,dement))
                      ,store-form)))))))
   (def-emac incf (place &optional (add 1))
-    (make-incrementer place add '+))
+    (make-dementor place add '+))
   (def-emac decf (place &optional (sub 1))
-    (make-incrementer place sub '-)))
+    (make-dementor place sub '-)))
 
 ;;; lists
 
