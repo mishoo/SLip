@@ -367,5 +367,5 @@
 (defmacro time body
   (let ((t1 (gensym)))
     `(let ((,t1 (get-internal-run-time)))
-       (prog1 (progn ,@body)
+       (multiple-value-prog1 (progn ,@body)
          (format t "Evaluation time: ~Ams~%" (- (get-internal-run-time) ,t1))))))
