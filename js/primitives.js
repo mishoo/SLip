@@ -117,8 +117,8 @@ function as_list(thing) {
 /* -----[ conditionals ]----- */
 
 function eq(a, b) {
-    return (a === S_NIL && b == null)
-        || (a == null && b === S_NIL)
+    return (a === S_NIL && b === null)
+        || (a === null && b === S_NIL)
         || (a === S_T && b === true)
         || (a === true && b === S_T)
         || a === b ? true : null;
@@ -126,7 +126,7 @@ function eq(a, b) {
 
 function equal(a, b) {
     if (LispList.is(a) && LispList.is(b)) {
-        while (a != null && b != null) {
+        while (a !== null && b !== null) {
             if (!equal(a.car, b.car)) return null;
             a = a.cdr;
             b = b.cdr;
@@ -196,12 +196,12 @@ defp("char/=", false, function(m, nargs){
 
 defp("null", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return m.pop() == null ? true : null;
+    return m.pop() === null ? true : null;
 });
 
 defp("not", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return m.pop() == null ? true : null;
+    return m.pop() === null ? true : null;
 });
 
 /* -----[ arithmetic ]----- */
@@ -384,7 +384,7 @@ defp("nthcdr", false, function(m, nargs){
     var list = m.pop(), n = m.pop();
     checktype(n, LispInteger);
     var p = list;
-    while (p != null && n-- > 0) {
+    while (p !== null && n-- > 0) {
         checktype(p, LispList);
         p = p.cdr;
     }
@@ -431,7 +431,7 @@ defp("%memq", false, function(m, nargs){
 defp("%assq", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var list = m.pop(), item = m.pop();
-    while (list != null) {
+    while (list !== null) {
         checktype(list, LispList);
         checktype(list.car, LispCons);
         if (eq(list.car.car, item)) return list.car;
@@ -444,7 +444,7 @@ defp("getf", false, function(m, nargs){
     checknargs(nargs, 2, 3);
     var not_found = nargs == 3 ? m.pop() : null;
     var item = m.pop(), list = m.pop();
-    while (list != null) {
+    while (list !== null) {
         checktype(list, LispList);
         if (!list.cdr) error("Malformed plist");
         if (eq(list.car, item))
@@ -458,7 +458,7 @@ defp("%putf", true, function(m, nargs){
     checknargs(nargs, 3, 3);
     var value = m.pop(), item = m.pop(), list = m.pop();
     var p = list;
-    while (p != null) {
+    while (p !== null) {
         checktype(p, LispList);
         if (!p.cdr) error("Malformed plist");
         if (eq(p.car, item)) break;
@@ -647,9 +647,9 @@ defp("vector-subseq", false, function(m, nargs){
     var start = nargs >= 2 ? m.pop() : null;
     var vector = m.pop();
     checktype(vector, LispArray);
-    if (start != null) checktype(start, LispNumber);
+    if (start !== null) checktype(start, LispNumber);
     else start = 0;
-    if (end != null) checktype(end, LispNumber);
+    if (end !== null) checktype(end, LispNumber);
     else end = vector.length;
     return vector.slice(start, end);
 });
@@ -674,7 +674,7 @@ function seq(m, nargs) {
     var ret = [];
     while (nargs-- > 0) {
         var x = m.pop();
-        if (x != null) {
+        if (x !== null) {
             if (LispCons.is(x)) {
                 ret.unshift.apply(ret, LispCons.toArray(x));
             }
@@ -697,7 +697,7 @@ defp("%seq-cat", true, function(m, nargs){
     checktype(list, LispList);
     checktype(seq, LispArray);
     LispCons.forEach(list, function(x){
-        if (x != null) {
+        if (x !== null) {
             if (LispCons.is(x)) {
                 seq.push.apply(seq, LispCons.toArray(x));
             }
@@ -744,7 +744,7 @@ defp("substr", false, function(m, nargs){
     var from = m.pop(), str = m.pop();
     checktype(from, LispNumber);
     checktype(str, LispString);
-    return from < str.length ? len != null ? str.substr(from, len) : str.substr(from) : null;
+    return from < str.length ? len !== null ? str.substr(from, len) : str.substr(from) : null;
 });
 
 defp("downcase", false, function(m, nargs){
@@ -979,7 +979,7 @@ defp("packagep", false, function(m, nargs){
 defp("keywordp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop();
-    return x != null && x !== true && LispSymbol.is(x) && x.pak === KEYWORD_PACK ? true : null;
+    return x !== null && x !== true && LispSymbol.is(x) && x.pak === KEYWORD_PACK ? true : null;
 });
 
 defp("threadp", false, function(m, nargs){
@@ -1063,14 +1063,14 @@ defp("%pad-string", false, function(m, nargs){
     checktype(inc, LispNumber);
     checktype(min, LispNumber);
     if (min > 0) {
-        if (left != null) {
+        if (left !== null) {
             str = repeat_string(chr, min) + str;
         } else {
             str = str + repeat_string(chr, min);
         }
     }
     if (inc != 1) chr = repeat_string(chr, inc);
-    if (left != null) {
+    if (left !== null) {
         while (str.length < width) str = chr + str;
     } else {
         while (str.length < width) str = str + chr;
@@ -1261,7 +1261,7 @@ defp("%stream-get", false, function(m, nargs){
 defp("%get-file-contents", false, function(m, nargs){
     checknargs(nargs, 1, 2);
     var cont = nargs == 2 ? m.pop() : null;
-    if (cont != null) checktype(cont, LispClosure);
+    if (cont !== null) checktype(cont, LispClosure);
     var url = m.pop();
     checktype(url, LispString);
 
@@ -1522,7 +1522,7 @@ defp("%macro", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var symbol = m.pop();
     checktype(symbol, LispSymbol);
-    return symbol != null && symbol !== true ? symbol.macro() : null;
+    return symbol !== null && symbol !== true ? symbol.macro() : null;
 });
 
 defp("disassemble", false, function(m, nargs){
@@ -1538,7 +1538,7 @@ defp("apply", true, function(m, nargs){
     if (func instanceof LispSymbol) func = func.function;
     checktype(func, LispClosure);
     var args = m.pop();
-    while (args != null) {
+    while (args !== null) {
         m.push(LispCons.car(args));
         args = args.cdr;
         nargs++;
@@ -1617,14 +1617,14 @@ defp("%specialp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return sym != null && sym !== true && sym.special() ? true : null;
+    return sym !== null && sym !== true && sym.special() ? true : null;
 });
 
 defp("%globalp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return sym != null && sym !== true && sym.global() ? true : null;
+    return sym !== null && sym !== true && sym.global() ? true : null;
 });
 
 defp("%function-name", true, function(m, nargs){
@@ -1665,7 +1665,7 @@ defp("intern", true, function(m, nargs){
     checknargs(nargs, 1, 2);
     var pak = nargs == 2 ? m.pop() : null;
     var name = m.pop();
-    if (pak == null) {
+    if (pak === null) {
         pak = m.gvar(BASE_PACK.PACKAGE_VAR);
     }
     if (!LispPackage.is(pak)) {
@@ -1681,7 +1681,7 @@ defp("unintern", true, function(m, nargs){
     checknargs(nargs, 1, 2);
     var pak = nargs == 2 ? m.pop() : null;
     var name = as_string(m.pop());
-    if (pak == null) {
+    if (pak === null) {
         pak = m.gvar(BASE_PACK.PACKAGE_VAR);
     }
     if (!LispPackage.is(pak)) {
@@ -1697,7 +1697,7 @@ defp("find-symbol", false, function(m, nargs){
     checknargs(nargs, 1, 2);
     var pak = nargs == 2 ? m.pop() : null;
     var name = as_string(m.pop());
-    if (pak == null) {
+    if (pak === null) {
         pak = m.gvar(BASE_PACK.PACKAGE_VAR);
     }
     if (!LispPackage.is(pak)) {
@@ -1714,7 +1714,7 @@ defp("shadow", true, function(m, nargs){
     checknargs(nargs, 1, 2);
     var pak = nargs == 2 ? m.pop() : null;
     var syms = as_list(m.pop());
-    if (pak == null) {
+    if (pak === null) {
         pak = m.gvar(BASE_PACK.PACKAGE_VAR);
     }
     if (!LispPackage.is(pak)) {
@@ -1837,7 +1837,7 @@ defp("symbol-package", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var symbol = m.pop();
     checktype(symbol, LispSymbol);
-    return symbol == null || symbol === true ? BASE_PACK : symbol.pak;
+    return symbol === null || symbol === true ? BASE_PACK : symbol.pak;
 });
 
 defp("%use-package", true, function(m, nargs){
@@ -2077,7 +2077,7 @@ defp("%grok-xref-info", true, function(m, nargs){
         var sym = data[0], type = data[1], pos = data[2];
         if (sym instanceof LispSymbol) {
             var a = sym.getv("XREF");
-            if (a == null) a = sym.setv("XREF", []);
+            if (a === null) a = sym.setv("XREF", []);
             a.push([ type, filename, pos ]);
         }
     });

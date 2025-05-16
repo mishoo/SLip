@@ -1,7 +1,7 @@
 import { LispType, LispPrimitiveError } from "./types.js";
 
 function listp(thing) {
-    return thing == null || thing instanceof LispCons;
+    return thing === null || thing instanceof LispCons;
 }
 
 function check_list(list, func) {
@@ -10,12 +10,12 @@ function check_list(list, func) {
 
 function car(cell) {
     check_list(cell, "CAR");
-    return cell == null ? null : cell.car;
+    return cell === null ? null : cell.car;
 }
 
 function cdr(cell) {
     check_list(cell, "CDR");
-    return cell == null ? null : cell.cdr;
+    return cell === null ? null : cell.cdr;
 }
 
 const DOT = {
@@ -34,7 +34,7 @@ export class LispCons extends LispType {
     }
     static forEach(p, callback) {
         var i = 0;
-        while (p != null) {
+        while (p !== null) {
             callback(p.car, i++);
             p = p.cdr;
             if (!listp(p)) {
@@ -55,14 +55,14 @@ export class LispCons extends LispType {
         return ret;
     }
     static last(list) {
-        while (list && cdr(list) != null && listp(list.cdr)) {
+        while (list && cdr(list) !== null && listp(list.cdr)) {
             list = list.cdr;
         }
         return list;
     }
     static copy(list) {
         let copy = new LispCons(null, null), p = copy;
-        while (list != null) {
+        while (list !== null) {
             p = p.cdr = new LispCons(car(list), null);
             list = list.cdr;
             if (!listp(list)) {
@@ -74,20 +74,20 @@ export class LispCons extends LispType {
     }
     static reverse(list) {
         var a = null;
-        while (list != null) {
+        while (list !== null) {
             a = new LispCons(car(list), a);
             list = cdr(list);
         }
         return a;
     }
     static nreverse(list) {
-        if (list == null || cdr(list) == null) return list;
+        if (list === null || cdr(list) === null) return list;
         var p = null;
         while (true) {
             var next = cdr(list);
             list.cdr = p;
             p = list;
-            if (next == null) return list;
+            if (next === null) return list;
             list = next;
         }
     }
@@ -96,7 +96,7 @@ export class LispCons extends LispType {
         var ret = null, p = null;
         while (lists.length > 1) {
             var l = lists.shift();
-            while (l != null) {
+            while (l !== null) {
                 var cell = new LispCons(car(l), null);
                 if (p) p.cdr = cell;
                 else ret = cell;
@@ -114,7 +114,7 @@ export class LispCons extends LispType {
         var ret = null, p = null;
         for (var i = 0; i < lists.length; ++i) {
             var l = lists[i];
-            if (l == null) continue;
+            if (l === null) continue;
             if (!ret) ret = l;
             if (p) {
                 check_list(p, "nconc");
@@ -125,16 +125,16 @@ export class LispCons extends LispType {
         return ret;
     }
     static nreconc(list, tail) {
-        if (list == null) return tail;
+        if (list === null) return tail;
         var tmp = list;
         list = LispCons.nreverse(list);
         tmp.cdr = tail;
         return list;
     }
     static revappend(list, tail) {
-        if (list == null) return tail;
+        if (list === null) return tail;
         var a = null, last = null;
-        while (list != null) {
+        while (list !== null) {
             a = new LispCons(car(list), a);
             if (!last) last = a;
             list = cdr(list);
@@ -162,9 +162,9 @@ export class LispCons extends LispType {
     }
     static len(list) {
         var len = 0;
-        while (list != null) {
+        while (list !== null) {
             ++len;
-            list = list.cdr;
+            list = cdr(list);
         }
         return len;
     }
@@ -181,7 +181,7 @@ export class LispCons extends LispType {
     }
     static isDotted(x) {
         var i = 0;
-        while (x != null) {
+        while (x !== null) {
             if (!listp(x)) return i;
             x = x.cdr;
             i++;
@@ -190,13 +190,13 @@ export class LispCons extends LispType {
     }
     static elt(list, i) {
         var p = list;
-        while (p != null && i-- > 0) {
+        while (p !== null && i-- > 0) {
             p = cdr(p);
         }
         return car(p);
     }
     static find(list, item, cmp) {
-        while (list != null && !cmp(list.car, item))
+        while (list !== null && !cmp(list.car, item))
             list = list.cdr;
         return list;
     }

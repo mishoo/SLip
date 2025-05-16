@@ -412,6 +412,7 @@ var optimize = (function(){
                         code.splice(i, 1, [ "CONS" ]);
                         return true;
                     }
+                    break;
                   case "LIST":
                     code.splice(i, 1, [ "LIST", el[2] ]);
                     return true;
@@ -424,13 +425,16 @@ var optimize = (function(){
                         code.splice(i, 1, [ "EQ" ]);
                         return true;
                     }
+                    break;
                   case "NULL":
                     if (el[2] == 1) {
                         code.splice(i, 1, [ "NOT" ]);
                         return true;
                     }
+                    break;
                 }
             }
+            break;
         }
         switch (el[0]) {
           case "GSET":
@@ -494,6 +498,7 @@ var optimize = (function(){
                 code[i] = code[idx + 1];
                 return true;
             }
+            break;
           case "CALL":
           case "RET":
           case "LRET":
@@ -529,7 +534,7 @@ var optimize = (function(){
             break;
         }
         if (i+1 < code.length) {
-            if ((el[0] == "CONST" && el[1] == null) || el[0] == "NIL") {
+            if ((el[0] == "CONST" && el[1] === null) || el[0] == "NIL") {
                 switch (code[i+1][0]) {
                   case "FJUMP":
                   case "FJUMPK":
@@ -543,7 +548,7 @@ var optimize = (function(){
                     code.splice(i, 2, [ "T" ]);
                     return true;
                 }
-                if (el[0] == "CONST" && el[1] == null) {
+                if (el[0] == "CONST" && el[1] === null) {
                     code.splice(i, 1, [ "NIL" ]);
                     return true;
                 }
@@ -622,7 +627,7 @@ var optimize = (function(){
 
 function constantp(x) {
     return x === true
-        || x == null
+        || x === null
         || typeof x == "number"
         || typeof x == "string"
         || x instanceof RegExp
@@ -699,14 +704,14 @@ function indent(level) {
 }
 
 function dump(thing) {
-    if (thing == null) return "NIL";
+    if (thing === null) return "NIL";
     if (thing === true) return "T";
     if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
     if (thing instanceof LispCons) {
         if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
             return "'" + dump(LispCons.cadr(thing));
         var ret = "(", first = true;
-        while (thing != null) {
+        while (thing !== null) {
             if (!first) ret += " ";
             else first = false;
             ret += dump(LispCons.car(thing));
@@ -780,7 +785,7 @@ export function disassemble(code) {
 
 function serialize_const(val, cache) {
     return function dump(val) {
-        if (val == null || val === true) return val + "";
+        if (val === null || val === true) return val + "";
         if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar) return val.serialize(cache);
         if (val instanceof RegExp) return val.toString();
         if (val instanceof LispCons) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
@@ -806,7 +811,7 @@ export function unserialize(code) {
             return cache[name];
         }
         let sym;
-        if (pak != null) {
+        if (pak !== null) {
             pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
             sym = LispSymbol.get(name, pak);
         } else {
@@ -865,7 +870,7 @@ export class LispMachine {
     find_dvar(symbol) {
         if (symbol.special()) {
             var p = this.denv;
-            while (p != null) {
+            while (p !== null) {
                 var el = p.car;
                 if (el instanceof LispBinding && el.symbol === symbol)
                     return el;
@@ -926,7 +931,7 @@ export class LispMachine {
     loop() {
         while (this.pc < this.code.length) {
             vmrun(this);
-            if (this.pc == null) break;
+            if (this.pc === null) break;
         }
         return this.stack.sp > 0 ? this.pop() : null;
     }
@@ -981,7 +986,7 @@ export class LispMachine {
         this.pc = 0;
         this.f = closure;
         while (true) {
-            if (this.pc == null) return this.pop();
+            if (this.pc === null) return this.pop();
             vmrun(this);
         }
     }
@@ -991,7 +996,7 @@ export class LispMachine {
         if (args !== false) {
             this.push(this.mkret(this.pc));
             let n = 0;
-            while (args != null) {
+            while (args !== null) {
                 this.push(args.car);
                 args = args.cdr;
                 n++;
@@ -1019,7 +1024,7 @@ export class LispMachine {
         var err = null;
         try {
             while (quota-- > 0) {
-                if (this.pc == null) {
+                if (this.pc === null) {
                     this.status = "finished";
                     break;
                 }
@@ -1064,8 +1069,8 @@ function rewind(env, i) {
 };
 
 function eq(a, b) {
-    if (a == null) return b == null || b === S_NIL ? true : null;
-    if (b == null) return a == null || a === S_NIL ? true : null;
+    if (a === null) return b === null || b === S_NIL ? true : null;
+    if (b === null) return a === null || a === S_NIL ? true : null;
     if (a === true) return b === true || b === S_T ? true : null;
     if (b === true) return a === true || a === S_T ? true : null;
     return a === b ? true : null;
@@ -1141,11 +1146,11 @@ let OP_RUN = [
     },
     /*OP.TJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.pop() != null) m.pc = addr;
+        if (m.pop() !== null) m.pc = addr;
     },
     /*OP.FJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.pop() == null) m.pc = addr;
+        if (m.pop() === null) m.pc = addr;
     },
     /*OP.BLOCK*/ (m) => {
         // this is moderately tricky: we can't do
@@ -1167,7 +1172,7 @@ let OP_RUN = [
         if (!noval) m.push(val);
     },
     /*OP.NOT*/ (m) => {
-        m.push(m.pop() == null ? true : null);
+        m.push(m.pop() === null ? true : null);
     },
     /*OP.SETCC*/ (m) => {
         m.stack.top().run(m);
@@ -1438,7 +1443,7 @@ let OP_RUN = [
         if (n < required) {
             error(`Expecting at least ${min} arguments`);
         }
-        if (max != null && n > max) {
+        if (max !== null && n > max) {
             error(`Expecting at most ${max} arguments`);
         }
         let frame = new Array(frame_len).fill(null);
@@ -1463,7 +1468,7 @@ let OP_RUN = [
                 }
                 if (!allow_other_keys) {
                     let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, maxi);
-                    if (pos != null) {
+                    if (pos !== null) {
                         allow_other_keys = stack[pos + 1];
                         stack[pos] = false;
                         if (pos == i) i += 2;
@@ -1471,7 +1476,7 @@ let OP_RUN = [
                 }
                 for (let k = 0; k < kl; k++, index += 2) {
                     let pos = find_key_arg(key[k], stack, i, maxi);
-                    if (pos != null) {
+                    if (pos !== null) {
                         frame[index] = true; // argument-passed-p
                         frame[index + 1] = stack[pos + 1];
                         stack[pos] = false;
@@ -1511,7 +1516,7 @@ let OP_RUN = [
     },
     /*OP.TJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.top() == null) {
+        if (m.top() === null) {
             m.pop();
         } else {
             m.pc = addr;
@@ -1519,7 +1524,7 @@ let OP_RUN = [
     },
     /*OP.FJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.top() == null) {
+        if (m.top() === null) {
             m.pop();
             m.pc = addr;
         }

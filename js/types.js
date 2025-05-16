@@ -400,10 +400,10 @@ export class LispSymbol extends LispType {
     static type = "symbol";
     static #SYMBOLS = Object.create(null);
     static symname(sym) {
-        return sym == null ? "NIL" : sym === true ? "T" : sym.name;
+        return sym === null ? "NIL" : sym === true ? "T" : sym.name;
     }
     static is(x) {
-        return x === true || x == null || x instanceof LispSymbol;
+        return x === true || x === null || x instanceof LispSymbol;
     }
     static get(name, pak = LispPackage.BASE_PACK) {
         var ret = pak ? pak.intern(name) : (LispSymbol.#SYMBOLS[name] || (
