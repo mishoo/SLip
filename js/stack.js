@@ -1,13 +1,32 @@
 import { LispPrimitiveError } from "./types.js";
 
+class Values {
+    constructor(vals) {
+        this.vals = vals;
+    }
+    first() {
+        return this.vals.length > 0 ? this.vals[0] : null;
+    }
+}
+
+export function value(el) {
+    return el instanceof Values ? el.first() : el;
+}
+
 export class LispStack {
     constructor(maxsize = 1024) {
         this.maxsize = maxsize;
         this.sp = 0;
         this.data = new Array(maxsize);
-        this.values = new Array(maxsize);
     }
     pop() {
+        if (this.sp > 0) {
+            return value(this.data[--this.sp]);
+        } else {
+            throw new LispPrimitiveError("pop() with an empty stack");
+        }
+    }
+    pop_ret() {
         if (this.sp > 0) {
             return this.data[--this.sp];
         } else {
@@ -16,14 +35,14 @@ export class LispStack {
     }
     top() {
         if (this.sp > 0) {
-            return this.data[this.sp - 1];
+            return value(this.data[this.sp - 1]);
         } else {
             throw new LispPrimitiveError("top() with an empty stack");
         }
     }
     at(index) {
         if (index < 0) index += this.sp;
-        return this.data.at(index);
+        return value(this.data.at(index));
     }
     replace(index, newval) {
         if (index < 0) index += this.sp;
@@ -39,8 +58,6 @@ export class LispStack {
     }
     push(val) {
         if (this.sp < this.maxsize) {
-            if (this.values[this.sp] !== null)
-                this.values[this.sp] = null;
             this.data[this.sp++] = val;
         } else {
             throw new LispPrimitiveError("Stack overflow");
@@ -50,8 +67,9 @@ export class LispStack {
         if (this.sp < len) {
             throw new LispPrimitiveError(`Insufficient stack elements in pop_frame (${this.sp}/${len})`);
         }
-        let end = this.sp;
-        return this.data.slice(this.sp -= len, end);
+        let frame = new Array(len);
+        while (len > 0) frame[--len] = this.pop();
+        return frame;
     }
     copy() {
         return this.data.slice(0, this.sp);
@@ -64,21 +82,13 @@ export class LispStack {
         return this;
     }
     set_values(len) {
-        if (len === 0) {
-            this.values[this.sp] = [];
-            this.data[this.sp++] = null;
-        } else {
-            let vals = this.pop_frame(len);
-            this.values[this.sp++] = vals;
-        }
+        this.push(new Values(this.pop_frame(len)));
     }
     set_values_array(vals) {
-        this.values[this.sp] = vals;
-        this.data[this.sp++] = vals[0];
+        this.data[this.sp++] = new Values(vals);
     }
     pop_values() {
-        let vals = this.values[--this.sp] || [ this.data[this.sp] ];
-        this.values[this.sp] = null;
-        return vals;
+        let v = this.data[--this.sp];
+        return v instanceof Values ? v.vals : [ v ];
     }
 }

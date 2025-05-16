@@ -63,6 +63,8 @@
 
 (defun ymacs-print (&rest vals)
   (cond
+    ((null vals)
+     "; No value")
     ((cdr vals)
      (format nil "~{  ~A~^~%~}" vals))
     ((stringp (car vals))

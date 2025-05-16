@@ -1088,7 +1088,7 @@ function error(msg) {
     throw new LispPrimitiveError(msg);
 }
 
-function find_key_arg(item, array, start, end) {
+function find_key_arg(item, array, start, end = array.length) {
     for (let i = start; i < end; i += 2) {
         if (eq(item, array[i])) return i;
     }
@@ -1185,12 +1185,10 @@ let OP_RUN = [
         let noval = m.f.noval;
         // using m.stack directly, rather than m.pop, since we'd like
         // to keep multiple values around for the caller.
-        let retval = m.stack.pop();
-        let moreval = m.stack.values[m.stack.sp];
+        let retval = m.stack.pop_ret();
         m.stack.pop().run(m);
         if (!noval) {
             m.stack.push(retval);
-            m.stack.values[m.stack.sp-1] = moreval;
         }
     },
     /*OP.CALL*/ (m) => {
@@ -1416,12 +1414,10 @@ let OP_RUN = [
     /*OP.LRET2*/ (m) => {
         let noval = m.f.noval;
         let fr = m.code[m.pc++];
-        let retval = m.stack.pop();
-        let moreval = m.stack.values[m.stack.sp];
+        let retval = m.stack.pop_ret();
         frame(m.env, fr)[0].run(m);
         if (!noval) {
             m.stack.push(retval);
-            m.stack.values[m.stack.sp-1] = moreval;
         }
     },
     /*OP.LJUMP2*/ (m) => {
@@ -1447,27 +1443,26 @@ let OP_RUN = [
             error(`Expecting at most ${max} arguments`);
         }
         let frame = new Array(frame_len).fill(null);
-        let stack = m.stack.data;
-        let maxi = m.stack.sp;
-        let i = maxi - n;
+        let stack = m.stack.pop_frame(n);
+        let i = 0;
         let index = 0;
         while (required-- > 0) {
             frame[index++] = stack[i++];
         }
-        while (optional-- > 0 && i < maxi) {
+        while (optional-- > 0 && i < n) {
             frame[index++] = true; // argument-passed-p
             frame[index++] = stack[i++];
         }
-        if (i < maxi) {
+        if (i < n) {
             if (rest) {
-                frame[index++] = LispCons.fromArray(stack, i, maxi);
+                frame[index++] = LispCons.fromArray(stack, i);
             }
             if (kl) {
-                if ((maxi - i) % 2 != 0) {
+                if ((n - i) % 2 != 0) {
                     error("Uneven number of &key arguments");
                 }
                 if (!allow_other_keys) {
-                    let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, maxi);
+                    let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, n);
                     if (pos !== null) {
                         allow_other_keys = stack[pos + 1];
                         stack[pos] = false;
@@ -1475,7 +1470,7 @@ let OP_RUN = [
                     }
                 }
                 for (let k = 0; k < kl; k++, index += 2) {
-                    let pos = find_key_arg(key[k], stack, i, maxi);
+                    let pos = find_key_arg(key[k], stack, i, n);
                     if (pos !== null) {
                         frame[index] = true; // argument-passed-p
                         frame[index + 1] = stack[pos + 1];
@@ -1484,7 +1479,7 @@ let OP_RUN = [
                     }
                 }
                 if (!allow_other_keys) {
-                    while (i < maxi) {
+                    while (i < n) {
                         if (stack[i] !== false) {
                             error(`Unknown keyword argument ${dump(stack[i])}`);
                         }
@@ -1493,7 +1488,6 @@ let OP_RUN = [
                 }
             }
         }
-        m.stack.sp -= n;
         m.env = new LispCons(frame, m.env);
     },
     /*OP.POPLIST*/ (m) => {
@@ -1542,7 +1536,7 @@ let OP_RUN = [
     },
     /*OP.POPBACK*/ (m) => {
         let n = m.code[m.pc++];
-        m.stack.replace(-n-1, m.pop());
+        m.stack.replace(-n-1, m.stack.pop_ret());
     },
 ];
 
