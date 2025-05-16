@@ -853,6 +853,7 @@
               (catch (comp-catch (cadr x) (cddr x) env val? more?))
               (throw (comp-throw (cadr x) (caddr x) env))
               (unwind-protect (comp-unwind-protect (cadr x) (cddr x) env val? more?))
+              (funcall (comp-funcall (cadr x) (cddr x) env val? more?))
               (t (cond
                    ((aif (and (symbolp (car x))
                               (compiler-macro-function (car x)))
@@ -862,7 +863,7 @@
                    ((aif (and (symbolp (car x))
                               (macro (car x) env))
                          (comp-macroexpand it (cdr x) env val? more?)
-                         (comp-funcall (car x) (cdr x) env val? more?)))))))))
+                         (comp-call t (car x) (cdr x) env val? more?)))))))))
 
      (comp-const (x val? more?)
        (when val?
@@ -1028,6 +1029,9 @@
          (t (comp (car exps) env val? more?))))
 
      (comp-funcall (f args env val? more?)
+       (comp-call nil f args env val? more?))
+
+     (comp-call (local f args env val? more?)
        (labels ((mkret (the-function)
                   (cond
                     (more? (let ((k (mklabel)))
@@ -1049,7 +1053,7 @@
                 (eq f t)
                 (eq f nil))
             (error (strcat f " is not a function")))
-           ((symbolp f)
+           ((and local (symbolp f))
             (let ((localfun (find-func f env)))
               (cond
                 (localfun
@@ -1065,6 +1069,15 @@
                  (unless (symbol-function f)
                    (unknown-function f))
                  (mkret (gen "FGVAR" f))))))
+           ((and (not local)
+                 (consp f)
+                 (eq (car f) 'quote)
+                 (symbolp (cadr f)))
+            ;; (funcall 'stuff ...)
+            (let ((f (cadr f)))
+              (unless (symbol-function f)
+                (unknown-function f))
+              (mkret (gen "FGVAR" f))))
            ((and (consp f)
                  (eq (car f) 'lambda)
                  (not (cadr f)))
