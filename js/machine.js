@@ -894,11 +894,6 @@ export class LispMachine {
     }
 
     push(v) {
-        // XXX: we should limit the stack; otherwise cases of infinite
-        // non-tail recursion are close to impossible to debug. I'm
-        // not decided on a proper maximum size though.
-        //
-        // if (this.stack.length > 20000) debugger;
         this.stack.push(v);
     }
 
@@ -1531,15 +1526,7 @@ let OP_RUN = [
     },
     /*OP.VALUES*/ (m) => {
         let nargs = m.code[m.pc++];
-        if (nargs == 0) {
-            // (values) is tricky.. let's say undefined means "no
-            // value", then let's wait for the bugs to pour.
-            m.push(undefined);
-            m.stack.set_values(null);
-        } else {
-            // the first value remains on the stack
-            m.stack.set_values(m.pop_frame(nargs - 1));
-        }
+        m.stack.set_values(nargs);
     },
     /*OP.MVB*/ (m) => {
         let n = m.code[m.pc++];

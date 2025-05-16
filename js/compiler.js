@@ -152,7 +152,7 @@ function lisp_reader(code) {
                 ch = LispChar.fromCode(parseInt(ch.substr(1), 16));
             } else {
                 ch = LispChar.fromName(ch);
-                if (ch == null)
+                if (!ch)
                     croak("Unknown character name: " + ch);
             }
             return ch;
@@ -310,11 +310,10 @@ function lisp_reader(code) {
     };
 
     function nullp(x) {
-        return x === S_NIL || x == null || (x instanceof Array && x.length == 0);
+        return x === S_NIL || x === null || (x instanceof Array && x.length == 0);
     };
 
-    function arg_count(form, min, max) {
-        if (max == null) max = min;
+    function arg_count(form, min, max = min) {
         var len = length(cdr(form));
         if (len < min) throw new Error("Expecting at least " + min + " arguments");
         if (len > max) throw new Error("Expecting at most " + max + " arguments");

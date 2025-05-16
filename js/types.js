@@ -405,8 +405,7 @@ export class LispSymbol extends LispType {
     static is(x) {
         return x === true || x == null || x instanceof LispSymbol;
     }
-    static get(name, pak) {
-        if (pak == null) pak = LispPackage.BASE_PACK;
+    static get(name, pak = LispPackage.BASE_PACK) {
         var ret = pak ? pak.intern(name) : (LispSymbol.#SYMBOLS[name] || (
             LispSymbol.#SYMBOLS[name] = new LispSymbol(name)
         ));

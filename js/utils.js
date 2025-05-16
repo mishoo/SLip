@@ -7,8 +7,7 @@ export function repeat_string(str, i) {
     return d;
 }
 
-export function pad_string(str, width, ch) {
-    if (ch == null) ch = " ";
+export function pad_string(str, width, ch = " ") {
     str += "";
     var len = Math.ceil(str.length / width) * width;
     if (len == str.length) len += width;

@@ -39,7 +39,8 @@ export class LispStack {
     }
     push(val) {
         if (this.sp < this.maxsize) {
-            this.values[this.sp] = null;
+            if (this.values[this.sp] !== null)
+                this.values[this.sp] = null;
             this.data[this.sp++] = val;
         } else {
             throw new LispPrimitiveError("Stack overflow");
@@ -62,18 +63,22 @@ export class LispStack {
         this.sp = copy.length;
         return this;
     }
-    set_values(vals) {
-        this.values[this.sp-1] = vals;
+    set_values(len) {
+        if (len === 0) {
+            this.values[this.sp] = [];
+            this.data[this.sp++] = null;
+        } else {
+            let vals = this.pop_frame(len);
+            this.values[this.sp++] = vals;
+        }
+    }
+    set_values_array(vals) {
+        this.values[this.sp] = vals;
+        this.data[this.sp++] = vals[0];
     }
     pop_values() {
-        let first = this.pop();
-        if (first === undefined) {
-            return [];
-        } else {
-            let vals = this.values[this.sp] || [];
-            vals.unshift(first);
-            this.values[this.sp] = null;
-            return vals;
-        }
+        let vals = this.values[--this.sp] || [ this.data[this.sp] ];
+        this.values[this.sp] = null;
+        return vals;
     }
 }

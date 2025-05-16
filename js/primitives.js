@@ -275,8 +275,7 @@ defp("1-", false, function(m, nargs){
         checktype(number, LispNumber);
         checktype(divisor, LispNumber);
         let quot = func(number / divisor);
-        m.push(quot);
-        m.stack.set_values([ number - quot * divisor ]);
+        m.stack.set_values_array([ quot, number - quot * divisor ]);
         return false;
     });
 });
@@ -1558,12 +1557,7 @@ defp("funcall", true, function(m, nargs){
 });
 
 defp("values", false, function(m, nargs){
-    if (nargs == 0) {
-        m.push(undefined);
-        m.stack.set_values(null);
-    } else {
-        m.stack.set_values(m.pop_frame(nargs - 1));
-    }
+    m.stack.set_values(nargs);
     return false;
 });
 
