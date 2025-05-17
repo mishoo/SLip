@@ -1,6 +1,6 @@
 import { LispCons } from "./list.js";
 import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
-import { LispMachine } from "./machine.js";
+import { LispMachine, OP } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
 
 let BASE_PACK = LispPackage.BASE_PACK;
@@ -76,10 +76,7 @@ function defp(name, seff, func) {
     });
     sym.primitive = func;
     sym.setv("primitive-side-effects", seff ? true : null);
-    sym.function = new LispClosure(LispMachine.assemble([
-        [ "PRIM", sym, -1 ],
-        [ "RET" ]
-    ]), sym);
+    sym.function = new LispClosure([ OP.PRIM, sym, -1, OP.RET ], sym);
     ALL_PRIMITIVES = new LispCons(sym, ALL_PRIMITIVES);
 };
 

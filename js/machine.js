@@ -10,7 +10,7 @@ let S_NIL = LispSymbol.get("NIL");
 let S_T = LispSymbol.get("T");
 let S_ALLOW_OTHER_KEYS = KEYWORD_PACK.intern("ALLOW-OTHER-KEYS");
 
-const OP = {
+export const OP = {
     NOP: 0,
     LVAR: 1,
     LSET: 2,
@@ -1243,7 +1243,7 @@ let OP_RUN = [
     },
     /*OP.ARGS*/ (m) => {
         let count = m.code[m.pc++];
-        if (count != m.n_args) {
+        if (count !== m.n_args) {
             console.error(m.f);
             error("Wrong number of arguments - expecting " + count + ", got " + m.n_args);
         }
@@ -1287,7 +1287,7 @@ let OP_RUN = [
     /*OP.PRIM*/ (m) => {
         let name = m.code[m.pc++];
         let nargs = m.code[m.pc++];
-        if (nargs == -1) nargs = m.n_args;
+        if (nargs === -1) nargs = m.n_args;
         let ret = name.primitive(m, nargs);
         if (ret !== false) m.push(ret ?? null);
     },
@@ -1304,14 +1304,14 @@ let OP_RUN = [
     /*OP.LIST*/ (m) => {
         let count = m.code[m.pc++];
         let p = null, n = count;
-        if (n == -1) n = m.n_args;
+        if (n === -1) n = m.n_args;
         while (n-- > 0) p = new LispCons(m.pop(), p);
         m.push(p);
     },
     /*OP.LIST_*/ (m) => {
         let count = m.code[m.pc++];
         let p = m.pop(), n = count;
-        if (n == -1) n = m.n_args;
+        if (n === -1) n = m.n_args;
         while (--n > 0) p = new LispCons(m.pop(), p);
         m.push(p);
     },
@@ -1461,7 +1461,7 @@ let OP_RUN = [
                 frame[index++] = LispCons.fromArray(stack, i);
             }
             if (kl) {
-                if ((n - i) % 2 != 0) {
+                if ((n - i) % 2) {
                     error("Uneven number of &key arguments");
                 }
                 if (!allow_other_keys) {
