@@ -64,3 +64,13 @@
     (let ((y (list (pop (cdr x))
                    (pop (cdr x)))))
       (values x y))))
+
+(defmacro my-inc (place)
+  (format t "Called for ~A~%" place)
+  `(incf ,place))
+
+(defun incf-sm ()
+  (symbol-macrolet ((mac (car y)))
+    (let ((y (list 1)))
+      (my-inc mac)
+      y)))

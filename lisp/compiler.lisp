@@ -228,8 +228,13 @@
 (defmacro member (item lst)
   `(%memq ,item ,lst))
 
+;; will be redefined later to also check compiler env for symbol-macrolet
+(defun safe-for-setq (thing)
+  (symbolp thing))
+
 (defmacro case (expr . cases)
-  (let* ((vexpr (if (symbolp expr)
+  (let* ((safe (safe-for-setq expr))
+         (vexpr (if safe
                     expr
                     (gensym "CASE")))
          (code (let recur ((cases cases))
@@ -244,7 +249,7 @@
                            `(if (eq ,vexpr ',(caar cases))
                                 (progn ,@(cdar cases))
                                 ,(recur (cdr cases)))))))))
-    (if (symbolp expr)
+    (if safe
         code
         `(let ((,vexpr ,expr)) ,code))))
 
@@ -645,6 +650,15 @@
   (when env
     (aif (find-in-compiler-env name :macro (hash-get env :macros))
          (caddr it))))
+
+(defun find-var-in-compiler-env (name &optional (env *compiler-env*))
+  (when env
+    (find-in-compiler-env name :var (hash-get env :lex))))
+
+(defun safe-for-setq (thing &optional (env *compiler-env*))
+  (and (symbolp thing)
+       (not (aif (find-var-in-compiler-env thing)
+                 (eq :smac (caddr it))))))
 
 (defun make-compiler-env ()
   ;; :lex should match the runtime lexical environment; both

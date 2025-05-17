@@ -415,7 +415,7 @@
 
 (def-emac push (obj place)
   (cond
-    ((symbolp place)
+    ((safe-for-setq place)
      `(setq ,place (cons ,obj ,place)))
     ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                           (get-setf-expansion place)
@@ -428,7 +428,7 @@
 (def-emac pop (place)
   (let ((v (gensym "place")))
     (cond
-      ((symbolp place)
+      ((safe-for-setq place)
        `(let ((,v ,place))
           (setf ,place (cdr ,v))
           (car ,v)))
@@ -443,7 +443,7 @@
 (defsetf getf (place indicator) (value)
   (let ((vval (gensym)))
     (cond
-      ((symbolp place)
+      ((safe-for-setq place)
        `(let (,vval)
           (setf ,place (%:%putf ,place ,indicator (setq ,vval ,value)))
           ,vval))
@@ -529,7 +529,7 @@
 (labels ((make-dementor (place delta inc)
            (symbol-macrolet ((dement `(,inc ,place ,delta)))
              (cond
-               ((symbolp place)
+               ((safe-for-setq place)
                 `(setq ,place ,dement))
                ((multiple-value-bind (temps value-forms store-vars store-form place)
                                      (get-setf-expansion place)

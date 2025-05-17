@@ -283,10 +283,13 @@
       (indent)
       (%pp-body forms printer))))
 
-(defun %pp-funargs (args)
-  (if (consp args)
-      (%pp-list args)
-      (%pp-object args)))
+(defun<< %pp-funargs (args)
+  (cond
+    ((consp args)
+     (%pp-list args))
+    ((null args)
+     (<< "()"))
+    ((%pp-object args))))
 
 (defun %pp-symbol (sym)
   (if (symbolp sym)
@@ -375,8 +378,12 @@
                       (destructuring-bind (name args &rest body) binding
                         (with-parens
                           (<< (%pp-symbol name) " ")
-                          (%pp-funargs args)
-                          (%pp-body-indent body)))))))
+                          (cond
+                            ((eq 'symbol-macrolet symbol)
+                             (%pp-object args))
+                            (t
+                             (%pp-funargs args)
+                             (%pp-body-indent body)))))))))
       (%pp-body-indent body))))
 
 (def-pretty-print if (condition &optional
@@ -420,6 +427,14 @@
     (with-parens
       (<< (%pp-symbol symbol))
       (with-indent 2 (%pp-body-indent (list form)))
+      (%pp-body-indent body))))
+
+(def-pretty-print (multiple-value-bind destructuring-bind) (names values &rest body)
+  (with-indent (%stream-col *pp-stream*)
+    (with-parens
+      (<< (%pp-symbol symbol) " ")
+      (%pp-funargs names)
+      (with-indent 2 (%pp-body-indent (list values)))
       (%pp-body-indent body))))
 
 (def-pretty-print (when unless block catch) (thing &rest body)
