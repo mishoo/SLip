@@ -1136,9 +1136,9 @@
                                   (comp defval env t t))     ;; compile default value
                                 (gen "LSET" 0 index)      ;; set arg value in env
                                 (gen "POP")               ;; discard from stack
-                                #(l1)
-                                (when (%specialp name)    ;; maybe bind special var
-                                  (gen "BIND" name index)))))
+                                #(l1))))
+                        (when (%specialp name)    ;; maybe bind special var
+                          (<< (gen "BIND" name index)))
                         (newarg name)))
                (<< (gen "XARGS"
                         (length required)
@@ -1158,11 +1158,12 @@
                         (lambda (aux)
                           (let ((name (car aux))
                                 (defval (cadr aux)))
-                            (<< (with-env (comp defval env t t))
-                                (gen "LSET" 0 index)
-                                (gen "POP")
-                                (when (%specialp name)
-                                  (gen "BIND" name index)))
+                            (when defval
+                              (<< (with-env (comp defval env t t))
+                                  (gen "LSET" 0 index)
+                                  (gen "POP")))
+                            (when (%specialp name)
+                              (<< (gen "BIND" name index)))
                             (newarg name))))
                (<< (with-env
                      (comp-block name body env t nil))))))))

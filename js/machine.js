@@ -1193,7 +1193,10 @@ let OP_RUN = [
     },
     /*OP.CALL*/ (m) => {
         let count = m.code[m.pc++];
-        let closure = m.pop();
+        let arg = m.pop();
+        let closure = arg instanceof LispSymbol ? arg.function : arg;
+        if (!(closure instanceof LispClosure))
+            error("OP.CALL invalid function: " + dump(arg));
         //if (m.trace) m.trace.push([ closure, m.stack.slice(-count) ]);
         m.n_args = count;
         m.code = closure.code;
