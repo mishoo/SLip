@@ -793,6 +793,9 @@
               ((multiple-value-prog1)
                (arg-count x 1)
                (comp-multiple-value-prog1 (cadr x) (cddr x) env val? more?))
+              (%pop
+               (arg-count x 1 1)
+               (comp-pop (cadr x) env val? more?))
               (setq
                (arg-count x 2 2)
                (assert (symbolp (cadr x)) "Only symbols can be SETQ")
@@ -928,6 +931,20 @@
                 (gen "VALUES" 1)
                 (unless more? (gen "RET"))))))
 
+     (comp-pop (name env val? more?)
+       (assert (symbolp name) (strcat "%POP expects a symbol, got: " name))
+       (%seq (if (%globalp name)
+                 (gen "POPGLIST" name)
+                 (aif (find-var name env)
+                      (if (eq :smac (caddr it))
+                          (error "%POP called on symbol macro: " name)
+                          (gen "POPLIST" (car it) (cadr it)))
+                      (progn
+                        (unknown-variable name)
+                        (gen "POPGLIST" name))))
+             (unless val? (gen "POP"))
+             (unless more? (gen "RET"))))
+
      (comp-list (exps env)
        (when exps
          (cond
@@ -944,7 +961,7 @@
                   (comp-list (cdr exps) env))))))
 
      (comp-block (name forms env val? more?)
-       (assert (symbolp name) (strcat "BLOCK expects a symbol, got " name))
+       (assert (symbolp name) (strcat "BLOCK expects a symbol, got: " name))
        (let ((body (catch name
                      (comp-seq forms env val? more?))))
          (or body
@@ -957,7 +974,7 @@
                      (if more? nil (gen "RET")))))))
 
      (comp-return (name value env)
-       (assert (symbolp name) "RETURN-FROM expects a symbol")
+       (assert (symbolp name) (strcat "RETURN-FROM expects a symbol, got: " name))
        (let* ((block (or (find-block name env)
                          (throw name)))
               (label (caddr block)))

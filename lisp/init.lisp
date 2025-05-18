@@ -63,12 +63,6 @@
 
 ;;;; destructuring-bind
 
-(defmacro %next (place)
-  (let ((v (gensym)))
-    `(let ((,v ,place))
-       (setq ,place (cdr ,v))
-       (car ,v))))
-
 (defun %dbind-error-missing-arg (arg)
   (error (strcat "Missing required argument: " arg)))
 
@@ -126,14 +120,14 @@
                           (push thisarg names)
                           (cond
                             (optional?
-                             (add thisarg `(%next ,values)))
+                             (add thisarg `(%pop ,values)))
                             (aux?
                              (add thisarg nil))
                             (key?
                              (add thisarg `(getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")))))
                             (t
                              (add thisarg `(if ,values
-                                               (%next ,values)
+                                               (%pop ,values)
                                                (%dbind-error-missing-arg ',thisarg)))))
                           (rec optional? rest? key? aux? (cdr args) values (+ i 1)))))
 
@@ -149,14 +143,14 @@
                                              (let ((val (gensym)))
                                                `(let ((,val (getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")) 'not-found)))
                                                   (if (eq ,val 'not-found) ,default ,val)))
-                                             `(if ,values (%next ,values) ,default)))))
+                                             `(if ,values (%pop ,values) ,default)))))
                          (aux? (let ((thisarg (car thisarg))
                                      (value (cadr thisarg)))
                                  (add thisarg value)))
                          (rest? (error "Invalid argument list following &REST/&BODY"))
                          (t
                           (let ((sublist (gensym)))
-                            (add sublist `(if ,values (%next ,values) (error "Missing sublist")))
+                            (add sublist `(if ,values (%pop ,values) (error "Missing sublist")))
                             (rec nil nil nil nil thisarg sublist 0))))
                        (rec optional? rest? key? aux? (cdr args) values (+ i 1))))))
                  (t (error "Invalid lambda-list"))))))
@@ -429,9 +423,7 @@
   (let ((v (gensym "place")))
     (cond
       ((safe-for-setq place)
-       `(let ((,v ,place))
-          (setf ,place (cdr ,v))
-          (car ,v)))
+       `(%:%pop ,place))
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                             (get-setf-expansion place)
          `(let* (,@(map2 #'list temps value-forms)
