@@ -1528,7 +1528,11 @@ let OP_RUN = [
     },
     /*OP.VALUES*/ (m) => {
         let nargs = m.code[m.pc++];
-        m.stack.set_values(nargs);
+        if (nargs === 1) {
+            m.stack.push(m.stack.pop());
+        } else {
+            m.stack.set_values(nargs);
+        }
     },
     /*OP.MVB*/ (m) => {
         let n = m.code[m.pc++];

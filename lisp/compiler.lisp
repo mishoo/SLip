@@ -195,12 +195,6 @@
       (funcall func (car lst))
       (rec (cdr lst)))))
 
-(defmacro prog1 (exp . body)
-  (let ((ret (gensym)))
-    `(let ((,ret ,exp))
-       ,@body
-       ,ret)))
-
 (defmacro prog2 (exp1 exp2 . body)
   `(progn
      ,exp1
@@ -710,8 +704,10 @@
     ((assert (p msg)
        (if p p (error msg)))
 
-     (arg-count (x min max)
-       (assert (<= min (- (length x) 1) max) "Wrong number of arguments"))
+     (arg-count (x min &optional max)
+       (if max
+           (assert (<= min (- (length x) 1) max) "Wrong number of arguments")
+           (assert (<= min (- (length x) 1)) "Wrong number of arguments")))
 
      (make-environment ()
        (make-compiler-env))
@@ -791,6 +787,12 @@
                (arg-count x 1 1)
                (comp-const (cadr x) val? more?))
               (progn (comp-seq (cdr x) env val? more?))
+              ((prog1)
+               (arg-count x 1)
+               (comp-prog1 (cadr x) (cddr x) env val? more?))
+              ((multiple-value-prog1)
+               (arg-count x 1)
+               (comp-multiple-value-prog1 (cadr x) (cddr x) env val? more?))
               (setq
                (arg-count x 2 2)
                (assert (symbolp (cadr x)) "Only symbols can be SETQ")
@@ -828,26 +830,30 @@
               (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
               (macrolet (comp-macrolet (cadr x) (cddr x) env val? more?))
               (symbol-macrolet (comp-symbol-macrolet (cadr x) (cddr x) env val? more?))
-              ((lambda λ) (when val?
-                            (%seq (comp-lambda nil (cadr x) (cddr x) env)
-                                  (unless more? (gen "RET")))))
+              ((lambda λ)
+               (when val?
+                 (%seq (comp-lambda nil (cadr x) (cddr x) env)
+                       (unless more? (gen "RET")))))
+              (%fn
+               (when val?
+                 (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
+                       (unless more? (gen "RET")))))
               (function
                (arg-count x 1 1)
                (let ((sym (cadr x)))
                  (when val?
                    (cond
-                     ((consp sym)
-                      (if (and (eq 'setf (car sym))
-                               (symbolp (cadr sym))
-                               (null (cddr sym)))
-                          ;; Hack to handle #'(SETF STUFF). In CL it seems
-                          ;; that the name of the function is the list
-                          ;; itself (SETF STUFF), but we really need to make
-                          ;; it a symbol. Hope this is sound..
-                          (comp `(function ,(intern (strcat "(SETF " (cadr sym) ")")
-                                                    (symbol-package (cadr sym))))
-                                env t more?)
-                          (comp sym env t more?)))
+                     ((when (and (consp sym)
+                                 (eq 'setf (car sym))
+                                 (symbolp (cadr sym))
+                                 (null (cddr sym)))
+                        ;; Hack to handle #'(SETF STUFF). In CL it seems
+                        ;; that the name of the function is the list
+                        ;; itself (SETF STUFF), but we really need to make
+                        ;; it a symbol. Hope this is sound..
+                        (comp `(function ,(intern (strcat "(SETF " (cadr sym) ")")
+                                                  (symbol-package (cadr sym))))
+                              env t more?)))
                      (t
                       (assert (symbolp sym) "FUNCTION requires a symbol")
                       (let ((local (find-func sym env)))
@@ -898,6 +904,29 @@
          ((not (cdr exps)) (comp (car exps) env val? more?))
          (t (%seq (comp (car exps) env nil t)
                   (comp-seq (cdr exps) env val? more?)))))
+
+     (comp-multiple-value-prog1 (first rest env val? more?)
+       (cond
+         ((not val?)
+          (comp-seq (list* first rest) env nil more?))
+         (rest
+          (%seq (comp first env t t)
+                (comp-seq rest env nil t)
+                (unless more? (gen "RET"))))
+         ((comp first env val? more?))))
+
+     (comp-prog1 (first rest env val? more?)
+       (cond
+         ((not val?)
+          (comp-seq (list* first rest) env nil more?))
+         (rest
+          (%seq (comp first env t t)
+                (gen "VALUES" 1)
+                (comp-seq rest env nil t)
+                (unless more? (gen "RET"))))
+         ((%seq (comp first env t t)
+                (gen "VALUES" 1)
+                (unless more? (gen "RET"))))))
 
      (comp-list (exps env)
        (when exps

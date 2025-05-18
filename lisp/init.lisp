@@ -759,12 +759,6 @@
                    `(setf ,var ,sym))
                  places syms))))
 
-(defmacro multiple-value-prog1 (form &rest body)
-  (let ((list (gensym "list")))
-    `(let ((,list (multiple-value-list ,form)))
-       ,@body
-       (values-list ,list))))
-
 (defparameter *standard-output* (%make-output-stream))
 (defparameter *error-output* (%make-output-stream))
 (defparameter *trace-output* (%make-output-stream))
