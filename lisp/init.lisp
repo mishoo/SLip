@@ -465,12 +465,12 @@
                       (cadr args)
                     (setq args (cddr args)))
                   (gensym "form"))))
-    `(flet ((,name (,form)
-              (destructuring-bind ,args (if (eq 'funcall (car ,form))
-                                            (cddr ,form)
-                                            (cdr ,form))
-                ,@body)))
-       (setf (compiler-macro-function ',name) #',name))))
+    `(setf (compiler-macro-function ',name)
+           (%fn ,name (,form)
+                (destructuring-bind ,args (if (eq 'funcall (car ,form))
+                                              (cddr ,form)
+                                              (cdr ,form))
+                  ,@body)))))
 
 (define-compiler-macro mapcar (&whole form func &rest lists)
   (cond
@@ -750,14 +750,14 @@
 (defun values-list (list)
   (apply #'values list))
 
-(defmacro multiple-value-setq ((&rest vars) value-form)
+(defmacro multiple-value-setq ((&rest places) value-form)
   (let ((syms (mapcar (lambda (var)
-                        (gensym (symbol-name var)))
-                      vars)))
+                        (gensym "mvs"))
+                      places)))
     `(multiple-value-bind ,syms ,value-form
        ,@(mapcar (lambda (var sym)
                    `(setf ,var ,sym))
-                 vars syms))))
+                 places syms))))
 
 (defmacro multiple-value-prog1 (form &rest body)
   (let ((list (gensym "list")))
