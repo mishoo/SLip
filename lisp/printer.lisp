@@ -51,10 +51,12 @@
   (<< (number-string number *print-base*)))
 
 (def-print (function)
-  (<< "<FUNCTION")
-  (when (%function-name function)
-    (<< " " (%function-name function)))
-  (<< ">"))
+  (cond
+    ((%function-name function)
+     (<< "#'")
+     (print-object (%function-name function) out))
+    (t
+     (<< "#'#:LAMBDA"))))
 
 (def-print (hash)
   (<< "<HASH[" (length hash) "]")
@@ -112,6 +114,8 @@
     (<< ")")))
 
 (def-print (vector)
+  (when *print-pretty*
+    (return-from print-object (pprint-object vector out)))
   (<< "#(")
   (let looop ((i 0)
               (len (length vector)))
@@ -471,3 +475,30 @@
       (%pp-object object)
       (let ((*pp-stream* output))
         (%pp-object object))))
+
+(defun<< %pp-array (array)
+  (<< "#(")
+  (let ((n (length array)))
+    (let rec ((i 0))
+      (when (< i n)
+        (unless (zerop i)
+          (<< #\Newline)
+          (indent))
+        (let ((el (vector-ref array i)))
+          (with-indent (%stream-col *pp-stream*)
+            (pprint-object el *pp-stream*)
+            (cond
+              ((and (keywordp el)
+                    (< i (1- n)))
+               (<< " ")
+               (pprint-object (vector-ref array (1+ i)) *pp-stream*)
+               (rec (+ i 2)))
+              (t
+               (rec (+ i 1)))))))))
+  (<< ")"))
+
+(defmethod pprint-object ((object vector) (output output-stream))
+  (if (eq *pp-stream* output)
+      (%pp-array object)
+      (let ((*pp-stream* output))
+        (%pp-array object))))

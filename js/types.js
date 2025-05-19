@@ -411,6 +411,9 @@ export class LispSymbol extends LispType {
         ));
         return ret;
     }
+    static keyword(name) {
+        return this.get(name, LispPackage.get("KEYWORD"));
+    }
     constructor(name, pak) {
         super();
         if (name) {

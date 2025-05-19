@@ -2218,6 +2218,11 @@ defp("%utc-date", false, function(m, nargs){
                                 time.getUTCMilliseconds()  ]);
 });
 
+defp("%backtrace", false, function(m, nargs) {
+    checknargs(nargs, 0, 0);
+    return m.backtrace();
+});
+
 /**
  * JS Implementation of MurmurHash3 (as of April 6, 2011)
  *

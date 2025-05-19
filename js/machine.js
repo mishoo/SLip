@@ -1056,6 +1056,20 @@ export class LispMachine {
         error(...args);
     }
 
+    backtrace() {
+        let stacktrace = [];
+        for (let i = this.stack.sp; --i >= 0;) {
+            let x = this.stack.data[i];
+            if (x instanceof LispRet) {
+                stacktrace.push([ LispSymbol.keyword("RET"), x.f ]);
+            }
+        }
+        return [
+            LispSymbol.keyword("FUNCTION"), this.f,
+            LispSymbol.keyword("STACKTRACE"), stacktrace,
+        ];
+    }
+
 }
 
 function frame(env, i) {
