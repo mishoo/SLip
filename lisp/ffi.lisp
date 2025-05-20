@@ -11,9 +11,9 @@
   (aif (regexp-exec #/^%/ name)
        (setf name (strcat "_" (substr name 1))))
   (aif (regexp-exec #/^\*(.*)\*$/ name)
-       (setf name (upcase (vector-ref it 1))))
+       (setf name (upcase (svref it 1))))
   (aif (regexp-exec #/^\+(.*)\+$/ name)
-       (setf name (strcat "$" (upcase (vector-ref it 1)))))
+       (setf name (strcat "$" (upcase (svref it 1)))))
   name)
 
 (defmacro defun-js (name args body)

@@ -123,7 +123,7 @@
     (list-add *loop-start* `(when (zerop (setf ,seq ,(pop args)
                                                ,length (length ,seq)))
                               (go $loop-end)))
-    (let ((setvar (dsetq var `(vector-ref ,seq ,index))))
+    (let ((setvar (dsetq var `(svref ,seq ,index))))
       (list-add *loop-body* `(when (>= (incf ,index) ,length)
                                (go $loop-end)))
       (list-nconc *loop-start* (copy-list setvar))
@@ -249,10 +249,10 @@
     (list-nconc *loop-start* `((setf ,symbols ,(nreverse get-symbols))
                                (when (zerop (setf ,length (length ,symbols)))
                                  (go $loop-end))
-                               (setf ,var (vector-ref ,symbols 0))))
+                               (setf ,var (svref ,symbols 0))))
     (list-nconc *loop-body* `((when (>= (incf ,index) ,length)
                                 (go $loop-end))
-                              (setf ,var (vector-ref ,symbols ,index)))))
+                              (setf ,var (svref ,symbols ,index)))))
   args)
 
 (defun parse-for-being (var args)
@@ -301,9 +301,9 @@
                               (when (cdr ,itval)
                                 (go $loop-end))
                               ,@(when vkey
-                                  `((setf ,vkey (vector-ref (car ,itval) 0))))
+                                  `((setf ,vkey (svref (car ,itval) 0))))
                               ,@(when vval
-                                  `((setf ,vval (vector-ref (car ,itval) 1)))))))
+                                  `((setf ,vval (svref (car ,itval) 1)))))))
              (list-nconc *loop-start*
                          `((setf ,hash-var ,hash-form)
                            (setf ,iter (hash-iterator ,hash-var))

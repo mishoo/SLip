@@ -18,6 +18,8 @@
 
 (defglobal *handlers* (make-hash))
 
+(defparameter *results* nil)
+
 (defun-js send-ymacs-reply (req-id what value) "
   YMACS.callHooks('onLispResponse', req_id, what, value);
 ")
@@ -61,7 +63,14 @@
   (let ((ret (eval expr)))
     ret))
 
+(defun save-result (val)
+  (unless (eq val (car *results*))
+    (push val *results*)
+    (let ((cell (nthcdr 2 *results*)))
+      (when cell (setf (cdr cell) nil)))))
+
 (defun ymacs-print (&rest vals)
+  (when vals (save-result (car vals)))
   (cond
     ((null vals)
      "; No value")
@@ -73,8 +82,11 @@
      (print-object-to-string (car vals)))))
 
 (define-handler :read-eval-print (code)
-  (let* ((expr (vector-ref (read1-from-string code) 0)))
-    (multiple-value-call #'ymacs-print (eval expr))))
+  (let ((expr (svref (read1-from-string code) 0)))
+    (multiple-value-call #'ymacs-print (eval `(let ((,(intern "*") (car *results*))
+                                                    (,(intern "**") (cadr *results*))
+                                                    (,(intern "***") (caddr *results*)))
+                                                ,expr)))))
 
 (define-handler :eval-print (expr)
   (multiple-value-call #'ymacs-print (eval expr)))

@@ -56,7 +56,7 @@
      (<< "#'")
      (print-object (%function-name function) out))
     (t
-     (<< "#'#:LAMBDA"))))
+     (<< "#'#:anonymous-function"))))
 
 (def-print (hash)
   (<< "<HASH[" (length hash) "]")
@@ -122,7 +122,7 @@
     (unless (zerop len)
       (when (> i 0)
         (<< " "))
-      (print-object (vector-ref vector i) out)
+      (print-object (svref vector i) out)
       (looop (+ i 1) (- len 1))))
   (<< ")"))
 
@@ -484,14 +484,14 @@
         (unless (zerop i)
           (<< #\Newline)
           (indent))
-        (let ((el (vector-ref array i)))
+        (let ((el (svref array i)))
           (with-indent (%stream-col *pp-stream*)
             (pprint-object el *pp-stream*)
             (cond
               ((and (keywordp el)
                     (< i (1- n)))
                (<< " ")
-               (pprint-object (vector-ref array (1+ i)) *pp-stream*)
+               (pprint-object (svref array (1+ i)) *pp-stream*)
                (rec (+ i 2)))
               (t
                (rec (+ i 1)))))))))

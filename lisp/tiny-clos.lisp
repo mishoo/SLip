@@ -99,19 +99,19 @@
       obj))
 
   (defun %instance-class (obj)
-    (vector-ref (%object-vector obj) 0))
+    (svref (%object-vector obj) 0))
 
   (defun %set-instance-class-to-self (obj)
     (vector-set (%object-vector obj) 0 obj))
 
   (defun %get-entity-proc (obj)
-    (vector-ref (%object-vector obj) 1))
+    (svref (%object-vector obj) 1))
 
   (defun %set-entity-proc (obj proc)
     (vector-set (%object-vector obj) 1 proc))
 
   (defun %instance-ref (obj index)
-    (vector-ref (%object-vector obj) (+ index 2)))
+    (svref (%object-vector obj) (+ index 2)))
 
   (defun %instance-set (obj index new-value)
     (vector-set (%object-vector obj) (+ index 2) new-value)))

@@ -223,20 +223,24 @@
   `(%memq ,item ,lst))
 
 ;; will be redefined later to also check compiler env for symbol-macrolet
-(defun safe-for-setq (thing)
+(defun safe-atom-p (thing)
   (symbolp thing))
 
 (defmacro case (expr . cases)
-  (let* ((safe (safe-for-setq expr))
+  (let* ((safe (safe-atom-p expr))
          (vexpr (if safe
                     expr
                     (gensym "CASE")))
          (code (let recur ((cases cases))
                  (when cases
-                   (if (and (listp (caar cases)) (caar cases))
-                       `(if (member ,vexpr ',(caar cases))
-                            (progn ,@(cdar cases))
-                            ,(recur (cdr cases)))
+                   (if (consp (caar cases))
+                       (if (cdaar cases)
+                           `(if (member ,vexpr ',(caar cases))
+                                (progn ,@(cdar cases))
+                                ,(recur (cdr cases)))
+                           `(if (eq ,vexpr ',(caaar cases))
+                                (progn ,@(cdar cases))
+                                ,(recur (cdr cases))))
                        (if (and (not (cdr cases))
                                 (member (caar cases) '(otherwise t)))
                            `(progn ,@(cdar cases))
@@ -626,18 +630,17 @@
            (frame (env i)
              (when env
                (or (position (car env) i 0)
-                   (progn
-                     ;; discard symbol-macrolet frames.
-                     ;; XXX: we should only do it for :lex env,
-                     ;; but such frames won't exist in other environments
-                     ;; anyway.
-                     (let* ((first (caar env))
-                            (type (cadr first))
-                            (arg (caddr first)))
-                       (when (and (eq type :var)
-                                  (eq arg :smac))
-                         (%decf i)))
-                     (frame (cdr env) (1+ i)))))))
+                   (let* ((first (caar env))
+                          (type (cadr first))
+                          (arg (caddr first)))
+                     ;; discard symbol-macrolet frames. XXX: we should only
+                     ;; do it for :lex env, but such frames won't exist in
+                     ;; other environments anyway.
+                     (frame (cdr env)
+                            (if (and (eq type :var)
+                                     (eq arg :smac))
+                                i
+                                (1+ i))))))))
     (frame env 0)))
 
 (defun find-macrolet-in-compiler-env (name &optional (env *compiler-env*))
@@ -649,10 +652,11 @@
   (when env
     (find-in-compiler-env name :var (hash-get env :lex))))
 
-(defun safe-for-setq (thing &optional (env *compiler-env*))
-  (and (symbolp thing)
-       (not (aif (find-var-in-compiler-env thing)
-                 (eq :smac (caddr it))))))
+(defun safe-atom-p (thing &optional (env *compiler-env*))
+  (and (atom thing)
+       (not (and (symbolp thing)
+                 (aif (find-var-in-compiler-env thing)
+                      (eq :smac (caddr it)))))))
 
 (defun make-compiler-env ()
   ;; :lex should match the runtime lexical environment; both
@@ -665,15 +669,17 @@
              :tags nil))
 
 (defun extend-compiler-env (rest &optional (env *compiler-env*))
-  (let ((h (hash-copy env)))
-    (labels ((rec (stuff)
-               (when stuff
-                 (let ((key (car stuff))
-                       (val (cadr stuff)))
-                   (hash-add h key (cons val (hash-get h key)))
-                   (rec (cddr stuff))))))
-      (rec rest))
-    h))
+  (cond
+    (rest
+     (let ((h (hash-copy env)))
+       (let rec ((stuff rest))
+         (when stuff
+           (let ((key (car stuff))
+                 (val (cadr stuff)))
+             (hash-add h key (cons val (hash-get h key)))
+             (rec (cddr stuff)))))
+       h))
+    (env)))
 
 (defmacro with-env body
   `(let ((*compiler-env* env))
@@ -746,18 +752,14 @@
                 (if (eq :smac (caddr it))
                     (comp (cadddr it) env t t) ;; symbol macro expansion
                     (gen "LVAR" (car it) (cadr it)))
-                (progn
-                  (unknown-variable name)
-                  (gen "GVAR" name)))))
+                (gen "GVAR" (unknown-variable name)))))
 
      (gen-set (name env local)
        (if (%globalp name)
            (gen "GSET" name)
            (if local
                (gen "LSET" (car local) (cadr local))
-               (progn
-                 (unknown-variable name)
-                 (gen "GSET" name)))))
+               (gen "GSET" (unknown-variable name)))))
 
      (mklabel ()
        (gensym "label"))
@@ -772,7 +774,8 @@
 
      (unknown-variable (sym)
        (unless (member sym *unknown-variables*)
-         (push sym *unknown-variables*)))
+         (push sym *unknown-variables*))
+       sym)
 
      (comp (x env val? more?)
        (cond
@@ -939,24 +942,24 @@
                       (if (eq :smac (caddr it))
                           (error "%POP called on symbol macro: " name)
                           (gen "POPLIST" (car it) (cadr it)))
-                      (progn
-                        (unknown-variable name)
-                        (gen "POPGLIST" name))))
+                      (gen "POPGLIST" (unknown-variable name))))
              (unless val? (gen "POP"))
              (unless more? (gen "RET"))))
 
      (comp-list (exps env)
        (when exps
          (cond
-           ((and (cdr exps)
-                 (consp (car exps))
+           ((and (consp (car exps))
                  (eq '%ooo (caar exps)))
             ;; “out-of-order” operator: evaluate this item *after* the rest of
             ;; the list, but leave values on the stack in the proper order.
-            (%seq (gen "NIL")
-                  (comp-list (cdr exps) env)
-                  (comp (cadar exps) env t t)
-                  (gen "POPBACK" (length (cdr exps)))))
+            (cond
+              ((cdr exps)
+               (%seq (gen "NIL")
+                     (comp-list (cdr exps) env)
+                     (comp (cadar exps) env t t)
+                     (gen "POPBACK" (length (cdr exps)))))
+              ((comp (cadar exps) env t t))))
            ((%seq (comp (car exps) env t t)
                   (comp-list (cdr exps) env))))))
 

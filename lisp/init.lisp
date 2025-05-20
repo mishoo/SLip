@@ -24,7 +24,7 @@
           charp char-equal char= char< char<= char> char>= char/= letterp digitp
           stringp string-equal string= string< string<= string> string>= string/=
           make-regexp regexp-test regexp-exec replace-regexp quote-regexp regexpp
-          vectorp vector vector-ref vector-set vector-push vector-pop make-vector
+          vectorp vector svref vector-push vector-pop make-vector
           getf
           list list* copy-list listp cons consp eq eql equal equalp gensym length
 
@@ -409,7 +409,7 @@
 
 (def-emac push (obj place)
   (cond
-    ((safe-for-setq place)
+    ((safe-atom-p place)
      `(setq ,place (cons ,obj ,place)))
     ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                           (get-setf-expansion place)
@@ -422,7 +422,7 @@
 (def-emac pop (place)
   (let ((v (gensym "place")))
     (cond
-      ((safe-for-setq place)
+      ((safe-atom-p place)
        `(%:%pop ,place))
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                             (get-setf-expansion place)
@@ -435,7 +435,7 @@
 (defsetf getf (place indicator) (value)
   (let ((vval (gensym)))
     (cond
-      ((safe-for-setq place)
+      ((safe-atom-p place)
        `(let (,vval)
           (setf ,place (%:%putf ,place ,indicator (setq ,vval ,value)))
           ,vval))
@@ -451,6 +451,12 @@
   (setf (getf %:*compiler-macros* name) handler))
 
 (def-emac define-compiler-macro (name args &body body)
+  (when (and (consp name)
+             (eq 'setf (car name))
+             (symbolp (cadr name))
+             (null (cddr name)))
+    (setf name (intern (strcat "(SETF " (cadr name) ")")
+                       (symbol-package (cadr name)))))
   (%:maybe-xref-info name 'compiler-macro)
   (let ((form (if (eq '&whole (car args))
                   (prog1
@@ -463,6 +469,12 @@
                                               (cddr ,form)
                                               (cdr ,form))
                   ,@body)))))
+
+(defun (setf svref) (value vector index)
+  (vector-set vector index value))
+
+(define-compiler-macro (setf svref) (value vector index)
+  `(vector-set ,vector ,index ,value))
 
 (define-compiler-macro mapcar (&whole form func &rest lists)
   (cond
@@ -521,7 +533,7 @@
 (labels ((make-dementor (place delta inc)
            (symbol-macrolet ((dement `(,inc ,place ,delta)))
              (cond
-               ((safe-for-setq place)
+               ((safe-atom-p place)
                 `(setq ,place ,dement))
                ((multiple-value-bind (temps value-forms store-vars store-form place)
                                      (get-setf-expansion place)
@@ -605,14 +617,14 @@
         (rmv (reverse list) nil))))
 
 (defun nhalf-list (a)
-  (cons a (when a
-            (let rec ((a a)
-                      (b (cddr a)))
-              (cond
-                ((eq a b) (error "Circular list detected"))
-                (b (rec (cdr a) (cddr b)))
-                (t (prog1 (cdr a)
-                     (setf (cdr a) nil))))))))
+  (when a
+    (let rec ((a a)
+              (b (cddr a)))
+      (cond
+        ((eq a b) (error "Circular list detected"))
+        (b (rec (cdr a) (cddr b)))
+        (t (prog1 (cdr a)
+             (setf (cdr a) nil)))))))
 
 (def-efun merge (list1 list2 predicate)
   (let* ((ret (list nil))
@@ -637,13 +649,8 @@
   (let sort ((list list))
     (cond ((not list) nil)
           ((not (cdr list)) list)
-          (t (let* ((a list)
-                    (b (labels ((sub (list i)
-                                  (if (zerop (decf i))
-                                      (prog1 (cdr list)
-                                        (setf (cdr list) nil))
-                                      (sub (cdr list) i))))
-                         (sub list (floor (length list) 2)))))
+          (t (let ((a list)
+                   (b (nhalf-list list)))
                (merge (sort a) (sort b) predicate))))))
 
 (setf (symbol-function 'sort) #'stable-sort)

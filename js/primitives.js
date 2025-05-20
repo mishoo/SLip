@@ -651,7 +651,7 @@ defp("vector-subseq", false, function(m, nargs){
     return vector.slice(start, end);
 });
 
-defp("vector-ref", false, function(m, nargs){
+defp("svref", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var index = m.pop(), vector = m.pop();
     checktype(vector, LispArray);
