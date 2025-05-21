@@ -86,9 +86,9 @@ export const OP = {
     LRET2: 72,
     LJUMP2: 73,
     XARGS: 74,
-    POPLIST: 75,
+    LPOP: 75,
     EQ: 76,
-    POPGLIST: 77,
+    GLPOP: 77,
     TJUMPK: 78,
     FJUMPK: 79,
     VALUES: 80,
@@ -172,9 +172,9 @@ const OP_LEN = [
     1 /* LRET2 */,
     2 /* LJUMP2 */,
     5 /* XARGS */,
-    2 /* POPLIST */,
+    2 /* LPOP */,
     0 /* EQ */,
-    1 /* POPGLIST */,
+    1 /* GLPOP */,
     1 /* TJUMPK */,
     1 /* FJUMPK */,
     1 /* VALUES */,
@@ -375,7 +375,7 @@ var optimize = (function(){
                 code[i+7][0] == "CAR" &&
                 code[i+8][0] == "UNFR" && code[i+8][1] == 1 && code[i+8][2] == 0)
             {
-                el[0] = "POPLIST";
+                el[0] = "LPOP";
                 code.splice(i + 1, 8);
                 return true;
             }
@@ -395,7 +395,7 @@ var optimize = (function(){
                 code[i+7][0] == "CAR" &&
                 code[i+8][0] == "UNFR" && code[i+8][1] == 1 && code[i+8][2] == 0)
             {
-                el[0] = "POPGLIST";
+                el[0] = "GLPOP";
                 code.splice(i + 1, 8);
                 return true;
             }
@@ -486,15 +486,14 @@ var optimize = (function(){
           case "TJUMPK":
             // SAVE L1; ... L1: JUMP L2 --> SAVE L2
             var idx = find_target(code, el[1]);
-            if (idx >= 0 && idx < code.length - 1 && code[idx + 1][0] == "JUMP") {
+            if (idx >= 0 && idx+1 < code.length && code[idx + 1][0] == "JUMP") {
                 el[1] = code[idx + 1][1];
                 return true;
             }
             break;
           case "JUMP":
             var idx = find_target(code, el[1]);
-            if (idx >= 0 && idx < code.length - 1 &&
-                (code[idx + 1][0] == "JUMP" || code[idx + 1][0] == "RET")) {
+            if (idx >= 0 && idx+1 < code.length && /^(?:JUMP|RET)$/.test(code[idx + 1][0])) {
                 code[i] = code[idx + 1];
                 return true;
             }
@@ -1507,7 +1506,7 @@ let OP_RUN = [
         }
         m.env = new LispCons(frame, m.env);
     },
-    /*OP.POPLIST*/ (m) => {
+    /*OP.LPOP*/ (m) => {
         let i = m.code[m.pc++];
         let j = m.code[m.pc++];
         let fr = frame(m.env, i);
@@ -1518,7 +1517,7 @@ let OP_RUN = [
     /*OP.EQ*/ (m) => {
         m.push(eq(m.pop(), m.pop()));
     },
-    /*OP.POPGLIST*/ (m) => {
+    /*OP.GLPOP*/ (m) => {
         let sym = m.code[m.pc++];
         let binding = m.find_dvar(sym);
         let lst = binding.value;

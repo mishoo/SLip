@@ -388,6 +388,24 @@ defp("nthcdr", false, function(m, nargs){
     return p;
 });
 
+defp("%nhalf-list", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let a = m.pop(), b = a;
+    if (a === null) return null;
+    while (true) {
+        b = LispCons.cddr(b);
+        if (b === null) {
+            b = a.cdr;
+            a.cdr = null;
+            return b;
+        }
+        if (a === b) {
+            error("Circular list detected");
+        }
+        a = a.cdr;
+    }
+});
+
 defp("reverse", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop();
@@ -461,12 +479,8 @@ defp("%putf", true, function(m, nargs){
         if (eq(p.car, item)) break;
         p = p.cdr.cdr;
     }
-    if (p) {
-        p.cdr.car = value;
-    } else {
-        list = new LispCons(item, new LispCons(value, list));
-    }
-    return list;
+    return p ? (p.cdr.car = value, list)
+        : new LispCons(item, new LispCons(value, list));
 });
 
 (function(N){

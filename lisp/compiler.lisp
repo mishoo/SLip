@@ -174,26 +174,29 @@
   `(if ,pred nil (progn ,@body)))
 
 (defun map1 (func lst)
-  (let rec ((lst lst)
-            (ret nil))
-    (if lst
-        (rec (cdr lst) (cons (funcall func (car lst)) ret))
-        (nreverse ret))))
+  (let ((ret nil))
+    (tagbody
+     next
+     (when lst
+       (setq ret (cons (funcall func (%pop lst)) ret))
+       (go next)))
+    (nreverse ret)))
 
 (defun map2 (func lst1 lst2)
-  (let rec ((lst1 lst1)
-            (lst2 lst2)
-            (ret nil))
-    (if (and lst1 lst2)
-        (rec (cdr lst1) (cdr lst2)
-             (cons (funcall func (car lst1) (car lst2)) ret))
-        (nreverse ret))))
+  (let ((ret nil))
+    (tagbody
+     next
+     (when (and lst1 lst2)
+       (setq ret (cons (funcall func (%pop lst1) (%pop lst2)) ret))
+       (go next)))
+    (nreverse ret)))
 
 (defun foreach (lst func)
-  (let rec ((lst lst))
-    (when lst
-      (funcall func (car lst))
-      (rec (cdr lst)))))
+  (tagbody
+   next
+   (when lst
+     (funcall func (%pop lst))
+     (go next))))
 
 (defmacro prog2 (exp1 exp2 . body)
   `(progn
@@ -937,12 +940,12 @@
      (comp-pop (name env val? more?)
        (assert (symbolp name) (strcat "%POP expects a symbol, got: " name))
        (%seq (if (%globalp name)
-                 (gen "POPGLIST" name)
+                 (gen "GLPOP" name)
                  (aif (find-var name env)
                       (if (eq :smac (caddr it))
                           (error "%POP called on symbol macro: " name)
-                          (gen "POPLIST" (car it) (cadr it)))
-                      (gen "POPGLIST" (unknown-variable name))))
+                          (gen "LPOP" (car it) (cadr it)))
+                      (gen "GLPOP" (unknown-variable name))))
              (unless val? (gen "POP"))
              (unless more? (gen "RET"))))
 
@@ -1001,7 +1004,7 @@
            ;; pass 1: fetch tags
            (labels ((rec (forms p)
                       (when forms
-                        (if (symbolp (car forms))
+                        (if (atom (car forms))
                             (let ((cell (list (list (car forms)
                                                     :tag
                                                     tbody
@@ -1016,7 +1019,7 @@
                               :tags tags)
              (<< (gen "BLOCK"))           ; define the tagbody entry
              (foreach forms (lambda (x)
-                              (if (symbolp x)
+                              (if (atom x)
                                   (progn
                                     (<< #( (cadddr (car tags)) ))
                                     (setq tags (cdr tags))) ; label

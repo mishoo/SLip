@@ -436,9 +436,13 @@
   (let ((vval (gensym)))
     (cond
       ((safe-atom-p place)
-       `(let (,vval)
-          (setf ,place (%:%putf ,place ,indicator (setq ,vval ,value)))
-          ,vval))
+       (if (safe-atom-p value)
+           `(progn
+              (setf ,place (%:%putf ,place ,indicator ,value))
+              ,value)
+           `(let (,vval)
+              (setf ,place (%:%putf ,place ,indicator (setq ,vval ,value)))
+              ,vval)))
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                             (get-setf-expansion place)
          `(let* (,vval
@@ -549,7 +553,9 @@
 
 (def-efun collect-if (test list)
   (cond ((not list) nil)
-        ((funcall test (car list)) (cons (car list) (collect-if test (cdr list))))
+        ((funcall test (car list))
+         (cons (car list)
+               (collect-if test (cdr list))))
         (t (collect-if test (cdr list)))))
 
 (def-efun remove (item list)
@@ -616,33 +622,22 @@
         (nreverse (rmv list nil))
         (rmv (reverse list) nil))))
 
-(defun nhalf-list (a)
-  (when a
-    (let rec ((a a)
-              (b (cddr a)))
-      (cond
-        ((eq a b) (error "Circular list detected"))
-        (b (rec (cdr a) (cddr b)))
-        (t (prog1 (cdr a)
-             (setf (cdr a) nil)))))))
-
 (def-efun merge (list1 list2 predicate)
   (let* ((ret (list nil))
          (p ret))
     (macrolet ((add (cell)
                  `(setf p (setf (cdr p) ,cell))))
-      (let rec ((a list1)
-                (b list2))
-        (cond ((and a b)
-               (if (funcall predicate (car b) (car a))
-                   (progn
-                     (add (list (car b)))
-                     (rec a (cdr b)))
-                   (progn
-                     (add (list (car a)))
-                     (rec (cdr a) b))))
-              (a (add a))
-              (b (add b))))
+      (let ((a list1)
+            (b list2))
+        (tagbody
+         next
+         (cond ((and a b)
+                (if (funcall predicate (car b) (car a))
+                    (setf b (cdr (add b)))
+                    (setf a (cdr (add a))))
+                (go next))
+               (a (add a))
+               (b (add b)))))
       (cdr ret))))
 
 (def-efun stable-sort (list predicate)
@@ -650,7 +645,7 @@
     (cond ((not list) nil)
           ((not (cdr list)) list)
           (t (let ((a list)
-                   (b (nhalf-list list)))
+                   (b (%nhalf-list list)))
                (merge (sort a) (sort b) predicate))))))
 
 (setf (symbol-function 'sort) #'stable-sort)
