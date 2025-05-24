@@ -622,22 +622,20 @@
         (nreverse (rmv list nil))
         (rmv (reverse list) nil))))
 
-(def-efun merge (list1 list2 predicate)
+(def-efun merge (a b predicate)
   (let* ((ret (list nil))
          (p ret))
     (macrolet ((add (cell)
                  `(setf p (setf (cdr p) ,cell))))
-      (let ((a list1)
-            (b list2))
-        (tagbody
-         next
-         (cond ((and a b)
-                (if (funcall predicate (car b) (car a))
-                    (setf b (cdr (add b)))
-                    (setf a (cdr (add a))))
-                (go next))
-               (a (add a))
-               (b (add b)))))
+      (tagbody
+       next
+       (cond ((and a b)
+              (if (funcall predicate (car b) (car a))
+                  (setf b (cdr (add b)))
+                  (setf a (cdr (add a))))
+              (go next))
+             (a (add a))
+             (b (add b))))
       (cdr ret))))
 
 (def-efun stable-sort (list predicate)
