@@ -342,6 +342,18 @@ var optimize = (function(){
             code.splice(i, 2, [ "TJUMPK", code[i+1][1] ]);
             return true;
         }
+        if (/^(?:JUMP|LJUMP2?|RET)$/.test(el[0])) {
+            for (var j = i + 1; j < code.length; ++j) {
+                if (code[j] instanceof LispSymbol) {
+                    let len = j - i - 1;
+                    if (len > 0) {
+                        code.splice(i + 1, len);
+                        return true;
+                    }
+                    break;
+                }
+            }
+        }
         switch (el[0]) {
           case "VARS":
             if (el[1] == 1) {
@@ -446,7 +458,7 @@ var optimize = (function(){
                 code.splice(i + 1, 2);
                 return true;
             }
-            if (pass == 2 &&
+            if (pass > 0 &&
                 i+2 < code.length &&
                 code[i+1][0] == "FJUMP" &&
                 code[i+2][0] == "GVAR" &&
@@ -467,7 +479,7 @@ var optimize = (function(){
                 code.splice(i + 1, 2);
                 return true;
             }
-            if (pass == 2 &&
+            if (pass > 0 &&
                 i+2 < code.length &&
                 code[i+1][0] == "FJUMP" &&
                 code[i+2][0] == "LVAR" &&
@@ -599,7 +611,7 @@ var optimize = (function(){
             }
             break;
           case "CONS":
-            if (i < code.length - 1) {
+            if (i+1 < code.length) {
                 if (code[i+1][0] == "CONS") {
                     code.splice(i, 2, [ "LIST_", 3 ]);
                     return true;
@@ -609,17 +621,12 @@ var optimize = (function(){
         }
     };
     return function optimize(code) {
-        while (true) {
+        let pass = 0;
+        while (pass < 2) {
             var changed = false;
             for (var i = 0; i < code.length; ++i)
-                if (optimize1(code, i, 1)) --i, changed = true;
-            if (!changed) break;
-        }
-        while (true) {
-            var changed = false;
-            for (var i = 0; i < code.length; ++i)
-                if (optimize1(code, i, 2)) --i, changed = true;
-            if (!changed) break;
+                if (optimize1(code, i, pass)) --i, changed = true;
+            if (!changed) pass++;
         }
     };
 })();
