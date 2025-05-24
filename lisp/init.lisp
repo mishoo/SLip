@@ -257,16 +257,16 @@
   `(progn (%global! ',name)
           (setq ,name ,val)))
 
-(labels ((finished (tails)
-           (when tails
-             (if (car tails) (finished (cdr tails)) t))))
-  (defun mapcar (f . lists)
-    (labels ((looop (ret tails)
-               (if (finished tails)
-                   (nreverse ret)
-                   (looop (cons (apply f (map1 #'car tails)) ret)
-                          (map1 #'cdr tails)))))
-      (looop nil lists))))
+(defun finished (tails)
+  (when tails
+    (if (car tails) (finished (cdr tails)) t)))
+
+(defun mapcar (f . lists)
+  (let rec (ret (tails lists))
+    (if (finished tails)
+        (nreverse ret)
+        (rec (cons (apply f (map1 #'car tails)) ret)
+             (map1 #'cdr tails)))))
 
 ;;; setf
 
@@ -551,63 +551,96 @@
 
 ;;; lists
 
+(def-emac dolist ((var list-form &optional result-form) &body body)
+  (let ((list (gensym "list"))
+        (next (gensym "next"))
+        (end (gensym "end")))
+    `(block nil
+       (let (,var (,list ,list-form))
+         (tagbody
+          ,next
+          (if ,list
+              (progn
+                (setf ,var (pop ,list))
+                ,@body
+                (go ,next))
+              (setf ,var nil)))
+         ,result-form))))
+
+(defmacro with-collectors ((&rest names) &body body)
+  (let (lists tails syms adders)
+    (flet ((mk-collector (name)
+             (let ((vlist (gensym))
+                   (vtail (gensym))
+                   (vadd name))
+               (push vlist lists)
+               (push vtail tails)
+               (push `(,name (cdr ,vlist)) syms)
+               (push `(,vadd (el)
+                       `(setf ,',vtail (setf (cdr ,',vtail)
+                                             (cons ,el nil))))
+                     adders))))
+      (foreach names #'mk-collector)
+      `(let* (,@(mapcar (lambda (name) `(,name (list nil)))
+                        lists)
+              ,@(mapcar #'list tails lists))
+         (macrolet (,@adders)
+           (symbol-macrolet (,@syms)
+             ,@body))))))
+
 (def-efun collect-if (test list)
-  (cond ((not list) nil)
-        ((funcall test (car list))
-         (cons (car list)
-               (collect-if test (cdr list))))
-        (t (collect-if test (cdr list)))))
+  (with-collectors (elements)
+    (dolist (el list)
+      (when (funcall test el)
+        (elements el)))
+    elements))
 
 (def-efun remove (item list)
   (collect-if (lambda (x)
                 (not (eq x item))) list))
 
-(labels ((finished (tails)
-           (when tails
-             (if (car tails) (finished (cdr tails)) t))))
+;; every returns false as soon as any invocation of predicate
+;; returns false. If the end of a sequence is reached, every returns
+;; true. Thus, every returns true if and only if every invocation of
+;; predicate returns true.
+(def-efun every (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) t
+        (and (apply test (map1 #'car tails))
+             (scan (map1 #'cdr tails))))))
 
-  ;; every returns false as soon as any invocation of predicate
-  ;; returns false. If the end of a sequence is reached, every returns
-  ;; true. Thus, every returns true if and only if every invocation of
-  ;; predicate returns true.
-  (def-efun every (test . lists)
-    (let scan ((tails lists))
-      (if (finished tails) t
-          (and (apply test (map1 #'car tails))
-               (scan (map1 #'cdr tails))))))
+;; some returns the first non-nil value which is returned by an
+;; invocation of predicate. If the end of a sequence is reached
+;; without any invocation of the predicate returning true, some
+;; returns false. Thus, some returns true if and only if some
+;; invocation of predicate returns true.
+(def-efun some (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) nil
+        (or (apply test (map1 #'car tails))
+            (scan (map1 #'cdr tails))))))
 
-  ;; some returns the first non-nil value which is returned by an
-  ;; invocation of predicate. If the end of a sequence is reached
-  ;; without any invocation of the predicate returning true, some
-  ;; returns false. Thus, some returns true if and only if some
-  ;; invocation of predicate returns true.
-  (def-efun some (test . lists)
-    (let scan ((tails lists))
-      (if (finished tails) nil
-          (or (apply test (map1 #'car tails))
-              (scan (map1 #'cdr tails))))))
+;; notany returns false as soon as any invocation of predicate
+;; returns true. If the end of a sequence is reached, notany returns
+;; true. Thus, notany returns true if and only if it is not the case
+;; that any invocation of predicate returns true.
+(def-efun notany (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) t
+        (if (apply test (map1 #'car tails))
+            nil
+            (scan (map1 #'cdr tails))))))
 
-  ;; notany returns false as soon as any invocation of predicate
-  ;; returns true. If the end of a sequence is reached, notany returns
-  ;; true. Thus, notany returns true if and only if it is not the case
-  ;; that any invocation of predicate returns true.
-  (def-efun notany (test . lists)
-    (let scan ((tails lists))
-      (if (finished tails) t
-          (if (apply test (map1 #'car tails))
-              nil
-              (scan (map1 #'cdr tails))))))
-
-  ;; notevery returns true as soon as any invocation of predicate
-  ;; returns false. If the end of a sequence is reached, notevery
-  ;; returns false. Thus, notevery returns true if and only if it is
-  ;; not the case that every invocation of predicate returns true.
-  (def-efun notevery (test . lists)
-    (let scan ((tails lists))
-      (if (finished tails) nil
-          (if (apply test (map1 #'car tails))
-              (scan (map1 #'cdr tails))
-              t)))))
+;; notevery returns true as soon as any invocation of predicate
+;; returns false. If the end of a sequence is reached, notevery
+;; returns false. Thus, notevery returns true if and only if it is
+;; not the case that every invocation of predicate returns true.
+(def-efun notevery (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) nil
+        (if (apply test (map1 #'car tails))
+            (scan (map1 #'cdr tails))
+            t))))
 
 (def-efun remove-duplicates (list &key (test #'eql) from-end)
   (labels ((rmv (list ret)
@@ -660,32 +693,11 @@
              (,var 0))
          (tagbody
           ,next
-          (unless (< ,var ,count)
-            (go ,end))
-          ,@body
-          (incf ,var)
-          (go ,next)
-          ,end))
+          (when (< ,var ,count)
+            ,@body
+            (incf ,var)
+            (go ,next))))
        ,result-form)))
-
-(def-emac dolist ((var list-form &optional result-form) &body body)
-  (let ((list (gensym "list"))
-        (next (gensym "next"))
-        (end (gensym "end")))
-    `(block nil
-       (let ((,list ,list-form)
-             (,var))
-         (tagbody
-          ,next
-          (unless ,list
-            (setf ,var nil)
-            (go ,end))
-          (setf ,var (car ,list)
-                ,list (cdr ,list))
-          ,@body
-          (go ,next)
-          ,end)
-         ,result-form))))
 
 ;;; do and do* differ by exactly two characters, but oh well... copy-paste FTW.
 
@@ -701,12 +713,10 @@
                    vars)
        (tagbody
         ,next
-        (when ,end-test-form
-          (go ,end))
-        ,@body
-        (psetf ,@step)
-        (go ,next)
-        ,end)
+        (unless ,end-test-form
+          ,@body
+          (psetf ,@step)
+          (go ,next)))
        ,result-form)))
 
 (def-emac do* (vars (end-test-form &optional result-form) &body body)
@@ -721,12 +731,10 @@
                     vars)
        (tagbody
         ,next
-        (when ,end-test-form
-          (go ,end))
-        ,@body
-        (setf ,@step)
-        (go ,next)
-        ,end)
+        (unless ,end-test-form
+          ,@body
+          (setf ,@step)
+          (go ,next)))
        ,result-form)))
 
 (def-emac use-package (source &optional (target *package*))
