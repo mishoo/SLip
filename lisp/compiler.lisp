@@ -23,10 +23,7 @@
            '*unknown-variables*
            '*compiler-env*
            '*xref-info*
-           '*let-tco*
            '*compiler-macros*)
-
-(setq *let-tco* t)
 
 ;; (defmacro cond (clauses)
 ;;   (when clauses
@@ -1297,11 +1294,7 @@
                      (more?
                       (<< (comp-seq body env val? t)
                           (gen "UNFR" 1 0)))
-                     (t ;; *let-tco*
-                        (<< (comp-seq body env val? nil)))
-                     (t
-                      (<< (comp-seq body env val? t)
-                          (gen "RET"))))))))
+                     ((<< (comp-seq body env val? nil))))))))
            (comp-seq body env val? more?)))
 
      (comp-macrolet (bindings body env val? more?)
@@ -1344,11 +1337,7 @@
                   (more?
                    (<< (comp-seq body env val? t)
                        (gen "UNFR" 1 specials)))
-                  (*let-tco*
-                   (<< (comp-seq body env val? nil)))
-                  (t
-                   (<< (comp-seq body env val? t)
-                       (gen "RET"))))))))
+                  ((<< (comp-seq body env val? nil))))))))
          (t
           (comp-seq (list values-form body) env val? more?))))
 
@@ -1392,11 +1381,7 @@
                        (more?
                         (<< (comp-seq body env val? t)
                             (gen "UNFR" 1 (length specials))))
-                       (*let-tco*
-                        (<< (comp-seq body env val? nil)))
-                       (t
-                        (<< (comp-seq body env val? t)
-                            (gen "RET"))))))))
+                       ((<< (comp-seq body env val? nil))))))))
            (comp-seq body env val? more?)))
 
      (comp-let* (bindings body env val? more?)
@@ -1426,11 +1411,7 @@
                    (more?
                     (<< (comp-seq body env val? t)
                         (gen "UNFR" 1 (length specials))))
-                   (t ;; *let-tco*
-                      (<< (comp-seq body env val? nil)))
-                   (t
-                    (<< (comp-seq body env val? t)
-                        (gen "RET")))))))
+                   ((<< (comp-seq body env val? nil)))))))
            (comp-seq body env val? more?)))
 
      (comp-catch (tag body env val? more?)
