@@ -1431,16 +1431,14 @@
              (gen "THROW")))
 
      (comp-unwind-protect (form cleanup env val? more?)
-       (if form
-           (let ((k (mklabel)))
-             (%seq (gen "UPOPEN" k)
-                   (comp form env val? t) ; if val? is T, this leaves it on the stack
-                   (gen "UPEXIT")
-                   #( k )
-                   (comp-seq cleanup env nil t) ; result of cleanup code not needed
-                   (gen "UPCLOSE")
-                   (if more? nil (gen "RET"))))
-           (comp-seq cleanup env val? more?)))
+       (let ((k (mklabel)))
+         (%seq (gen "UPOPEN" k)
+               (comp form env val? t) ; if val? is T, this leaves it on the stack
+               (gen "UPEXIT")
+               #( k )
+               (comp-seq cleanup env nil t) ; result of cleanup code not needed
+               (gen "UPCLOSE")
+               (if more? nil (gen "RET")))))
 
      (compile (exp)
        (assert (and (consp exp)
