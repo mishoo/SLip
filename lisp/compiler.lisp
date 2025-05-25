@@ -704,7 +704,7 @@
   (unless (and env
                (or (find-in-compiler-env name :func (hash-get env :lex))
                    (find-in-compiler-env name :macro (hash-get env :macros))))
-    (getf %:*compiler-macros* name)))
+    (getf *compiler-macros* name)))
 
 (labels
     ((assert (p msg)
@@ -1199,7 +1199,7 @@
                             (<< (gen "LVAR" 0 (1- index)) ;; supplied-p
                                 (gen "TJUMP" l1)          ;; if T then it's passed
                                 (with-env
-                                  (comp defval env t t))     ;; compile default value
+                                  (comp defval env t t))  ;; compile default value
                                 (gen "LSET" 0 index)      ;; set arg value in env
                                 (gen "POP")               ;; discard from stack
                                 #(l1))))
@@ -1348,7 +1348,7 @@
                 (gen "VALUES" (length forms))
                 (unless more? (gen "RET"))))
          (t
-          (comp-seq forms env val? more?))))
+          (comp-seq forms env nil more?))))
 
      (comp-let (bindings body env val? more?)
        (if bindings
@@ -1416,14 +1416,18 @@
 
      (comp-catch (tag body env val? more?)
        (if body
-           (let ((k (mklabel)))
+           (let ((k1 (mklabel)))
              (%seq (comp tag env t t)
-                   (gen "CATCH" k)
-                   (comp-seq body env t t)
-                   #( k )
-                   (if val? nil (gen "POP"))
-                   (if more? nil (gen "RET"))))
-           (%seq (if more? nil (gen "RET")))))
+                   (gen "CATCH" k1)
+                   (comp-seq body env val? more?)
+                   #( k1 )
+                   (if val?
+                       (if more?
+                           (gen "UNFR" 0 1)
+                           (gen "RET"))
+                       (gen "POP"))))
+           (%seq (when val? (gen "NIL"))
+                 (unless more? (gen "RET")))))
 
      (comp-throw (tag ret env)
        (%seq (comp tag env t t)
@@ -1431,14 +1435,16 @@
              (gen "THROW")))
 
      (comp-unwind-protect (form cleanup env val? more?)
-       (let ((k (mklabel)))
-         (%seq (gen "UPOPEN" k)
-               (comp form env val? t) ; if val? is T, this leaves it on the stack
-               (gen "UPEXIT")
-               #( k )
-               (comp-seq cleanup env nil t) ; result of cleanup code not needed
-               (gen "UPCLOSE")
-               (if more? nil (gen "RET")))))
+       (if cleanup
+           (let ((k (mklabel)))
+             (%seq (gen "UPOPEN" k)
+                   (comp form env val? t) ; if val? is T, this leaves it on the stack
+                   (gen "UPEXIT")
+                   #( k )
+                   (comp-seq cleanup env nil t) ; result of cleanup code not needed
+                   (gen "UPCLOSE")
+                   (if more? nil (gen "RET"))))
+           (comp form env val? more?)))
 
      (compile (exp)
        (assert (and (consp exp)
