@@ -784,10 +784,6 @@
                                    `(setf ,var ,sym))
                                  places syms))))))
 
-(defparameter *standard-output* (%make-output-stream))
-(defparameter *error-output* (%make-output-stream))
-(defparameter *trace-output* (%make-output-stream))
-
 (def-emac with-output-to-string ((var &optional string) &body body)
   `(let ((,var (%make-output-stream)))
      ,@(when string

@@ -788,7 +788,6 @@ ${fasls.map(f => `;;     - ${f}\n`).join("")}\
 
         repl.cmd("sl_repl_mode");
         buf.cmd("switch_to_buffer", "*sl-repl*");
-        repl.cmd("sl_repl_prompt");
         ed.setActiveFrame(frame);
     }
     return repl;
@@ -841,17 +840,20 @@ export function make_desktop(load_files = []) {
         };
     });
 
-    setTimeout(function(){
-        ymacs.focus();
-        let buf = get_repl_buffer();
-        if (load_files.length == 0) {
-            load_files = [ "ide/info.md" ];
-        }
-        load_files.forEach(name => {
-            buf.cmd("split_frame_horizontally");
-            buf.cmd("other_frame");
-            ymacs.listenOnce("onBufferSwitch", (buf) => buf.cmd("other_frame"));
-            buf.cmd("find_file", name);
-        });
-    }, 10);
+    return () => {
+        setTimeout(() => {
+            ymacs.focus();
+            let buf = get_repl_buffer();
+            if (load_files.length == 0) {
+                load_files = ["ide/info.md"];
+            }
+            buf.cmd("sl_repl_prompt");
+            load_files.forEach(name => {
+                buf.cmd("split_frame_horizontally");
+                buf.cmd("other_frame");
+                ymacs.listenOnce("onBufferSwitch", (buf) => buf.cmd("other_frame"));
+                buf.cmd("find_file", name);
+            });
+        }, 10);
+    };
 };

@@ -23,7 +23,10 @@
            '*unknown-variables*
            '*compiler-env*
            '*xref-info*
-           '*compiler-macros*)
+           '*compiler-macros*
+           '*standard-output*
+           '*error-output*
+           '*trace-output*)
 
 ;; (defmacro cond (clauses)
 ;;   (when clauses
@@ -1495,6 +1498,10 @@
   (set-symbol-function! 'compile #'compile)
   (set-symbol-function! 'compile-string #'compile-string))
 
+(setq *standard-output* (%make-output-stream))
+(setq *error-output* (%make-output-stream))
+(setq *trace-output* (%make-output-stream))
+
 (defun read1-from-string (str)
   (let ((reader (lisp-reader str 'EOF)))
     #( (cdr (funcall reader 'next)) (funcall reader 'pos) )))
@@ -1531,10 +1538,11 @@
         (rec nil (cdr (funcall reader 'next)))))))
 
 (defun %load (url)
+  (%stream-put *trace-output* (strcat ";; Loading " url #\Newline))
   (let ((code (%get-file-contents (make-url url))))
     (unless code (error (strcat "Unable to load file: " url)))
     (with-undefined-warnings
-      (compile-string code url))))
+        (compile-string code url))))
 
 (defun make-url (url)
   (if *url-prefix*

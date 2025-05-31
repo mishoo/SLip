@@ -117,6 +117,8 @@ import "../js/primitives.js";
                 }
                 compile(files.slice(1), cont);
             });
+        } else {
+            compile(files.slice(1), cont);
         }
     };
 
@@ -153,8 +155,8 @@ import "../js/primitives.js";
             load_fasls(lisp_files, function(){
                 window.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
                 [ ...document.querySelectorAll(".lisp-log") ].forEach(el => el.remove());
-                make_desktop(startup_files);
-                compile(startup_files, () => {}, true);
+                let done = make_desktop(startup_files);
+                compile(startup_files, done, true);
             });
         });
     };
