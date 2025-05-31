@@ -971,12 +971,15 @@
        (let ((body (catch name
                      (comp-seq forms env val? more?))))
          (or body
-             (let ((label (gensym "block")))
+             (let ((label (gensym "block"))
+                   (k2 (when more? (gensym "block-k2"))))
                (%seq (gen "BLOCK")
                      (with-extenv (:lex (list (list name :block label)))
-                       (comp-seq forms env t t))
+                       (comp-seq forms env val? more?))
+                     (when more? (gen "JUMP" k2))
                      #( label )
                      (unless val? (gen "POP"))
+                     (when more? #( k2 ))
                      (gen "UNFR" 1 0)
                      (unless more? (gen "RET")))))))
 
@@ -984,7 +987,8 @@
        (assert (symbolp name) (strcat "RETURN-FROM expects a symbol, got: " name))
        (let* ((block (or (find-block name env)
                          (throw name)))
-              (label (caddr block)))
+              (data (cddr block))
+              (label (car data)))
          (%seq (comp value env t t)
                (gen "LVAR" (car block) (cadr block))
                (gen "LRET" label))))
