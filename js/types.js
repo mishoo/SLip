@@ -575,6 +575,7 @@ export class LispProcess extends LispType {
         } while (this.noint);
         if (err) {
             console.error("Error in PID: ", this.pid);
+            console.log(m.backtrace());
             console.dir(err);
             console.dir(err.stack);
             console.log(this);

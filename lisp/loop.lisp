@@ -19,12 +19,20 @@
 (in-package :sl-loop)
 
 (defparameter *clause-parsers* (list))
+
 (defparameter *loop-body* nil)
 (defparameter *loop-variables* nil)
-(defparameter *loop-collect* nil)
 (defparameter *loop-start* nil)
 (defparameter *loop-iterate* nil)
 (defparameter *loop-finish* nil)
+
+(defparameter @loop-body nil)
+(defparameter @loop-variables nil)
+(defparameter @loop-start nil)
+(defparameter @loop-iterate nil)
+(defparameter @loop-finish nil)
+
+(defparameter *loop-collect* nil)
 (defparameter *loop-block-name* nil)
 
 (defun parse-clause (args)
@@ -64,7 +72,7 @@
           (if (consp x)
               (eq (car x) name)
               (eq x name)))
-        *loop-variables*))
+        (cdr @loop-variables)))
 
 (defun dsetq (var data)
   (cond
@@ -104,9 +112,9 @@
                 (setf next (gensym "next")))
       (list-add *loop-start* `(setf ,next ,(pop args))))
     (list-add *loop-body*
-              `(unless (setf ,seq ,(if next
-                                       `(funcall ,next ,seq)
-                                       `(cdr ,seq)))
+              `(unless (consp (setf ,seq ,(if next
+                                              `(funcall ,next ,seq)
+                                              `(cdr ,seq))))
                  (go $loop-end)))
     (let ((setvar (dsetq var (case kind
                                ((in :in) `(car ,seq))
@@ -154,6 +162,7 @@
      `(%check-positive-loop-step ,step))))
 
 (defun parse-for-arithmetic (var args)
+  (unless var (setf var (gensym "WAT")))
   (list-add *loop-variables* var)
   (let ((step nil))
     (let* ((init-form nil)
@@ -163,11 +172,13 @@
            (step)
            (noteq nil)
            (kind (car args))
-           (upwards (iskw kind '(from upfrom below upto to))))
+           (upwards t))
 
       (flet ((dig ()
                (cond
                  ((iskw (car args) '(from upfrom downfrom))
+                  (when (iskw (car args) 'downfrom)
+                    (setf upwards nil))
                   (when init-form
                     (error "LOOP for: more than one init form ~A" args))
                   (pop args)
@@ -180,9 +191,7 @@
                     (error "LOOP for: more than one limit form ~A" args))
                   (cond
                     ((iskw (car args) '(downto above))
-                     (setf upwards nil))
-                    ((iskw (car args) '(upto below))
-                     (setf upwards t)))
+                     (setf upwards nil)))
                   (setf noteq (iskw (pop args) '(below above))
                         limit-form (pop args))
                   (cond
@@ -213,7 +222,8 @@
       (unless init-form
         (if upwards
             (list-add *loop-start* `(setf ,var 0))
-            (error "Downward LOOP requires init form")))
+            (unless step-form
+              (error "Downward LOOP requires init form"))))
 
       (list-add *loop-body*
                 `(setf ,var ,(if step-form
@@ -576,31 +586,31 @@
   args)
 
 (defun expand-loop (args)
-  (let ((loop-body (cons nil nil))
-        (loop-variables (cons nil nil))
-        (loop-start (cons nil nil))
-        (loop-iterate (cons nil nil))
-        (loop-finish (cons nil nil))
+  (let ((@loop-body (cons nil nil))
+        (@loop-variables (cons nil nil))
+        (@loop-start (cons nil nil))
+        (@loop-iterate (cons nil nil))
+        (@loop-finish (cons nil nil))
         (*loop-block-name* nil)
         (*loop-collect* nil))
-    (let ((*loop-body* loop-body)
-          (*loop-variables* loop-variables)
-          (*loop-start* loop-start)
-          (*loop-iterate* loop-iterate)
-          (*loop-finish* loop-finish))
+    (let ((*loop-body* @loop-body)
+          (*loop-variables* @loop-variables)
+          (*loop-start* @loop-start)
+          (*loop-iterate* @loop-iterate)
+          (*loop-finish* @loop-finish))
       (let rec ((args args))
         (when args
           (rec (parse-clause args)))))
     `(block ,*loop-block-name*
-       (let (,@(cdr loop-variables))
+       (let (,@(cdr @loop-variables))
          (tagbody
-            ,@(cdr loop-start)
+            ,@(cdr @loop-start)
           $loop-next
-            ,@(cdr loop-iterate)
-            ,@(cdr loop-body)
+            ,@(cdr @loop-iterate)
+            ,@(cdr @loop-body)
             (go $loop-next)
           $loop-end)
-         ,@(cdr loop-finish)))))
+         ,@(cdr @loop-finish)))))
 
 (defmacro loop (&body args)
   (if (symbolp (car args))

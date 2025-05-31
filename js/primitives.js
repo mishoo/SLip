@@ -127,6 +127,8 @@ function equal(a, b) {
             if (!equal(a.car, b.car)) return null;
             a = a.cdr;
             b = b.cdr;
+            if (!LispCons.is(a) || !LispCons.is(b))
+                return equal(a, b);
         }
         return a === b;
     } else if (LispArray.is(a) && LispArray.is(b)) {
@@ -2077,7 +2079,13 @@ defp("%warn", true, function(m, nargs){
 /* -----[ other ]----- */
 
 defp("%debugger", true, function(m, nargs){
+    checknargs(nargs, 0, 0);
     debugger;
+});
+
+defp("%step-debug-mode", true, function(m, nargs){
+    checknargs(nargs, 0, 0);
+    m.debug = true;
 });
 
 defp("%grok-xref-info", true, function(m, nargs){

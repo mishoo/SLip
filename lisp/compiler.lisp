@@ -860,6 +860,9 @@
                         (comp `(function ,(intern (strcat "(SETF " (cadr sym) ")")
                                                   (symbol-package (cadr sym))))
                               env t more?)))
+                     ((when (and (consp sym)
+                                 (eq 'lambda (car sym)))
+                        (comp sym env t more?)))
                      (t
                       (assert (symbolp sym) "FUNCTION requires a symbol")
                       (let ((local (find-func sym env)))
@@ -969,23 +972,22 @@
                      (comp-seq forms env val? more?))))
          (or body
              (let ((label (gensym "block")))
-               (%seq (gen "BLOCK2" label)
+               (%seq (gen "BLOCK")
                      (with-extenv (:lex (list (list name :block label)))
-                       (comp-seq forms env val? t))
+                       (comp-seq forms env t t))
                      #( label )
+                     (unless val? (gen "POP"))
                      (gen "UNFR" 1 0)
-                     (if more? nil (gen "RET")))))))
+                     (unless more? (gen "RET")))))))
 
      (comp-return (name value env)
        (assert (symbolp name) (strcat "RETURN-FROM expects a symbol, got: " name))
        (let* ((block (or (find-block name env)
                          (throw name)))
               (label (caddr block)))
-         (if (zerop (car block))
-             (%seq (comp value env t t)
-                   (gen "JUMP" label))
-             (%seq (comp value env t t)
-                   (gen "LRET2" (car block))))))
+         (%seq (comp value env t t)
+               (gen "LVAR" (car block) (cadr block))
+               (gen "LRET" label))))
 
      (comp-tagbody (forms env val? more?)
        ;; a TAGBODY introduces a single return point in the lexical
@@ -1029,10 +1031,10 @@
        (let ((pos (find-tag tag env)))
          (assert pos (strcat "TAG " tag " not found"))
          (let* ((tbody (find-tagbody (caddr pos) env))
-                (i (car tbody)))
-           (if (zerop i)
-               (gen "JUMP" (cadddr pos))
-               (gen "LJUMP2" (cadddr pos) i)))))
+                (i (car tbody))
+                (j (cadr tbody)))
+           (%seq (gen "LVAR" i j)
+                 (gen "LJUMP" (cadddr pos))))))
 
      (comp-if (pred then else env val? more?)
        (cond
@@ -1339,7 +1341,7 @@
                        (gen "UNFR" 1 specials)))
                   ((<< (comp-seq body env val? nil))))))))
          (t
-          (comp-seq (list values-form body) env val? more?))))
+          (comp-seq (list* values-form body) env val? more?))))
 
      (comp-values (forms env val? more?)
        (cond

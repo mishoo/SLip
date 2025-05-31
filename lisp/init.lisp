@@ -45,6 +45,7 @@
           car cdr caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr
           cddar cdddr caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
           cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
+          first second third fourth rest
 
           get-internal-run-time
           compiler-macro-function
@@ -551,7 +552,7 @@
 
 ;;; lists
 
-(def-emac dolist ((var list-form &optional result-form) &body body)
+(def-emac dolist ((var list-form &rest result-form) &body body)
   (let ((list (gensym "list"))
         (next (gensym "next"))
         (end (gensym "end")))
@@ -559,13 +560,14 @@
        (let (,var (,list ,list-form))
          (tagbody
           ,next
-          (if ,list
-              (progn
-                (setf ,var (pop ,list))
-                ,@body
-                (go ,next))
-              (setf ,var nil)))
-         ,result-form))))
+          (unless ,list
+            (go ,end))
+          (setf ,var (pop ,list))
+          ,@body
+          (go ,next)
+          ,end
+          (setf ,var nil))
+         ,@result-form))))
 
 (defmacro with-collectors ((&rest names) &body body)
   (let (lists tails syms adders)
@@ -682,9 +684,24 @@
 (setf (symbol-function 'sort) #'stable-sort)
 (export '(sort export import))
 
+(defmacro first (list)
+  `(car ,list))
+
+(defmacro second (list)
+  `(car (cdr ,list)))
+
+(defmacro third (list)
+  `(car (cddr ,list)))
+
+(defmacro fourth (list)
+  `(car (cdddr ,list)))
+
+(defmacro rest (list)
+  `(cdr ,list))
+
 ;;; basic looping
 
-(def-emac dotimes ((var count-form &optional result-form) &body body)
+(def-emac dotimes ((var count-form &rest result-form) &body body)
   (let ((count (gensym))
         (next (gensym "next"))
         (end (gensym "end")))
@@ -693,49 +710,57 @@
              (,var 0))
          (tagbody
           ,next
-          (when (< ,var ,count)
-            ,@body
-            (incf ,var)
-            (go ,next))))
-       ,result-form)))
+          (unless (< ,var ,count)
+            (go ,end))
+          ,@body
+          (incf ,var)
+          (go ,next)
+          ,end)
+         ,@result-form))))
 
 ;;; do and do* differ by exactly two characters, but oh well... copy-paste FTW.
 
-(def-emac do (vars (end-test-form &optional result-form) &body body)
+(def-emac do (vars (end-test-form &rest result-form) &body body)
   (let ((next (gensym "next"))
         (end (gensym "end"))
         (step (apply #'nconc (mapcar (lambda (var)
                                        (when (> (length var) 2)
                                          (list (car var) (caddr var))))
                                      vars))))
-    `(let ,(mapcar (lambda (var)
-                     (list (car var) (cadr var)))
-                   vars)
-       (tagbody
-        ,next
-        (unless ,end-test-form
+    `(block nil
+       (let ,(mapcar (lambda (var)
+                       (list (car var) (cadr var)))
+                     vars)
+         (tagbody
+          ,next
+          (when ,end-test-form
+            (go ,end))
           ,@body
           (psetf ,@step)
-          (go ,next)))
-       ,result-form)))
+          (go ,next)
+          ,end)
+         ,@result-form))))
 
-(def-emac do* (vars (end-test-form &optional result-form) &body body)
+(def-emac do* (vars (end-test-form &rest result-form) &body body)
   (let ((next (gensym "next"))
         (end (gensym "end"))
         (step (apply #'nconc (mapcar (lambda (var)
                                        (when (> (length var) 2)
                                          (list (car var) (caddr var))))
                                      vars))))
-    `(let* ,(mapcar (lambda (var)
-                      (list (car var) (cadr var)))
-                    vars)
-       (tagbody
-        ,next
-        (unless ,end-test-form
+    `(block nil
+       (let* ,(mapcar (lambda (var)
+                        (list (car var) (cadr var)))
+                      vars)
+         (tagbody
+          ,next
+          (when ,end-test-form
+            (go ,end))
           ,@body
           (setf ,@step)
-          (go ,next)))
-       ,result-form)))
+          (go ,next)
+          ,end)
+         ,@result-form))))
 
 (def-emac use-package (source &optional (target *package*))
   `(%use-package (find-package ,source) (find-package ,target)))
@@ -755,9 +780,9 @@
                         (gensym "mvs"))
                       places)))
     `(multiple-value-bind ,syms ,value-form
-       ,@(mapcar (lambda (var sym)
-                   `(setf ,var ,sym))
-                 places syms))))
+       (values (values ,@(mapcar (lambda (var sym)
+                                   `(setf ,var ,sym))
+                                 places syms))))))
 
 (defparameter *standard-output* (%make-output-stream))
 (defparameter *error-output* (%make-output-stream))

@@ -104,7 +104,8 @@
 
 (defmacro ignore-errors (&body body)
   `(handler-case (progn ,@body)
-     (error (condition))))
+     (error (condition)
+       (values nil condition))))
 
 (defun existing-condition-name? (name)
   (let ((class (find-class name)))

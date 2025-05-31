@@ -217,17 +217,16 @@ class LispCleanup {
 // return context for TAGBODY and BLOCK
 class LispLongRet {
     static #NO_RET = {};
-    constructor(m, exit) {
+    constructor(m) {
         this.f = m.f;
         this.code = m.code;
         this.env = m.env;
         this.denv = m.denv;
         this.slen = m.stack.sp;
         this.n_args = m.n_args;
-        this.exit = exit;
         //if (m.trace) this.trace = m.trace.slice();
     }
-    unwind(m, addr = this.exit) {
+    unwind(m, addr) {
         m.f = this.f;
         m.code = this.code;
         m.env = this.env;
@@ -237,7 +236,7 @@ class LispLongRet {
         m.n_args = this.n_args;
         //if (this.trace) m.trace = this.trace;
     }
-    run(m, addr = this.exit, val = LispLongRet.#NO_RET) {
+    run(m, addr, val = LispLongRet.#NO_RET) {
         // figure out if we need to execute cleanup hooks
         let doit;
         (doit = () => {
@@ -537,7 +536,7 @@ var optimize = (function(){
                     code.splice(i + 1, 1);
                     return true;
                 }
-                if ([ "RET", "LRET", "LRET2", "LJUMP", "LJUMP2" ].includes(code[i+1][0])) {
+                if ([ "RET", "LRET", "LJUMP" ].includes(code[i+1][0])) {
                     code.splice(i, 1);
                     return true;
                 }
@@ -767,6 +766,9 @@ export function disassemble(code) {
                 break;
               case OP.CONST:
                 data = dump(code[i]);
+                break;
+              case OP.LJUMP:
+                data = code[i];
                 break;
               default:
                 if (is_jump_instruction(op)) {
@@ -1187,9 +1189,12 @@ let OP_RUN = [
     /*OP.LRET*/ (m) => {
         let noval = m.f.noval;
         let addr = m.code[m.pc++];
-        let bret = m.pop(), val = m.pop();
-        bret.run(m, addr);
-        if (!noval) m.push(val);
+        let bret = m.pop(), retval = m.stack.pop_ret();
+        if (!noval) {
+            bret.run(m, addr, retval);
+        } else {
+            bret.run(m, addr);
+        }
     },
     /*OP.NOT*/ (m) => {
         m.push(m.pop() === null ? true : null);
@@ -1244,7 +1249,7 @@ let OP_RUN = [
         m.dynpush(c);
     },
     /*OP.THROW*/ (m) => {
-        let val = m.pop();
+        let val = m.stack.pop_ret();
         let tag = m.pop();
         let p = m.denv;
         while (p) {
@@ -1429,12 +1434,14 @@ let OP_RUN = [
         m.push(LispCons.cddddr(m.pop()));
     },
     /*OP.BLOCK2*/ (m) => {
+        error("Deprecated instruction BLOCK2");
         let exit = m.code[m.pc++];
         let frame = [];
         m.env = new LispCons(frame, m.env);
         frame[0] = new LispLongRet(m, exit);
     },
     /*OP.LRET2*/ (m) => {
+        error("Deprecated instruction LRET2");
         let noval = m.f.noval;
         let fr = m.code[m.pc++];
         let retval = m.stack.pop_ret();
@@ -1444,6 +1451,7 @@ let OP_RUN = [
         }
     },
     /*OP.LJUMP2*/ (m) => {
+        error("Deprecated instruction LJUMP2");
         let addr = m.code[m.pc++];
         let fr = m.code[m.pc++];
         frame(m.env, fr)[0].run(m, addr);
@@ -1568,5 +1576,13 @@ let OP_RUN = [
 ];
 
 function vmrun(m) {
+    if (m.debug) {
+        console.log(
+            OP_REV[m.code[m.pc]],
+            ...m.code.slice(m.pc+1, m.pc+1+OP_LEN[m.code[m.pc]]),
+            m.stack.copy().reverse()
+        );
+        debugger;
+    }
     OP_RUN[m.code[m.pc++]](m);
 }
