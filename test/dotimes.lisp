@@ -157,49 +157,47 @@
   (dotimes (i -100 i))
   0)
 
-%:EOF
-
-(deftest dotimes.21
-  (let ((x 0))
-    (dotimes (i (1- most-negative-fixnum) (values i x))
-      (declare (type fixnum i))
-      (incf x)))
-  0 0)
+;; (deftest dotimes.21
+;;   (let ((x 0))
+;;     (dotimes (i (1- most-negative-fixnum) (values i x))
+;;       (declare (type fixnum i))
+;;       (incf x)))
+;;   0 0)
 
 ;;; Scope of free declarations
 
-(deftest dotimes.22
-  (block done
-    (let ((x :bad))
-      (declare (special x))
-      (let ((x :good))
-        (dotimes (i (return-from done x))
-          (declare (special x))))))
-  :good)
+;; (deftest dotimes.22
+;;   (block done
+;;     (let ((x :bad))
+;;       (declare (special x))
+;;       (let ((x :good))
+;;         (dotimes (i (return-from done x))
+;;           (declare (special x))))))
+;;   :good)
 
-(deftest dotimes.23
-  (let ((x :good))
-    (declare (special x))
-    (let ((x :bad))
-      (dotimes (i 10 x)
-        (declare (special x)))))
-  :good)
+;; (deftest dotimes.23
+;;   (let ((x :good))
+;;     (declare (special x))
+;;     (let ((x :bad))
+;;       (dotimes (i 10 x)
+;;         (declare (special x)))))
+;;   :good)
 
-(deftest dotimes.23a
-  (let ((x :good) (bound 10))
-    (declare (special x))
-    (let ((x :bad))
-      (dotimes (i bound x)
-        (declare (special x)))))
-  :good)
+;; (deftest dotimes.23a
+;;   (let ((x :good) (bound 10))
+;;     (declare (special x))
+;;     (let ((x :bad))
+;;       (dotimes (i bound x)
+;;         (declare (special x)))))
+;;   :good)
 
-(deftest dotimes.24
-  (let ((bound 4) (j 0))
-    (values
-     (dotimes (i bound)
-       (incf j) (decf bound))
-     bound j))
-  nil 0 4)
+;; (deftest dotimes.24
+;;   (let ((bound 4) (j 0))
+;;     (values
+;;      (dotimes (i bound)
+;;        (incf j) (decf bound))
+;;      bound j))
+;;   nil 0 4)
 
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
@@ -220,5 +218,7 @@
        (push i result))))
   (3 2 1 0))
 
+%:EOF
+
 (def-macro-test dotimes.error.1
-  (dotimes (i 10)))
+    (dotimes (i 10)))

@@ -76,3 +76,6 @@
 (defun equalpt (x y)
   "Like EQUALP, but guaranteed to return T for true."
   (apply #'values (mapcar #'notnot (multiple-value-list (equalp x y)))))
+
+(defmacro expand-in-current-env (form)
+  (macroexpand form))

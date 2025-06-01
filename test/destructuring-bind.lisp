@@ -163,8 +163,6 @@
   (destructuring-bind (x &aux (y (list x))) '(:foo) (values x y))
   :foo (:foo))
 
-%:EOF
-
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
 
@@ -174,28 +172,30 @@
    (destructuring-bind (a b c) (expand-in-current-env (%m '(1 2 3))) (values a b c)))
   1 2 3)
 
+%:EOF
+
 ;;; Error cases
 
 #|
 (deftest destructuring-bind.error.1
-  (signals-error (destructuring-bind (a b c) nil (list a b c))
-                 program-error)
-  t)
+(signals-error (destructuring-bind (a b c) nil (list a b c))
+program-error)
+t)
 
 (deftest destructuring-bind.error.2
-  (signals-error (destructuring-bind ((a b c)) nil (list a b c))
-                 program-error)
-  t)
+(signals-error (destructuring-bind ((a b c)) nil (list a b c))
+program-error)
+t)
 
 (deftest destructuring-bind.error.3
-  (signals-error (destructuring-bind (a b) 'x (list a b))
-                 program-error)
-  t)
+(signals-error (destructuring-bind (a b) 'x (list a b))
+program-error)
+t)
 
 (deftest destructuring-bind.error.4
-  (signals-error (destructuring-bind (a . b) 'x (list a b))
-                 program-error)
-  t)
+(signals-error (destructuring-bind (a . b) 'x (list a b))
+program-error)
+t)
 |#
 
 ;;; (deftest destructuring-bind.error.5
@@ -207,8 +207,8 @@
 ;;;  t)
 
 (deftest destructuring-bind.error.7
-  (signals-error (funcall (macro-function 'destructuring-bind))
-                 program-error)
+    (signals-error (funcall (macro-function 'destructuring-bind))
+                   program-error)
   t)
 
 (deftest destructuring-bind.error.8

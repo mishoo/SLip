@@ -295,8 +295,6 @@
     (loop for nil from 5 above 0 collect (incf i)))
   (1 2 3 4 5))
 
-%:EOF
-
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
 

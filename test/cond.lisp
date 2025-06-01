@@ -80,8 +80,6 @@
      (return-from done 'good)))
   good)
 
-%:EOF
-
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
 
@@ -99,6 +97,8 @@
          ((expand-in-current-env (%m :good)))
          (t :bad2)))
   :good)
+
+%:EOF
 
 ;;; Error tests
 

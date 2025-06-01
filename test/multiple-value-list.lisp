@@ -28,15 +28,13 @@
   (multiple-value-list (values 'a 'b))
   (a b))
 
-%:EOF
-
-(deftest multiple-value-list.7
-  (not
-   (loop
-    for i from 0 below (min multiple-values-limit 100)
-    for x = (make-list i :initial-element 'a)
-    always (equal x (multiple-value-list (values-list x)))))
-  nil)
+;; (deftest multiple-value-list.7
+;;   (not
+;;    (loop
+;;     for i from 0 below 100
+;;     for x = (make-list i :initial-element 'a)
+;;     always (equal x (multiple-value-list (values-list x)))))
+;;   nil)
 
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
@@ -60,11 +58,13 @@
     (values (multiple-value-list (incf i)) i))
   (1) 1)
 
+%:EOF
+
 ;;; Error tests
 
 (deftest multiple-value-list.error.1
-  (signals-error (funcall (macro-function 'multiple-value-list))
-                 program-error)
+    (signals-error (funcall (macro-function 'multiple-value-list))
+                   program-error)
   t)
 
 (deftest multiple-value-list.error.2

@@ -86,8 +86,6 @@
      (return-from done 'good)))
   good)
 
-%:EOF
-
 ;;; Macros are expanded in the appropriate environment
 
 (deftest catch.14
@@ -105,6 +103,8 @@
             (catch 'foo (throw 'foo (expand-in-current-env (%m :good))) :bad))
   :good)
 
+%:EOF
+
 (deftest throw-error
-  (signals-error (throw (gensym) nil) control-error)
+    (signals-error (throw (gensym) nil) control-error)
   t)

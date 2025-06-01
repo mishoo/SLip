@@ -111,26 +111,24 @@
       (when (eq e 'c) (return x))))
   (c b a))
 
-%:EOF
-
 ;;; Scope of free declarations
 
-(deftest dolist.16
-  (block done
-    (let ((x :bad))
-      (declare (special x))
-      (let ((x :good))
-        (dolist (e (return-from done x))
-          (declare (special x))))))
-  :good)
+;; (deftest dolist.16
+;;   (block done
+;;     (let ((x :bad))
+;;       (declare (special x))
+;;       (let ((x :good))
+;;         (dolist (e (return-from done x))
+;;           (declare (special x))))))
+;;   :good)
 
-(deftest dolist.17
-  (let ((x :good))
-    (declare (special x))
-    (let ((x :bad))
-      (dolist (e nil x)
-        (declare (special x)))))
-  :good)
+;; (deftest dolist.17
+;;   (let ((x :good))
+;;     (declare (special x))
+;;     (let ((x :bad))
+;;       (dolist (e nil x)
+;;         (declare (special x)))))
+;;   :good)
 
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
@@ -151,8 +149,10 @@
        (push x result))))
   (c b a))
 
+%:EOF
+
 ;;; Error tests
 
 (def-macro-test dolist.error.1
-  (dolist (x nil)))
+    (dolist (x nil)))
 

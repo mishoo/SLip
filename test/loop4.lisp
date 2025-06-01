@@ -58,8 +58,6 @@
 ;;    program-error)
 ;;   t)
 
-%:EOF
-
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
 

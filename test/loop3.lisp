@@ -135,8 +135,6 @@
   (a c e g)
   1 2 2)
 
-%:EOF
-
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
 

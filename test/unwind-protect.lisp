@@ -115,14 +115,14 @@
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
 
-;; (deftest unwind-protect.12
-;;   (macrolet
-;;    ((%m (z) z))
-;;    (unwind-protect (expand-in-current-env (%m :good)) :bad))
-;;   :good)
+(deftest unwind-protect.12
+  (macrolet
+   ((%m (z) z))
+   (unwind-protect (expand-in-current-env (%m :good)) :bad))
+  :good)
 
-;; (deftest unwind-protect.13
-;;   (macrolet
-;;    ((%m (z) z))
-;;    (unwind-protect :good (expand-in-current-env (%m :bad))))
-;;   :good)
+(deftest unwind-protect.13
+  (macrolet
+   ((%m (z) z))
+   (unwind-protect :good (expand-in-current-env (%m :bad))))
+  :good)

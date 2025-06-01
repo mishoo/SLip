@@ -82,8 +82,6 @@
      (return 'good)))
   good)
 
-%:EOF
-
 ;;; Macros are expanded in the appropriate environment
 
 (deftest multiple-value-prog1.11

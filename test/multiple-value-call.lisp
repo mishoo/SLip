@@ -16,8 +16,6 @@
   (multiple-value-call 'list (floor 13 4))
   (3 1))
 
-%:EOF
-
 ;;; Macros are expanded in the appropriate environment
 
 (deftest multiple-value-call.4

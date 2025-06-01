@@ -80,8 +80,6 @@
   (multiple-value-bind () (values 1 2 3 4 5))
   nil)
 
-%:EOF
-
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
 
@@ -93,11 +91,13 @@
                         (list x y z)))
   (1 2 3))
 
+%:EOF
+
 ;;; Error cases
 
 (deftest multiple-value-bind.error.1
-  (signals-error (funcall (macro-function 'multiple-value-bind))
-                 program-error)
+    (signals-error (funcall (macro-function 'multiple-value-bind))
+                   program-error)
   t)
 
 (deftest multiple-value-bind.error.2
