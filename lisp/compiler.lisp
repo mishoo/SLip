@@ -1090,24 +1090,31 @@
                        ecode
                        (if more? #( l2 ))))))))))
 
-     (comp-or (exps env val? more?)
+     (comp-or (exps env val? more? &optional l1)
        (cond
          ((null exps)
           (%seq (when val? (gen "NIL"))
                 (unless more? (gen "RET"))))
          ((cdr exps)
-          (if (always-true-p (car exps))
-              (comp (car exps) env val? more?)
-              (if (not (cadr exps))
-                  (comp-or `(,(car exps) ,@(cddr exps)) env val? more?)
-                  (let ((l1 (mklabel)))
-                    (%seq (comp (car exps) env t t)
-                          (if val?
-                              (gen "TJUMPK" l1)
-                              (gen "TJUMP" l1))
-                          (comp-or (cdr exps) env val? more?)
-                          #( l1 )
-                          (unless more? (gen "RET")))))))
+          (cond
+            ((always-true-p (car exps))
+             (comp (car exps) env val? more?))
+            (l1
+             (%seq (comp (car exps) env t t)
+                   (if val?
+                       (gen "TJUMPK" l1)
+                       (gen "TJUMP" l1))
+                   (comp-or (cdr exps) env val? more? l1)))
+            (t
+             (let ((l1 (mklabel)))
+               (%seq (comp (car exps) env t t)
+                     (if val?
+                         (gen "TJUMPK" l1)
+                         (gen "TJUMP" l1))
+                     (comp-or (cdr exps) env val? more? l1)
+                     #( l1 )
+                     (gen "VALUES" 1)
+                     (unless more? (gen "RET")))))))
          (t (comp (car exps) env val? more?))))
 
      (comp-funcall (f args env val? more?)

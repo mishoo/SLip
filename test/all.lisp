@@ -12,6 +12,7 @@
 (load "test/multiple-value-prog1.lisp")
 (load "test/multiple-value-setq.lisp")
 
+(load "test/cond.lisp")
 (load "test/destructuring-bind.lisp")
 
 (load "test/block.lisp")
