@@ -202,7 +202,8 @@
 
 (def-efun macroexpand-1 (form)
   (cond
-    ((atom form) form)
+    ((atom form)
+     (or (%:find-symbol-macrolet-in-compiler-env form) form))
     ((and (eq 'progn (car form))
           (null (cdr form)))
      nil)
@@ -305,6 +306,10 @@
 (def-efun get-setf-expansion (form)
   (cond
     ((symbolp form)
+     ;; could be symbol macro.
+     (let ((exp (macroexpand-1 form)))
+       (unless (eq exp form)
+         (return-from get-setf-expansion (get-setf-expansion exp))))
      (let ((vals (list (gensym "val"))))
        (values nil nil vals `(setq ,form ,@vals) form)))
     ((consp form)
@@ -776,13 +781,29 @@
   (apply #'values list))
 
 (defmacro multiple-value-setq ((&rest places) value-form)
-  (let ((syms (mapcar (lambda (var)
-                        (gensym "mvs"))
-                      places)))
-    `(multiple-value-bind ,syms ,value-form
-       (values (values ,@(mapcar (lambda (var sym)
-                                   `(setf ,var ,sym))
-                                 places syms))))))
+  (cond
+    ((null places)
+     `(values ,value-form))
+    (t
+     (let ((syms (mapcar (lambda (place)
+                           (list* (gensym "mvs")
+                                  (multiple-value-list
+                                   (get-setf-expansion place))))
+                         places)))
+       `(let* (,@(apply #'append (mapcar (lambda (exp)
+                                           (let ((temps (cadr exp))
+                                                 (value-forms (caddr exp)))
+                                             (mapcar #'list temps value-forms)))
+                                         syms)))
+          (multiple-value-bind ,(mapcar #'car syms) ,value-form
+            (let (,@(append (mapcar (lambda (exp)
+                                      (let ((store-vars (cadddr exp)))
+                                        `(,(car store-vars) ,(car exp))))
+                                    syms)))
+              ,@(mapcar (lambda (exp)
+                          (elt exp 4))
+                        syms)
+              ,(caar syms))))))))
 
 (def-emac with-output-to-string ((var &optional string) &body body)
   `(let ((,var (%make-output-stream)))

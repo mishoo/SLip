@@ -651,6 +651,12 @@
     (aif (find-in-compiler-env name :macro (hash-get env :macros))
          (caddr it))))
 
+(defun find-symbol-macrolet-in-compiler-env (name &optional (env *compiler-env*))
+  (and env (symbolp name)
+       (aif (find-var-in-compiler-env name)
+            (when (eq :smac (caddr it))
+              (cadddr it)))))
+
 (defun find-var-in-compiler-env (name &optional (env *compiler-env*))
   (when env
     (find-in-compiler-env name :var (hash-get env :lex))))
