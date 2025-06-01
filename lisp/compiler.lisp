@@ -725,7 +725,8 @@
            (assert (<= min (- (length x) 1)) "Wrong number of arguments")))
 
      (make-environment ()
-       (make-compiler-env))
+       (or *compiler-env*
+           (make-compiler-env)))
 
      (extenv (env . rest)
        (extend-compiler-env rest env))

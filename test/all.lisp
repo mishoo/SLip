@@ -4,6 +4,8 @@
 
 (load "test/apply.lisp")
 
+(load "test/values.lisp")
+(load "test/values-list.lisp")
 (load "test/multiple-value-bind.lisp")
 (load "test/multiple-value-call.lisp")
 (load "test/multiple-value-list.lisp")

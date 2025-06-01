@@ -14,7 +14,7 @@
         '(atom quasiquote defmacro defun when unless labels flet foreach
           prog1 prog2 or and cond member case mapcar with-cc aif it push
           error warn without-interrupts
-          lisp-reader compile load function unwind-protect
+          lisp-reader eval compile load function unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
           quote lambda λ let let* if progn setq t nil not
           tagbody go block return return-from
@@ -134,17 +134,30 @@
 
                       ((consp thisarg)
                        (cond
-                         ((or optional? key?)
+                         (optional?
                           (let ((thisarg (car thisarg))
                                 (default (cadr thisarg))
                                 (thisarg-p (caddr thisarg)))
                             (when thisarg-p
                               (add thisarg-p `(if ,values t nil)))
-                            (add thisarg (if key?
-                                             (let ((val (gensym)))
-                                               `(let ((,val (getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")) 'not-found)))
-                                                  (if (eq ,val 'not-found) ,default ,val)))
-                                             `(if ,values (%pop ,values) ,default)))))
+                            (add thisarg `(if ,values (%pop ,values) ,default))))
+                         (key?
+                          (let ((thisarg (car thisarg))
+                                (default (cadr thisarg))
+                                (thisarg-p (caddr thisarg)))
+                            (when thisarg-p
+                              (add thisarg-p nil))
+                            (add thisarg
+                                 (let ((val (gensym)))
+                                   `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
+                                                                       (find-package "KEYWORD"))
+                                                      '%not-found)))
+                                      (if (eq ,val '%not-found)
+                                          ,default
+                                          (progn
+                                            ,@(when thisarg-p
+                                                `((setq ,thisarg-p t)))
+                                            ,val)))))))
                          (aux? (let ((thisarg (car thisarg))
                                      (value (cadr thisarg)))
                                  (add thisarg value)))
