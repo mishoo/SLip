@@ -3,6 +3,7 @@
 (load "test/deftest.lisp")
 
 (load "test/apply.lisp")
+(load "test/funcall.lisp")
 
 (load "test/values.lisp")
 (load "test/values-list.lisp")
@@ -12,6 +13,7 @@
 (load "test/multiple-value-prog1.lisp")
 (load "test/multiple-value-setq.lisp")
 
+(load "test/if.lisp")
 (load "test/cond.lisp")
 (load "test/destructuring-bind.lisp")
 
