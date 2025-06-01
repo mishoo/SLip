@@ -131,15 +131,19 @@ import "../js/primitives.js";
             log(`<span style='color: red'>ERROR: ${ev.error}</span>`);
         });
         load_fasls([ "lisp/compiler.lisp" ], function(){
-            let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
-            lisp_files.unshift("lisp/compiler.lisp");
-            compile(lisp_files, function(){
-                log("<span style='color: green'><b>DONE — press ENTER to reload</b></span>");
-                document.addEventListener("keydown", ev => {
-                    if (ev.key == "Enter") {
-                        //window.location.replace((""+window.location).replace(/\?recompile$/, ""));
-                        window.location.replace(document.referrer);
-                    }
+            compile([ "lisp/compiler.lisp" ], function(){
+                compile([ "lisp/compiler.lisp" ], function () {
+                    let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
+                    //lisp_files.unshift("lisp/compiler.lisp");
+                    compile(lisp_files, function () {
+                        log("<span style='color: green'><b>DONE — press ENTER to reload</b></span>");
+                        document.addEventListener("keydown", ev => {
+                            if (ev.key == "Enter") {
+                                //window.location.replace((""+window.location).replace(/\?recompile$/, ""));
+                                window.location.replace(document.referrer);
+                            }
+                        });
+                    });
                 });
             });
         });

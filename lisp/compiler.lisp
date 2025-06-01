@@ -883,9 +883,6 @@
                                       (unknown-function sym))
                                     (gen "FGVAR" sym)))
                               (unless more? (gen "RET")))))))))
-              (%fn (when val?
-                     (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
-                           (unless more? (gen "RET")))))
               (tagbody (comp-tagbody (cdr x) env val? more?))
               (go
                (arg-count x 1 1)
