@@ -67,6 +67,15 @@
      i a b c))
   (x . y) 3 1 2 3)
 
+(deftest funcall.order.3
+  (let ((i 0) a b c)
+    (symbol-macrolet ((q (progn (setf a (incf i)) #'cons))
+                      (w (progn (setf b (incf i)) 'x))
+                      (e (progn (setf c (incf i)) 'y)))
+     (values (funcall q w e)
+      i a b c)))
+  (x . y) 3 1 2 3)
+
 %:EOF
 
 ;;; FUNCALL should throw an UNDEFINED-FUNCTION condition when

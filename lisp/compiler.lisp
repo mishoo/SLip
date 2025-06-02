@@ -1115,7 +1115,14 @@
          (t (comp (car exps) env val? more?))))
 
      (comp-funcall (f args env val? more?)
-       (comp-call nil f args env val? more?))
+       (if (or (safe-atom-p f)
+               (let rec ((args args))
+                 (if (not args)
+                     t
+                     (and (safe-atom-p (car args))
+                          (rec (cdr args))))))
+           (comp-call nil f args env val? more?)
+           (comp-call t 'funcall (list* f args) env val? more?)))
 
      (comp-call (local f args env val? more?)
        (labels ((mkret (the-function)
