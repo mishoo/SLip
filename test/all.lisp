@@ -31,3 +31,5 @@
 (load "test/loop2.lisp")
 (load "test/loop3.lisp")
 (load "test/loop4.lisp")
+
+(load "test/handler-case.lisp")

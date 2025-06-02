@@ -13,7 +13,8 @@
           handler-case
           handler-bind
           ignore-errors
-          assert))
+          assert
+          typep))
 
 (defun typep (obj type)
   (if (is-a obj type) t nil))
@@ -88,7 +89,12 @@
           `(block ,error-return
              (block ,normal-return
                (return-from ,error-return
-                 (handler-case (return-from ,normal-return ,form)
+                 (handler-case (return-from ,normal-return
+                                 (multiple-value-call
+                                  (lambda ,(cadr has-no-error)
+                                    (pop *handler-clusters*)
+                                    ,@(cddr has-no-error))
+                                  ,form))
                    ,@(remove has-no-error clauses))))))
         (let ((block-tag (gensym))
               (condition (gensym)))
