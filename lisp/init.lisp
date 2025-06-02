@@ -832,6 +832,8 @@
          (or (hash-get ,memo ,(car args))
              (hash-add ,memo ,(car args) (progn ,@body)))))))
 
+(def-efun identity (x) x)
+
 (export '(*standard-output*
           *error-output*
           *trace-output*
