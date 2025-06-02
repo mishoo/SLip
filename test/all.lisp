@@ -34,3 +34,4 @@
 
 (load "test/handler-bind.lisp")
 (load "test/handler-case.lisp")
+(load "test/ignore-errors.lisp")
