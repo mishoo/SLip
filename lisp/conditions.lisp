@@ -13,6 +13,7 @@
           handler-case
           handler-bind
           ignore-errors
+          make-condition
           assert
           typep))
 
@@ -20,7 +21,7 @@
   (if (is-a obj type) t nil))
 
 (defclass condition () (datum))
-(defclass simple-condition (condition) (format-control format-args))
+(defclass simple-condition (condition) (:format-control :format-arguments))
 (defclass serious-condition (condition) ())
 (defclass error (serious-condition) ())
 (defclass simple-error (simple-condition error) ())
@@ -31,12 +32,12 @@
 (defglobal <condition> (find-class 'condition))
 
 (defmethod print-object ((c simple-condition) (out output-stream))
-  (apply #'format out
-         (strcat "<~A: "
-                 (slot-ref c 'format-control)
-                 ">")
-         (class-name (class-of c))
-         (slot-ref c 'format-args)))
+  (let ((format-control (slot-ref c :format-control))
+        (format-arguments (slot-ref c :format-arguments)))
+    (strcat
+     "<" (class-name (class-of c)) ": "
+     (apply #'format out format-control format-arguments)
+     ">")))
 
 (defparameter *handler-clusters* '())
 (defparameter *restart-clusters* '())
@@ -119,9 +120,11 @@
 
 (defun %condition (datum arguments default-class)
   (cond ((typep datum 'condition) datum)
-        ((typep datum 'string) (make-instance default-class
-                                              'format-control datum
-                                              'format-args arguments))
+        ((or (stringp datum)
+             (functionp datum))
+         (make-instance default-class
+                        :format-control datum
+                        :format-arguments arguments))
         ((existing-condition-name? datum)
          (apply #'make-instance datum arguments))))
 
@@ -149,8 +152,11 @@
   (unless cond (apply #'error arguments)))
 
 (defun primitive-error (fmt . arguments)
-  (error 'primitive-error 'format-control fmt 'format-args arguments))
+  (error 'primitive-error :format-control fmt :format-arguments arguments))
 
 (defun warn (datum . args)
   (let ((warning (%condition datum args 'simple-warning)))
     (signal warning)))
+
+(defun make-condition (datum &rest args)
+  (%condition datum args 'simple-condition))

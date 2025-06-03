@@ -356,6 +356,7 @@ Ymacs_Buffer.newCommands({
                   case "SETF":
                   case "DEFSETF":
                   case "COMPILER-MACRO":
+                  case "DEFCLASS":
                     return true;
                 }
             });

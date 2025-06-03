@@ -49,19 +49,19 @@
   (handler-case 'foo (condition () 'bar))
   foo)
 
-;;; (deftest handler-case.8
-;;;  (handler-case 'foo (t () 'bar))
-;;;  foo)
+(deftest handler-case.8
+ (handler-case 'foo (t () 'bar))
+ foo)
 
 (deftest handler-case.9
   (handler-case (values 1 2 3 4 5 6 7 8) (condition () nil))
   1 2 3 4 5 6 7 8)
 
-;;; (deftest handler-case.10
-;;;  (handler-case
-;;;   (error "foo")
-;;;   (t () 'good))
-;;;  good)
+(deftest handler-case.10
+ (handler-case
+  (error "foo")
+  (t () 'good))
+ good)
 
 ;; (deftest handler-case.11
 ;;   (labels ((%f () (declare (special *c*))
@@ -78,11 +78,11 @@
 ;;     (%g))
 ;;   t)
 
-;; (deftest handler-case.12
-;;   (handler-case (error "foo")
-;;                 (nil () nil)
-;;                 (error (c) (notnot-mv (typep c 'simple-error))))
-;;   t)
+(deftest handler-case.12
+  (handler-case (error "foo")
+                (nil () nil)
+                (error (c) (notnot-mv (typep c 'simple-error))))
+  t)
 
 (deftest handler-case.13
   (handler-case (error "foo")

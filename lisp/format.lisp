@@ -1,6 +1,6 @@
 (in-package :sl)
 
-(export '(format time))
+(export '(format formatter time))
 
 (defpackage :sl-format
   (:use :sl :%))
@@ -353,9 +353,9 @@
 
 ;;; main entry point
 
-(defun format (stream format . args)
+(defun exec-format (parsed args stream)
   (labels ((doit (stream)
-             (%exec-format (%parse-format format) args stream)))
+             (%exec-format parsed args stream)))
     (cond ((eq stream nil)
            (let ((out (%make-output-stream)))
              (doit out)
@@ -363,6 +363,20 @@
           ((eq stream t)
            (doit *standard-output*))
           (t (doit stream)))))
+
+(defun format (stream format . args)
+  (cond
+    ((stringp format)
+     (exec-format (%parse-format format) args stream))
+    ((functionp format)
+     (apply format stream args))
+    (t
+     (error "Unsupported format control ~A" format))))
+
+(defun formatter (control-string)
+  (let ((parsed (%parse-format control-string)))
+    (lambda (stream &rest arguments)
+      (exec-format parsed arguments stream))))
 
 (defmacro time body
   (let ((t1 (gensym)))

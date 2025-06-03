@@ -1899,6 +1899,8 @@ defp("set-symbol-function!", true, function(m, nargs){
 defp("%set-symbol-prop", true, function(m, nargs){
     checknargs(nargs, 3, 3);
     var val = m.pop(), key = as_string(m.pop()), sym = m.pop();
+    if (sym === null) sym = S_NIL;
+    else if (sym === true) sym = S_T;
     checktype(key, LispString);
     checktype(sym, LispSymbol);
     return sym.setv(key, val);
@@ -1907,6 +1909,8 @@ defp("%set-symbol-prop", true, function(m, nargs){
 defp("%get-symbol-prop", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var key = as_string(m.pop()), sym = m.pop();
+    if (sym === null) sym = S_NIL;
+    else if (sym === true) sym = S_T;
     checktype(key, LispString);
     checktype(sym, LispSymbol);
     return sym.getv(key);

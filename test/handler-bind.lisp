@@ -104,15 +104,15 @@
      (error "an error")))
   good)
 
-;; (deftest handler-bind.15
-;;   (catch 'done
-;;     (handler-bind
-;;      ((nil #'(lambda (c)
-;;                (throw 'done 'bad)))
-;;       (error #'(lambda (c)
-;;                  (throw 'done 'good))))
-;;      (error "an error")))
-;;   good)
+(deftest handler-bind.15
+  (catch 'done
+    (handler-bind
+     ((nil #'(lambda (c)
+               (throw 'done 'bad)))
+      (error #'(lambda (c)
+                 (throw 'done 'good))))
+     (error "an error")))
+  good)
 
 (deftest handler-bind.16
   (catch 'done

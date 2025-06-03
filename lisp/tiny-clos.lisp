@@ -41,6 +41,7 @@
   `(%set-symbol-prop ,sym :generic ,generic))
 
 (def-emac defclass (name direct-supers direct-slots)
+  (%:maybe-xref-info name 'defclass)
   (unless direct-supers
     (setf direct-supers '(object)))
   `(setf (find-class ',name)
@@ -593,6 +594,9 @@
         ((%input-stream-p x) <input-stream>)
         ((%output-stream-p x) <output-stream>)
         (t <unknown>)))
+
+(setf (find-class 'nil) <null>)
+(setf (find-class 't) <top>)
 
 (export '(class
           char

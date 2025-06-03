@@ -57,9 +57,9 @@
 (defun notnot-mv-fn (results)
   (if (null results)
       (values)
-    (apply #'values
-           (not (not (first results)))
-           (cdr results))))
+      (apply #'values
+             (not (not (first results)))
+             (cdr results))))
 
 (defun eqt (x y)
   "Like EQ, but guaranteed to return T for true."
@@ -79,3 +79,22 @@
 
 (defmacro expand-in-current-env (form)
   (macroexpand form))
+
+(defun frob-simple-condition (c expected-fmt &rest expected-args)
+  "Try out the format control and format arguments of a simple-condition C,
+   but make no assumptions about what they print as, only that they
+   do print."
+  (and (typep c 'simple-condition)
+       (let ((fc (slot-ref c :format-control))
+             (args (slot-ref c :format-arguments)))
+         (and
+          (stringp (apply #'format nil fc args))
+          t))))
+
+(defun frob-simple-error (c expected-fmt &rest expected-args)
+  (and (typep c 'simple-error)
+       (apply #'frob-simple-condition c expected-fmt expected-args)))
+
+(defun frob-simple-warning (c expected-fmt &rest expected-args)
+  (and (typep c 'simple-warning)
+       (apply #'frob-simple-condition c expected-fmt expected-args)))
