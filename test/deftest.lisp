@@ -6,8 +6,7 @@
   (%:maybe-xref-info name 'defun)
   (let ((notes
          (loop while (keywordp (car args))
-               collect (cons (car args) (cadr args))
-               do (setf args (cddr args)))))
+               collect (cons (pop args) (pop args)))))
     (destructuring-bind (form &rest expected) args
       (let ((val (gensym))
             (exp (gensym))

@@ -364,9 +364,17 @@
                         ((and (consp binding)
                               (= 2 (length binding)))
                          (destructuring-bind (name val) binding
-                           (with-parens
-                             (<< (%pp-symbol name) " ")
-                             (%pp-object val))))
+                           (case name
+                             (%:qq-unquote
+                              (<< ",")
+                              (%pp-object val))
+                             (%:qq-splice
+                              (<< ",@")
+                              (%pp-object val))
+                             (t
+                              (with-parens
+                                (<< (%pp-symbol name) " ")
+                                (%pp-object val))))))
                         (t
                          (%pp-funargs binding)))))))
       (%pp-body-indent body))))
