@@ -15,7 +15,7 @@
                   (let (,val ,exp ,ok)
                     (format t "Testing ~A ..." ',name)
                     (setf ,exp ',expected)
-                    (setf ,val (multiple-value-list ,form))
+                    (setf ,val (multiple-value-list (eval ',form)))
                     (setf ,ok (equal ,val ,exp))
                     (if ,ok
                         (format t " OK~%")

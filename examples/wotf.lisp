@@ -8,9 +8,8 @@
       ,@body)
     (%::c/c)))
 
-(%special! '*amb-fail*)
-(setq *amb-fail* (lambda (arg)
-                   (console.print "TOTAL FAILURE")))
+(defglobal *amb-fail* (lambda (arg)
+                        (console.print "TOTAL FAILURE")))
 
 (defmacro amb alternatives
   (if alternatives
