@@ -16,6 +16,7 @@
 (load "test/if.lisp")
 (load "test/cond.lisp")
 (load "test/destructuring-bind.lisp")
+(load "test/macrolet.lisp")
 
 (load "test/block.lisp")
 (load "test/catch.lisp")

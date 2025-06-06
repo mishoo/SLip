@@ -105,19 +105,16 @@
      (return 'good)))
   good)
 
-;; XXX [mishoo]: destructuring &whole and &rest? commented out (errs at
-;; compile-time) but I should look into that..
-;;
-;; (deftest destructuring-bind.20
-;;   (destructuring-bind (&whole (a . b) c . d) '(1 . 2) (list a b c d))
-;;   (1 2 1 2))
-;;
-;; (deftest destructuring-bind.21
-;;   (destructuring-bind
-;;       (x &rest (y z))
-;;       '(1 2 3)
-;;     (values x y z))
-;;   1 2 3)
+(deftest destructuring-bind.20
+  (destructuring-bind (&whole (a . b) c . d) '(1 . 2) (list a b c d))
+  (1 2 1 2))
+
+(deftest destructuring-bind.21
+  (destructuring-bind
+      (x &rest (y z))
+      '(1 2 3)
+    (values x y z))
+  1 2 3)
 
 (deftest destructuring-bind.22
   (destructuring-bind (x y &key) '(1 2) (values x y))

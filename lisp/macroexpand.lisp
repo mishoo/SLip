@@ -198,8 +198,16 @@
 (defun macrolet-mexp (f)
   (let ((defs (nreverse
                (mapcar (lambda (md)
-                         (let ((name (car md))
-                               (func (compile (list* '%:%fn md))))
+                         (let* ((name (car md))
+                                (args (cadr md))
+                                (body (cddr md))
+                                (func (cond
+                                        ((%:ordinary-lambda-list-p args)
+                                         (compile (list* '%:%fn name args body)))
+                                        (t
+                                         (let ((val (gensym "macrolet")))
+                                           (compile `(%fn ,name ,val
+                                                          ,(%:%fn-destruct t args val body))))))))
                            (list name :macro func)))
                        (cadr f)))))
     (let ((%:*compiler-env* (%:extend-compiler-env `(:macros ,defs))))

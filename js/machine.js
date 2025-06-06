@@ -1496,8 +1496,6 @@ let OP_RUN = [
                     let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, n);
                     if (pos !== null) {
                         allow_other_keys = stack[pos + 1];
-                        stack[pos] = false;
-                        if (pos == i) i += 2;
                     }
                 }
                 for (let k = 0; k < kl; k++, index += 2) {
@@ -1511,7 +1509,7 @@ let OP_RUN = [
                 }
                 if (!allow_other_keys) {
                     while (i < n) {
-                        if (stack[i] !== false) {
+                        if (stack[i] !== false && stack[i] !== S_ALLOW_OTHER_KEYS) {
                             error(`Unknown keyword argument ${dump(stack[i])}`);
                         }
                         i += 2;

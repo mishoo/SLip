@@ -62,141 +62,6 @@
 (in-package :sl)
 "
 
-;;;; destructuring-bind
-
-(defun %dbind-error-missing-arg (arg)
-  (error (strcat "Missing required argument: " arg)))
-
-(defun %fn-destruct (args values body)
-  (let (names decls)
-    (let ((topv (gensym)) rec)
-      (labels
-          ((add (name val)
-             (push `(,name ,val) decls))
-           (rec (optional? rest? key? aux? args values i)
-             (when args
-               (cond
-                 ((symbolp args)
-                  (add args values))
-                 ((consp args)
-                  (let ((thisarg (car args)))
-                    (cond
-                      ((symbolp thisarg)
-                       (case thisarg
-                         (&whole
-                          (when (> i 0) (error "Misplaced &WHOLE"))
-                          (let ((thisarg (cadr args)))
-                            (unless (and thisarg (symbolp thisarg))
-                              (error "Missing variable name for &WHOLE"))
-                            (add thisarg values))
-                          (rec nil nil nil nil (cddr args) values i))
-
-                         (&optional
-                          (when (or optional? rest? key? aux?)
-                            (error "Invalid &OPTIONAL"))
-                          (rec t nil nil nil (cdr args) values i))
-
-                         ((&rest &body)
-                          (when (or rest? key? aux?)
-                            (error "Invalid &REST/&BODY"))
-                          (let ((thisarg (cadr args)))
-                            (unless (and thisarg (symbolp thisarg))
-                              (error "Missing variable name for &REST"))
-                            (add thisarg values))
-                          (rec nil t nil nil (cddr args) values i))
-
-                         (&key
-                          (when (or key? aux?)
-                            (error "Invalid &KEY"))
-                          (rec nil nil t nil (cdr args) values i))
-
-                         (&aux
-                          (when aux?
-                            (error "Invalid &AUX"))
-                          (rec nil nil nil t (cdr args) values i))
-
-                         (t
-                          (when (member thisarg names)
-                            (error (strcat "Argument seen twice: " thisarg)))
-                          (push thisarg names)
-                          (cond
-                            (optional?
-                             (add thisarg `(%pop ,values)))
-                            (aux?
-                             (add thisarg nil))
-                            (key?
-                             (add thisarg `(getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")))))
-                            (t
-                             (add thisarg `(if ,values
-                                               (%pop ,values)
-                                               (%dbind-error-missing-arg ',thisarg)))))
-                          (rec optional? rest? key? aux? (cdr args) values (+ i 1)))))
-
-                      ((consp thisarg)
-                       (cond
-                         (optional?
-                          (let ((thisarg (car thisarg))
-                                (default (cadr thisarg))
-                                (thisarg-p (caddr thisarg)))
-                            (when thisarg-p
-                              (add thisarg-p `(if ,values t nil)))
-                            (add thisarg `(if ,values (%pop ,values) ,default))))
-                         (key?
-                          (let ((thisarg (car thisarg))
-                                (default (cadr thisarg))
-                                (thisarg-p (caddr thisarg)))
-                            (when thisarg-p
-                              (add thisarg-p nil))
-                            (add thisarg
-                                 (let ((val (gensym)))
-                                   `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
-                                                                       (find-package "KEYWORD"))
-                                                      '%not-found)))
-                                      (if (eq ,val '%not-found)
-                                          ,default
-                                          (progn
-                                            ,@(when thisarg-p
-                                                `((setq ,thisarg-p t)))
-                                            ,val)))))))
-                         (aux? (let ((thisarg (car thisarg))
-                                     (value (cadr thisarg)))
-                                 (add thisarg value)))
-                         (rest? (error "Invalid argument list following &REST/&BODY"))
-                         (t
-                          (let ((sublist (gensym)))
-                            (add sublist `(if ,values (%pop ,values) (error "Missing sublist")))
-                            (rec nil nil nil nil thisarg sublist 0))))
-                       (rec optional? rest? key? aux? (cdr args) values (+ i 1))))))
-                 (t (error "Invalid lambda-list"))))))
-        (rec nil nil nil nil args topv 0))
-      `(let* ((,topv ,values) ,@(nreverse decls))
-         ,@body))))
-
-(defmacro destructuring-bind (args values . body)
-  (%fn-destruct args values body))
-
-(defun ordinary-lambda-list-p (args)
-  (cond
-    ((symbolp args))
-    ((not (consp args))
-     (error "Bad macro lambda list"))
-    ((not (symbolp (car args)))
-     nil)
-    ((%::lambda-keyword-p (car args))
-     t)
-    ((ordinary-lambda-list-p (cdr args)))))
-
-(defmacro defmacro (name lambda-list . body)
-  (when (%primitivep name)
-    (error (strcat "We shall not DEFMACRO on " name " (primitive function)")))
-  (%::maybe-xref-info name 'defmacro)
-  (if (ordinary-lambda-list-p lambda-list)
-      `(%macro! ',name (%::%fn ,name ,lambda-list ,@body))
-      (let ((args (gensym "ARGS")))
-        `(%macro! ',name (%::%fn ,name ,args
-                                 (destructuring-bind ,lambda-list ,args
-                                   ,@body))))))
-
 (defmacro import (symbols &optional (package *package*))
   `(%import ,symbols ,package))
 
@@ -222,7 +87,8 @@
      nil)
     ((aif (or (%:find-macrolet-in-compiler-env (car form))
               (%macro (car form)))
-          (apply it (cdr form))
+          (let ((%:*whole-form* form))
+            (apply it (cdr form)))
           form))))
 
 (def-efun macroexpand (form)
