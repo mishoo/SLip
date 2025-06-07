@@ -708,6 +708,16 @@
 
 (def-efun identity (x) x)
 
+(def-emac prog (bindings &body body)
+  `(block nil
+     (let ,bindings
+       (tagbody ,@body))))
+
+(def-emac prog* (bindings &body body)
+  `(block nil
+     (let* ,bindings
+       (tagbody ,@body))))
+
 (export '(*standard-output*
           *error-output*
           *trace-output*

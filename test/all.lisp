@@ -6,6 +6,7 @@
 (load "test/funcall.lisp")
 (load "test/prog1.lisp")
 (load "test/prog2.lisp")
+(load "test/prog.lisp")
 (load "test/or.lisp")
 (load "test/and.lisp")
 

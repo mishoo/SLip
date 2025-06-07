@@ -1123,8 +1123,9 @@
 
      (comp-block (name forms env val? more?)
        (assert (symbolp name) (strcat "BLOCK expects a symbol, got: " name))
-       (let ((body (catch name
-                     (comp-seq forms env val? more?))))
+       (let ((body (and (not (find-block name env))
+                        (catch name
+                          (comp-seq forms env val? more?)))))
          (or body
              (let ((label (gensym "block"))
                    (k2 (when more? (gensym "block-k2"))))
@@ -1407,7 +1408,7 @@
                               (<< (gen "BIND" name index)))
                             (newarg name))))
                (<< (with-env
-                     (comp-block name body env t nil))))))))
+                     (comp-lambda-body name body env))))))))
 
      (comp-lambda (name args body env)
        (gen "FN"
@@ -1424,12 +1425,17 @@
                              (%seq dyn
                                    (if args
                                        (with-extenv (:lex (map1 (lambda (name) (list name :var)) args))
-                                         (comp-block name body env t nil))
-                                       (comp-block name body env t nil))))))))
+                                         (comp-lambda-body name body env))
+                                       (comp-lambda-body name body env))))))))
               (if (eq code '$xargs)
                   (comp-extended-lambda name args body env)
                   code))
             name))
+
+     (comp-lambda-body (name body env)
+       (if name
+           (comp-block name body env t nil)
+           (comp-seq body env t nil)))
 
      (get-bindings (bindings vars?)
        (let (names vals specials (i 0))

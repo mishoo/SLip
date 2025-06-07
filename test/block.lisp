@@ -85,6 +85,13 @@
   (block nil (return-from nil :good) :bad)
   :good)
 
+(deftest slip/return-from.3
+  (block nil
+    (return-from nil
+      (1+ (block nil
+            (return-from nil 1)))))
+  2)
+
 ;;; Macros are expanded in the appropriate environment
 
 (deftest block.12
