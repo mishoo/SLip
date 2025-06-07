@@ -15,7 +15,13 @@
           ignore-errors
           make-condition
           assert
+          error
           typep))
+
+(defpackage :sl-cond
+  (:use :sl :%))
+
+(in-package :sl-cond)
 
 (defun typep (obj type)
   (if (is-a obj type) t nil))

@@ -13,7 +13,7 @@
             (ok (gensym)))
         `(flet ((,name ()
                   (let (,val ,exp ,ok)
-                    (format t "Testing ~A ..." ',name)
+                    (format t "Testing #'~S ..." ',name)
                     (setf ,exp ',expected)
                     (handler-bind
                         ((error (lambda (condition)
