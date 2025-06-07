@@ -708,6 +708,8 @@
 
 (def-efun identity (x) x)
 
+(define-compiler-macro identity (x) x)
+
 (def-emac prog (bindings &body body)
   `(block nil
      (let ,bindings
