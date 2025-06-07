@@ -15,11 +15,17 @@
                   (let (,val ,exp ,ok)
                     (format t "Testing ~A ..." ',name)
                     (setf ,exp ',expected)
-                    (setf ,val (multiple-value-list (eval ',form)))
-                    (setf ,ok (equal ,val ,exp))
-                    (if ,ok
-                        (format t " OK~%")
-                        (format t " FAIL - ~A~%" ,val))
+                    (handler-bind
+                        ((error (lambda (condition)
+                                  (format t " FAIL.~%!ERROR: ~A~%!ERROR: ~S~%"
+                                          condition (%:%backtrace))
+                                  (throw 'test-error '#:test-error))))
+                      (setf ,val (catch 'test-error
+                                   (multiple-value-list (eval ',form))))
+                      (setf ,ok (equal ,val ,exp))
+                      (if ,ok
+                          (format t " OK~%")
+                          (format t " FAIL - ~A~%" ,val)))
                     ,(when notes
                        `(format t "    ~A~%" ',notes))
                     ,ok)))
@@ -39,10 +45,7 @@
                    *tests*)))
     (loop for (func name) on (reverse tests) by #'cddr
           for test from 1
-          for ok = (handler-case
-                       (funcall func)
-                     (error (condition)
-                       (format t "~%!ERROR: ~A~%" condition)))
+          for ok = (funcall func)
           counting ok into success
           finally (format t "~A tests, ~A OK~%" test success))))
 

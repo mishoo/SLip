@@ -121,7 +121,6 @@
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
 
-;; XXX: This one fails to compile, not yet sure why.
 (deftest multiple-value-setq.16
   (macrolet
       ((%m (z) z))

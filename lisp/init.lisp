@@ -175,7 +175,10 @@
 
 (defun %get-setf-place (form)
   (let ((expander (let dig ()
-                    (or (%get-symbol-prop (car form) :setf)
+                    ;; XXX: return T when form is a symbol (for some reason).
+                    ;;      not sure this is correct, but it works.
+                    (or (symbolp form)
+                        (%get-symbol-prop (car form) :setf)
                         (let ((exp (macroexpand-1 form)))
                           (unless (eq exp form)
                             (setq form exp)
@@ -193,6 +196,11 @@
        (values nil nil vals `(setq ,form ,@vals) form)))
     ((consp form)
      (multiple-value-bind (expander form) (%get-setf-place form)
+       (when (eq expander t)
+         ;; XXX: see above in `%get-setf-place'. We receive T when we got down
+         ;; to a symbol. By recursing here we also expand an eventual
+         ;; symbol-macrolet on that symbol.
+         (return-from get-setf-expansion (get-setf-expansion form)))
        (let* ((temps (map1 (lambda (subform)
                              (gensym "temp"))
                            (cdr form)))
