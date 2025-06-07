@@ -4,6 +4,10 @@
 
 (load "test/apply.lisp")
 (load "test/funcall.lisp")
+(load "test/prog1.lisp")
+(load "test/prog2.lisp")
+(load "test/or.lisp")
+(load "test/and.lisp")
 
 (load "test/values.lisp")
 (load "test/values-list.lisp")
