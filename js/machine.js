@@ -341,7 +341,7 @@ var optimize = (function(){
             code.splice(i, 2, [ "TJUMPK", code[i+1][1] ]);
             return true;
         }
-        if (/^(?:JUMP|LJUMP2?|RET)$/.test(el[0])) {
+        if (/^(?:JUMP|LJUMP|RET)$/.test(el[0])) {
             for (var j = i + 1; j < code.length; ++j) {
                 if (code[j] instanceof LispSymbol) {
                     let len = j - i - 1;
@@ -512,7 +512,6 @@ var optimize = (function(){
           case "CALL":
           case "RET":
           case "LRET":
-          case "LRET2":
             for (var j = i; ++j < code.length;) {
                 if (code[j] instanceof LispSymbol) {
                     break;
@@ -652,8 +651,6 @@ function is_jump_instruction(op) {
       case OP.UPOPEN:
       case OP.SAVE:
       case OP.CATCH:
-      case OP.BLOCK2:
-      case OP.LJUMP2:
       case OP.TJUMPK:
       case OP.FJUMPK:
         return true;
