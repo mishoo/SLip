@@ -199,6 +199,23 @@
      (funcall func (%pop lst))
      (go next))))
 
+(defun filter (lst pred)
+  (let rec ((lst lst)
+            (ret nil))
+    (cond
+      ((null lst) (nreverse ret))
+      ((funcall pred (car lst))
+       (rec (cdr lst) (cons (car lst) ret)))
+      ((rec (cdr lst) ret)))))
+
+(defun index-of (el lst)
+  (let rec ((lst lst)
+            (index 0))
+    (when lst
+      (if (eq el (car lst))
+          index
+          (rec (cdr lst) (1+ index))))))
+
 (defmacro prog2 (exp1 exp2 . body)
   `(progn
      ,exp1
@@ -829,6 +846,7 @@
   ;; :macros and :tags are necessry only at compile-time.
   (make-hash :lex nil
              :macros nil
+             :declarations nil
              :tags nil))
 
 (defun extend-compiler-env (rest &optional (env *compiler-env*))
@@ -868,6 +886,30 @@
                (or (find-in-compiler-env name :func (hash-get env :lex))
                    (find-in-compiler-env name :macro (hash-get env :macros))))
     (getf *compiler-macros* name)))
+
+(defun dig-declarations (exps)
+  (let ((declarations nil)
+        (documentation nil))
+    (let rec ()
+      (cond
+        ((null exps))
+        ((and (stringp (car exps))
+              (cdr exps))
+         (setq documentation (append documentation (list (%pop exps))))
+         (rec))
+        ((and (consp (car exps))
+              (eq 'declare (caar exps)))
+         (setq declarations (append declarations (cdr (%pop exps))))
+         (rec))))
+    (when declarations
+      (let ((specials nil))
+        (let rec ((decl declarations))
+          (when decl
+            (case (caar decl)
+              (special (setq specials (append specials (cdar decl)))))
+            (rec (cdr decl))))
+        (setq declarations `(:special ,specials))))
+    (values exps declarations documentation)))
 
 (labels
     ((assert (p msg)
@@ -909,21 +951,28 @@
      (find-macrolet (name env)
        (caddr (find-in-env name :macro (hash-get env :macros))))
 
+     (find-special (name env)
+       (or (%specialp name)
+           (let ((val (find-in-env name :special (hash-get env :declarations))))
+             (when val (caddr val)))))
+
      (gen-var (name env)
-       (if (%globalp name)
+       (if (or (%globalp name)
+               (find-special name env))
            (gen "GVAR" name)
            (aif (find-var name env)
                 (if (eq :smac (caddr it))
                     (comp (cadddr it) env t t) ;; symbol macro expansion
                     (gen "LVAR" (car it) (cadr it)))
-                (gen "GVAR" (unknown-variable name)))))
+                (gen "GVAR" (unknown-variable name env)))))
 
      (gen-set (name env local)
-       (if (%globalp name)
+       (if (or (%globalp name)
+               (find-special name env))
            (gen "GSET" name)
            (if local
                (gen "LSET" (car local) (cadr local))
-               (gen "GSET" (unknown-variable name)))))
+               (gen "GSET" (unknown-variable name env)))))
 
      (mklabel ()
        (gensym "label"))
@@ -936,9 +985,11 @@
        (unless (member sym *unknown-functions*)
          (push sym *unknown-functions*)))
 
-     (unknown-variable (sym)
-       (unless (member sym *unknown-variables*)
-         (push sym *unknown-variables*))
+     (unknown-variable (sym env)
+       (unless (or (%globalp sym)
+                   (find-special sym env))
+         (unless (member sym *unknown-variables*)
+           (push sym *unknown-variables*)))
        sym)
 
      (comp (x env val? more?)
@@ -954,6 +1005,7 @@
                (arg-count x 1 1)
                (comp-const (cadr x) val? more?))
               (progn (comp-seq (cdr x) env val? more?))
+              (locally (comp-decl-seq (cdr x) env val? more?))
               ((prog1)
                (arg-count x 1)
                (comp-prog1 (cadr x) (cddr x) env val? more?))
@@ -1075,6 +1127,27 @@
          (t (%seq (comp (car exps) env nil t)
                   (comp-seq (cdr exps) env val? more?)))))
 
+     (comp-decl-seq (exps env val? more?)
+       (multiple-value-bind (exps declarations) (dig-declarations exps)
+         (cond
+           (declarations
+            (setq env (apply-declarations declarations env))
+            (with-env (comp-seq exps env val? more?)))
+           (t
+            (comp-seq exps env val? more?)))))
+
+     (apply-declarations (declarations env)
+       (let ((specials (getf declarations :special)))
+         (when specials
+           ;; discard those that are globally special.
+           (setq specials (filter specials (lambda (sym)
+                                             (not (%specialp sym)))))
+           (setq env (extenv env :declarations
+                             (map1 (lambda (name)
+                                     (list name :special t))
+                                   specials))))
+         env))
+
      (comp-multiple-value-prog1 (first rest env val? more?)
        (cond
          ((not val?)
@@ -1106,7 +1179,7 @@
                       (if (eq :smac (caddr it))
                           (error "%POP called on symbol macro: " name)
                           (gen "LPOP" (car it) (cadr it)))
-                      (gen "GLPOP" (unknown-variable name))))
+                      (gen "GLPOP" (unknown-variable name env))))
              (unless val? (gen "POP"))
              (unless more? (gen "RET"))))
 
@@ -1330,7 +1403,7 @@
                  (eq (car f) 'lambda)
                  (not (cadr f)))
             (assert (not args) "Too many arguments")
-            (comp-seq (cddr f) env val? more?))
+            (comp-decl-seq (cddr f) env val? more?))
            (t (mkret (comp f env t t))))))
 
      (gen-simple-args (args n names)
@@ -1479,10 +1552,10 @@
                  (with-env
                    (cond
                      (more?
-                      (<< (comp-seq body env val? t)
+                      (<< (comp-decl-seq body env val? t)
                           (gen "UNFR" 1 0)))
-                     ((<< (comp-seq body env val? nil))))))))
-           (comp-seq body env val? more?)))
+                     ((<< (comp-decl-seq body env val? nil))))))))
+           (comp-decl-seq body env val? more?)))
 
      (comp-macrolet-function (def)
        (let ((name (car def))
@@ -1503,7 +1576,7 @@
                                    (list (car def) :macro
                                          (comp-macrolet-function def)))
                                  bindings))))
-       (with-env (comp-seq body env val? more?)))
+       (with-env (comp-decl-seq body env val? more?)))
 
      (comp-symbol-macrolet (bindings body env val? more?)
        (let ((ext (map1 (lambda (el)
@@ -1512,7 +1585,7 @@
                             (list name :var :smac expansion)))
                         bindings)))
          (with-extenv (:lex ext)
-           (comp-seq body env val? more?))))
+           (comp-decl-seq body env val? more?))))
 
      (comp-macroexpand (expander form env val? more?)
        (with-env (comp (let ((*whole-form* form))
@@ -1542,7 +1615,7 @@
                        (gen "UNFR" 1 specials)))
                   ((<< (comp-seq body env val? nil))))))))
          (t
-          (comp-seq (list* values-form body) env val? more?))))
+          (comp-decl-seq (list* values-form body) env val? more?))))
 
      (comp-values (forms env val? more?)
        (cond
@@ -1585,7 +1658,7 @@
                         (<< (comp-seq body env val? t)
                             (gen "UNFR" 1 (length specials))))
                        ((<< (comp-seq body env val? nil))))))))
-           (comp-seq body env val? more?)))
+           (comp-decl-seq body env val? more?)))
 
      (comp-let* (bindings body env val? more?)
        (if bindings
@@ -1615,7 +1688,7 @@
                     (<< (comp-seq body env val? t)
                         (gen "UNFR" 1 (length specials))))
                    ((<< (comp-seq body env val? nil)))))))
-           (comp-seq body env val? more?)))
+           (comp-decl-seq body env val? more?)))
 
      (comp-catch (tag body env val? more?)
        (if body

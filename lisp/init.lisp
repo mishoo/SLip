@@ -27,6 +27,7 @@
           vectorp vector svref vector-push vector-pop make-vector
           getf
           list list* copy-list listp cons consp eq eql equal equalp gensym length
+          declare locally type ignore special optimize speed debug space fixnum integer unsigned-byte
 
           numberp zerop plusp minusp evenp oddp parse-number parse-integer number-fixed number-string
           < <= > >= + - * / = /= null 1+ 1- floor ceiling round mod
