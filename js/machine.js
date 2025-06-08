@@ -1506,8 +1506,9 @@ let OP_RUN = [
                 }
                 if (!allow_other_keys) {
                     while (i < n) {
-                        if (stack[i] !== false && stack[i] !== S_ALLOW_OTHER_KEYS) {
-                            error(`Unknown keyword argument ${dump(stack[i])}`);
+                        let arg = stack[i];
+                        if (arg !== false && arg !== S_ALLOW_OTHER_KEYS && !key.includes(arg)) {
+                            error(`Unknown keyword argument ${dump(arg)}`);
                         }
                         i += 2;
                     }

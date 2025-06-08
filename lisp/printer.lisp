@@ -187,7 +187,8 @@
      (setf (getf *pretty-printers* symbol) func))
     ((consp symbol)
      (%def-pretty-print (car symbol) func)
-     (%def-pretty-print (cdr symbol) func))))
+     (when (cdr symbol)
+       (%def-pretty-print (cdr symbol) func)))))
 
 (defmacro defun<< (name args &body body)
   `(defun ,name ,args

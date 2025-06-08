@@ -7,6 +7,7 @@
           simple-condition
           simple-warning
           simple-error
+          primitive-error
           serious-condition
           warning
           signal
@@ -16,6 +17,7 @@
           make-condition
           assert
           error
+          warn
           typep))
 
 (defpackage :sl-cond
