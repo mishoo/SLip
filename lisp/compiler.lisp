@@ -199,6 +199,20 @@
      (funcall func (%pop lst))
      (go next))))
 
+(defmacro %incf (var)
+  `(setq ,var (1+ ,var)))
+
+(defmacro %decf (var)
+  `(setq ,var (1- ,var)))
+
+(defun foreach-index (lst func)
+  (let ((index -1))
+    (tagbody
+     next
+     (when lst
+       (funcall func (%pop lst) (%incf index))
+       (go next)))))
+
 (defun filter (lst pred)
   (let rec ((lst lst)
             (ret nil))
@@ -275,12 +289,6 @@
 (defmacro aif (cond . rest)
   `(let ((it ,cond))
      (if it ,@rest)))
-
-(defmacro %incf (var)
-  `(setq ,var (1+ ,var)))
-
-(defmacro %decf (var)
-  `(setq ,var (1- ,var)))
 
 (defmacro push (obj place)
   `(setq ,place (cons ,obj ,place)))
@@ -662,6 +670,9 @@
   (console.dir data)
   data)
 
+(%global! '+skip-count+)
+(setq +skip-count+ (gensym "skip"))
+
 (defun find-in-compiler-env (name type env)
   (labels ((position (lst i j)
              (when lst
@@ -672,18 +683,12 @@
                      (position (cdr lst) i (1+ j))))))
            (frame (env i)
              (when env
-               (or (position (car env) i 0)
-                   (let* ((first (caar env))
-                          (type (cadr first))
-                          (arg (caddr first)))
-                     ;; discard symbol-macrolet frames. XXX: we should only
-                     ;; do it for :lex env, but such frames won't exist in
-                     ;; other environments anyway.
-                     (frame (cdr env)
-                            (if (and (eq type :var)
-                                     (eq arg :smac))
-                                i
-                                (1+ i))))))))
+               (let ((list (car env))
+                     (skip nil))
+                 (when (eq +skip-count+ (car list))
+                   (setq skip (%pop list)))
+                 (or (position list i 0)
+                     (frame (cdr env) (if skip i (1+ i))))))))
     (frame env 0)))
 
 (defun find-macrolet-in-compiler-env (name &optional (env *compiler-env*))
@@ -846,7 +851,6 @@
   ;; :macros and :tags are necessry only at compile-time.
   (make-hash :lex nil
              :macros nil
-             :declarations nil
              :tags nil))
 
 (defun extend-compiler-env (rest &optional (env *compiler-env*))
@@ -911,6 +915,13 @@
         (setq declarations `(:special ,specials))))
     (values exps declarations documentation)))
 
+(defmacro with-declarations (exps &body body)
+  `(multiple-value-bind (,exps declarations) (dig-declarations ,exps)
+     (let ((locally-special (filter (getf declarations :special)
+                                    (lambda (sym)
+                                      (not (%specialp sym))))))
+       ,@body)))
+
 (labels
     ((assert (p msg)
        (if p p (error msg)))
@@ -953,8 +964,8 @@
 
      (find-special (name env)
        (or (%specialp name)
-           (let ((val (find-in-env name :special (hash-get env :declarations))))
-             (when val (caddr val)))))
+           (let ((v (find-var name env)))
+             (when v (getf v :special)))))
 
      (gen-var (name env)
        (if (or (%globalp name)
@@ -1128,25 +1139,16 @@
                   (comp-seq (cdr exps) env val? more?)))))
 
      (comp-decl-seq (exps env val? more?)
-       (multiple-value-bind (exps declarations) (dig-declarations exps)
+       (with-declarations exps
          (cond
-           (declarations
-            (setq env (apply-declarations declarations env))
+           (locally-special
+            (setq env (extenv env :lex
+                              (cons +skip-count+
+                                    (map1 (lambda (name)
+                                            (list name :var :special t))
+                                          locally-special))))
             (with-env (comp-seq exps env val? more?)))
-           (t
-            (comp-seq exps env val? more?)))))
-
-     (apply-declarations (declarations env)
-       (let ((specials (getf declarations :special)))
-         (when specials
-           ;; discard those that are globally special.
-           (setq specials (filter specials (lambda (sym)
-                                             (not (%specialp sym)))))
-           (setq env (extenv env :declarations
-                             (map1 (lambda (name)
-                                     (list name :special t))
-                                   specials))))
-         env))
+           ((comp-seq exps env val? more?)))))
 
      (comp-multiple-value-prog1 (first rest env val? more?)
        (cond
@@ -1437,73 +1439,81 @@
                (aux (getf args :aux))
                (allow-other-keys (getf args :aok))
                (index 0))
-           (with-seq-output <<
-             (labels ((newarg (name)
-                        (when (%specialp name)    ;; maybe bind special var
-                          (<< (gen "BIND" name index)))
-                        (let ((new (list (list name :var))))
-                          (if envcell
-                              (rplacd envcell new)
-                              (setq env (extenv env :lex new)))
-                          (setq envcell new))
-                        (%incf index))
-                      (newdef (name defval supplied-p)
-                        (unless supplied-p
-                          (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
-                        (newarg supplied-p)
-                        (when defval
-                          (let ((l1 (mklabel)))
-                            (<< (gen "LVAR" 0 (1- index)) ;; supplied-p
-                                (gen "TJUMP" l1)          ;; if T then it's passed
-                                (with-env
-                                  (comp defval env t t))  ;; compile default value
-                                (gen "LSET" 0 index)      ;; set arg value in env
-                                (gen "POP")               ;; discard from stack
-                                #(l1))))
-                        (newarg name)))
-               (<< (gen "XARGS"
-                        (length required)
-                        (length optional)
-                        (if rest 1 0)
-                        (as-vector (map1 #'caar key))
-                        allow-other-keys))
-               (foreach required #'newarg)
-               (foreach optional
-                        (lambda (opt)
-                          (newdef (car opt) (cadr opt) (caddr opt))))
-               (when rest (newarg rest))
-               (foreach key
-                        (lambda (key)
-                          (newdef (cadar key) (cadr key) (caddr key))))
-               (foreach aux
-                        (lambda (aux)
-                          (let ((name (car aux))
-                                (defval (cadr aux)))
-                            (when defval
-                              (<< (with-env (comp defval env t t))
-                                  (gen "LSET" 0 index)
-                                  (gen "POP")))
-                            (newarg name))))
-               (<< (with-env
-                     (comp-lambda-body name body env))))))))
+           (with-declarations body
+             (with-seq-output <<
+               (labels ((newarg (name)
+                          (when (or (%specialp name)
+                                    (member name locally-special))
+                            (<< (gen "BIND" name index)))
+                          (let ((new (list (if (member name locally-special)
+                                               (list name :var :special t)
+                                               (list name :var)))))
+                            (if envcell
+                                (rplacd envcell new)
+                                (setq env (extenv env :lex new)))
+                            (setq envcell new))
+                          (%incf index))
+                        (newdef (name defval supplied-p)
+                          (unless supplied-p
+                            (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
+                          (newarg supplied-p)
+                          (when defval
+                            (let ((l1 (mklabel)))
+                              (<< (gen "LVAR" 0 (1- index)) ;; supplied-p
+                                  (gen "TJUMP" l1)          ;; if T then it's passed
+                                  (with-env
+                                    (comp defval env t t))  ;; compile default value
+                                  (gen "LSET" 0 index)      ;; set arg value in env
+                                  (gen "POP")               ;; discard from stack
+                                  #(l1))))
+                          (newarg name)))
+                 (<< (gen "XARGS"
+                          (length required)
+                          (length optional)
+                          (if rest 1 0)
+                          (as-vector (map1 #'caar key))
+                          allow-other-keys))
+                 (foreach required #'newarg)
+                 (foreach optional
+                          (lambda (opt)
+                            (newdef (car opt) (cadr opt) (caddr opt))))
+                 (when rest (newarg rest))
+                 (foreach key
+                          (lambda (key)
+                            (newdef (cadar key) (cadr key) (caddr key))))
+                 (foreach aux
+                          (lambda (aux)
+                            (let ((name (car aux))
+                                  (defval (cadr aux)))
+                              (when defval
+                                (<< (with-env (comp defval env t t))
+                                    (gen "LSET" 0 index)
+                                    (gen "POP")))
+                              (newarg name))))
+                 (<< (with-env
+                       (comp-lambda-body name body env)))))))))
 
      (comp-lambda (name args body env)
        (gen "FN"
             (let ((code
                    (catch '$xargs
-                     (%seq (gen-simple-args args 0 nil)
-                           (let ((dyn '())
-                                 (i 0)
-                                 (args (make-true-list args)))
-                             (foreach args (lambda (x)
-                                             (when (%specialp x)
-                                               (push #("BIND" x i) dyn))
-                                             (%incf i)))
-                             (%seq dyn
-                                   (if args
-                                       (with-extenv (:lex (map1 (lambda (name) (list name :var)) args))
-                                         (comp-lambda-body name body env))
-                                       (comp-lambda-body name body env))))))))
+                     (with-seq-output <<
+                       (<< (gen-simple-args args 0 nil))
+                       (with-declarations body
+                         (let ((args (make-true-list args)))
+                           (foreach-index args
+                                          (lambda (name index)
+                                            (when (or (%specialp name)
+                                                      (member name locally-special))
+                                              (<< (gen "BIND" name index)))))
+                           (if args
+                               (with-extenv (:lex (map1 (lambda (name)
+                                                          (if (member name locally-special)
+                                                              (list name :var :special t)
+                                                              (list name :var)))
+                                                        args))
+                                 (<< (comp-lambda-body name body env)))
+                               (<< (comp-lambda-body name body env)))))))))
               (if (eq code '$xargs)
                   (comp-extended-lambda name args body env)
                   code))
@@ -1582,7 +1592,7 @@
                                 (expansion (cadr el)))
                             (list name :var :smac expansion)))
                         bindings)))
-         (with-extenv (:lex ext)
+         (with-extenv (:lex (cons +skip-count+ ext))
            (comp-decl-seq body env val? more?))))
 
      (comp-macroexpand (expander form env val? more?)
@@ -1598,20 +1608,24 @@
           (with-seq-output <<
             (<< (comp values-form env t t)
                 (gen "MVB" (length names)))
-            (let ((specials 0))
-              (let rec ((names names)
-                        (index 0))
-                (when names
-                  (when (%specialp (car names))
-                    (setq specials (1+ specials))
-                    (<< (gen "BIND" (car names) index)))
-                  (rec (cdr names) (1+ index))))
-              (with-extenv (:lex (map1 (lambda (name) (list name :var)) names))
-                (cond
-                  (more?
-                   (<< (comp-seq body env val? t)
-                       (gen "UNFR" 1 specials)))
-                  ((<< (comp-seq body env val? nil))))))))
+            (with-declarations body
+              (let ((specials 0))
+                (foreach-index names
+                               (lambda (name index)
+                                 (when (or (%specialp name)
+                                           (member name locally-special))
+                                   (%incf specials)
+                                   (<< (gen "BIND" name index)))))
+                (with-extenv (:lex (map1 (lambda (name)
+                                           (if (member name locally-special)
+                                               (list name :var :special t)
+                                               (list name :var)))
+                                         names))
+                  (cond
+                    (more?
+                     (<< (comp-seq body env val? t)
+                         (gen "UNFR" 1 specials)))
+                    ((<< (comp-seq body env val? nil)))))))))
          (t
           (comp-decl-seq (list* values-form body) env val? more?))))
 
@@ -1624,69 +1638,82 @@
          (t
           (comp-seq forms env nil more?))))
 
+     (comp-named-let (looop bindings body env val? more?)
+       (let ((names (map1 (lambda (x)
+                            (if (consp x) (car x) x))
+                          bindings)))
+         (comp `(labels ((,looop ,names
+                           ,@body))
+                  (,looop ,@(map1 (lambda (x)
+                                    (if (consp x) (cadr x)))
+                                  bindings)))
+               env val? more?)))
+
      (comp-let (bindings body env val? more?)
-       (if bindings
-           (if (symbolp bindings)
-               (let* ((looop bindings)
-                      (bindings (car body))
-                      (body (cdr body))
-                      (names (map1 (lambda (x)
-                                     (if (consp x) (car x) x))
-                                   bindings)))
-                 (comp `(labels ((,looop ,names
-                                   ,@body))
-                          (,looop ,@(map1 (lambda (x)
-                                            (if (consp x) (cadr x)))
-                                          bindings)))
-                       env val? more?))
-               (with-seq-output <<
-                 (let* ((bindings (get-bindings bindings t))
-                        (names (car bindings))
-                        (vals (cadr bindings))
-                        (len (caddr bindings))
-                        (specials (cadddr bindings)))
-                   (foreach vals (lambda (x)
-                                   (<< (comp x env t t))))
-                   (<< (gen "LET" len))
-                   (foreach specials (lambda (x)
-                                       (<< (gen "BIND" (car x) (cdr x)))))
-                   (with-extenv (:lex (map1 (lambda (name) (list name :var)) names))
-                     (cond
-                       (more?
-                        (<< (comp-seq body env val? t)
-                            (gen "UNFR" 1 (length specials))))
-                       ((<< (comp-seq body env val? nil))))))))
-           (comp-decl-seq body env val? more?)))
+       (cond
+         ((null bindings)
+          (comp-decl-seq body env val? more?))
+         ((symbolp bindings)
+          (comp-named-let bindings (%pop body) body env val? more?))
+         ((with-seq-output <<
+            (with-declarations body
+              (let* ((bindings (get-bindings bindings t))
+                     (names (car bindings))
+                     (vals (cadr bindings))
+                     (specials 0))
+                (foreach vals (lambda (val) (<< (comp val env t t))))
+                (<< (gen "LET" (length names)))
+                (foreach-index names
+                               (lambda (name index)
+                                 (when (or (%specialp name)
+                                           (member name locally-special))
+                                   (%incf specials)
+                                   (<< (gen "BIND" name index)))))
+                (with-extenv (:lex (map1 (lambda (name)
+                                           (if (member name locally-special)
+                                               (list name :var :special t)
+                                               (list name :var))) names))
+                  (cond
+                    (more?
+                     (<< (comp-seq body env val? t)
+                         (gen "UNFR" 1 specials)))
+                    ((<< (comp-seq body env val? nil)))))))))))
 
      (comp-let* (bindings body env val? more?)
-       (if bindings
-           (with-seq-output <<
-             (let* ((bindings (get-bindings bindings t))
-                    (names (car bindings))
-                    (vals (cadr bindings))
-                    (specials (cadddr bindings))
-                    (i 0)
-                    (newargs '()))
-               (map2 (lambda (name x)
-                       (<< (with-env (comp x env t t))
-                           (unless newargs (gen "FRAME"))
-                           (gen "VAR")
-                           (when (%specialp name)
-                             (gen "BIND" name i)))
-                       (%incf i)
-                       (let ((cell (list (list name :var))))
-                         (if newargs
-                             (rplacd newargs cell)
-                             (setq env (extenv env :lex cell)))
-                         (setq newargs cell)))
-                     names vals)
-               (with-env
-                 (cond
-                   (more?
-                    (<< (comp-seq body env val? t)
-                        (gen "UNFR" 1 (length specials))))
-                   ((<< (comp-seq body env val? nil)))))))
-           (comp-decl-seq body env val? more?)))
+       (cond
+         ((null bindings)
+          (comp-decl-seq body env val? more?))
+         ((with-seq-output <<
+            (with-declarations body
+              (let* ((bindings (get-bindings bindings t))
+                     (names (car bindings))
+                     (vals (cadr bindings))
+                     (specials 0)
+                     (index 0)
+                     (newargs '()))
+                (map2 (lambda (name x)
+                        (<< (with-env (comp x env t t))
+                            (unless newargs (gen "FRAME"))
+                            (gen "VAR")
+                            (when (or (%specialp name)
+                                      (member name locally-special))
+                              (%incf specials)
+                              (gen "BIND" name index)))
+                        (%incf index)
+                        (let ((cell (list (if (member name locally-special)
+                                              (list name :var :special t)
+                                              (list name :var)))))
+                          (if newargs
+                              (rplacd newargs cell)
+                              (setq env (extenv env :lex cell)))
+                          (setq newargs cell)))
+                      names vals)
+                (with-env
+                  (cond
+                    (more?
+                     (<< (comp-seq body env val? t)
+                         (gen "UNFR" 1 specials)))
+                    ((<< (comp-seq body env val? nil)))))))))))
 
      (comp-catch (tag body env val? more?)
        (if body
