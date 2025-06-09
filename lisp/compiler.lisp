@@ -1439,6 +1439,8 @@
                (index 0))
            (with-seq-output <<
              (labels ((newarg (name)
+                        (when (%specialp name)    ;; maybe bind special var
+                          (<< (gen "BIND" name index)))
                         (let ((new (list (list name :var))))
                           (if envcell
                               (rplacd envcell new)
@@ -1458,8 +1460,6 @@
                                 (gen "LSET" 0 index)      ;; set arg value in env
                                 (gen "POP")               ;; discard from stack
                                 #(l1))))
-                        (when (%specialp name)    ;; maybe bind special var
-                          (<< (gen "BIND" name index)))
                         (newarg name)))
                (<< (gen "XARGS"
                         (length required)
@@ -1483,8 +1483,6 @@
                               (<< (with-env (comp defval env t t))
                                   (gen "LSET" 0 index)
                                   (gen "POP")))
-                            (when (%specialp name)
-                              (<< (gen "BIND" name index)))
                             (newarg name))))
                (<< (with-env
                      (comp-lambda-body name body env))))))))
