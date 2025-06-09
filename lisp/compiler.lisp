@@ -213,7 +213,9 @@
        (funcall func (%pop lst) (%incf index))
        (go next)))))
 
-(defun filter (lst pred)
+(defun identity (x) x)
+
+(defun filter (lst &optional (pred #'identity))
   (let rec ((lst lst)
             (ret nil))
     (cond
@@ -1569,12 +1571,11 @@
                        names funcs)
                  (unless labels? (extenv))
                  (<< (if (> len 1) (gen "VARS" len) (gen "VAR")))
-                 (with-env
-                   (cond
-                     (more?
-                      (<< (comp-decl-seq body env val? t)
-                          (gen "UNFR" 1 0)))
-                     ((<< (comp-decl-seq body env val? nil))))))))
+                 (cond
+                   (more?
+                    (<< (with-env (comp-decl-seq body env val? t))
+                        (gen "UNFR" 1 0)))
+                   ((<< (with-env (comp-decl-seq body env val? nil))))))))
            (comp-decl-seq body env val? more?)))
 
      (comp-macrolet-function (def)

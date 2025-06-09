@@ -28,6 +28,7 @@
           getf
           list list* copy-list listp cons consp eq eql equal equalp gensym length
           declare locally type ignore special optimize speed debug space fixnum integer unsigned-byte
+          identity
 
           numberp zerop plusp minusp evenp oddp parse-number parse-integer number-fixed number-string
           < <= > >= + - * / = /= null 1+ 1- floor ceiling round mod
@@ -715,12 +716,12 @@
 
 (defmacro defun-memoize (name args &body body)
   (let ((memo (gensym "memo")))
-    `(let ((,memo (make-hash)))
-       (defun ,name ,args
-         (or (hash-get ,memo ,(car args))
-             (hash-add ,memo ,(car args) (progn ,@body)))))))
-
-(def-efun identity (x) x)
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(let ((,memo (make-hash)))
+         (defun ,name ,args
+           (declare ,@declarations)
+           (or (hash-get ,memo ,(car args))
+               (hash-add ,memo ,(car args) (progn ,@body))))))))
 
 (define-compiler-macro identity (x) x)
 
