@@ -208,9 +208,9 @@
                                          (let ((val (gensym "macrolet")))
                                            (compile `(%fn ,name ,val
                                                           ,(%:%fn-destruct t args val body))))))))
-                           (list name :macro func)))
+                           (list name :func :macro func)))
                        (cadr f)))))
-    (let ((%:*compiler-env* (%:extend-compiler-env `(:macros ,defs))))
+    (let ((%:*compiler-env* (%:extend-compiler-env `(:lex ,defs))))
       (if (cdddr f)
           `(progn ,@(all-mexp (cddr f)))
           (mexp (caddr f))))))

@@ -693,14 +693,13 @@
 
 (defun find-macrolet-in-compiler-env (name &optional (env *compiler-env*))
   (when env
-    (aif (find-in-compiler-env name :macro (hash-get env :macros))
-         (caddr it))))
+    (aif (find-in-compiler-env name :func (hash-get env :lex))
+         (getf (cddr it) :macro))))
 
 (defun find-symbol-macrolet-in-compiler-env (name &optional (env *compiler-env*))
   (and env (symbolp name)
        (aif (find-var-in-compiler-env name)
-            (when (eq :smac (caddr it))
-              (cadddr it)))))
+            (getf (cddr it) :smac))))
 
 (defun find-var-in-compiler-env (name &optional (env *compiler-env*))
   (when env
@@ -847,11 +846,7 @@
   ;; :lex should match the runtime lexical environment; both
   ;; variables and functions are stored there, but the compiler
   ;; distinguiesh them and will emit different frame,index pairs.
-  ;;
-  ;; :macros and :tags are necessry only at compile-time.
-  (make-hash :lex nil
-             :macros nil
-             :tags nil))
+  (make-hash :lex nil :tags nil))
 
 (defun extend-compiler-env (rest &optional (env *compiler-env*))
   (cond
@@ -886,9 +881,7 @@
            (cadr form))))
 
 (defun compiler-macro-function (name &optional (env *compiler-env*))
-  (unless (and env
-               (or (find-in-compiler-env name :func (hash-get env :lex))
-                   (find-in-compiler-env name :macro (hash-get env :macros))))
+  (unless (and env (find-in-compiler-env name :func (hash-get env :lex)))
     (getf *compiler-macros* name)))
 
 (defun dig-declarations (exps)
@@ -971,7 +964,7 @@
        (find-in-env name :block (hash-get env :lex)))
 
      (find-macrolet (name env)
-       (caddr (find-in-env name :macro (hash-get env :macros))))
+       (find-macrolet-in-compiler-env name env))
 
      (find-special (name env)
        (or (%specialp name)
@@ -1589,11 +1582,12 @@
 
      (comp-macrolet (bindings body env val? more?)
        (when bindings
-         (setq env (extenv env :macros
-                           (map1 (lambda (def)
-                                   (list (car def) :macro
-                                         (comp-macrolet-function def)))
-                                 bindings))))
+         (setq env (extenv env :lex
+                           (cons +skip-count+
+                                 (map1 (lambda (def)
+                                         (list (car def) :func
+                                               :macro (comp-macrolet-function def)))
+                                       bindings)))))
        (with-env (comp-decl-seq body env val? more?)))
 
      (comp-symbol-macrolet (bindings body env val? more?)
