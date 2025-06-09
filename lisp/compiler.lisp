@@ -898,18 +898,21 @@
               (eq 'declare (caar exps)))
          (setq declarations (append declarations (cdr (%pop exps))))
          (rec))))
-    (when declarations
-      (let ((specials nil))
-        (let rec ((decl declarations))
-          (when decl
-            (case (caar decl)
-              (special (setq specials (append specials (cdar decl)))))
-            (rec (cdr decl))))
-        (setq declarations `(:special ,specials))))
     (values exps declarations documentation)))
+
+(defun zip-declarations (declarations)
+  (when declarations
+    (let ((specials nil))
+      (let rec ((decl declarations))
+        (when decl
+          (case (caar decl)
+            (special (setq specials (append specials (cdar decl)))))
+          (rec (cdr decl))))
+      `(:special ,specials))))
 
 (defmacro with-declarations (exps &body body)
   `(multiple-value-bind (,exps declarations) (dig-declarations ,exps)
+     (setq declarations (zip-declarations declarations))
      (let ((locally-special (filter (getf declarations :special)
                                     (lambda (sym)
                                       (not (%specialp sym))))))
@@ -1620,18 +1623,17 @@
                                            (member name locally-special))
                                    (%incf specials)
                                    (<< (gen "BIND" name index)))))
-                (with-extenv (:lex (map1 (lambda (name)
-                                           (if (member name locally-special)
-                                               (list name :var :special t)
-                                               (list name :var)))
-                                         names))
-                  (declare-locally-special :except names)
-                  (with-env
-                    (cond
-                      (more?
-                       (<< (comp-seq body env val? t)
-                           (gen "UNFR" 1 specials)))
-                      ((<< (comp-seq body env val? nil))))))))))
+                (setq env (extenv env :lex (map1 (lambda (name)
+                                                   (if (member name locally-special)
+                                                       (list name :var :special t)
+                                                       (list name :var)))
+                                                 names)))
+                (declare-locally-special :except names)
+                (cond
+                  (more?
+                   (<< (with-env (comp-seq body env val? t))
+                       (gen "UNFR" 1 specials)))
+                  ((<< (with-env (comp-seq body env val? nil)))))))))
          (t
           (comp-decl-seq (list* values-form body) env val? more?))))
 
@@ -1675,17 +1677,17 @@
                                            (member name locally-special))
                                    (%incf specials)
                                    (<< (gen "BIND" name index)))))
-                (with-extenv (:lex (map1 (lambda (name)
-                                           (if (member name locally-special)
-                                               (list name :var :special t)
-                                               (list name :var))) names))
-                  (declare-locally-special :except names)
-                  (with-env
-                    (cond
-                      (more?
-                       (<< (comp-seq body env val? t)
-                           (gen "UNFR" 1 specials)))
-                      ((<< (comp-seq body env val? nil))))))))))))
+                (setq env (extenv env :lex (map1 (lambda (name)
+                                                   (if (member name locally-special)
+                                                       (list name :var :special t)
+                                                       (list name :var)))
+                                                 names)))
+                (declare-locally-special :except names)
+                (cond
+                  (more?
+                   (<< (with-env (comp-seq body env val? t))
+                       (gen "UNFR" 1 specials)))
+                  ((<< (with-env (comp-seq body env val? nil)))))))))))
 
      (comp-let* (bindings body env val? more?)
        (cond
@@ -1717,12 +1719,11 @@
                           (setq newargs cell)))
                       names vals)
                 (declare-locally-special :except names)
-                (with-env
-                  (cond
-                    (more?
-                     (<< (comp-seq body env val? t)
-                         (gen "UNFR" 1 specials)))
-                    ((<< (comp-seq body env val? nil)))))))))))
+                (cond
+                  (more?
+                   (<< (with-env (comp-seq body env val? t))
+                       (gen "UNFR" 1 specials)))
+                  ((<< (with-env (comp-seq body env val? nil)))))))))))
 
      (comp-catch (tag body env val? more?)
        (if body

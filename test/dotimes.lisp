@@ -111,43 +111,43 @@
   nil 10 a)
 
 ;;; Check special variable decls
-;; (deftest dotimes.17
-;;   (let ((i 0) (y nil))
-;;     (declare (special i))
-;;     (flet ((%f () i))
-;;       (dotimes (i 4)
-;;         (push (%f) y)))
-;;     y)
-;;   (0 0 0 0))
+(deftest dotimes.17
+  (let ((i 0) (y nil))
+    (declare (special i))
+    (flet ((%f () i))
+      (dotimes (i 4)
+        (push (%f) y)))
+    y)
+  (0 0 0 0))
 
-;; (deftest dotimes.17a
-;;   (let ((i 0) (y nil) (bound 4))
-;;     (declare (special i))
-;;     (flet ((%f () i))
-;;       (dotimes (i bound)
-;;         (push (%f) y)))
-;;     y)
-;;   (0 0 0 0))
+(deftest dotimes.17a
+  (let ((i 0) (y nil) (bound 4))
+    (declare (special i))
+    (flet ((%f () i))
+      (dotimes (i bound)
+        (push (%f) y)))
+    y)
+  (0 0 0 0))
 
-;; (deftest dotimes.18
-;;   (let ((i 0) (y nil))
-;;     (declare (special i))
-;;     (flet ((%f () i))
-;;       (dotimes (i 4)
-;;         (declare (special i))
-;;         (push (%f) y)))
-;;     y)
-;;   (3 2 1 0))
+(deftest dotimes.18
+  (let ((i 0) (y nil))
+    (declare (special i))
+    (flet ((%f () i))
+      (dotimes (i 4)
+        (declare (special i))
+        (push (%f) y)))
+    y)
+  (3 2 1 0))
 
-;; (deftest dotimes.18a
-;;   (let ((i 0) (y nil) (bound 4))
-;;     (declare (special i))
-;;     (flet ((%f () i))
-;;       (dotimes (i bound)
-;;         (declare (special i))
-;;         (push (%f) y)))
-;;     y)
-;;   (3 2 1 0))
+(deftest dotimes.18a
+  (let ((i 0) (y nil) (bound 4))
+    (declare (special i))
+    (flet ((%f () i))
+      (dotimes (i bound)
+        (declare (special i))
+        (push (%f) y)))
+    y)
+  (3 2 1 0))
 
 (deftest dotimes.19
   (dotimes (i 100 i))
@@ -166,38 +166,38 @@
 
 ;;; Scope of free declarations
 
-;; (deftest dotimes.22
-;;   (block done
-;;     (let ((x :bad))
-;;       (declare (special x))
-;;       (let ((x :good))
-;;         (dotimes (i (return-from done x))
-;;           (declare (special x))))))
-;;   :good)
+(deftest dotimes.22
+  (block done
+    (let ((x :bad))
+      (declare (special x))
+      (let ((x :good))
+        (dotimes (i (return-from done x))
+          (declare (special x))))))
+  :good)
 
-;; (deftest dotimes.23
-;;   (let ((x :good))
-;;     (declare (special x))
-;;     (let ((x :bad))
-;;       (dotimes (i 10 x)
-;;         (declare (special x)))))
-;;   :good)
+(deftest dotimes.23
+  (let ((x :good))
+    (declare (special x))
+    (let ((x :bad))
+      (dotimes (i 10 x)
+        (declare (special x)))))
+  :good)
 
-;; (deftest dotimes.23a
-;;   (let ((x :good) (bound 10))
-;;     (declare (special x))
-;;     (let ((x :bad))
-;;       (dotimes (i bound x)
-;;         (declare (special x)))))
-;;   :good)
+(deftest dotimes.23a
+  (let ((x :good) (bound 10))
+    (declare (special x))
+    (let ((x :bad))
+      (dotimes (i bound x)
+        (declare (special x)))))
+  :good)
 
-;; (deftest dotimes.24
-;;   (let ((bound 4) (j 0))
-;;     (values
-;;      (dotimes (i bound)
-;;        (incf j) (decf bound))
-;;      bound j))
-;;   nil 0 4)
+(deftest dotimes.24
+  (let ((bound 4) (j 0))
+    (values
+     (dotimes (i bound)
+       (incf j) (decf bound))
+     bound j))
+  nil 0 4)
 
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment

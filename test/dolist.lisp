@@ -20,14 +20,14 @@
     (dolist (x nil count) (incf count)))
   0)
 
-;; (deftest dolist.4
-;;   (let ((y nil))
-;;     (flet ((%f () (locally (declare (special e))
-;;                            (push e y))))
-;;       (dolist (e '(a b c) (reverse y))
-;;         (declare (special e))
-;;         (%f))))
-;;   (a b c))
+(deftest dolist.4
+  (let ((y nil))
+    (flet ((%f () (locally (declare (special e))
+                           (push e y))))
+      (dolist (e '(a b c) (reverse y))
+        (declare (special e))
+        (%f))))
+  (a b c))
 
 ;;; Tests that it's a tagbody
 (deftest dolist.5
@@ -45,14 +45,14 @@
   (1 3 5 7))
 
 ;;; Test that bindings are not normally special
-;; (deftest dolist.6
-;;   (let ((i 0) (y nil))
-;;     (declare (special i))
-;;     (flet ((%f () i))
-;;       (dolist (i '(1 2 3 4))
-;;         (push (%f) y)))
-;;     y)
-;;   (0 0 0 0))
+(deftest dolist.6
+  (let ((i 0) (y nil))
+    (declare (special i))
+    (flet ((%f () i))
+      (dolist (i '(1 2 3 4))
+        (push (%f) y)))
+    y)
+  (0 0 0 0))
 
 ;;; Test multiple return values
 
@@ -113,22 +113,22 @@
 
 ;;; Scope of free declarations
 
-;; (deftest dolist.16
-;;   (block done
-;;     (let ((x :bad))
-;;       (declare (special x))
-;;       (let ((x :good))
-;;         (dolist (e (return-from done x))
-;;           (declare (special x))))))
-;;   :good)
+(deftest dolist.16
+  (block done
+    (let ((x :bad))
+      (declare (special x))
+      (let ((x :good))
+        (dolist (e (return-from done x))
+          (declare (special x))))))
+  :good)
 
-;; (deftest dolist.17
-;;   (let ((x :good))
-;;     (declare (special x))
-;;     (let ((x :bad))
-;;       (dolist (e nil x)
-;;         (declare (special x)))))
-;;   :good)
+(deftest dolist.17
+  (let ((x :good))
+    (declare (special x))
+    (let ((x :bad))
+      (dolist (e nil x)
+        (declare (special x)))))
+  :good)
 
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment

@@ -453,18 +453,20 @@
   (let ((list (gensym "list"))
         (next (gensym "next"))
         (end (gensym "end")))
-    `(block nil
-       (let (,var (,list ,list-form))
-         (tagbody
-          ,next
-          (unless ,list
-            (go ,end))
-          (setf ,var (pop ,list))
-          ,@body
-          (go ,next)
-          ,end
-          (setf ,var nil))
-         ,@result-form))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let (,var (,list ,list-form))
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (unless ,list
+              (go ,end))
+            (setf ,var (pop ,list))
+            ,@body
+            (go ,next)
+            ,end
+            (setf ,var nil))
+           ,@result-form)))))
 
 (defmacro with-collectors ((&rest names) &body body)
   (let (lists tails syms adders)
@@ -602,18 +604,20 @@
   (let ((count (gensym))
         (next (gensym "next"))
         (end (gensym "end")))
-    `(block nil
-       (let ((,count ,count-form)
-             (,var 0))
-         (tagbody
-          ,next
-          (unless (< ,var ,count)
-            (go ,end))
-          ,@body
-          (incf ,var)
-          (go ,next)
-          ,end)
-         ,@result-form))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let ((,count ,count-form)
+               (,var 0))
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (unless (< ,var ,count)
+              (go ,end))
+            ,@body
+            (incf ,var)
+            (go ,next)
+            ,end)
+           ,@result-form)))))
 
 ;;; do and do* differ by exactly two characters, but oh well... copy-paste FTW.
 
@@ -624,19 +628,21 @@
                                        (when (> (length var) 2)
                                          (list (car var) (caddr var))))
                                      vars))))
-    `(block nil
-       (let ,(mapcar (lambda (var)
-                       (list (car var) (cadr var)))
-                     vars)
-         (tagbody
-          ,next
-          (when ,end-test-form
-            (go ,end))
-          ,@body
-          (psetf ,@step)
-          (go ,next)
-          ,end)
-         ,@result-form))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let ,(mapcar (lambda (var)
+                         (list (car var) (cadr var)))
+                       vars)
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (when ,end-test-form
+              (go ,end))
+            ,@body
+            (psetf ,@step)
+            (go ,next)
+            ,end)
+           ,@result-form)))))
 
 (def-emac do* (vars (end-test-form &rest result-form) &body body)
   (let ((next (gensym "next"))
@@ -645,19 +651,21 @@
                                        (when (> (length var) 2)
                                          (list (car var) (caddr var))))
                                      vars))))
-    `(block nil
-       (let* ,(mapcar (lambda (var)
-                        (list (car var) (cadr var)))
-                      vars)
-         (tagbody
-          ,next
-          (when ,end-test-form
-            (go ,end))
-          ,@body
-          (setf ,@step)
-          (go ,next)
-          ,end)
-         ,@result-form))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let* ,(mapcar (lambda (var)
+                          (list (car var) (cadr var)))
+                        vars)
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (when ,end-test-form
+              (go ,end))
+            ,@body
+            (setf ,@step)
+            (go ,next)
+            ,end)
+           ,@result-form)))))
 
 (def-emac use-package (source &optional (target *package*))
   `(%use-package (find-package ,source) (find-package ,target)))
@@ -716,14 +724,18 @@
 (define-compiler-macro identity (x) x)
 
 (def-emac prog (bindings &body body)
-  `(block nil
-     (let ,bindings
-       (tagbody ,@body))))
+  (multiple-value-bind (body declarations) (%:dig-declarations body)
+    `(block nil
+       (let ,bindings
+         (declare ,@declarations)
+         (tagbody ,@body)))))
 
 (def-emac prog* (bindings &body body)
-  `(block nil
-     (let* ,bindings
-       (tagbody ,@body))))
+  (multiple-value-bind (body declarations) (%:dig-declarations body)
+    `(block nil
+       (let* ,bindings
+         (declare ,@declarations)
+         (tagbody ,@body)))))
 
 (export '(*standard-output*
           *error-output*
