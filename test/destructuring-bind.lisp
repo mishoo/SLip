@@ -128,29 +128,29 @@
   (destructuring-bind (&rest x &key) nil x)
   nil)
 
-;; (deftest destructuring-bind.25
-;;   (let ((x :bad))
-;;     (declare (special x))
-;;     (let ((x :good))
-;;       (destructuring-bind (y) (list x)
-;;         (declare (special x))
-;;         y)))
-;;   :good)
+(deftest destructuring-bind.25
+  (let ((x :bad))
+    (declare (special x))
+    (let ((x :good))
+      (destructuring-bind (y) (list x)
+        (declare (special x))
+        y)))
+  :good)
 
 (deftest destructuring-bind.26
   (destructuring-bind (x) (list 1))
   nil)
 
-;; (deftest destructuring-bind.27
-;;   (destructuring-bind (x) (list 1)
-;;     (declare (optimize)))
-;;   nil)
+(deftest destructuring-bind.27
+  (destructuring-bind (x) (list 1)
+    (declare (optimize)))
+  nil)
 
-;; (deftest destructuring-bind.28
-;;   (destructuring-bind (x) (list 1)
-;;     (declare (optimize))
-;;     (declare))
-;;   nil)
+(deftest destructuring-bind.28
+  (destructuring-bind (x) (list 1)
+    (declare (optimize))
+    (declare))
+  nil)
 
 (deftest destructuring-bind.29
   (destructuring-bind (x &aux y) '(:foo) (values x y))

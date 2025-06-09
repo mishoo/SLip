@@ -24,7 +24,7 @@
                         (case val
                           (fetch (pop args))
                           (count (length args))
-                          (nil ,(cadr x))
+                          ((nil) ,(cadr x))
                           (t val)))))
                   cmdargs)
      ,@body))
@@ -83,9 +83,9 @@
                           (if tok
                               (looop (cons tok ret))
                               (looop ret)))))
-               (nil (if end
-                        (error (strcat "Expecting " end))
-                        (nreverse ret)))
+               ((nil) (if end
+                          (error (strcat "Expecting " end))
+                          (nreverse ret)))
                (t (looop (cons (read-text) ret))))))
 
          (read-directive ()
@@ -150,7 +150,7 @@
                    (#\# (next)
                         (push 'count ret))
                    (#\, (push nil ret))
-                   (nil (croak "Unterminated parameter list")))
+                   ((nil) (croak "Unterminated parameter list")))
               t1 (case (peek)
                    (#\, (next)
                         (if (or colmod? atmod?)

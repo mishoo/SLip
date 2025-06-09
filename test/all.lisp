@@ -9,6 +9,8 @@
 (load "test/prog.lisp")
 (load "test/or.lisp")
 (load "test/and.lisp")
+(load "test/let.lisp")
+(load "test/letstar.lisp")
 
 (load "test/values.lisp")
 (load "test/values-list.lisp")
@@ -20,6 +22,7 @@
 
 (load "test/if.lisp")
 (load "test/cond.lisp")
+(load "test/case.lisp")
 (load "test/destructuring-bind.lisp")
 (load "test/macrolet.lisp")
 

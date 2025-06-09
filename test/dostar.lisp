@@ -98,15 +98,15 @@
   nil)
 
 ;; Special var
-;; (deftest do*.14
-;;   (let ((x 0))
-;;     (flet ((%f () (locally (declare (special i))
-;;                            (incf x i))))
-;;       (do* ((i 0 (1+ i)))
-;;            ((>= i 10) x)
-;;         (declare (special i))
-;;         (%f))))
-;;   45)
+(deftest do*.14
+  (let ((x 0))
+    (flet ((%f () (locally (declare (special i))
+                           (incf x i))))
+      (do* ((i 0 (1+ i)))
+           ((>= i 10) x)
+        (declare (special i))
+        (%f))))
+  45)
 
 ;;; Confirm that the variables in succesive iterations are
 ;;; identical
@@ -120,43 +120,43 @@
 
 ;;; Scope of free declarations
 
-;; (deftest do*.16
-;;   (block done
-;;     (let ((x :bad))
-;;       (declare (special x))
-;;       (let ((x :good))
-;;         (do* ((i (return-from done x) 0))
-;;             (t nil)
-;;           (declare (special x))))))
-;;   :good)
+(deftest do*.16
+  (block done
+    (let ((x :bad))
+      (declare (special x))
+      (let ((x :good))
+        (do* ((i (return-from done x) 0))
+            (t nil)
+          (declare (special x))))))
+  :good)
 
-;; (deftest do*.17
-;;   (block done
-;;     (let ((x :good))
-;;       (declare (special x))
-;;       (let ((x :bad))
-;;         (do* ((i 0 (return-from done x)))
-;;             (nil nil)
-;;           (declare (special x))))))
-;;   :good)
+(deftest do*.17
+  (block done
+    (let ((x :good))
+      (declare (special x))
+      (let ((x :bad))
+        (do* ((i 0 (return-from done x)))
+            (nil nil)
+          (declare (special x))))))
+  :good)
 
-;; (deftest do*.18
-;;   (block done
-;;     (let ((x :good))
-;;       (declare (special x))
-;;       (let ((x :bad))
-;;         (do* ((i 0 0))
-;;             ((return-from done x) nil)
-;;           (declare (special x))))))
-;;   :good)
+(deftest do*.18
+  (block done
+    (let ((x :good))
+      (declare (special x))
+      (let ((x :bad))
+        (do* ((i 0 0))
+            ((return-from done x) nil)
+          (declare (special x))))))
+  :good)
 
-;; (deftest do*.19
-;;   (let ((x :good))
-;;     (declare (special x))
-;;     (let ((x :bad))
-;;       (do* () (t x)
-;;         (declare (special x)))))
-;;   :good)
+(deftest do*.19
+  (let ((x :good))
+    (declare (special x))
+    (let ((x :bad))
+      (do* () (t x)
+        (declare (special x)))))
+  :good)
 
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment

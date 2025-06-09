@@ -34,18 +34,18 @@
     (list x y z))
   (nil nil nil))
 
-;; (deftest multiple-value-bind.7
-;;   (let ((z 0) x y)
-;;     (declare (special z))
-;;     (values
-;;      (flet ((%x () (symbol-value 'x))
-;;             (%y () (symbol-value 'y))
-;;             (%z () (symbol-value 'z)))
-;;        (multiple-value-bind (x y z) (values 1 2 3)
-;;          (declare (special x y))
-;;          (list (%x) (%y) (%z))))
-;;      x y z))
-;;   (1 2 0) nil nil 0)
+(deftest multiple-value-bind.7
+  (let ((z 0) x y)
+    (declare (special z))
+    (values
+     (flet ((%x () (symbol-value 'x))
+            (%y () (symbol-value 'y))
+            (%z () (symbol-value 'z)))
+       (multiple-value-bind (x y z) (values 1 2 3)
+         (declare (special x y))
+         (list (%x) (%y) (%z))))
+     x y z))
+  (1 2 0) nil nil 0)
 
 ;;; No implicit tagbody
 (deftest multiple-value-bind.8

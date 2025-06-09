@@ -35,7 +35,7 @@
 
 (deftest prog.7
   (prog ((i 1) (s 0))
-        ;; (declare (type fixnum i s))
+        (declare (type fixnum i s))
         again
         (when (> i 10) (return s))
         (incf s i)
@@ -49,12 +49,12 @@
           (return (values x y z))))
   2 1 2)
 
-;; (deftest prog.9
-;;   (flet ((%f () (locally (declare (special z)) z)))
-;;     (prog ((z 10))
-;;           (declare (special z))
-;;           (return (%f))))
-;;   10)
+(deftest prog.9
+  (flet ((%f () (locally (declare (special z)) z)))
+    (prog ((z 10))
+          (declare (special z))
+          (return (%f))))
+  10)
 
 (deftest prog.10
   (prog ()
@@ -70,14 +70,14 @@
         (return 'bad))
   2)
 
-;; (deftest prog.11
-;;   (let ((x :bad))
-;;     (declare (special x))
-;;     (let ((x :good))
-;;       (prog ((y x))
-;;             (declare (special x))
-;;             (return y))))
-;;   :good)
+(deftest prog.11
+  (let ((x :bad))
+    (declare (special x))
+    (let ((x :good))
+      (prog ((y x))
+            (declare (special x))
+            (return y))))
+  :good)
 
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment
@@ -111,7 +111,7 @@
 (deftest prog*.5
   (let ((x 'a))
     (prog* ((z x) (x 'b) (y x))
-          ;; (declare (type symbol x y))
+          (declare (type symbol x y))
           (return (values x y z))))
   b b a)
 
@@ -123,7 +123,7 @@
 
 (deftest prog*.7
   (prog* ((i 1) (s 0))
-        ;; (declare (type fixnum i s))
+        (declare (type fixnum i s))
         again
         (when (> i 10) (return s))
         (incf s i)
@@ -137,12 +137,12 @@
           (return (values x y z))))
   2 1 2)
 
-;; (deftest prog*.9
-;;   (flet ((%f () (locally (declare (special z)) z)))
-;;     (prog* ((z 10))
-;;           (declare (special z))
-;;           (return (%f))))
-;;   10)
+(deftest prog*.9
+  (flet ((%f () (locally (declare (special z)) z)))
+    (prog* ((z 10))
+          (declare (special z))
+          (return (%f))))
+  10)
 
 (deftest prog*.10
   (prog* ()
@@ -158,14 +158,14 @@
         (return 'bad))
   2)
 
-;; (deftest prog*.11
-;;   (let ((x :bad))
-;;     (declare (special x))
-;;     (let ((x :good))
-;;       (prog* ((y x))
-;;              (declare (special x))
-;;              (return y))))
-;;   :good)
+(deftest prog*.11
+  (let ((x :bad))
+    (declare (special x))
+    (let ((x :good))
+      (prog* ((y x))
+             (declare (special x))
+             (return y))))
+  :good)
 
 ;;; Test that explicit calls to macroexpand in subforms
 ;;; are done in the correct environment

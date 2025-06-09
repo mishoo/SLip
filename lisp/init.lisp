@@ -12,7 +12,7 @@
   (%use-package main user)
   (setq exported
         '(atom quasiquote defmacro defun when unless labels flet foreach
-          prog1 prog2 or and cond member case mapcar with-cc aif it push
+          prog1 prog2 or and cond member case otherwise mapcar with-cc aif it push
           error warn without-interrupts
           lisp-reader eval compile load function unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
@@ -27,6 +27,8 @@
           vectorp vector svref vector-push vector-pop make-vector
           getf
           list list* copy-list listp cons consp eq eql equal equalp gensym length
+          declare locally type ignore special optimize speed debug space fixnum integer unsigned-byte
+          identity
 
           numberp zerop plusp minusp evenp oddp parse-number parse-integer number-fixed number-string
           < <= > >= + - * / = /= null 1+ 1- floor ceiling round mod
@@ -49,10 +51,12 @@
 
           get-internal-run-time
           compiler-macro-function
+          symbol-value
 
           values multiple-value-bind multiple-value-call values-list
           multiple-value-list multiple-value-setq multiple-value-prog1
 
+          lambda-list-keywords
           &key &rest &body &whole &optional &aux &allow-other-keys))
   (%export exported boot)
   (%export exported main)
@@ -300,6 +304,9 @@
   (%::maybe-xref-info sym 'defun)
   (set-symbol-function! sym func))
 
+(defun (setf symbol-value) (value sym)
+  (set-symbol-value! sym value))
+
 (def-emac push (obj place)
   (cond
     ((safe-atom-p place)
@@ -448,18 +455,20 @@
   (let ((list (gensym "list"))
         (next (gensym "next"))
         (end (gensym "end")))
-    `(block nil
-       (let (,var (,list ,list-form))
-         (tagbody
-          ,next
-          (unless ,list
-            (go ,end))
-          (setf ,var (pop ,list))
-          ,@body
-          (go ,next)
-          ,end
-          (setf ,var nil))
-         ,@result-form))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let (,var (,list ,list-form))
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (unless ,list
+              (go ,end))
+            (setf ,var (pop ,list))
+            ,@body
+            (go ,next)
+            ,end
+            (setf ,var nil))
+           ,@result-form)))))
 
 (defmacro with-collectors ((&rest names) &body body)
   (let (lists tails syms adders)
@@ -597,18 +606,20 @@
   (let ((count (gensym))
         (next (gensym "next"))
         (end (gensym "end")))
-    `(block nil
-       (let ((,count ,count-form)
-             (,var 0))
-         (tagbody
-          ,next
-          (unless (< ,var ,count)
-            (go ,end))
-          ,@body
-          (incf ,var)
-          (go ,next)
-          ,end)
-         ,@result-form))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let ((,count ,count-form)
+               (,var 0))
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (unless (< ,var ,count)
+              (go ,end))
+            ,@body
+            (incf ,var)
+            (go ,next)
+            ,end)
+           ,@result-form)))))
 
 ;;; do and do* differ by exactly two characters, but oh well... copy-paste FTW.
 
@@ -619,19 +630,21 @@
                                        (when (> (length var) 2)
                                          (list (car var) (caddr var))))
                                      vars))))
-    `(block nil
-       (let ,(mapcar (lambda (var)
-                       (list (car var) (cadr var)))
-                     vars)
-         (tagbody
-          ,next
-          (when ,end-test-form
-            (go ,end))
-          ,@body
-          (psetf ,@step)
-          (go ,next)
-          ,end)
-         ,@result-form))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let ,(mapcar (lambda (var)
+                         (list (car var) (cadr var)))
+                       vars)
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (when ,end-test-form
+              (go ,end))
+            ,@body
+            (psetf ,@step)
+            (go ,next)
+            ,end)
+           ,@result-form)))))
 
 (def-emac do* (vars (end-test-form &rest result-form) &body body)
   (let ((next (gensym "next"))
@@ -640,19 +653,21 @@
                                        (when (> (length var) 2)
                                          (list (car var) (caddr var))))
                                      vars))))
-    `(block nil
-       (let* ,(mapcar (lambda (var)
-                        (list (car var) (cadr var)))
-                      vars)
-         (tagbody
-          ,next
-          (when ,end-test-form
-            (go ,end))
-          ,@body
-          (setf ,@step)
-          (go ,next)
-          ,end)
-         ,@result-form))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let* ,(mapcar (lambda (var)
+                          (list (car var) (cadr var)))
+                        vars)
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (when ,end-test-form
+              (go ,end))
+            ,@body
+            (setf ,@step)
+            (go ,next)
+            ,end)
+           ,@result-form)))))
 
 (def-emac use-package (source &optional (target *package*))
   `(%use-package (find-package ,source) (find-package ,target)))
@@ -701,24 +716,35 @@
 
 (defmacro defun-memoize (name args &body body)
   (let ((memo (gensym "memo")))
-    `(let ((,memo (make-hash)))
-       (defun ,name ,args
-         (or (hash-get ,memo ,(car args))
-             (hash-add ,memo ,(car args) (progn ,@body)))))))
-
-(def-efun identity (x) x)
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(let ((,memo (make-hash)))
+         (defun ,name ,args
+           (declare ,@declarations)
+           (or (hash-get ,memo ,(car args))
+               (hash-add ,memo ,(car args) (progn ,@body))))))))
 
 (define-compiler-macro identity (x) x)
 
 (def-emac prog (bindings &body body)
-  `(block nil
-     (let ,bindings
-       (tagbody ,@body))))
+  (multiple-value-bind (body declarations) (%:dig-declarations body)
+    `(block nil
+       (let ,bindings
+         (declare ,@declarations)
+         (tagbody ,@body)))))
 
 (def-emac prog* (bindings &body body)
-  `(block nil
-     (let* ,bindings
-       (tagbody ,@body))))
+  (multiple-value-bind (body declarations) (%:dig-declarations body)
+    `(block nil
+       (let* ,bindings
+         (declare ,@declarations)
+         (tagbody ,@body)))))
+
+(def-efun make-list (size &key initial-element)
+  (let ((list nil))
+    (dotimes (i size list)
+      (setq list (cons initial-element list)))))
+
+(defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
 
 (export '(*standard-output*
           *error-output*

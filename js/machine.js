@@ -873,14 +873,13 @@ export class LispMachine {
     }
 
     find_dvar(symbol) {
-        if (symbol.special()) {
-            var p = this.denv;
-            while (p !== null) {
-                var el = p.car;
-                if (el instanceof LispBinding && el.symbol === symbol)
-                    return el;
-                p = p.cdr;
-            }
+        if (symbol.global() && !symbol.special()) return symbol;
+        var p = this.denv;
+        while (p !== null) {
+            var el = p.car;
+            if (el instanceof LispBinding && el.symbol === symbol)
+                return el;
+            p = p.cdr;
         }
         return symbol;
     }
@@ -900,7 +899,6 @@ export class LispMachine {
     bind(symbol, i) {
         let frame = this.env.car;
         this.dynpush(new LispBinding(symbol, frame[i]));
-        frame[i] = null;
     }
 
     push(v) {
