@@ -292,7 +292,7 @@
             (rest-args (cdr args)))
        `(progn
           (set-symbol-function! ',setter
-                                (%fn ,setter (,value-arg ,@rest-args)
+                                (%fn ,(cadr name) (,value-arg ,@rest-args)
                                      ,@body))
           (defsetf ,(cadr name) ,rest-args (,value-arg)
             `(,',setter (%:%ooo ,,value-arg) ,,@rest-args)))))
