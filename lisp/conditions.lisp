@@ -102,7 +102,7 @@
                                  (multiple-value-call
                                   (lambda ,(cadr has-no-error)
                                     (pop *handler-clusters*)
-                                    ,@(cddr has-no-error))
+                                    (locally ,@(cddr has-no-error)))
                                   ,form))
                    ,@(remove has-no-error clauses))))))
         (let ((block-tag (gensym))

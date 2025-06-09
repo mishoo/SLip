@@ -63,20 +63,20 @@
   (t () 'good))
  good)
 
-;; (deftest handler-case.11
-;;   (labels ((%f () (declare (special *c*))
-;;                (and (typep *c* 'condition) t))
-;;            (%g ()
-;;                (let ((*c* nil))
-;;                  (declare (special *c*))
-;;                  (%h)))
-;;            (%h ()
-;;             (handler-case
-;;              (error "foo")
-;;              (error (*c*) (declare (special *c*))
-;;                     (%f)))))
-;;     (%g))
-;;   t)
+(deftest handler-case.11
+  (labels ((%f () (declare (special *c*))
+               (and (typep *c* 'condition) t))
+           (%g ()
+               (let ((*c* nil))
+                 (declare (special *c*))
+                 (%h)))
+           (%h ()
+            (handler-case
+             (error "foo")
+             (error (*c*) (declare (special *c*))
+                    (%f)))))
+    (%g))
+  t)
 
 (deftest handler-case.12
   (handler-case (error "foo")
@@ -128,16 +128,16 @@
      i))
   good 1)
 
-;; (deftest handler-case.19
-;;   (handler-case
-;;    (error "foo")
-;;    (error (c)
-;;           ;; Test that declarations can go here
-;;           (declare (optimize (safety 3)))
-;;           (declare (type condition c))
-;;           (declare (ignore c))
-;;           t))
-;;   t)
+(deftest handler-case.19
+  (handler-case
+   (error "foo")
+   (error (c)
+          ;; Test that declarations can go here
+          (declare (optimize (safety 3)))
+          (declare (type condition c))
+          (declare (ignore c))
+          t))
+  t)
 
 (deftest handler-case.20
   (handler-case
@@ -178,35 +178,35 @@
    (error () 'good))
   good)
 
-;; (deftest handler-case.26
-;;   (handler-case
-;;    (values 1 'a 1.0)
-;;    (error () 'bad)
-;;    (:no-error (a b c)
-;;               ;; Test that declarations can go here
-;;               (declare (type integer a))
-;;               (declare (type symbol b))
-;;               (declare (type number c))
-;;               (declare (ignore a c))
-;;               b))
-;;   a)
+(deftest handler-case.26
+  (handler-case
+   (values 1 'a 1.0)
+   (error () 'bad)
+   (:no-error (a b c)
+              ;; Test that declarations can go here
+              (declare (type integer a))
+              (declare (type symbol b))
+              (declare (type number c))
+              (declare (ignore a c))
+              b))
+  a)
 
 (deftest handler-case.27
   (handler-case (error "foo") (error ()))
   nil)
 
-;; (deftest handler-case.28
-;;   (handler-case (error "foo") (error () (declare (optimize speed))))
-;;   nil)
+(deftest handler-case.28
+  (handler-case (error "foo") (error () (declare (optimize speed))))
+  nil)
 
 ;;; Free declaration scope
 
-;; (deftest handler-case.29
-;;   (let ((x :bad))
-;;     (declare (special x))
-;;     (let ((x :good))
-;;       (handler-case nil
-;;                     (:no-error (z &aux (y x))
-;;                                (declare (special x) (ignore z))
-;;                                y))))
-;;   :good)
+(deftest handler-case.29
+  (let ((x :bad))
+    (declare (special x))
+    (let ((x :good))
+      (handler-case nil
+                    (:no-error (z &aux (y x))
+                               (declare (special x) (ignore z))
+                               y))))
+  :good)

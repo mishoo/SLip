@@ -920,7 +920,18 @@
      (let ((locally-special (filter (getf declarations :special)
                                     (lambda (sym)
                                       (not (%specialp sym))))))
-       ,@body)))
+       (labels ((declare-locally-special (&key except)
+                  (when locally-special
+                    (setq env (extenv env :lex
+                                      (cons +skip-count+
+                                            (map1 (lambda (name)
+                                                    (list name :var :special t))
+                                                  (if except
+                                                      (filter locally-special
+                                                              (lambda (name)
+                                                                (not (member name except))))
+                                                      locally-special))))))))
+         ,@body))))
 
 (labels
     ((assert (p msg)
@@ -1140,15 +1151,8 @@
 
      (comp-decl-seq (exps env val? more?)
        (with-declarations exps
-         (cond
-           (locally-special
-            (setq env (extenv env :lex
-                              (cons +skip-count+
-                                    (map1 (lambda (name)
-                                            (list name :var :special t))
-                                          locally-special))))
-            (with-env (comp-seq exps env val? more?)))
-           ((comp-seq exps env val? more?)))))
+         (declare-locally-special)
+         (with-env (comp-seq exps env val? more?))))
 
      (comp-multiple-value-prog1 (first rest env val? more?)
        (cond
@@ -1438,10 +1442,12 @@
                (key (getf args :key))
                (aux (getf args :aux))
                (allow-other-keys (getf args :aok))
+               (names (list))
                (index 0))
            (with-declarations body
              (with-seq-output <<
                (labels ((newarg (name)
+                          (push name names)
                           (when (or (%specialp name)
                                     (member name locally-special))
                             (<< (gen "BIND" name index)))
@@ -1490,8 +1496,8 @@
                                     (gen "LSET" 0 index)
                                     (gen "POP")))
                               (newarg name))))
-                 (<< (with-env
-                       (comp-lambda-body name body env)))))))))
+                 (declare-locally-special :except names)
+                 (<< (with-env (comp-lambda-body name body env)))))))))
 
      (comp-lambda (name args body env)
        (gen "FN"
@@ -1506,14 +1512,18 @@
                                             (when (or (%specialp name)
                                                       (member name locally-special))
                                               (<< (gen "BIND" name index)))))
-                           (if args
-                               (with-extenv (:lex (map1 (lambda (name)
-                                                          (if (member name locally-special)
-                                                              (list name :var :special t)
-                                                              (list name :var)))
-                                                        args))
-                                 (<< (comp-lambda-body name body env)))
-                               (<< (comp-lambda-body name body env)))))))))
+                           (cond
+                             (args
+                              (setq env (extenv env :lex (map1 (lambda (name)
+                                                                 (if (member name locally-special)
+                                                                     (list name :var :special t)
+                                                                     (list name :var)))
+                                                               args)))
+                              (declare-locally-special :except args)
+                              (<< (with-env (comp-lambda-body name body env))))
+                             (t
+                              (declare-locally-special)
+                              (<< (with-env (comp-lambda-body name body env)))))))))))
               (if (eq code '$xargs)
                   (comp-extended-lambda name args body env)
                   code))
@@ -1621,11 +1631,13 @@
                                                (list name :var :special t)
                                                (list name :var)))
                                          names))
-                  (cond
-                    (more?
-                     (<< (comp-seq body env val? t)
-                         (gen "UNFR" 1 specials)))
-                    ((<< (comp-seq body env val? nil)))))))))
+                  (declare-locally-special :except names)
+                  (with-env
+                    (cond
+                      (more?
+                       (<< (comp-seq body env val? t)
+                           (gen "UNFR" 1 specials)))
+                      ((<< (comp-seq body env val? nil))))))))))
          (t
           (comp-decl-seq (list* values-form body) env val? more?))))
 
@@ -1673,11 +1685,13 @@
                                            (if (member name locally-special)
                                                (list name :var :special t)
                                                (list name :var))) names))
-                  (cond
-                    (more?
-                     (<< (comp-seq body env val? t)
-                         (gen "UNFR" 1 specials)))
-                    ((<< (comp-seq body env val? nil)))))))))))
+                  (declare-locally-special :except names)
+                  (with-env
+                    (cond
+                      (more?
+                       (<< (comp-seq body env val? t)
+                           (gen "UNFR" 1 specials)))
+                      ((<< (comp-seq body env val? nil))))))))))))
 
      (comp-let* (bindings body env val? more?)
        (cond
@@ -1708,6 +1722,7 @@
                               (setq env (extenv env :lex cell)))
                           (setq newargs cell)))
                       names vals)
+                (declare-locally-special :except names)
                 (with-env
                   (cond
                     (more?

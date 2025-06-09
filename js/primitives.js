@@ -1875,9 +1875,23 @@ defp("set", true, function(m, nargs){
 
 defp("symbol-value", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var sym = m.pop();
+    let sym = m.pop();
     checktype(sym, LispSymbol);
-    return Object.hasOwn(sym, "value") ? sym.value : null;
+    let binding = m.find_dvar(sym);
+    return binding.value ?? null;
+});
+
+defp("set-symbol-value!", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let value = m.pop();
+    let sym = m.pop();
+    if (sym === S_T)
+        error("Veritas aeterna. (can't set SYMBOL-VALUE of T)");
+    if (sym === S_NIL || sym === null)
+        error("Nihil ex nihil. (can't set SYMBOL-VALUE of NIL)");
+    checktype(sym, LispSymbol);
+    let binding = m.find_dvar(sym);
+    return binding.value = value;
 });
 
 defp("symbol-function", false, function(m, nargs){

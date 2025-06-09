@@ -331,8 +331,6 @@
   (nil 2)
   (1 2))
 
-%:EOF
-
 ;;; &whole is followed by a destructuring pattern (see 3.4.4.1.2)
 (deftest macrolet.36
   (macrolet ((%m (&whole (m a b) c d) `(quote (,m ,a ,b ,c ,d))))
@@ -350,12 +348,12 @@
 
 ;;; The &environment parameter is bound first
 
-(deftest macrolet.38
-  (macrolet ((foo () 1))
-    (macrolet ((%f (&optional (x (macroexpand '(foo) env)) &environment env)
-                   x))
-      (%f)))
-  1)
+;; (deftest macrolet.38
+;;   (macrolet ((foo () 1))
+;;     (macrolet ((%f (&optional (x (macroexpand '(foo) env)) &environment env)
+;;                    x))
+;;       (%f)))
+;;   1)
 
 ;;; Test for bug that showed up in sbcl
 
@@ -365,55 +363,55 @@
 
 ;;; Test that macrolets accept declarations
 
-;; (deftest macrolet.40
-;;   (macrolet ((%x () t))
-;;     (declare (optimize)))
-;;   nil)
+(deftest macrolet.40
+  (macrolet ((%x () t))
+    (declare (optimize)))
+  nil)
 
-;; (deftest macrolet.41
-;;   (macrolet ((%x () t))
-;;     (declare (optimize))
-;;     (declare (notinline identity)))
-;;   nil)
+(deftest macrolet.41
+  (macrolet ((%x () t))
+    (declare (optimize))
+    (declare (notinline identity)))
+  nil)
 
-;; (deftest macrolet.42
-;;   (macrolet ((%x () t))
-;;     (declare (optimize))
-;;     (%x))
-;;   t)
+(deftest macrolet.42
+  (macrolet ((%x () t))
+    (declare (optimize))
+    (%x))
+  t)
 
-;; (deftest macrolet.43
-;;   (let ((*x-in-macrolet.43* nil))
-;;     (declare (special *x-in-macrolet.43*))
-;;     (let ((*f* #'(lambda () *x-in-macrolet.43*)))
-;;       (declare (special *f*))
-;;       (eval `(macrolet ((%m (*x-in-macrolet.43*)
-;;                             (declare (special *f*))
-;;                             (funcall *f*)))
-;;                (%m t)))))
-;;   nil)
+(deftest macrolet.43
+  (let ((*x-in-macrolet.43* nil))
+    (declare (special *x-in-macrolet.43*))
+    (let ((*f* #'(lambda () *x-in-macrolet.43*)))
+      (declare (special *f*))
+      (eval `(macrolet ((%m (*x-in-macrolet.43*)
+                            (declare (special *f*))
+                            (funcall *f*)))
+               (%m t)))))
+  nil)
 
-;; (deftest macrolet.44
-;;   (let ((*x-in-macrolet.44* nil))
-;;     (declare (special *x-in-macrolet.44*))
-;;     (let ((*f* #'(lambda () *x-in-macrolet.44*)))
-;;       (declare (special *f*))
-;;       (eval `(macrolet ((%m (*x-in-macrolet.44*)
-;;                             (declare (special *f* *x-in-macrolet.44*))
-;;                             (funcall *f*)))
-;;                (%m t)))))
-;;   t)
+(deftest macrolet.44
+  (let ((*x-in-macrolet.44* nil))
+    (declare (special *x-in-macrolet.44*))
+    (let ((*f* #'(lambda () *x-in-macrolet.44*)))
+      (declare (special *f*))
+      (eval `(macrolet ((%m (*x-in-macrolet.44*)
+                            (declare (special *f* *x-in-macrolet.44*))
+                            (funcall *f*)))
+               (%m t)))))
+  t)
 
-;; (deftest macrolet.45
-;;   (let ((*x-in-macrolet.45* nil))
-;;     (declare (special *x-in-macrolet.45*))
-;;     (let ((*f* #'(lambda () *x-in-macrolet.45*)))
-;;       (declare (special *f*))
-;;       (eval `(macrolet ((%m ((*x-in-macrolet.45*))
-;;                             (declare (special *f* *x-in-macrolet.45*))
-;;                             (funcall *f*)))
-;;                (%m (t))))))
-;;   t)
+(deftest macrolet.45
+  (let ((*x-in-macrolet.45* nil))
+    (declare (special *x-in-macrolet.45*))
+    (let ((*f* #'(lambda () *x-in-macrolet.45*)))
+      (declare (special *f*))
+      (eval `(macrolet ((%m ((*x-in-macrolet.45*))
+                            (declare (special *f* *x-in-macrolet.45*))
+                            (funcall *f*)))
+               (%m (t))))))
+  t)
 
 ;;; Macros are expanded in the appropriate environment
 
@@ -424,24 +422,24 @@
 
 ;;; Free declarations in macrolet
 
-;; (deftest macrolet.47
-;;   (let ((x :good))
-;;     (declare (special x))
-;;     (let ((x :bad))
-;;       (macrolet () (declare (special x)) x)))
-;;   :good)
+(deftest macrolet.47
+  (let ((x :good))
+    (declare (special x))
+    (let ((x :bad))
+      (macrolet () (declare (special x)) x)))
+  :good)
 
-;; (deftest macrolet.48
-;;   (let ((x :good))
-;;     (let ((y :bad))
-;;       (macrolet () (declare (ignore y)) x)))
-;;   :good)
+(deftest macrolet.48
+  (let ((x :good))
+    (let ((y :bad))
+      (macrolet () (declare (ignore y)) x)))
+  :good)
 
-;; (deftest macrolet.49
-;;   (let ((x :good))
-;;     (let ((y :bad))
-;;       (macrolet () (declare (ignorable y)) x)))
-;;   :good)
+(deftest macrolet.49
+  (let ((x :good))
+    (let ((y :bad))
+      (macrolet () (declare (ignorable y)) x)))
+  :good)
 
 
 ;;; TODO: more special declarations for other macrolet arguments

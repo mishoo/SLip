@@ -50,6 +50,7 @@
 
           get-internal-run-time
           compiler-macro-function
+          symbol-value
 
           values multiple-value-bind multiple-value-call values-list
           multiple-value-list multiple-value-setq multiple-value-prog1
@@ -300,6 +301,9 @@
 (defun (setf symbol-function) (func sym)
   (%::maybe-xref-info sym 'defun)
   (set-symbol-function! sym func))
+
+(defun (setf symbol-value) (value sym)
+  (set-symbol-value! sym value))
 
 (def-emac push (obj place)
   (cond
