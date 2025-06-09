@@ -22,6 +22,7 @@
 
 (load "test/if.lisp")
 (load "test/cond.lisp")
+(load "test/case.lisp")
 (load "test/destructuring-bind.lisp")
 (load "test/macrolet.lisp")
 

@@ -12,7 +12,7 @@
   (%use-package main user)
   (setq exported
         '(atom quasiquote defmacro defun when unless labels flet foreach
-          prog1 prog2 or and cond member case mapcar with-cc aif it push
+          prog1 prog2 or and cond member case otherwise mapcar with-cc aif it push
           error warn without-interrupts
           lisp-reader eval compile load function unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
