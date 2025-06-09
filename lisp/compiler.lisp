@@ -676,11 +676,11 @@
 (defun find-in-compiler-env (name type env)
   (labels ((position (lst i j)
              (when lst
-               (let ((x (car lst)))
-                 (if (and (eq name (car x))
-                          (eq type (cadr x)))
-                     (list* i j (cddr x))
-                     (position (cdr lst) i (1+ j))))))
+               (or (position (cdr lst) i (1+ j))
+                   (let ((x (car lst)))
+                     (when (and (eq name (car x))
+                                (eq type (cadr x)))
+                       (list* i j (cddr x)))))))
            (frame (env i)
              (when env
                (let ((list (car env))
@@ -1539,8 +1539,9 @@
                                  (if vars?
                                      (push nil vals)
                                      (error "Malformed LABELS/FLET/MACROLET")))
-                             (when (member x names)
-                               (error "Duplicate name in LET/LABELS/FLET/MACROLET"))
+                             (when (and (not vars?)
+                                        (member x names))
+                               (error "Duplicate name in LABELS/FLET/MACROLET"))
                              (push x names)
                              (when (and vars? (%specialp x))
                                (push (cons x i) specials))

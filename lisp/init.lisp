@@ -55,6 +55,7 @@
           values multiple-value-bind multiple-value-call values-list
           multiple-value-list multiple-value-setq multiple-value-prog1
 
+          lambda-list-keywords
           &key &rest &body &whole &optional &aux &allow-other-keys))
   (%export exported boot)
   (%export exported main)
@@ -736,6 +737,13 @@
        (let* ,bindings
          (declare ,@declarations)
          (tagbody ,@body)))))
+
+(def-efun make-list (size &key initial-element)
+  (let ((list nil))
+    (dotimes (i size list)
+      (setq list (cons initial-element list)))))
+
+(defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
 
 (export '(*standard-output*
           *error-output*
