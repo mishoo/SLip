@@ -560,6 +560,7 @@
         (optional nil)
         (rest nil)
         (key nil)
+        (has-key nil)
         (aux nil)
         (allow-other-keys nil))
     (labels
@@ -635,6 +636,7 @@
               (error "Bad &key argument name"))))
 
          (rec-key (args)
+           (setq has-key t)
            (case (car args)
              (&allow-other-keys
               (setq allow-other-keys t)
@@ -650,7 +652,7 @@
                  (push (list* (key-arg-names (caar args)) (cdar args)) key))
                 ((symp (car args))
                  (push (list (key-arg-names (car args))) key))
-                (t
+                (args
                  (error "Bad &key parameter in lambda list"))))))
 
          (rec-aux (args)
@@ -670,6 +672,7 @@
             :optional optional
             :rest rest
             :key key
+            :has-key has-key
             :aux aux
             :aok allow-other-keys))))
 
@@ -1004,7 +1007,8 @@
 
      (macro (sym env)
        (or (find-macrolet sym env)
-           (%macro sym)))
+           (and (not (find-func sym env))
+                (%macro sym))))
 
      (unknown-function (sym)
        (unless (member sym *unknown-functions*)
@@ -1016,6 +1020,19 @@
          (unless (member sym *unknown-variables*)
            (push sym *unknown-variables*)))
        sym)
+
+     (function-name (sym)
+       ;; Hack to handle #'(SETF STUFF). In CL it seems that the name of the
+       ;; function is the list itself (SETF STUFF), but we really need to make
+       ;; it a symbol.
+       (cond
+         ((and (consp sym)
+               (eq 'setf (car sym))
+               (symbolp (cadr sym))
+               (null (cddr sym)))
+          (intern (strcat "(SETF " (cadr sym) ")")
+                  (symbol-package (cadr sym))))
+         (sym)))
 
      (comp (x env val? more?)
        (cond
@@ -1087,20 +1104,9 @@
                        (unless more? (gen "RET")))))
               (function
                (arg-count x 1 1)
-               (let ((sym (cadr x)))
+               (let ((sym (function-name (cadr x))))
                  (when val?
                    (cond
-                     ((when (and (consp sym)
-                                 (eq 'setf (car sym))
-                                 (symbolp (cadr sym))
-                                 (null (cddr sym)))
-                        ;; Hack to handle #'(SETF STUFF). In CL it seems
-                        ;; that the name of the function is the list
-                        ;; itself (SETF STUFF), but we really need to make
-                        ;; it a symbol. Hope this is sound..
-                        (comp `(function ,(intern (strcat "(SETF " (cadr sym) ")")
-                                                  (symbol-package (cadr sym))))
-                              env t more?)))
                      ((when (and (consp sym)
                                  (eq 'lambda (car sym)))
                         (comp sym env t more?)))
@@ -1379,9 +1385,7 @@
                 (stringp f)
                 (regexpp f)
                 (charp f)
-                (vectorp f)
-                (eq f t)
-                (eq f nil))
+                (vectorp f))
             (error (strcat f " is not a function")))
            ((and local (symbolp f))
             (let ((localfun (find-func f env)))
@@ -1437,70 +1441,79 @@
              (cons (car l) (make-true-list (cdr l))))))
 
      (comp-extended-lambda (name args body env)
-       (let ((args (parse-lambda-list args))
-             (envcell nil))
-         (let ((required (getf args :required))
-               (optional (getf args :optional))
-               (rest (getf args :rest))
-               (key (getf args :key))
-               (aux (getf args :aux))
-               (allow-other-keys (getf args :aok))
-               (names (list))
-               (index 0))
-           (with-declarations body
-             (with-seq-output <<
-               (labels ((newarg (name)
-                          (push name names)
-                          (when (or (%specialp name)
-                                    (member name locally-special))
-                            (<< (gen "BIND" name index)))
-                          (let ((new (list (if (member name locally-special)
-                                               (list name :var :special t)
-                                               (list name :var)))))
-                            (if envcell
-                                (rplacd envcell new)
-                                (setq env (extenv env :lex new)))
-                            (setq envcell new))
-                          (%incf index))
-                        (newdef (name defval supplied-p)
-                          (unless supplied-p
-                            (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
-                          (newarg supplied-p)
-                          (when defval
-                            (let ((l1 (mklabel)))
-                              (<< (gen "LVAR" 0 (1- index)) ;; supplied-p
-                                  (gen "TJUMP" l1)          ;; if T then it's passed
-                                  (with-env
-                                    (comp defval env t t))  ;; compile default value
-                                  (gen "LSET" 0 index)      ;; set arg value in env
-                                  (gen "POP")               ;; discard from stack
-                                  #(l1))))
-                          (newarg name)))
-                 (<< (gen "XARGS"
-                          (length required)
-                          (length optional)
-                          (if rest 1 0)
-                          (as-vector (map1 #'caar key))
-                          allow-other-keys))
-                 (foreach required #'newarg)
-                 (foreach optional
-                          (lambda (opt)
-                            (newdef (car opt) (cadr opt) (caddr opt))))
-                 (when rest (newarg rest))
-                 (foreach key
-                          (lambda (key)
-                            (newdef (cadar key) (cadr key) (caddr key))))
-                 (foreach aux
-                          (lambda (aux)
-                            (let ((name (car aux))
-                                  (defval (cadr aux)))
-                              (when defval
-                                (<< (with-env (comp defval env t t))
-                                    (gen "LSET" 0 index)
-                                    (gen "POP")))
-                              (newarg name))))
-                 (declare-locally-special :except names)
-                 (<< (with-env (comp-lambda-body name body env)))))))))
+       (let* ((envcell nil)
+              (args (parse-lambda-list args))
+              (required (getf args :required))
+              (optional (getf args :optional))
+              (rest (getf args :rest))
+              (key (getf args :key))
+              (has-key (getf args :has-key))
+              (aux (getf args :aux))
+              (allow-other-keys (getf args :aok))
+              (names (append required
+                             (map1 #'car optional)
+                             (when rest (list rest))
+                             (map1 #'cadar key)
+                             (map1 #'car aux)))
+              (index 0))
+         (with-declarations body
+           (with-seq-output <<
+             (labels ((newcell (name)
+                        (let ((new (list (if (member name locally-special)
+                                             (list name :var :special t)
+                                             (list name :var)))))
+                          (if envcell
+                              (rplacd envcell new)
+                              (setq env (extenv env :lex new)))
+                          (setq envcell new)))
+                      (bindcell (name)
+                        (when (or (%specialp name)
+                                  (member name locally-special))
+                          (<< (gen "BIND" name index)))
+                        (%incf index))
+                      (newarg (name)
+                        (newcell name)
+                        (bindcell name))
+                      (newdef (name defval supplied-p)
+                        (unless supplied-p
+                          (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
+                        (newarg supplied-p)
+                        (when defval
+                          (let ((l1 (mklabel)))
+                            (<< (gen "LVAR" 0 (1- index)) ;; supplied-p
+                                (gen "TJUMP" l1)          ;; if T then it's passed
+                                (with-env
+                                  (comp defval env t t))  ;; compile default value
+                                (gen "LSET" 0 index)      ;; set arg value in env
+                                (gen "POP")               ;; discard from stack
+                                #(l1))))
+                        (newarg name)))
+               (<< (gen "XARGS"
+                        (length required)
+                        (length optional)
+                        (if rest 1 0)
+                        (when has-key (as-vector (map1 #'caar key)))
+                        allow-other-keys))
+               (foreach required #'newarg)
+               (foreach optional
+                        (lambda (opt)
+                          (newdef (car opt) (cadr opt) (caddr opt))))
+               (when rest (newarg rest))
+               (foreach key
+                        (lambda (key)
+                          (newdef (cadar key) (cadr key) (caddr key))))
+               (foreach aux
+                        (lambda (aux)
+                          (let ((name (car aux))
+                                (defval (cadr aux)))
+                            (newcell name)
+                            (when defval
+                              (<< (with-env (comp defval env t t))
+                                  (gen "LSET" 0 index)
+                                  (gen "POP")))
+                            (bindcell name))))
+               (declare-locally-special :except names)
+               (<< (with-env (comp-lambda-body name body env))))))))
 
      (comp-lambda (name args body env)
        (gen "FN"
@@ -1546,6 +1559,8 @@
                                  (if vars?
                                      (push nil vals)
                                      (error "Malformed LABELS/FLET/MACROLET")))
+                             (unless vars?
+                               (setq x (function-name x)))
                              (when (and (not vars?)
                                         (member x names))
                                (error "Duplicate name in LABELS/FLET/MACROLET"))

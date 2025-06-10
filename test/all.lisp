@@ -12,6 +12,7 @@
 (load "test/let.lisp")
 (load "test/letstar.lisp")
 (load "test/defun.lisp")
+(load "test/flet.lisp")
 
 (load "test/values.lisp")
 (load "test/values-list.lisp")

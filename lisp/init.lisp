@@ -215,6 +215,10 @@
                             ((and expander
                                   (symbolp expander))
                              `(,expander ,@temps ,@vals))
+                            ((symbolp (car form))
+                             (let ((setter (intern (strcat "(SETF " (car form) ")")
+                                                   (symbol-package (car form)))))
+                               `(,setter ,@vals ,@temps)))
                             ((error (strcat "Unknown SETF expander " (car form)))))))
          (when (eq '%mvb-internal (car store-form))
            ;; hack: for multiple store vars, fetch names directly from
@@ -237,8 +241,12 @@
        ((consp (car args))
         (multiple-value-bind (expander form) (%get-setf-place (car args))
           (cond
-            ((null expander)
-             (error (strcat "No SETF expander for " (caar args))))
+            ((and (null expander)
+                  (symbolp (car form)))
+             ;; no global setter defined, but maybe there is a (SETF FOO) somewhere.
+             (let ((setter (intern (strcat "(SETF " (car form) ")")
+                                   (symbol-package (car form)))))
+               `(,setter ,(cadr args) ,@(cdr form))))
             ((functionp expander)
              (apply expander (append (cdr form) (list (cadr args)))))
             ((symbolp expander)

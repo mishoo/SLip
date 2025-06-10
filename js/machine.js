@@ -1457,11 +1457,11 @@ let OP_RUN = [
         let rest = m.code[m.pc++];
         let key = m.code[m.pc++];
         let allow_other_keys = m.code[m.pc++];
-        let kl = key?.length;
+        let kl = key ? key.length : 0;
         let n = m.n_args;
         let frame_len = required + 2 * optional + rest + 2 * kl;
         let min = required;
-        let max = rest || kl ? null : required + optional;
+        let max = rest || key || allow_other_keys ? null : required + optional;
         if (n < required) {
             error(`Expecting at least ${min} arguments`);
         }

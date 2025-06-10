@@ -14,7 +14,7 @@ export function value(el) {
 }
 
 export class LispStack {
-    constructor(maxsize = 1024) {
+    constructor(maxsize = 4096) {
         this.maxsize = maxsize;
         this.sp = 0;
         this.data = new Array(maxsize);
