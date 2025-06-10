@@ -29,13 +29,6 @@
 (defun defun-test-fun-4 (x)
   (car x))
 
-;; XXX SLip: in the original ansi-test the order of the following two forms is
-;; reversed, so SETF should actually work *before* the setter is defined. Oh,
-;; fuck it, I'm just glad it works in “normal” order.
-;;
-(defun (setf defun-test-fun-4) (newval x)
-  (return-from defun-test-fun-4 (setf (car x) newval)))
-;;
 (deftest defun.4
   (let ((x (list 'a 'b)))
     (values
@@ -43,6 +36,9 @@
      x))
   c
   (c b))
+
+(defun (setf defun-test-fun-4) (newval x)
+  (return-from defun-test-fun-4 (setf (car x) newval)))
 
 (deftest defun.5
   (let ((x 1))
