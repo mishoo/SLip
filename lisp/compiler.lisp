@@ -1421,24 +1421,24 @@
 
      (gen-simple-args (args n names)
        (cond
-         ((not args) (gen "ARGS" n))
+         ((null args) (gen "ARGS" n))
          ((symbolp args)
           (when (member args names)
             (error (strcat "Duplicate function argument " args)))
           (gen "ARG_" n))
-         ((and (consp args) (symbolp (car args)))
-          (when (lambda-keyword-p (car args))
-            (throw '$xargs '$xargs))
-          (when (member (car args) names)
-            (error (strcat "Duplicate function argument " (car args))))
-          (gen-simple-args (cdr args) (1+ n) (cons (car args) names)))
-         (t (error "Illegal argument list"))))
+         ((lambda-keyword-p (car args))
+          (throw '$xargs '$xargs))
+         ((member (car args) names)
+          (error (strcat "Duplicate function argument " (car args))))
+         ((gen-simple-args (cdr args)
+                           (1+ n)
+                           (cons (car args) names)))))
 
-     (make-true-list (l)
-       (when l
-         (if (atom l)
-             (list l)
-             (cons (car l) (make-true-list (cdr l))))))
+     (make-true-list (lst)
+       (when lst
+         (if (atom lst)
+             (list lst)
+             (cons (car lst) (make-true-list (cdr lst))))))
 
      (comp-extended-lambda (name args body env)
        (let* ((envcell nil)

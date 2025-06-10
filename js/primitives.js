@@ -1541,6 +1541,7 @@ defp("%macro", false, function(m, nargs){
 defp("disassemble", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var func = m.pop();
+    if (func instanceof LispSymbol) func = func.function;
     checktype(func, LispClosure);
     return LispMachine.disassemble(func.code);
 });
