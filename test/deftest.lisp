@@ -1,6 +1,15 @@
 (in-package :sl-user)
 
 (defparameter *tests* (list))
+(defparameter *compile-time* 0)
+(defparameter *run-time* 0)
+
+(defmacro time-it (dest form)
+  (let ((t1 (gensym)))
+    `(let ((,t1 (get-internal-run-time)))
+       (multiple-value-prog1
+           ,form
+         (setf ,dest (- (get-internal-run-time) ,t1))))))
 
 (defmacro deftest (name &rest args)
   (%:maybe-xref-info name 'defun)
@@ -10,9 +19,10 @@
     (destructuring-bind (form &rest expected) args
       (let ((val (gensym))
             (exp (gensym))
+            (comp (gensym))
             (ok (gensym)))
         `(flet ((,name ()
-                  (let (,val ,exp ,ok)
+                  (let (,val ,exp ,comp ,ok)
                     (format t "#'~S ..." ',name)
                     (setf ,exp ',expected)
                     (handler-bind
@@ -20,8 +30,11 @@
                                   (format t " FAIL.~%!ERROR: ~A~%!ERROR: ~S~%"
                                           condition (%:%backtrace))
                                   (throw 'test-error '#:test-error))))
-                      (setf ,val (catch 'test-error
-                                   (multiple-value-list (eval ',form))))
+                      (setf ,comp (time-it *compile-time*
+                                           (compile (list 'lambda nil ',form))))
+                      (setf ,val (time-it *run-time*
+                                          (catch 'test-error
+                                            (multiple-value-list (funcall ,comp)))))
                       (setf ,ok (equal ,val ,exp))
                       (if ,ok
                           (format t " OK~%")
@@ -38,16 +51,22 @@
   (funcall (get-test name)))
 
 (defun run-tests (&optional match-name)
-  (let ((tests (if match-name
-                   (loop for (name func) on *tests* by #'cddr
-                         when (regexp-test match-name (symbol-name name))
-                         nconc (list name func))
-                   *tests*)))
-    (loop for (func name) on (reverse tests) by #'cddr
-          for test from 1
-          for ok = (funcall func)
-          counting ok into success
-          finally (format t "~A tests, ~A OK~%" test success))))
+  (let ((*compile-time* 0)
+        (*run-time* 0))
+    (let ((tests (if match-name
+                     (loop for (name func) on *tests* by #'cddr
+                           when (regexp-test match-name (symbol-name name))
+                           nconc (list name func))
+                     *tests*)))
+      (loop for (func name) on (reverse tests) by #'cddr
+            for test from 1
+            for ok = (funcall func)
+            counting ok into success
+            summing *compile-time* into compile-time
+            summing *run-time* into run-time
+            finally (format t "~A tests, ~A OK~%Compile time: ~Ams~%Run time: ~Ams~%"
+                            test success
+                            compile-time run-time)))))
 
 ;;;; utils from ansi-test
 
