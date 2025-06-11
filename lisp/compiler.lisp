@@ -1295,15 +1295,20 @@
                      (rec (cdr forms) (rplacd p cell)))
                    (rec (cdr forms) p))))
            (%pop tags)
-           (with-extenv (:tags (as-vector tags) :lex (vector (list tbody :tagbody)))
-             (<< (gen "BLOCK"))           ; define the tagbody entry
-             (foreach forms (lambda (x)
-                              (if (atom x)
-                                  (<< #( (cadddr (%pop tags)) )) ; label
-                                  (<< (comp x env nil t)))))
-             (when val? (<< (gen "NIL"))) ; tagbody returns NIL
-             (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
-             (unless more? (<< (gen "RET")))))))
+           (cond
+             ((null tags)
+              (<< (comp-seq forms env nil t)
+                  (when val? (gen "NIL"))
+                  (unless more? (gen "RET"))))
+             ((with-extenv (:tags (as-vector tags) :lex (vector (list tbody :tagbody)))
+                (<< (gen "BLOCK"))           ; define the tagbody entry
+                (foreach forms (lambda (x)
+                                 (if (atom x)
+                                     (<< #( (cadddr (%pop tags)) )) ; label
+                                     (<< (comp x env nil t)))))
+                (when val? (<< (gen "NIL"))) ; tagbody returns NIL
+                (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
+                (unless more? (<< (gen "RET")))))))))
 
      (comp-go (tag env)
        (let ((pos (find-tag tag env)))
