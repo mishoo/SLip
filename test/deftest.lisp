@@ -66,7 +66,8 @@
             summing *run-time* into run-time
             finally (format t "~A tests, ~A OK~%Compile time: ~Ams~%Run time: ~Ams~%"
                             test success
-                            compile-time run-time)))))
+                            compile-time run-time))
+      'done)))
 
 ;;;; utils from ansi-test
 

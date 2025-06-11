@@ -15,7 +15,7 @@
                    (mapcar (lambda (name)
                              (list name :var))
                            names))))
-        (let ((%:*compiler-env* (%:extend-compiler-env `(:lex ,defs))))
+        (let ((%:*compiler-env* (%:extend-compiler-env `(:lex ,(as-vector defs)))))
           (funcall thunk)))
       (funcall thunk)))
 
@@ -210,7 +210,7 @@
                                                           ,(%:%fn-destruct t args val body))))))))
                            (list name :func :macro func)))
                        (cadr f)))))
-    (let ((%:*compiler-env* (%:extend-compiler-env `(:lex ,defs))))
+    (let ((%:*compiler-env* (%:extend-compiler-env `(:lex ,(as-vector defs)))))
       (if (cdddr f)
           `(progn ,@(all-mexp (cddr f)))
           (mexp (caddr f))))))
@@ -222,7 +222,7 @@
                                (exp (cadr def)))
                            (list name :var :smac exp)))
                        (cadr f)))))
-    (let ((%:*compiler-env* (%:extend-compiler-env `(:lex ,defs))))
+    (let ((%:*compiler-env* (%:extend-compiler-env `(:lex ,(as-vector defs)))))
       `(symbol-macrolet ,(cadr f)
          ,@(all-mexp (cddr f))))))
 

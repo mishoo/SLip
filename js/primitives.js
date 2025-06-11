@@ -463,7 +463,7 @@ defp("getf", false, function(m, nargs){
     var item = m.pop(), list = m.pop();
     while (list !== null) {
         checktype(list, LispList);
-        if (!list.cdr) error("Malformed plist");
+        if (list.cdr === null) error("Malformed plist");
         if (eq(list.car, item))
             return list.cdr.car;
         list = list.cdr.cdr;
@@ -622,16 +622,15 @@ defp("as-list", false, function(m, nargs){
 
 defp("vector-push", true, function(m, nargs){
     checknargs(nargs, 2);
-    var a = [];
-    while (nargs-- > 1) a[nargs - 1] = m.pop();
+    var a = m.pop_frame(nargs - 1);
     var vector = m.pop();
     checktype(vector, LispArray);
-    vector.push.apply(vector, a);
+    vector.push(...a);
     return vector;
 });
 
 defp("vector-pop", true, function(m, nargs){
-    checknargs(nargs, 1);
+    checknargs(nargs, 1, 1);
     var vector = m.pop();
     checktype(vector, LispArray);
     return vector.length > 0 ? vector.pop() : null;
@@ -2096,6 +2095,29 @@ defp("%warn", true, function(m, nargs){
 });
 
 /* -----[ other ]----- */
+
+var S_SKIP_COUNT = LispSymbol.get("%SKIP-COUNT");
+defp("%find-in-env", false, function(m, nargs){
+    checknargs(nargs, 3, 3);
+    let env = checktype(m.pop(), LispList);
+    let type = m.pop();
+    let name = m.pop();
+    for (let i = 0; env !== null; env = env.cdr) {
+        let frame = env.car, skip = false;
+        if (frame instanceof LispCons) {
+            skip = frame.car === S_SKIP_COUNT;
+            frame = frame.cdr;
+        }
+        for (let j = frame.length; --j >= 0;) {
+            let lst = frame[j];
+            if (lst.car === name && lst.cdr.car === type) {
+                return new LispCons(i, new LispCons(j, LispCons.cddr(lst)));
+            }
+        }
+        if (!skip) i++;
+    }
+    return null;
+});
 
 defp("%debugger", true, function(m, nargs){
     checknargs(nargs, 0, 0);
