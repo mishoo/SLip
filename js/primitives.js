@@ -181,6 +181,13 @@ function all_different(a) {
 
 defp("/=", false, function(m, nargs){
     checknargs(nargs, 1);
+    if (nargs === 1) {
+        m.pop_number(error);
+        return true;
+    }
+    if (nargs === 2) {
+        return m.pop_number(error) === m.pop_number(error) ? null : true;
+    }
     var a = [];
     while (nargs-- > 0) a.push(m.pop_number(error));
     return all_different(a);
@@ -812,8 +819,8 @@ defp("letterp", false, function(m, nargs){
 
 // number/string/char comparators
 (defcmp => {
-    defcmp("="  , (a, b) => a == b);
-    defcmp("/=" , (a, b) => a != b);
+    defcmp("="  , (a, b) => a === b);
+    defcmp("/=" , (a, b) => a !== b);
     defcmp("<=" , (a, b) => a <= b);
     defcmp(">=" , (a, b) => a >= b);
     defcmp("<"  , (a, b) => a < b);
@@ -825,6 +832,12 @@ defp("letterp", false, function(m, nargs){
         defp(name, false, function(m, nargs){
             checknargs(nargs, 1);
             let prev = m.pop_number(error);
+            if (nargs === 1) {
+                return true;
+            }
+            if (nargs === 2) {
+                return cmp(m.pop_number(error), prev) ? true : null;
+            }
             let ret = true;
             while (--nargs > 0) {
                 let el = m.pop_number(error);
@@ -2108,8 +2121,9 @@ defp("%find-in-env", false, function(m, nargs){
             skip = frame.car === S_SKIP_COUNT;
             frame = frame.cdr;
         }
+        checktype(frame, LispArray);
         for (let j = frame.length; --j >= 0;) {
-            let lst = frame[j];
+            let lst = checktype(frame[j], LispList);
             if (lst.car === name && lst.cdr.car === type) {
                 return new LispCons(i, new LispCons(j, LispCons.cddr(lst)));
             }

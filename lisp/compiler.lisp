@@ -1033,9 +1033,9 @@
        (gensym "label"))
 
      (macro (sym env)
-       (or (find-macrolet sym env)
-           (and (not (find-func sym env))
-                (%macro sym))))
+       (aif (find-func sym env)
+            (getf (cddr it) :macro)
+            (%macro sym)))
 
      (unknown-function (sym)
        (unless (member sym *unknown-functions*)
@@ -1364,6 +1364,10 @@
          ((null exps)
           (%seq (when val? (gen "NIL"))
                 (unless more? (gen "RET"))))
+         ((and (consp (car exps))
+               (eq 'or (caar exps)))
+          (comp-or (append (cdar exps) (cdr exps))
+                   env val? more? l1))
          ((cdr exps)
           (cond
             ((always-true-p (car exps))
@@ -1384,7 +1388,7 @@
                      #( l1 )
                      (gen "VALUES" 1)
                      (unless more? (gen "RET")))))))
-         (t (comp (car exps) env val? more?))))
+         ((comp (car exps) env val? more?))))
 
      (comp-funcall (f args env val? more?)
        (if (or (safe-atom-p f)
@@ -1488,18 +1492,14 @@
          (with-declarations body
            (with-seq-output <<
              (setq env (extenv env :lex envcell))
-             (labels ((newcell (name)
+             (labels ((newarg (name)
                         (vector-push envcell (if (member name locally-special)
                                                  (list name :var :special t)
-                                                 (list name :var))))
-                      (bindcell (name)
+                                                 (list name :var)))
                         (when (or (%specialp name)
                                   (member name locally-special))
                           (<< (gen "BIND" name index)))
                         (%incf index))
-                      (newarg (name)
-                        (newcell name)
-                        (bindcell name))
                       (newdef (name defval supplied-p)
                         (unless supplied-p
                           (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
@@ -1536,8 +1536,7 @@
                               (<< (with-env (comp defval env t t))
                                   (gen "LSET" 0 index)
                                   (gen "POP")))
-                            (newcell name)
-                            (bindcell name))))
+                            (newarg name))))
                (declare-locally-special :except names)
                (<< (with-env (comp-lambda-body name body env))))))))
 
@@ -1578,7 +1577,7 @@
            (comp-seq body env t nil)))
 
      (get-bindings (bindings vars?)
-       (let (names vals specials (i 0))
+       (let (names vals)
          (foreach bindings (lambda (x)
                              (if (consp x)
                                  (progn (push (if vars? (cadr x) (cdr x)) vals)
@@ -1591,11 +1590,8 @@
                              (when (and (not vars?)
                                         (member x names))
                                (error "Duplicate name in LABELS/FLET/MACROLET"))
-                             (push x names)
-                             (when (and vars? (%specialp x))
-                               (push (cons x i) specials))
-                             (%incf i)))
-         (list (nreverse names) (nreverse vals) i (nreverse specials))))
+                             (push x names)))
+         (list (nreverse names) (nreverse vals))))
 
      (comp-flets (bindings body env labels? val? more?)
        (if bindings
@@ -1603,7 +1599,7 @@
              (let* ((bindings (get-bindings bindings nil))
                     (names (car bindings))
                     (funcs (cadr bindings))
-                    (len (caddr bindings)))
+                    (len (length names)))
                (flet ((extenv ()
                         (setq env (extenv env :lex (map1-vector (lambda (name)
                                                                   (list name :func))
