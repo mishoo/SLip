@@ -1,6 +1,6 @@
 import { LispCons } from "./list.js";
 import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
-import { LispMachine, OP } from "./machine.js";
+import { LispMachine, OP, want_bound } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
 
 let BASE_PACK = LispPackage.BASE_PACK;
@@ -1890,8 +1890,23 @@ defp("symbol-value", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     let sym = m.pop();
     checktype(sym, LispSymbol);
+    return m.gvar(sym);
+});
+
+defp("boundp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let sym = m.pop();
+    checktype(sym, LispSymbol);
     let binding = m.find_dvar(sym);
-    return binding.value ?? null;
+    return binding.value === false || binding.value === undefined ? null : true;
+});
+
+defp("makunbound", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let sym = m.pop();
+    checktype(sym, LispSymbol);
+    m.find_dvar(sym).value = false;
+    return sym;
 });
 
 defp("set-symbol-value!", false, function(m, nargs){

@@ -419,7 +419,7 @@ export class LispSymbol extends LispType {
         if (name) {
             this.name = name + "";
             this.pak = pak || null;
-            this.value = null;
+            this.value = false;
             this.vlist = Object.create(null);
             this.primitive = null;
             this.function = null;

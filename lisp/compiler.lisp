@@ -29,6 +29,21 @@
            '*trace-output*
            '*whole-form*)
 
+(setq *read-table* nil)
+(setq *standard-input* nil)
+(setq *current-file* nil)
+(setq *current-pos* nil)
+(setq *url-prefix* nil)
+(setq *unknown-functions* nil)
+(setq *unknown-variables* nil)
+(setq *compiler-env* nil)
+(setq *xref-info* nil)
+(setq *compiler-macros* nil)
+(setq *standard-output* nil)
+(setq *error-output* nil)
+(setq *trace-output* nil)
+(setq *whole-form* nil)
+
 ;; (defmacro cond (clauses)
 ;;   (when clauses
 ;;     (let ((first (car clauses)))
@@ -1078,6 +1093,9 @@
               ((prog1)
                (arg-count x 1)
                (comp-prog1 (cadr x) (cddr x) env val? more?))
+              ((progv)
+               (arg-count x 2)
+               (comp-progv (cadr x) (caddr x) (cdddr x) env val? more?))
               ((multiple-value-prog1)
                (arg-count x 1)
                (comp-multiple-value-prog1 (cadr x) (cddr x) env val? more?))
@@ -1212,6 +1230,19 @@
          ((%seq (comp first env t t)
                 (gen "VALUES" 1)
                 (unless more? (gen "RET"))))))
+
+     (comp-progv (names values body env val? more?)
+       (cond
+         ((and body names)
+          (%seq (comp names env t t)
+                (comp values env t t)
+                (gen "PROGV")
+                (comp-seq body env val? more?)
+                (if more?
+                    (gen "UNFR" 0 1)
+                    (gen "RET"))))
+         (t
+          (comp-seq (append values body) env val? more?))))
 
      (comp-pop (name env val? more?)
        (assert (symbolp name) (strcat "%POP expects a symbol, got: " name))

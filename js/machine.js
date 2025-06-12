@@ -82,7 +82,7 @@ export const OP = {
     CDDADR: 68,
     CDDDAR: 69,
     CDDDDR: 70,
-    BLOCK2: 71,
+    PROGV: 71,
     LRET2: 72,
     LJUMP2: 73,
     XARGS: 74,
@@ -168,7 +168,7 @@ const OP_LEN = [
     0 /* CDDADR */,
     0 /* CDDDAR */,
     0 /* CDDDDR */,
-    1 /* BLOCK2 */,
+    0 /* PROGV */,
     1 /* LRET2 */,
     2 /* LJUMP2 */,
     5 /* XARGS */,
@@ -181,6 +181,11 @@ const OP_LEN = [
     1 /* MVB */,
     1 /* POPBACK */,
 ];
+
+export function want_bound(name, val) {
+    if (val === false || val === undefined) error(`Symbol ${dump(name)} not bound`);
+    return val;
+}
 
 // normal RET context
 class LispRet {
@@ -845,6 +850,20 @@ export function unserialize(code) {
     return code;
 }
 
+function find_binding(env, symbol) {
+    while (env !== null) {
+        let el = env.car;
+        if (el instanceof LispBinding && el.symbol === symbol)
+            return el;
+        if (Array.isArray(el)) {
+            let binding = el.find(el => el instanceof LispBinding && el.symbol === symbol);
+            if (binding) return binding;
+        }
+        env = env.cdr;
+    }
+    return symbol;
+}
+
 export class LispMachine {
 
     static XREF = {};            // store per-file cross-reference information
@@ -874,18 +893,11 @@ export class LispMachine {
 
     find_dvar(symbol) {
         if (symbol.global() && !symbol.special()) return symbol;
-        var p = this.denv;
-        while (p !== null) {
-            var el = p.car;
-            if (el instanceof LispBinding && el.symbol === symbol)
-                return el;
-            p = p.cdr;
-        }
-        return symbol;
+        return find_binding(this.denv, symbol);
     }
 
     gvar(symbol) {
-        return this.find_dvar(symbol).value;
+        return want_bound(symbol, this.find_dvar(symbol).value);
     }
 
     gset(symbol, val) {
@@ -1428,12 +1440,18 @@ let OP_RUN = [
     /*OP.CDDDDR*/ (m) => {
         m.push(LispCons.cddddr(m.pop()));
     },
-    /*OP.BLOCK2*/ (m) => {
-        error("Deprecated instruction BLOCK2");
-        let exit = m.code[m.pc++];
-        let frame = [];
-        m.env = new LispCons(frame, m.env);
-        frame[0] = new LispLongRet(m, exit);
+    /*OP.PROGV*/ (m) => {
+        let values = m.pop(), count = 0, frame = [];
+        for (let names = m.pop(); names !== null; names = LispCons.cdr(names), count++) {
+            let name = LispCons.car(names);
+            let val = false;
+            if (values !== null) {
+                val = LispCons.car(values);
+                values = LispCons.cdr(values);
+            }
+            frame.push(new LispBinding(name, val));
+        }
+        m.dynpush(frame);
     },
     /*OP.LRET2*/ (m) => {
         error("Deprecated instruction LRET2");
@@ -1529,7 +1547,7 @@ let OP_RUN = [
     /*OP.GLPOP*/ (m) => {
         let sym = m.code[m.pc++];
         let binding = m.find_dvar(sym);
-        let lst = binding.value;
+        let lst = want_bound(sym, binding.value);
         m.push(LispCons.car(lst));
         binding.value = LispCons.cdr(lst);
     },

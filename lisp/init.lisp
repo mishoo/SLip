@@ -16,7 +16,7 @@
           error warn without-interrupts
           lisp-reader eval compile load function unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
-          quote lambda λ let let* if progn setq t nil not
+          quote lambda λ let let* if progn progv setq t nil not
           tagbody go block return return-from
           *package* *read-table*
           elt rplaca rplacd nthcdr last reverse nreverse append nconc nreconc revappend
@@ -48,6 +48,8 @@
           cddar cdddr caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
           cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
           first second third fourth rest
+
+          boundp makunbound fboundp fmakunbound
 
           get-internal-run-time
           compiler-macro-function
