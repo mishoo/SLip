@@ -274,7 +274,7 @@
     (catch 'abort-format-iteration
       (labels ((iterate (list i)
                  (when (eq i maxn)
-                   (throw 'abort-format-iteration))
+                   (throw 'abort-format-iteration nil))
                  (if list
                      (let ((x (car list)))
                        (if (listp x)
@@ -298,7 +298,7 @@
 
 (def-format #\^ ()
   (or *format-current-args*
-      (throw 'abort-format-iteration)))
+      (throw 'abort-format-iteration nil)))
 
 (def-format #\} ()
   (error "Unmatched ~~}"))

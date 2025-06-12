@@ -17,10 +17,11 @@
          (loop while (keywordp (car args))
                collect (cons (pop args) (pop args)))))
     (destructuring-bind (form &rest expected) args
-      (let ((val (gensym))
-            (exp (gensym))
-            (comp (gensym))
-            (ok (gensym)))
+      (let* ((val (gensym))
+             (exp (gensym))
+             (comp (gensym))
+             (global (intern (format nil "TEST.~A" name)))
+             (ok (gensym)))
         `(flet ((,name ()
                   (let (,val ,exp ,comp ,ok)
                     (format t "#'~S ..." ',name)
@@ -32,6 +33,7 @@
                                   (throw 'test-error '#:test-error))))
                       (setf ,comp (time-it *compile-time*
                                            (compile (list 'lambda nil ',form))))
+                      (defparameter ,global ,comp)
                       (setf ,val (time-it *run-time*
                                           (catch 'test-error
                                             (multiple-value-list (funcall ,comp)))))

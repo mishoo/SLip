@@ -1154,7 +1154,7 @@
               (block (comp-block (cadr x) (cddr x) env val? more?))
               (return-from (arg-count x 1 2) (comp-return (cadr x) (caddr x) env))
               (catch (comp-catch (cadr x) (cddr x) env val? more?))
-              (throw (comp-throw (cadr x) (caddr x) env))
+              (throw (arg-count x 2 2) (comp-throw (cadr x) (caddr x) env))
               (unwind-protect (comp-unwind-protect (cadr x) (cddr x) env val? more?))
               (funcall (comp-funcall (cadr x) (cddr x) env val? more?))
               (t (cond
@@ -1252,27 +1252,27 @@
                         (catch name
                           (comp-seq forms env val? more?)))))
          (or body
-             (let ((label (gensym "block"))
-                   (k2 (when more? (gensym "block-k2"))))
+             (let ((label (gensym "block")))
                (%seq (gen "BLOCK")
-                     (with-extenv (:lex (vector (list name :block label)))
+                     (with-extenv (:lex (vector (list name :block label val?)))
                        (comp-seq forms env val? more?))
-                     (when more? (gen "JUMP" k2))
                      #( label )
-                     (unless val? (gen "POP"))
-                     (when more? #( k2 ))
-                     (gen "UNFR" 1 0)
-                     (unless more? (gen "RET")))))))
+                     (if more?
+                         (gen "UNFR" 1 0)
+                         (gen "RET")))))))
 
      (comp-return (name value env)
        (assert (symbolp name) (strcat "RETURN-FROM expects a symbol, got: " name))
        (let* ((block (or (find-block name env)
-                         (throw name)))
+                         (throw name nil)))
               (data (cddr block))
-              (label (car data)))
-         (%seq (comp value env t t)
+              (label (%pop data))
+              (val? (%pop data)))
+         (%seq (comp value env val? t)
                (gen "LVAR" (car block) (cadr block))
-               (gen "LRET" label))))
+               (if val?
+                   (gen "LRET" label)
+                   (gen "LJUMP" label)))))
 
      (comp-tagbody (forms env val? more?)
        ;; a TAGBODY introduces a single return point in the lexical
