@@ -36,11 +36,12 @@
   (%send-ymacs-notify (strcat what) value))
 
 (defmacro define-handler (what (&rest args) &body body)
-  (let ((name (intern (strcat "EXEC-" what))))
+  (let ((name (intern (strcat "EXEC-" what)))
+        (pass-args (gensym)))
     `(labels ((,name ,args ,@body))
        (setf (symbol-function ',name) #',name)
        (hash-set *handlers* ,(symbol-name what)
-                 (lambda (req-id ,@args)
+                 (lambda (req-id . ,pass-args)
                    (make-thread
                     (lambda ()
                       (block out
@@ -50,7 +51,7 @@
                              (error (lambda (x)
                                       (send-ymacs-notify :error (format nil "~A" x))
                                       (return-from out x))))
-                          (let ((ret (,name ,@args)))
+                          (let ((ret (apply #',name ,pass-args)))
                             (send-ymacs-reply req-id ,what ret)
                             ret))))))))))
 
@@ -100,10 +101,12 @@
                                  " compiled in "
                                  (number-fixed (/ (- (get-internal-run-time) t1) 1000) 3) " s")))))
 
-(define-handler :eval-string (pak str)
+(define-handler :eval-string (pak str &optional save)
   (let ((*package* (or (and pak (find-package pak))
                        *package*)))
-    (eval-string str)))
+    (let ((val (eval-string str)))
+      (when save (save-result val))
+      val)))
 
 (define-handler :compile-string (code filename)
   (compile-string code filename))

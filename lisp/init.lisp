@@ -19,7 +19,7 @@
           quote lambda λ let let* if progn progv setq t nil not
           tagbody go block return return-from
           *package* *read-table*
-          elt rplaca rplacd nthcdr last reverse nreverse append nconc nreconc revappend
+          elt rplaca rplacd nth nthcdr last reverse nreverse append nconc nreconc revappend
           char-name char-code name-char code-char upcase downcase
           charp char-equal char= char< char<= char> char>= char/= letterp digitp
           stringp string-equal string= string< string<= string> string>= string/=
@@ -76,8 +76,8 @@
 
 (defmacro def-efun (name . rest)
   `(progn
-     (defun ,name ,@rest)
-     (export ',name)))
+     (export ',name)
+     (defun ,name ,@rest)))
 
 (defmacro def-emac (name . rest)
   `(progn
@@ -290,26 +290,6 @@
 (defsetf cdr (x) (val)
   `(rplacd ,x ,val))
 
-(defmacro defun (name args . body)
-  (cond
-    ((and (consp name)
-          (eq 'setf (car name))
-          (symbolp (cadr name))
-          (null (cddr name)))
-     (let* ((setter (intern (strcat "(SETF " (cadr name) ")")
-                            (symbol-package (cadr name))))
-            (value-arg (car args))
-            (rest-args (cdr args)))
-       `(progn
-          (set-symbol-function! ',setter
-                                (%fn ,(cadr name) (,value-arg ,@rest-args)
-                                     ,@body))
-          (defsetf ,(cadr name) ,rest-args (,value-arg)
-            `(,',setter (%:%ooo ,,value-arg) ,,@rest-args)))))
-    (t
-     (maybe-xref-info name 'defun)
-     `(set-symbol-function! ',name (%fn ,name ,args ,@body)))))
-
 (defun (setf symbol-function) (func sym)
   (%::maybe-xref-info sym 'defun)
   (set-symbol-function! sym func))
@@ -365,30 +345,34 @@
   (setf (getf %:*compiler-macros* name) handler))
 
 (def-emac define-compiler-macro (name args &body body)
-  (when (and (consp name)
-             (eq 'setf (car name))
-             (symbolp (cadr name))
-             (null (cddr name)))
-    (setf name (intern (strcat "(SETF " (cadr name) ")")
-                       (symbol-package (cadr name)))))
-  (%:maybe-xref-info name 'compiler-macro)
-  (let ((form (if (eq '&whole (car args))
-                  (prog1
-                      (cadr args)
-                    (setq args (cddr args)))
-                  (gensym "form"))))
-    `(setf (compiler-macro-function ',name)
-           (%fn ,name (,form)
-                (destructuring-bind ,args (if (eq 'funcall (car ,form))
-                                              (cddr ,form)
-                                              (cdr ,form))
-                  ,@body)))))
+  (multiple-value-bind (setter name) (%:maybe-setter name)
+    (%:maybe-xref-info name (if setter
+                                'compiler-macro-setf
+                                'compiler-macro))
+    (let ((form (if (eq '&whole (car args))
+                    (prog1
+                        (cadr args)
+                      (setq args (cddr args)))
+                    (gensym "form"))))
+      `(setf (compiler-macro-function ',(or setter name))
+             (%fn ,name (,form)
+                  (destructuring-bind ,args (if (eq 'funcall (car ,form))
+                                                (cddr ,form)
+                                                (cdr ,form))
+                    ,@body))))))
 
 (defun (setf svref) (value vector index)
   (vector-set vector index value))
 
 (define-compiler-macro (setf svref) (value vector index)
-  `(vector-set ,vector ,index ,value))
+  (cond
+    ((or (safe-atom-p value)
+         (and (safe-atom-p vector)
+              (safe-atom-p index)))
+     `(vector-set ,vector ,index ,value))
+    ((let ((v (gensym)))
+       `(let ((,v ,value))
+          (vector-set ,vector ,index ,v))))))
 
 (define-compiler-macro mapcar (&whole form func &rest lists)
   (cond
@@ -679,6 +663,12 @@
             ,end)
            ,@result-form)))))
 
+(def-efun nth (n list)
+  (car (nthcdr n list)))
+
+(defun (setf nth) (value n list)
+  (setf (car (nthcdr n list)) value))
+
 (def-emac use-package (source &optional (target *package*))
   `(%use-package (find-package ,source) (find-package ,target)))
 
@@ -753,6 +743,51 @@
   (let ((list nil))
     (dotimes (i size list)
       (setq list (cons initial-element list)))))
+
+(def-efun make-array (dimensions &key
+                                 element-type
+                                 initial-element
+                                 initial-contents
+                                 adjustable
+                                 fill-pointer
+                                 displaced-to
+                                 displaced-index-offset)
+  (when (listp dimensions)
+    (error "make-array: multi-dimensional arrays not supported (yet?)"))
+  (make-vector dimensions initial-element initial-contents))
+
+(define-compiler-macro make-array (&whole form
+                                          dimensions &key
+                                          initial-element
+                                          initial-contents
+                                          &allow-other-keys)
+  (cond
+    ((listp dimensions)
+     form)
+    (t
+     `(make-vector ,dimensions ,initial-element ,initial-contents))))
+
+(def-efun aref (array &rest pos)
+  (when (cdr pos)
+    (error "aref: multi-dimensional arrays not supported (yet?)"))
+  (svref array (car pos)))
+
+(define-compiler-macro aref (&whole form array &rest pos)
+  (cond
+    ((cdr pos) form)
+    (t
+     `(svref ,array ,(car pos)))))
+
+(defun (setf aref) (value array &rest pos)
+  (when (cdr pos)
+    (error "(setf aref): multi-dimensional arrays not supported (yet?)"))
+  (setf (svref array (car pos)) value))
+
+(define-compiler-macro (setf aref) (&whole form value array &rest pos)
+  (cond
+    ((cdr pos) form)
+    (t
+     `(setf (svref ,array ,(car pos)) ,value))))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
 

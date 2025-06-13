@@ -345,39 +345,35 @@ Ymacs_Buffer.newCommands({
                     "(%:%get-symbol-prop '" + sym.value + " \"XREF\")"
                 );
             } catch(ex) {};
-            if (debug) debug = [...debug].filter(function(stuff){
-                switch (stuff[0].name ?? stuff[0]) {
-                  case "DEFMACRO":
-                  case "DEFUN":
-                  case "DEFPARAMETER":
-                  case "DEFVAR":
-                  case "DEFGLOBAL":
-                  case "DEFCONSTANT":
-                  case "SETF":
-                  case "DEFSETF":
-                  case "COMPILER-MACRO":
-                  case "DEFCLASS":
-                    return true;
-                }
-            });
-            if (!debug || debug.length == 0)
+            if (debug) debug = [...debug];
+            if (!debug?.length)
                 throw new Ymacs_Exception("No xref information for symbol " + sym.value);
-            var history = this.getq("sl_xref_history");
-            history.push({ buffer: this.name, point: point });
-            var stuff = debug.at(-1);
-            var filename = stuff[1];
-            var position = stuff[2];
-            var ymacs = this.ymacs;
-            var buf = ymacs.getBuffer(filename);
-            function cont(buf) {
-                buf.cmd("goto_char", position);
-                buf.cmd("ensure_caret_visible");
-            }
-            ymacs.listenOnce("onBufferSwitch", cont);
-            if (buf) {
-                ymacs.switchToBuffer(buf);
+            let goto = index => {
+                var history = this.getq("sl_xref_history");
+                history.push({ buffer: this.name, point: point });
+                var stuff = debug[index];
+                var filename = stuff[1];
+                var position = stuff[2];
+                var ymacs = this.ymacs;
+                var buf = ymacs.getBuffer(filename);
+                function cont(buf) {
+                    buf.cmd("goto_char", position);
+                    buf.cmd("ensure_caret_visible");
+                }
+                ymacs.listenOnce("onBufferSwitch", cont);
+                if (buf) {
+                    ymacs.switchToBuffer(buf);
+                } else {
+                    this.cmd("find_file", filename);
+                }
+            };
+            if (debug.length == 1) {
+                goto(0);
             } else {
-                this.cmd("find_file", filename);
+                this.cmd("popup_menu", {
+                    items: debug.map(stuff => stuff[0].name ?? stuff[0]),
+                    onSelect: goto,
+                });
             }
         } else {
             throw new Ymacs_Exception("No symbol at point");
@@ -659,7 +655,7 @@ function eval_lisp(buf, expr, pack) {
     if (!pack) pack = null;
     var start = new Date().getTime();
     get_repl_buffer().deleteOverlay("match-paren");
-    buf.ymacs.run_lisp("EVAL-STRING", pack, expr, function(val){
+    buf.ymacs.run_lisp("EVAL-STRING", pack, expr, true, function(val){
         var end = new Date().getTime();
         if (typeof val != "string") val = MACHINE().dump(val);
         sl_log(val + "\n;; <== in " + ((end - start) / 1000).toFixed(3) + "s");

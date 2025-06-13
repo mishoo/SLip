@@ -1583,7 +1583,11 @@ let OP_RUN = [
     },
     /*OP.POPBACK*/ (m) => {
         let n = m.code[m.pc++];
-        m.stack.replace(-n-1, m.stack.pop_ret());
+        if (n < 0) {
+            m.stack.push(m.stack.remove(n));
+        } else {
+            m.stack.replace(-n-1, m.stack.pop_ret());
+        }
     },
 ];
 

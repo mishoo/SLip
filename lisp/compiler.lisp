@@ -170,9 +170,23 @@
 
 ;;;; let the show begin
 
+(defun maybe-setter (sym)
+  (cond
+    ((and (consp sym)
+          (eq 'setf (car sym))
+          (symbolp (cadr sym))
+          (null (cddr sym)))
+     (values (intern (strcat "(SETF " (cadr sym) ")")
+                     (symbol-package (cadr sym)))
+             (cadr sym)))
+    (t
+     (values nil sym))))
+
 (defmacro defun (name args . body)
-  (maybe-xref-info name 'defun)
-  `(set-symbol-function! ',name (%fn ,name ,args ,@body)))
+  (multiple-value-bind (setter name) (%:maybe-setter name)
+    (maybe-xref-info name (if setter 'setf 'defun))
+    `(set-symbol-function! ',(or setter name)
+                           (%fn ,name ,args ,@body))))
 
 (defun error (msg)
   (%error msg))
@@ -1064,14 +1078,7 @@
        ;; Hack to handle #'(SETF STUFF). In CL it seems that the name of the
        ;; function is the list itself (SETF STUFF), but we really need to make
        ;; it a symbol.
-       (cond
-         ((and (consp sym)
-               (eq 'setf (car sym))
-               (symbolp (cadr sym))
-               (null (cddr sym)))
-          (intern (strcat "(SETF " (cadr sym) ")")
-                  (symbol-package (cadr sym))))
-         (sym)))
+       (or (maybe-setter sym) sym))
 
      (comp (x env val? more?)
        (cond
