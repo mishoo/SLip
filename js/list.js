@@ -188,11 +188,13 @@ export class LispCons extends LispType {
         }
         return false;
     }
-    static elt(list, i) {
+    static elt(list, n, error) {
         var p = list;
+        let i = n;
         while (p !== null && i-- > 0) {
             p = cdr(p);
         }
+        if (error && p === null) error(`ELT: index ${n} is too large`);
         return car(p);
     }
     static find(list, item, cmp) {

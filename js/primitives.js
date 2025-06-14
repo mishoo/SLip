@@ -1,6 +1,6 @@
 import { LispCons } from "./list.js";
 import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
-import { LispMachine, OP, want_bound } from "./machine.js";
+import { LispMachine, OP } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
 
 let BASE_PACK = LispPackage.BASE_PACK;
@@ -15,7 +15,7 @@ var LispList = {
     type: "list"
 };
 
-var LispArray = {
+var LispVector = {
     is: Array.isArray,
     type: "array"
 };
@@ -131,7 +131,7 @@ function equal(a, b) {
                 return equal(a, b);
         }
         return a === b;
-    } else if (LispArray.is(a) && LispArray.is(b)) {
+    } else if (LispVector.is(a) && LispVector.is(b)) {
         var i = a.length;
         if (i !== b.length) return null;
         while (--i >= 0) {
@@ -356,7 +356,7 @@ defp("length", false, function(m, nargs){
     var x = m.pop();
     if (LispCons.isList(x)) return LispCons.len(x);
     if (LispString.is(x)) return x.length;
-    if (LispArray.is(x)) return x.length;
+    if (LispVector.is(x)) return x.length;
     if (LispHash.is(x)) return x.size();
     error("Unrecognized sequence in length");
 });
@@ -365,8 +365,8 @@ defp("elt", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var i = m.pop(), x = m.pop();
     checktype(i, LispNumber);
-    if (LispCons.isList(x)) return LispCons.elt(x, i);
-    if (LispArray.is(x)) return i < x.length ? x[i] : null;
+    if (LispCons.isList(x)) return LispCons.elt(x, i, error);
+    if (LispVector.is(x)) return i < x.length ? x[i] : null;
     if (LispString.is(x)) return i < x.length ? LispChar.get(x.charAt(i)) : null;
     error("Unrecognized sequence in elt");
 });
@@ -419,7 +419,7 @@ defp("reverse", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop();
     if (LispList.is(x)) return LispCons.reverse(x);
-    if (LispArray.is(x)) return [...x].reverse();
+    if (LispVector.is(x)) return [...x].reverse();
     if (LispString.is(x)) {
         for (var i = x.length, ret = ""; --i >= 0;) ret += x.charAt(i);
         return ret;
@@ -431,7 +431,7 @@ defp("nreverse", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop();
     if (LispList.is(x)) return LispCons.nreverse(x);
-    if (LispArray.is(x)) return x.reverse();
+    if (LispVector.is(x)) return x.reverse();
     error("Unrecognized sequence in nreverse");
 });
 
@@ -440,7 +440,7 @@ defp("%memq", false, function(m, nargs){
     var seq = m.pop(), item = m.pop();
     if (LispList.is(seq))
         return LispCons.find(seq, item, eq);
-    if (LispArray.is(seq)) {
+    if (LispVector.is(seq)) {
         var pos = seq.indexOf(item);
         return pos >= 0 ? pos : null;
     }
@@ -630,7 +630,7 @@ defp("as-list", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var vec = m.pop();
     if (LispList.is(vec)) return vec;
-    if (LispArray.is(vec)) return LispCons.fromArray(vec);
+    if (LispVector.is(vec)) return LispCons.fromArray(vec);
     error("Unsupported sequence");
 });
 
@@ -638,7 +638,7 @@ defp("vector-push", true, function(m, nargs){
     checknargs(nargs, 2);
     var a = m.pop_frame(nargs - 1);
     var vector = m.pop();
-    checktype(vector, LispArray);
+    checktype(vector, LispVector);
     vector.push(...a);
     return vector;
 });
@@ -646,7 +646,7 @@ defp("vector-push", true, function(m, nargs){
 defp("vector-pop", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var vector = m.pop();
-    checktype(vector, LispArray);
+    checktype(vector, LispVector);
     return vector.length > 0 ? vector.pop() : null;
 });
 
@@ -656,12 +656,12 @@ defp("vector-splice", true, function(m, nargs){
     var len = m.pop();
     var start = m.pop();
     var vector = m.pop();
-    checktype(vector, LispArray);
+    checktype(vector, LispVector);
     checktype(start, LispNumber);
     checktype(len, LispNumber);
     var a = [ start, len ];
     if (content) {
-        checktype(content, LispArray);
+        checktype(content, LispVector);
         a.push.apply(a, content);
     }
     return vector.splice.apply(vector, a);
@@ -672,7 +672,7 @@ defp("vector-subseq", false, function(m, nargs){
     var end = nargs == 3 ? m.pop() : null;
     var start = nargs >= 2 ? m.pop() : null;
     var vector = m.pop();
-    checktype(vector, LispArray);
+    checktype(vector, LispVector);
     if (start !== null) checktype(start, LispNumber);
     else start = 0;
     if (end !== null) checktype(end, LispNumber);
@@ -683,7 +683,7 @@ defp("vector-subseq", false, function(m, nargs){
 defp("svref", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var index = m.pop(), vector = m.pop();
-    checktype(vector, LispArray);
+    checktype(vector, LispVector);
     checktype(index, LispNumber);
     return index >= 0 && index < vector.length ? vector[index] : null;
 });
@@ -691,8 +691,10 @@ defp("svref", false, function(m, nargs){
 defp("vector-set", true, function(m, nargs){
     checknargs(nargs, 3, 3);
     var val = m.pop(), index = m.pop(), vector = m.pop();
-    checktype(vector, LispArray);
+    checktype(vector, LispVector);
     checktype(index, LispNumber);
+    if (index >= vector.length)
+        error(`VECTOR-SET: index ${index} is too large`);
     return vector[index] = val;
 });
 
@@ -704,7 +706,7 @@ function seq(m, nargs) {
             if (LispCons.is(x)) {
                 ret.unshift.apply(ret, LispCons.toArray(x));
             }
-            else if (LispArray.is(x)) {
+            else if (LispVector.is(x)) {
                 ret.unshift.apply(ret, x);
             }
             else ret.unshift(x);
@@ -721,13 +723,13 @@ defp("%seq-cat", true, function(m, nargs){
     checknargs(nargs, 2, 2);
     var list = m.pop(), seq = m.pop();
     checktype(list, LispList);
-    checktype(seq, LispArray);
+    checktype(seq, LispVector);
     LispCons.forEach(list, function(x){
         if (x !== null) {
             if (LispCons.is(x)) {
                 seq.push.apply(seq, LispCons.toArray(x));
             }
-            else if (LispArray.is(x)) {
+            else if (LispVector.is(x)) {
                 seq.push.apply(seq, x);
             }
             else seq.push(x);
@@ -978,7 +980,7 @@ defp("functionp", false, function(m, nargs){
 
 defp("vectorp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispArray.is(m.pop()) ? true : null;
+    return LispVector.is(m.pop()) ? true : null;
 });
 
 defp("listp", false, function(m, nargs){
@@ -2143,7 +2145,7 @@ defp("%find-in-env", false, function(m, nargs){
             skip = frame.car === S_SKIP_COUNT;
             frame = frame.cdr;
         }
-        checktype(frame, LispArray);
+        checktype(frame, LispVector);
         for (let j = frame.length; --j >= 0;) {
             let lst = checktype(frame[j], LispList);
             if (lst.car === name && lst.cdr.car === type) {
@@ -2192,7 +2194,7 @@ defp("%machine.stack", false, function(m, nargs){
 defp("%eval-bytecode", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var code = m.pop();
-    checktype(code, LispArray);
+    checktype(code, LispVector);
     code = LispMachine.assemble(code);
     var f = new LispClosure(code, null, new LispCons([], null));
     return m._callnext(f, null);
@@ -2206,7 +2208,7 @@ defp("%eval-bytecode", true, function(m, nargs){
 defp("%exec-code", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var code = m.pop();
-    checktype(code, LispArray);
+    checktype(code, LispVector);
     code = LispMachine.assemble(code);
     // hack: this function needs to return the assembled code, so
     // we push two instructions to do it.  we need to copy the
@@ -2224,7 +2226,7 @@ defp("%relocate-code", true, function(m, nargs){
     checknargs(nargs, 2, 2);
     var addr = m.pop();
     var code = m.pop();
-    checktype(code, LispArray);
+    checktype(code, LispVector);
     checktype(addr, LispNumber);
     return LispMachine.relocate(code, addr);
 });
@@ -2233,7 +2235,7 @@ defp("%serialize-code", false, function(m, nargs){
     checknargs(nargs, 1, 2);
     var cache = nargs == 2 ? m.pop() : null;
     var code = m.pop();
-    checktype(code, LispArray);
+    checktype(code, LispVector);
     if (nargs == 2) checktype(cache, LispHash);
     return LispMachine.serialize(code, true, cache);
 });
@@ -2252,7 +2254,7 @@ defp("%js-apply", true, function(m, nargs){
     if (LispList.is(args))
         args = LispCons.toArray(args);
     checktype(func, LispNativeFunction);
-    checktype(args, LispArray);
+    checktype(args, LispVector);
     return boxit(func.apply(instance, args));
 });
 

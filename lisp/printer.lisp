@@ -298,7 +298,7 @@
 
 (defun %pp-symbol (sym)
   (if (symbolp sym)
-      (downcase (print-object-to-string sym))
+      (print-object-to-string sym)
       (with-output-to-string (out)
         (%pp-object sym))))
 

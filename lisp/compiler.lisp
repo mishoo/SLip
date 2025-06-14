@@ -27,7 +27,8 @@
            '*standard-output*
            '*error-output*
            '*trace-output*
-           '*whole-form*)
+           '*whole-form*
+           '*load-timing*)
 
 (setq *read-table* nil)
 (setq *url-prefix* nil)
@@ -36,6 +37,7 @@
 (setq *compiler-env* nil)
 (setq *compiler-macros* nil)
 (setq *whole-form* nil)
+(setq *load-timing* nil)
 
 (setq *standard-output* (%make-output-stream))
 (setq *error-output* (%make-output-stream))
@@ -1917,12 +1919,33 @@
                           (cdr (funcall reader 'next))))))
         (rec nil (cdr (funcall reader 'next)))))))
 
+(defmacro with-load-timings body
+  `(cond
+     (*load-timing*
+      ,(let ((t-load (gensym))
+             (t-comp (gensym)))
+         `(flet ((%get-file-contents args
+                   (let ((,t-load (get-internal-run-time)))
+                     (prog1 (apply (symbol-function '%get-file-contents) args)
+                       (rplaca *load-timing*
+                               (+ (car *load-timing*)
+                                  (- (get-internal-run-time) ,t-load))))))
+                 (compile-string args
+                   (let ((,t-comp (get-internal-run-time)))
+                     (prog1 (apply (symbol-function 'compile-string) args)
+                       (rplaca (cdr *load-timing*)
+                               (+ (cadr *load-timing*)
+                                  (- (get-internal-run-time) ,t-comp)))))))
+            ,@body)))
+     (t ,@body)))
+
 (defun %load (url)
   (%stream-put *trace-output* (strcat ";; Loading " url #\Newline))
-  (let ((code (%get-file-contents (make-url url))))
-    (unless code (error (strcat "Unable to load file: " url)))
-    (with-undefined-warnings
-      (compile-string code url))))
+  (with-load-timings
+    (let ((code (%get-file-contents (make-url url))))
+      (unless code (error (strcat "Unable to load file: " url)))
+      (with-undefined-warnings
+        (compile-string code url)))))
 
 (defun make-url (url)
   (if *url-prefix*

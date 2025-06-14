@@ -464,10 +464,16 @@ export class LispSymbol extends LispType {
 }
 
 (function(BASE_PACK){
-    var pak = BASE_PACK.intern("*PACKAGE*");
-    pak.value = BASE_PACK;
-    pak.setv("special", true);
-    BASE_PACK.PACKAGE_VAR = pak;
+    BASE_PACK.PACKAGE_VAR = special("*PACKAGE*", BASE_PACK);
+    special("MOST-POSITIVE-FIXNUM", Number.MAX_SAFE_INTEGER);
+    special("MOST-NEGATIVE-FIXNUM", Number.MIN_SAFE_INTEGER);
+
+    function special(name, value = null) {
+        let sym = BASE_PACK.intern(name);
+        sym.setv("special", true);
+        sym.value = value;
+        return sym;
+    }
 })(LispPackage.get("%"));
 
 export class LispMutex extends LispType {

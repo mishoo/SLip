@@ -14,7 +14,7 @@
         '(atom quasiquote defmacro defun when unless labels flet foreach
           prog1 prog2 or and cond member case otherwise mapcar with-cc aif it push
           error warn without-interrupts
-          lisp-reader eval compile load function unwind-protect
+          eval compile load function unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
           quote lambda λ let let* if progn progv setq t nil not
           tagbody go block return return-from
@@ -29,6 +29,8 @@
           list list* copy-list listp cons consp eq eql equal equalp gensym length
           declare locally type ignore special optimize speed debug space fixnum integer unsigned-byte
           identity
+
+          most-positive-fixnum most-negative-fixnum
 
           numberp zerop plusp minusp evenp oddp parse-number parse-integer number-fixed number-string
           < <= > >= + - * / = /= null 1+ 1- floor ceiling round mod
@@ -788,6 +790,17 @@
     ((cdr pos) form)
     (t
      `(setf (svref ,array ,(car pos)) ,value))))
+
+(defun (setf elt) (value seq index)
+  (cond
+    ((vectorp seq)
+     (setf (svref seq index) value))
+    ((listp seq)
+     (let ((cell (nthcdr index seq)))
+       (unless cell (error (strcat "SETF ELT: Index " index " too large")))
+       (setf (car cell) value)))
+    (t
+     (error "SETF ELT: Unknown sequence"))))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
 
