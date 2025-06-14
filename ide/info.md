@@ -5,6 +5,12 @@
 
 ## Quick demo
 
+New (2025-06-14) — I broke stuff, then fixed stuff, then broke it again,
+until I realized I need some tests. I added some from Paul Dietz's amazing
+ANSI test suite (https://gitlab.common-lisp.net/ansi-test/ansi-test). To run
+the tests, eval `(load "test/all.lisp")` and then `(run-tests)`. They should
+all pass.
+
 Type `(load "examples/clock.lisp")` to load the old crazy clock demo. The
 canvas that shows up isn't fixed, you can drag it around with the mouse. You
 can then type `C-c M-p` and select the `TURTLE` package, and then, for
