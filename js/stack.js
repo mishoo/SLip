@@ -46,7 +46,7 @@ export class LispStack {
     }
     replace(index, newval) {
         if (index < 0) index += this.sp;
-        let val = this.data[index];
+        let val = value(this.data[index]);
         this.data[index] = newval;
         return val;
     }

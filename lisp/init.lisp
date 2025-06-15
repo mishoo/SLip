@@ -14,7 +14,7 @@
         '(atom quasiquote defmacro defun when unless labels flet foreach
           prog1 prog2 or and cond member case otherwise mapcar with-cc aif it push
           error warn without-interrupts
-          eval compile load function unwind-protect
+          eval compile load function functionp unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
           quote lambda λ let let* if progn progv setq t nil not
           tagbody go block return return-from
@@ -170,16 +170,18 @@
     ((> (length store-vars) 1)
      (let ((arg (gensym "setfarg")))
        `(%set-symbol-prop ',access-fn :setf
-                          (%fn ,access-fn (,@lambda-list ,arg)
-                               (symbol-macrolet
-                                   (,@(map1 (lambda (sym)
-                                              `(,sym ',sym))
-                                            store-vars))
-                                 `(%mvb-internal ,'(,@store-vars) ,,arg
-                                    ,,@body))))))
+                          (%fn ,access-fn (,@lambda-list)
+                               (lambda (,arg)
+                                 (symbol-macrolet
+                                     (,@(map1 (lambda (sym)
+                                                `(,sym ',sym))
+                                              store-vars))
+                                   `(%mvb-internal ,'(,@store-vars) ,,arg
+                                                   ,,@body)))))))
     (t
      `(%set-symbol-prop ',access-fn :setf
-                        (%fn ,access-fn (,@lambda-list ,@store-vars) ,@body)))))
+                        (%fn ,access-fn (,@lambda-list)
+                             (lambda ,store-vars ,@body))))))
 
 (defun %get-setf-place (form)
   (let ((expander (let dig ()
@@ -200,7 +202,7 @@
      (let ((exp (macroexpand-1 form)))
        (unless (eq exp form)
          (return-from get-setf-expansion (get-setf-expansion exp))))
-     (let ((vals (list (gensym "val"))))
+     (let ((vals (list (gensym "new"))))
        (values nil nil vals `(setq ,form ,@vals) form)))
     ((consp form)
      (multiple-value-bind (expander form) (%get-setf-place form)
@@ -215,7 +217,7 @@
               (vals (list (gensym "new")))
               (store-form (cond
                             ((functionp expander)
-                             (apply expander (append temps vals)))
+                             (funcall (apply expander temps) (car vals)))
                             ((and expander
                                   (symbolp expander))
                              `(,expander ,@temps ,@vals))
@@ -252,7 +254,7 @@
                                    (symbol-package (car form)))))
                `(,setter ,(cadr args) ,@(cdr form))))
             ((functionp expander)
-             (apply expander (append (cdr form) (list (cadr args)))))
+             (funcall (apply expander (cdr form)) (cadr args)))
             ((symbolp expander)
              `(,expander ,@(cdr form) ,(cadr args)))
             ((error (strcat "Unknown SETF expander for " (caar args) ": " expander))))))
@@ -324,7 +326,7 @@
             ,store-form
             (car ,v)))))))
 
-(defsetf getf (place indicator) (value)
+(defsetf getf (place indicator &optional default) (value)
   (let ((vval (gensym)))
     (cond
       ((safe-atom-p place)
