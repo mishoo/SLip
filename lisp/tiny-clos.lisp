@@ -301,9 +301,10 @@
         'procedure procedure))
 
 (def-efun is-a (obj class)
-  (when (symbolp class)
-    (setf class (find-class class)))
-  (%memq class (class-cpl (class-of obj))))
+  (when class
+    (when (symbolp class)
+      (setf class (find-class class)))
+    (%memq class (class-cpl (class-of obj)))))
 
 ;;
 ;; Initialization protocol

@@ -12,7 +12,7 @@
          (setf ,dest (- (get-internal-run-time) ,t1))))))
 
 (defmacro deftest (name &rest args)
-  (%:maybe-xref-info name 'defun)
+  (%:maybe-xref-info name 'deftest)
   (let ((notes
          (loop while (keywordp (car args))
                collect (cons (pop args) (pop args)))))

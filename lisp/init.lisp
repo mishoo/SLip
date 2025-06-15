@@ -184,16 +184,17 @@
                              (lambda ,store-vars ,@body))))))
 
 (defun %get-setf-place (form)
-  (let ((expander (let dig ()
-                    ;; XXX: return T when form is a symbol (for some reason).
-                    ;;      not sure this is correct, but it works.
-                    (or (symbolp form)
-                        (%get-symbol-prop (car form) :setf)
-                        (let ((exp (macroexpand-1 form)))
-                          (unless (eq exp form)
-                            (setq form exp)
-                            (dig)))))))
-    (values expander form)))
+  (let dig ((form form))
+    (if (symbolp form)
+        ;; XXX: return T when form is a symbol (for some reason).
+        ;;      not sure this is correct, but it works.
+        (values t form)
+        (aif (%get-symbol-prop (car form) :setf)
+             (values it form)
+             (let ((exp (macroexpand-1 form)))
+               (if (eq exp form)
+                   (values nil form)
+                   (dig exp)))))))
 
 (def-efun get-setf-expansion (form)
   (cond
@@ -288,11 +289,8 @@
                  `(setf ,var ,set))
                places temps))))
 
-(defsetf car (x) (val)
-  `(rplaca ,x ,val))
-
-(defsetf cdr (x) (val)
-  `(rplacd ,x ,val))
+(defsetf car rplaca)
+(defsetf cdr rplacd)
 
 (defun (setf symbol-function) (func sym)
   (%::maybe-xref-info sym 'defun)
