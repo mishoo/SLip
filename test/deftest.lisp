@@ -30,17 +30,21 @@
                         ((error (lambda (condition)
                                   (format t " FAIL.~%!ERROR: ~A~%!ERROR: ~S~%"
                                           condition (%:%backtrace))
-                                  (throw 'test-error '#:test-error))))
-                      (setf ,comp (time-it *compile-time*
-                                           (compile (list 'lambda nil ',form))))
-                      (defparameter ,global ,comp)
-                      (setf ,val (time-it *run-time*
-                                          (catch 'test-error
-                                            (multiple-value-list (funcall ,comp)))))
-                      (setf ,ok (equal ,val ,exp))
-                      (if ,ok
-                          (format t " OK~%")
-                          (format t " FAIL - ~A~%" ,val)))
+                                  (throw 'test-error 'test-error))))
+                      (setf ,comp
+                            (catch 'test-error
+                              (time-it *compile-time*
+                                       (compile (list 'lambda nil ',form)))))
+                      (cond
+                        ((eq ,comp 'test-error)
+                         (setf ,ok nil))
+                        (t
+                         (defparameter ,global ,comp)
+                         (setf ,val (time-it *run-time* (multiple-value-list (funcall ,comp))))
+                         (setf ,ok (equal ,val ,exp))
+                         (if ,ok
+                             (format t " OK~%")
+                             (format t " FAIL - ~A~%" ,val)))))
                     ,(when notes
                        `(format t "    ~A~%" ',notes))
                     ,ok)))

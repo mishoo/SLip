@@ -846,7 +846,8 @@
                             (aux?
                              (add thisarg nil))
                             (key?
-                             (add thisarg `(getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")))))
+                             (add thisarg `(getf ,values ,(intern (symbol-name thisarg)
+                                                                  (find-package "KEYWORD")))))
                             (t
                              (add thisarg `(if ,values
                                                (%pop ,values)
@@ -868,17 +869,30 @@
                                 (thisarg-p (caddr thisarg)))
                             (when thisarg-p
                               (add thisarg-p nil))
-                            (add thisarg
-                                 (let ((val (gensym)))
-                                   `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
-                                                                       (find-package "KEYWORD"))
-                                                      '%not-found)))
-                                      (if (eq ,val '%not-found)
-                                          ,default
-                                          (progn
-                                            ,@(when thisarg-p
-                                                `((setq ,thisarg-p t)))
-                                            ,val)))))))
+                            (cond
+                              ((consp thisarg)
+                               (add (cadr thisarg)
+                                    (let ((val (gensym)))
+                                      `(let ((,val (getf ,values ,(car thisarg)
+                                                         '%not-found)))
+                                         (if (eq ,val '%not-found)
+                                             ,default
+                                             (progn
+                                               ,@(when thisarg-p
+                                                   `((setq ,thisarg-p t)))
+                                               ,val))))))
+                              (t
+                               (add thisarg
+                                    (let ((val (gensym)))
+                                      `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
+                                                                          (find-package "KEYWORD"))
+                                                         '%not-found)))
+                                         (if (eq ,val '%not-found)
+                                             ,default
+                                             (progn
+                                               ,@(when thisarg-p
+                                                   `((setq ,thisarg-p t)))
+                                               ,val)))))))))
                          (aux? (let ((thisarg (car thisarg))
                                      (value (cadr thisarg)))
                                  (add thisarg value)))
@@ -1926,13 +1940,13 @@
              (t-comp (gensym)))
          `(flet ((%get-file-contents args
                    (let ((,t-load (get-internal-run-time)))
-                     (prog1 (apply (symbol-function '%get-file-contents) args)
+                     (prog1 (apply #'%get-file-contents args)
                        (rplaca *load-timing*
                                (+ (car *load-timing*)
                                   (- (get-internal-run-time) ,t-load))))))
                  (compile-string args
                    (let ((,t-comp (get-internal-run-time)))
-                     (prog1 (apply (symbol-function 'compile-string) args)
+                     (prog1 (apply #'compile-string args)
                        (rplaca (cdr *load-timing*)
                                (+ (cadr *load-timing*)
                                   (- (get-internal-run-time) ,t-comp)))))))
