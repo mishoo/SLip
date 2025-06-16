@@ -1601,8 +1601,7 @@
                                 (defval (cadr aux)))
                             (when defval
                               (<< (with-env (comp defval env t t))
-                                  (gen "LSET" 0 index)
-                                  (gen "POP")))
+                                  (gen "VAR")))
                             (newarg name))))
                (declare-locally-special :except names)
                (<< (with-env (comp-lambda-body name body env))))))))
