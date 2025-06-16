@@ -814,6 +814,12 @@
     (t
      (error "SETF ELT: Unknown sequence"))))
 
+(def-efun copy-tree (tree)
+  (if (consp tree)
+      (cons (copy-tree (car tree))
+            (copy-tree (cdr tree)))
+      tree))
+
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
 
 (export '(*standard-output*
