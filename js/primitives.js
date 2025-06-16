@@ -576,6 +576,15 @@ defp("copy-list", false, function(m, nargs){
     return LispCons.copy(checktype(m.pop(), LispList));
 });
 
+defp("copy-seq", false, function (m, nargs) {
+    checknargs(nargs, 1);
+    let seq = m.pop();
+    if (seq === null) return null;
+    if (LispVector.is(seq)) return seq.slice();
+    if (LispString.is(seq)) return seq;
+    return LispCons.copy(checktype(seq, LispCons));
+});
+
 defp("append", false, function(m, nargs) {
     return nargs == 0 ? null : LispCons.append(m.pop_frame(nargs));
 });

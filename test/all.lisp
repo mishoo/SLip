@@ -52,6 +52,8 @@
   (load "test/ignore-errors.lisp")
   (load "test/error.lisp")
 
+  (load "test/cons/member.lisp")
+  (load "test/cons/adjoin.lisp")
   (load "test/cons/getf.lisp")
   (load "test/cons/pop.lisp")
   (load "test/cons/push.lisp")

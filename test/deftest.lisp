@@ -34,7 +34,7 @@
                       (setf ,comp
                             (catch 'test-error
                               (time-it *compile-time*
-                                       (compile (list 'lambda nil ',form)))))
+                                       (compile (list '%:%fn ',name nil ',form)))))
                       (cond
                         ((eq ,comp 'test-error)
                          (setf ,ok nil))
@@ -128,3 +128,42 @@
 (defun frob-simple-warning (c expected-fmt &rest expected-args)
   (and (typep c 'simple-warning)
        (apply #'frob-simple-condition c expected-fmt expected-args)))
+
+(defmacro defharmless (name form)
+  `(deftest ,name
+     (block done
+       (let ((*debugger-hook* (lambda (&rest args)
+                                (declare (ignore args))
+                                (return-from done :good))))
+         (handler-case
+             (unwind-protect (eval ',form) (return-from done :good))
+           (condition () :good))))
+     :good))
+
+;; XXX: changed the following two, as I don't yet have defstruct.
+(defun make-scaffold-copy (x)
+  "Make a tree that will be used to check if a tree has been changed."
+  (if (consp x)
+      (list x
+            (make-scaffold-copy (car x))
+            (make-scaffold-copy (cdr x)))
+      (list x nil nil)))
+
+(defun check-scaffold-copy (x xcopy)
+  "Return t if xcopy were produced from x by make-scaffold-copy,
+   and none of the cons cells in the tree rooted at x have been
+   changed."
+  (and (eq x (pop xcopy))
+       (or (not (consp x))
+           (and (check-scaffold-copy (car x) (pop xcopy))
+                (check-scaffold-copy (cdr x) (pop xcopy))))))
+
+(defmacro def-fold-test (name form)
+  "Create a test that FORM, which should produce a fresh value,
+   does not improperly introduce sharing during constant folding."
+  `(deftest ,name
+     (flet ((%f () (declare (optimize (speed 3) (safety 0) (space 0)
+                                      (compilation-speed 0) (debug 0)))
+              ,form))
+       (eq (%f) (%f)))
+     nil))

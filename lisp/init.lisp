@@ -26,9 +26,9 @@
           make-regexp regexp-test regexp-exec replace-regexp quote-regexp regexpp
           vectorp vector svref vector-push vector-pop make-vector
           getf
-          list list* copy-list listp cons consp eq eql equal equalp gensym length
+          list list* copy-list copy-seq listp cons consp eq eql equal equalp gensym length
           declare locally type ignore special optimize speed debug space fixnum integer unsigned-byte
-          identity
+          identity constantly
 
           most-positive-fixnum most-negative-fixnum
 
@@ -49,7 +49,7 @@
           car cdr caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr
           cddar cdddr caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
           cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
-          first second third fourth rest
+          first second third fourth fifth rest
 
           boundp makunbound fboundp fmakunbound
 
@@ -376,6 +376,11 @@
                     ,@body))))))
 
 (define-compiler-macro identity (x) x)
+
+(defun constantly (value)
+  (lambda args
+    (declare (ignore args))
+    value))
 
 (defun (setf svref) (value vector index)
   (vector-set vector index value))
@@ -705,13 +710,13 @@
       (no-test
        (let rec ((lst lst))
          (when lst
-           (if (eq (funcall key item) (funcall key (car lst)))
+           (if (eq item (funcall key (car lst)))
                lst
                (rec (cdr lst))))))
       (t
        (let rec ((lst lst))
          (when lst
-           (if (funcall test (funcall key item) (funcall key (car lst)))
+           (if (funcall test item (funcall key (car lst)))
                lst
                (rec (cdr lst)))))))))
 
@@ -725,6 +730,11 @@
      `(%:%memq ,item ,lst))
     (t form)))
 
+(def-efun adjoin (item lst &rest args &key test test-not key)
+  (if (apply #'member (if key (funcall key item) item) lst args)
+      lst
+      (cons item lst)))
+
 (def-emac pushnew (obj place &rest args &key test test-not key)
   (let ((vobj (gensym "obj"))
         (vcurr (gensym "curr")))
@@ -733,10 +743,8 @@
       `(let* ((,vobj ,obj)
               ,@(mapcar #'list temps vals)
               (,vcurr ,get))
-         (if (member ,vobj ,vcurr ,@args)
-             ,vcurr
-             (let ((,(car stores) (cons ,vobj ,vcurr)))
-               ,set))))))
+         (let ((,(car stores) (adjoin ,vobj ,vcurr ,@args)))
+           ,set)))))
 
 (def-efun nth (n list)
   (car (nthcdr n list)))

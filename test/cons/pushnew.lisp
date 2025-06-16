@@ -232,11 +232,11 @@
       x)))
   (3) (3))
 
-;; (defharmless pushnew.test-and-test-not.1
-;;   (let ((x '(b c))) (pushnew 'a x :test #'eql :test-not #'eql)))
+(defharmless pushnew.test-and-test-not.1
+  (let ((x '(b c))) (pushnew 'a x :test #'eql :test-not #'eql)))
 
-;; (defharmless pushnew.test-and-test-not.2
-;;   (let ((x '(b c))) (pushnew 'a x :test-not #'eql :test #'eql)))
+(defharmless pushnew.test-and-test-not.2
+  (let ((x '(b c))) (pushnew 'a x :test-not #'eql :test #'eql)))
 
 (deftest pushnew.order.1
   (let ((x (vector nil nil nil nil))
