@@ -52,6 +52,8 @@
   (load "test/ignore-errors.lisp")
   (load "test/error.lisp")
 
+  (load "test/cons/getf.lisp")
+
   (format t "Network time: ~Ams~%Compile time: ~Ams~%"
           (car timing)
           (cadr timing)))

@@ -183,18 +183,26 @@
                         (%fn ,access-fn (,@lambda-list)
                              (lambda ,store-vars ,@body))))))
 
+(def-emac define-setf-expander (access-fn lambda-list &body body)
+  (maybe-xref-info access-fn 'define-setf-expander)
+  `(%set-symbol-prop ',access-fn :setf-exp
+                     (%fn ,access-fn (,@lambda-list)
+                          ,@body)))
+
 (defun %get-setf-place (form)
   (let dig ((form form))
     (if (symbolp form)
         ;; XXX: return T when form is a symbol (for some reason).
         ;;      not sure this is correct, but it works.
         (values t form)
-        (aif (%get-symbol-prop (car form) :setf)
-             (values it form)
-             (let ((exp (macroexpand-1 form)))
-               (if (eq exp form)
-                   (values nil form)
-                   (dig exp)))))))
+        (aif (%get-symbol-prop (car form) :setf-exp)
+             (values it form t)
+             (aif (%get-symbol-prop (car form) :setf)
+                  (values it form)
+                  (let ((exp (macroexpand-1 form)))
+                    (if (eq exp form)
+                        (values nil form)
+                        (dig exp))))))))
 
 (def-efun get-setf-expansion (form)
   (cond
@@ -206,12 +214,15 @@
      (let ((vals (list (gensym "new"))))
        (values nil nil vals `(setq ,form ,@vals) form)))
     ((consp form)
-     (multiple-value-bind (expander form) (%get-setf-place form)
+     (multiple-value-bind (expander form setf-exp)
+                          (%get-setf-place form)
        (when (eq expander t)
          ;; XXX: see above in `%get-setf-place'. We receive T when we got down
          ;; to a symbol. By recursing here we also expand an eventual
          ;; symbol-macrolet on that symbol.
          (return-from get-setf-expansion (get-setf-expansion form)))
+       (when setf-exp
+         (return-from get-setf-expansion (apply expander (cdr form))))
        (let* ((temps (map1 (lambda (subform)
                              (gensym "temp"))
                            (cdr form)))
@@ -246,8 +257,13 @@
     (cons
      (cond
        ((consp (car args))
-        (multiple-value-bind (expander form) (%get-setf-place (car args))
+        (multiple-value-bind (expander form setf-exp) (%get-setf-place (car args))
           (cond
+            (setf-exp
+             (multiple-value-bind (temps vals stores set get) (apply expander (cdr form))
+               `(let (,@(map2 #'list temps vals))
+                  (multiple-value-bind ,stores ,(cadr args)
+                    ,set))))
             ((and (null expander)
                   (symbolp (car form)))
              ;; no global setter defined, but maybe there is a (SETF FOO) somewhere.
@@ -324,24 +340,20 @@
             ,store-form
             (car ,v)))))))
 
-(defsetf getf (place indicator &optional default) (value)
-  (let ((vval (gensym)))
-    (cond
-      ((safe-atom-p place)
-       (if (safe-atom-p value)
-           `(progn
-              (setf ,place (%:%putf ,place ,indicator ,value))
-              ,value)
-           `(let (,vval)
-              (setf ,place (%:%putf ,place ,indicator (setq ,vval ,value)))
-              ,vval)))
-      ((multiple-value-bind (temps value-forms store-vars store-form get-form)
-                            (get-setf-expansion place)
-         `(let* (,vval
-                 ,@(map2 #'list temps value-forms)
-                 (,(car store-vars) (%:%putf ,get-form ,indicator (setq ,vval ,value))))
-            ,store-form
-            ,vval))))))
+(define-setf-expander getf (place indicator &optional default)
+  (multiple-value-bind (place-tempvars place-tempvals stores set get)
+                       (get-setf-expansion place)
+    (let ((vindicator (gensym "indicator"))
+          (vdefault (gensym "default"))
+          (newval (gensym "newval")))
+      (values `(,@place-tempvars ,vindicator ,vdefault)
+              `(,@place-tempvals ,indicator ,default)
+              `(,newval)
+              `(let ((,(car stores) (%:%putf ,get ,vindicator ,newval))
+                     ,@(cdr stores))
+                 ,set
+                 ,newval)
+              `(getf ,get ,vindicator ,vdefault)))))
 
 (defun (setf compiler-macro-function) (handler name)
   (setf (getf %:*compiler-macros* name) handler))
