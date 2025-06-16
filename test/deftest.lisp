@@ -40,7 +40,9 @@
                          (setf ,ok nil))
                         (t
                          (defparameter ,global ,comp)
-                         (setf ,val (time-it *run-time* (multiple-value-list (funcall ,comp))))
+                         (setf ,val (time-it *run-time*
+                                             (multiple-value-list (catch 'test-error
+                                                                    (funcall ,comp)))))
                          (setf ,ok (equal ,val ,exp))
                          (if ,ok
                              (format t " OK~%")

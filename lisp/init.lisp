@@ -375,6 +375,8 @@
                                                 (cdr ,form))
                     ,@body))))))
 
+(define-compiler-macro identity (x) x)
+
 (defun (setf svref) (value vector index)
   (vector-set vector index value))
 
@@ -605,6 +607,9 @@
 (defmacro fourth (list)
   `(car (cdddr ,list)))
 
+(defmacro fifth (list)
+  `(car (cddddr ,list)))
+
 (defmacro rest (list)
   `(cdr ,list))
 
@@ -677,6 +682,62 @@
             ,end)
            ,@result-form)))))
 
+(def-efun complement (f)
+  (lambda args
+    (not (apply f args))))
+
+(defun member (item lst &key test test-not key)
+  (when test-not
+    (when test
+      (error "MEMBER: both TEST and TEST-NOT are given"))
+    (setf test (complement test-not)))
+  (let ((no-test (or (not test) (eq test #'eq) (eq test #'eql)))
+        (no-key (or (not key) (eq key #'identity))))
+    (cond
+      (no-key
+       (if no-test
+           (%:%memq item lst)
+           (let rec ((lst lst))
+             (when lst
+               (if (funcall test item (car lst))
+                   lst
+                   (rec (cdr lst)))))))
+      (no-test
+       (let rec ((lst lst))
+         (when lst
+           (if (eq (funcall key item) (funcall key (car lst)))
+               lst
+               (rec (cdr lst))))))
+      (t
+       (let rec ((lst lst))
+         (when lst
+           (if (funcall test (funcall key item) (funcall key (car lst)))
+               lst
+               (rec (cdr lst)))))))))
+
+(define-compiler-macro member (&whole form item lst &key test test-not key)
+  (cond
+    ((and (not test-not)
+          (or (not test) (member test (list `#'eql #'eql `#'eq #'eq 'eql 'eq ''eql ''eq)
+                                 :test #'equal))
+          (or (not key) (member key (list `#'identity #'identity 'identity ''identity)
+                                :test #'equal)))
+     `(%:%memq ,item ,lst))
+    (t form)))
+
+(def-emac pushnew (obj place &rest args &key test test-not key)
+  (let ((vobj (gensym "obj"))
+        (vcurr (gensym "curr")))
+    (multiple-value-bind (temps vals stores set get)
+                         (get-setf-expansion place)
+      `(let* ((,vobj ,obj)
+              ,@(mapcar #'list temps vals)
+              (,vcurr ,get))
+         (if (member ,vobj ,vcurr ,@args)
+             ,vcurr
+             (let ((,(car stores) (cons ,vobj ,vcurr)))
+               ,set))))))
+
 (def-efun nth (n list)
   (car (nthcdr n list)))
 
@@ -736,8 +797,6 @@
            (declare ,@declarations)
            (or (hash-get ,memo ,(car args))
                (hash-add ,memo ,(car args) (progn ,@body))))))))
-
-(define-compiler-macro identity (x) x)
 
 (def-emac prog (bindings &body body)
   (multiple-value-bind (body declarations) (%:dig-declarations body)

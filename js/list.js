@@ -199,7 +199,7 @@ export class LispCons extends LispType {
     }
     static find(list, item, cmp) {
         while (list !== null && !cmp(list.car, item))
-            list = list.cdr;
+            list = cdr(list);
         return list;
     }
 

@@ -55,6 +55,7 @@
   (load "test/cons/getf.lisp")
   (load "test/cons/pop.lisp")
   (load "test/cons/push.lisp")
+  (load "test/cons/pushnew.lisp")
 
   (format t "Network time: ~Ams~%Compile time: ~Ams~%"
           (car timing)

@@ -499,6 +499,7 @@ defp("%putf", true, function(m, nargs){
         if (nargs == 1) {
             name = m.pop();
             checktype(name, LispString);
+            if (name === "_reset") N = -1;
         }
         return new LispSymbol(name + (++N));
     });

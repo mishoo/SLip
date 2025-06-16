@@ -302,9 +302,6 @@
     (exps (car exps))
     (t t)))
 
-(defmacro member (item lst)
-  `(%memq ,item ,lst))
-
 ;; will be redefined later to also check compiler env for symbol-macrolet
 (defun safe-atom-p (thing)
   (symbolp thing))
@@ -320,14 +317,14 @@
                     nil)
                    ((consp (caar cases))
                     (if (cdaar cases)
-                        `(if (member ,vexpr ',(caar cases))
+                        `(if (%memq ,vexpr ',(caar cases))
                              (progn ,@(cdar cases))
                              ,(recur (cdr cases)))
                         `(if (eq ,vexpr ',(caaar cases))
                              (progn ,@(cdar cases))
                              ,(recur (cdr cases)))))
                    ((and (not (cdr cases))
-                         (member (caar cases) '(otherwise t)))
+                         (%memq (caar cases) '(otherwise t)))
                     `(progn ,@(cdar cases)))
                    ((not (caar cases))
                     (recur (cdr cases)))
@@ -375,13 +372,13 @@
 
          (skip-ws ()
            (read-while (lambda (ch)
-                         (member ch '(#\Space
-                                      #\Newline
-                                      #\Tab
-                                      #\Page
-                                      #\Line_Separator
-                                      #\Paragraph_Separator
-                                      #\NO-BREAK_SPACE)))))
+                         (%memq ch '(#\Space
+                                     #\Newline
+                                     #\Tab
+                                     #\Page
+                                     #\Line_Separator
+                                     #\Paragraph_Separator
+                                     #\NO-BREAK_SPACE)))))
 
          (skip (expected)
            (unless (eq (next) expected)
@@ -412,7 +409,7 @@
          (read-regexp ()
            (let ((str (read-escaped #\/ #\/ t))
                  (mods (downcase (read-while (lambda (ch)
-                                               (member ch '(#\g #\m #\i #\y)))))))
+                                               (%memq ch '(#\g #\m #\i #\y)))))))
              (make-regexp str mods)))
 
          (skip-comment ()
@@ -424,10 +421,10 @@
                          (or
                           (letterp ch)
                           (char<= #\0 ch #\9)
-                          (member ch
-                                  '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
-                                    #\@ #\! #\? #\& #\= #\< #\>
-                                    #\[ #\] #\{ #\} #\/ #\^ #\#)))))))
+                          (%memq ch
+                                 '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
+                                   #\@ #\! #\? #\& #\= #\< #\>
+                                   #\[ #\] #\{ #\} #\/ #\^ #\#)))))))
              (upcase str)))
 
          (read-symbol ()
@@ -486,7 +483,7 @@
          (read-quasiquote ()
            (skip #\`)
            (skip-ws)
-           (if (member (peek) '(#\( #\`))
+           (if (%memq (peek) '(#\( #\`))
                (prog2
                    (%incf in-qq)
                    (list 'quasiquote (read-token))
@@ -576,10 +573,10 @@
   `(return-from nil ,val))
 
 (defun lambda-keyword-p (sym)
-  (member sym '(&optional &rest &body &key &aux &allow-other-keys)))
+  (%memq sym '(&optional &rest &body &key &aux &allow-other-keys)))
 
 (defun macro-keyword-p (sym)
-  (member sym '(&whole &environment)))
+  (%memq sym '(&whole &environment)))
 
 (defun ordinary-lambda-list-p (args)
   (let dig ((args args)
@@ -591,7 +588,7 @@
       ((consp (car args))
        (when (and seen (symbolp (caar args)))
          (dig (cdr args) t)))
-      ((member (car args) '(&rest &body))
+      ((%memq (car args) '(&rest &body))
        (when (symbolp (cadr args))
          (dig (cddr args) seen)))
       ((lambda-keyword-p (car args))
@@ -621,7 +618,7 @@
          (add (name)
            (unless (symp name)
              (error (strcat "Invalid name in lambda list " name)))
-           (when (member name all)
+           (when (%memq name all)
              (error (strcat "Duplicate name in lambda list " name)))
            (push name all)
            name)
@@ -837,7 +834,7 @@
                           (rec nil nil nil t (cdr args) values i))
 
                          (t
-                          (when (member thisarg names)
+                          (when (%memq thisarg names)
                             (error (strcat "Argument seen twice: " thisarg)))
                           (push thisarg names)
                           (cond
@@ -994,7 +991,7 @@
      (setq declarations (zip-declarations declarations))
      (let ((locally-special (getf declarations :special)))
        (labels ((maybe-special (name)
-                  (if (member name locally-special)
+                  (if (%memq name locally-special)
                       (list name :var :special t)
                       (list name :var)))
                 (declare-locally-special (&key except)
@@ -1007,7 +1004,7 @@
                                              (if except
                                                  (filter locally-special
                                                          (lambda (name)
-                                                           (not (member name except))))
+                                                           (not (%memq name except))))
                                                  locally-special))))))))
          ,@body))))
 
@@ -1084,14 +1081,14 @@
 
      (unknown-function (sym)
        (unless (symbol-function sym)
-         (unless (member sym *unknown-functions*)
+         (unless (%memq sym *unknown-functions*)
            (push sym *unknown-functions*)))
        sym)
 
      (unknown-variable (sym env)
        (unless (or (%globalp sym)
                    (find-special sym env))
-         (unless (member sym *unknown-variables*)
+         (unless (%memq sym *unknown-variables*)
            (push sym *unknown-variables*)))
        sym)
 
@@ -1528,12 +1525,12 @@
        (cond
          ((null args) (gen "ARGS" n))
          ((symbolp args)
-          (when (member args names)
+          (when (%memq args names)
             (error (strcat "Duplicate function argument " args)))
           (gen "ARG_" n))
          ((lambda-keyword-p (car args))
           (throw '$xargs '$xargs))
-         ((member (car args) names)
+         ((%memq (car args) names)
           (error (strcat "Duplicate function argument " (car args))))
          ((gen-simple-args (cdr args)
                            (1+ n)
@@ -1567,7 +1564,7 @@
              (labels ((newarg (name)
                         (vector-push envcell (maybe-special name))
                         (when (or (%specialp name)
-                                  (member name locally-special))
+                                  (%memq name locally-special))
                           (<< (gen "BIND" name index)))
                         (%incf index))
                       (newdef (name defval supplied-p)
@@ -1621,7 +1618,7 @@
                            (foreach-index args
                                           (lambda (name index)
                                             (when (or (%specialp name)
-                                                      (member name locally-special))
+                                                      (%memq name locally-special))
                                               (<< (gen "BIND" name index)))))
                            (cond
                              (args
@@ -1653,7 +1650,7 @@
                              (unless vars?
                                (setq x (function-name x)))
                              (when (and (not vars?)
-                                        (member x names))
+                                        (%memq x names))
                                (error "Duplicate name in LABELS/FLET/MACROLET"))
                              (push x names)))
          (list (nreverse names) (nreverse vals))))
@@ -1733,7 +1730,7 @@
                 (foreach-index names
                                (lambda (name index)
                                  (when (or (%specialp name)
-                                           (member name locally-special))
+                                           (%memq name locally-special))
                                    (%incf specials)
                                    (<< (gen "BIND" name index)))))
                 (setq env (extenv env :lex (map1-vector #'maybe-special names)))
@@ -1783,7 +1780,7 @@
                 (foreach-index names
                                (lambda (name index)
                                  (when (or (%specialp name)
-                                           (member name locally-special))
+                                           (%memq name locally-special))
                                    (%incf specials)
                                    (<< (gen "BIND" name index)))))
                 (setq env (extenv env :lex (map1-vector #'maybe-special names)))
@@ -1812,7 +1809,7 @@
                         (<< (with-env (comp x env t t))
                             (gen "VAR")
                             (when (or (%specialp name)
-                                      (member name locally-special))
+                                      (%memq name locally-special))
                               (%incf specials)
                               (gen "BIND" name index)))
                         (%incf index)
@@ -1859,7 +1856,7 @@
 
      (compile (exp)
        (assert (and (consp exp)
-                    (member (car exp) '(%fn lambda λ)))
+                    (%memq (car exp) '(%fn lambda λ)))
                "Expecting (LAMBDA (...) ...) in COMPILE")
        (%eval-bytecode (comp exp (make-environment) t nil)))
 
