@@ -49,7 +49,7 @@
           car cdr caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr
           cddar cdddr caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
           cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
-          first second third fourth fifth rest
+          first second third fourth fifth rest destructuring-bind
 
           boundp makunbound fboundp fmakunbound
 
@@ -59,6 +59,8 @@
 
           values multiple-value-bind multiple-value-call values-list
           multiple-value-list multiple-value-setq multiple-value-prog1
+
+          *standard-output* *error-output* *trace-output*
 
           lambda-list-keywords
           &key &rest &body &whole &optional &aux &allow-other-keys))
@@ -922,8 +924,3 @@
             `(values ,@getters))))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
-
-(export '(*standard-output*
-          *error-output*
-          *trace-output*
-          destructuring-bind))

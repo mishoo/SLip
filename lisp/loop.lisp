@@ -54,7 +54,8 @@
   (cond
     ((consp name)
      (register-parser (car name) parser)
-     (register-parser (cdr name) parser))
+     (when (cdr name)
+       (register-parser (cdr name) parser)))
     ((symbolp name)
      (register-parser (symbol-name name) parser))
     ((stringp name)
