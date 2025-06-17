@@ -35,7 +35,7 @@ export class LispStack {
     }
     top() {
         if (this.sp > 0) {
-            return value(this.data[this.sp - 1]);
+            return this.data[this.sp - 1] = value(this.data[this.sp - 1]);
         } else {
             throw new LispPrimitiveError("top() with an empty stack");
         }

@@ -12,7 +12,7 @@
   (%use-package main user)
   (setq exported
         '(atom quasiquote defmacro defun when unless labels flet foreach
-          prog1 prog2 or and cond member case otherwise mapcar with-cc aif it push
+          prog1 prog2 or and cond member case otherwise mapcar mapc with-cc aif it push
           error warn without-interrupts
           eval compile load function functionp unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
@@ -157,6 +157,12 @@
         (rec (cons (apply f (map1 #'car tails)) ret)
              (map1 #'cdr tails)))))
 
+(defun mapc (f . lists)
+  (let rec ((tails lists))
+    (if (finished tails)
+        (car lists)
+        (rec (map1 #'cdr tails)))))
+
 ;;; setf
 
 (defmacro %mvb-internal (names form &body body)
@@ -235,8 +241,10 @@
                              `(,expander ,@temps ,@vals))
                             ((symbolp (car form))
                              (let ((setter (intern (strcat "(SETF " (car form) ")")
-                                                   (symbol-package (car form)))))
-                               `(,setter ,@vals ,@temps)))
+                                                   (symbol-package (car form))))
+                                   (tmplist (gensym "setfargs")))
+                               `(let ((,tmplist (list ,@temps)))
+                                  (apply #',setter (cons ,(car vals) ,tmplist)))))
                             ((error (strcat "Unknown SETF expander " (car form)))))))
          (when (eq '%mvb-internal (car store-form))
            ;; hack: for multiple store vars, fetch names directly from
@@ -259,6 +267,9 @@
        ((consp (car args))
         (multiple-value-bind (expander form setf-exp) (%get-setf-place (car args))
           (cond
+            ((eq expander t)
+             ;; form is a symbol.
+             `(setq ,form ,(cadr args)))
             (setf-exp
              (multiple-value-bind (temps vals stores set get) (apply expander (cdr form))
                `(let (,@(map2 #'list temps vals))
@@ -268,8 +279,10 @@
                   (symbolp (car form)))
              ;; no global setter defined, but maybe there is a (SETF FOO) somewhere.
              (let ((setter (intern (strcat "(SETF " (car form) ")")
-                                   (symbol-package (car form)))))
-               `(,setter ,(cadr args) ,@(cdr form))))
+                                   (symbol-package (car form))))
+                   (tmplist (gensym "setfargs")))
+               `(let ((,tmplist (list ,@(cdr form))))
+                  (apply #',setter (cons ,(cadr args) ,tmplist)))))
             ((functionp expander)
              (funcall (apply expander (cdr form)) (cadr args)))
             ((symbolp expander)
@@ -495,14 +508,14 @@
                (push vtail tails)
                (push `(,name (cdr ,vlist)) syms)
                (push `(,vadd (el)
-                       `(setf ,',vtail (setf (cdr ,',vtail)
-                                             (cons ,el nil))))
+                       (setf ,vtail (setf (cdr ,vtail)
+                                          (cons el nil))))
                      adders))))
       (foreach names #'mk-collector)
       `(let* (,@(mapcar (lambda (name) `(,name (list nil)))
                         lists)
               ,@(mapcar #'list tails lists))
-         (macrolet (,@adders)
+         (flet (,@adders)
            (symbol-macrolet (,@syms)
              ,@body))))))
 
@@ -886,6 +899,27 @@
       (cons (copy-tree (car tree))
             (copy-tree (cdr tree)))
       tree))
+
+(defun (setf cadr) (value list)
+  (setf (car (cdr list)) value))
+
+(define-setf-expander values (&rest places)
+  (with-collectors (temp-vars temp-vals store-main-vars store-other-vars setters getters)
+    (dolist (place places)
+      (multiple-value-bind (place-temps place-vals place-stores place-set place-get)
+                           (get-setf-expansion place)
+        (foreach place-temps #'temp-vars)
+        (foreach place-vals #'temp-vals)
+        (foreach (cdr place-stores) #'store-other-vars)
+        (store-main-vars (car place-stores))
+        (setters place-set)
+        (getters place-get)))
+    (values temp-vars
+            temp-vals
+            store-main-vars
+            `(let (,@store-other-vars)
+               (values ,@setters))
+            `(values ,@getters))))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
 

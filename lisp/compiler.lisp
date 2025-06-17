@@ -1129,21 +1129,7 @@
              (arg-count x 1 1)
              (comp-pop (cadr x) env val? more?))
             ((setq)
-             (arg-count x 2 2)
-             (assert (symbolp (cadr x)) "Only symbols can be SETQ")
-             (let* ((name (cadr x))
-                    (value (caddr x))
-                    (local (when (not (%globalp name))
-                             (find-var name env))))
-               (cond
-                 ((and local (eq :smac (caddr local)))
-                  ;; setq on symbol macro should be treated as setf on expansion
-                  (comp `(setf ,(cadddr local) ,value) env val? more?))
-                 (t
-                  (%seq (comp value env t t)
-                        (gen-set name env local)
-                        (unless val? (gen "POP"))
-                        (unless more? (gen "RET")))))))
+             (comp-setq (cdr x) env val? more?))
             ((if)
              (arg-count x 2 3)
              (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
@@ -1230,6 +1216,29 @@
                      (comp-macroexpand it x env val? more?)
                      (comp-call t (car x) (cdr x) env val? more?)))))))))
 
+     (comp-one-setq (name value env val? more?)
+       (assert (symbolp name) "Only symbols can be SETQ")
+       (let* ((local (when (not (%globalp name))
+                       (find-var name env))))
+         (cond
+           ((and local (eq :smac (caddr local)))
+            ;; setq on symbol macro should be treated as setf on expansion
+            (comp `(setf ,(cadddr local) ,value) env val? more?))
+           (t
+            (%seq (comp value env t t)
+                  (gen-set name env local)
+                  (unless val? (gen "POP"))
+                  (unless more? (gen "RET")))))))
+
+     (comp-setq (exps env val? more?)
+       (cond
+         ((not exps)
+          (comp-const nil val? more?))
+         ((not (cddr exps))
+          (comp-one-setq (car exps) (cadr exps) env val? more?))
+         (t (%seq (comp-one-setq (car exps) (cadr exps) env nil t)
+                  (comp-setq (cddr exps) env val? more?)))))
+
      (comp-const (x val? more?)
        (when val?
          (%seq (gen "CONST" x)
@@ -1304,22 +1313,8 @@
        (with-seq-output <<
          (let rec ((exps exps))
            (when exps
-             (cond
-               ((and (consp (car exps))
-                     (eq '%ooo (caar exps)))
-                ;; “out-of-order” operator: evaluate this item *after* the rest of
-                ;; the list, but leave values on the stack in the proper order.
-                (cond
-                  ((cdr exps)
-                   (<< (gen "NIL"))
-                   (rec (cdr exps))
-                   (<< (comp (cadar exps) env t t)
-                       (gen "POPBACK" (length (cdr exps)))))
-                  (t
-                   (<< (comp (cadar exps) env t t)))))
-               (t
-                (<< (comp (car exps) env t t))
-                (rec (cdr exps))))))))
+             (<< (comp (car exps) env t t))
+             (rec (cdr exps))))))
 
      (comp-block (name forms env val? more?)
        (assert (symbolp name) (strcat "BLOCK expects a symbol, got: " name))
@@ -1903,7 +1898,7 @@
 (defun %with-undefined-warnings (thunk)
   (let ((*unknown-functions* nil)
         (*unknown-variables* nil))
-    (prog1
+    (multiple-value-prog1
         (funcall thunk)
       (foreach *unknown-functions*
                (lambda (sym)

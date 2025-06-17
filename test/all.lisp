@@ -51,6 +51,7 @@
   (load "test/handler-case.lisp")
   (load "test/ignore-errors.lisp")
   (load "test/error.lisp")
+  (load "test/places.lisp")
 
   (load "test/cons/append.lisp")
   (load "test/cons/member.lisp")
