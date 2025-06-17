@@ -1325,7 +1325,7 @@
        (assert (symbolp name) (strcat "BLOCK expects a symbol, got: " name))
        (let ((body (and (not (find-block name env))
                         (catch name
-                          (comp-seq forms env val? more?)))))
+                          (with-env (comp-seq forms env val? more?))))))
          (or body
              (let ((label (gensym "block")))
                (%seq (gen "BLOCK")
@@ -1903,7 +1903,7 @@
 (defun %with-undefined-warnings (thunk)
   (let ((*unknown-functions* nil)
         (*unknown-variables* nil))
-    (unwind-protect
+    (prog1
         (funcall thunk)
       (foreach *unknown-functions*
                (lambda (sym)

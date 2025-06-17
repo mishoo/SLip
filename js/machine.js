@@ -244,20 +244,20 @@ class LispLongRet {
     run(m, addr, val = LispLongRet.#NO_RET) {
         // figure out if we need to execute cleanup hooks
         let doit;
-        (doit = () => {
+        (doit = (m) => {
             var p = m.denv;
             while (p && p !== this.denv) {
                 var c = p.car;
                 if (c instanceof LispCleanup) {
-                    m.after_cleanup = doit;
                     c.run(m);
+                    m.push(doit);
                     return;
                 }
                 p = p.cdr;
             }
             this.unwind(m, addr);
             if (val !== LispLongRet.#NO_RET) m.push(val);
-        })();
+        })(m);
     }
 }
 
@@ -887,7 +887,6 @@ export class LispMachine {
         this.error = null;
         this.process = null;
         this.f = null;
-        this.after_cleanup = null;
         //this.trace = [];
     }
 
@@ -1245,10 +1244,10 @@ let OP_RUN = [
         // no need to run it, we're already in
         // the right place.  just discard.
         m.denv = m.denv.cdr;
-        m.after_cleanup = null;
+        m.push(() => {});
     },
     /*OP.UPCLOSE*/ (m) => {
-        if (m.after_cleanup) m.after_cleanup(m);
+        m.pop()(m);
     },
     /*OP.CATCH*/ (m) => {
         let addr = m.code[m.pc++];
