@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="module">
+
+     import { LispMachine } from "../js/machine.js";
+     import { LispSymbol, LispPackage } from "../js/types.js";
+     import "../js/primitives.js";
+
+     // load fasls
+     let machine = new LispMachine();
+     let files = [
+       "../lisp/compiler.fasl",
+       "../lisp/init.fasl",
+       "../lisp/macroexpand.fasl",
+       "../lisp/tiny-clos.fasl",
+       "../lisp/printer.fasl",
+       "../lisp/format.fasl",
+       "../lisp/ffi.fasl",
+       "../lisp/conditions.fasl",
+       "../lisp/loop.fasl",
+     ];
+
+     let responses = await Promise.all(files.map(url => fetch(url)));
+     let data = await Promise.all(responses.map(x => x.text()));
+     data.forEach(code => machine._exec(LispMachine.unserialize(code)));
+
+     // this function is defined in compiler.lisp (the symbol exists in the bootstrap package, '%').
+     let eval_string_fn = LispSymbol.get("EVAL-STRING").function;
+     let eval_lisp = code => machine.atomic_call(eval_string_fn, [ code ]);
+
+     eval_lisp(`(in-package :sl-user)
+                (defun fib (n)
+                  (if (< n 2)
+                      n
+                      (+ (fib (- n 1))
+                         (fib (- n 2)))))`);
+
+     // disassemble
+     let fib = LispSymbol.get("FIB", LispPackage.get("SL-USER"));
+     console.log(LispMachine.disassemble(fib.function.code));
+
+     // call
+     console.log("FIB 20:", eval_lisp("(fib 20)"));
+
+     document.body.innerHTML = eval_lisp(`
+       (loop for sym being each external-symbol in :sl
+             collect sym into symbols
+             finally (return (format nil "<pre>~A</pre>" symbols)))`);
+
+    </script>
+  </head>
+  <body>
+  </body>
+</html>
