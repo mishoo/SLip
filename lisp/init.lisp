@@ -479,16 +479,6 @@
 (defun (setf svref) (value vector index)
   (vector-set vector index value))
 
-(define-compiler-macro (setf svref) (value vector index)
-  (cond
-    ((or (safe-atom-p value)
-         (and (safe-atom-p vector)
-              (safe-atom-p index)))
-     `(vector-set ,vector ,index ,value))
-    ((let ((v (gensym)))
-       `(let ((,v ,value))
-          (vector-set ,vector ,index ,v))))))
-
 (define-compiler-macro mapcar (&whole form func &rest lists)
   (cond
     ((null lists)
@@ -914,12 +904,6 @@
   (when (cdr pos)
     (error "(setf aref): multi-dimensional arrays not supported (yet?)"))
   (setf (svref array (car pos)) value))
-
-(define-compiler-macro (setf aref) (&whole form value array &rest pos)
-  (cond
-    ((cdr pos) form)
-    (t
-     `(setf (svref ,array ,(car pos)) ,value))))
 
 (defun (setf elt) (value seq index)
   (cond
