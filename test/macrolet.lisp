@@ -120,21 +120,21 @@
 
 ;;; Interaction with symbol-macrolet
 
-;; (deftest macrolet.13
-;;   (symbol-macrolet ((a b))
-;;     (macrolet ((foo (x &environment env)
-;;                     (let ((y (macroexpand x env)))
-;;                       (if (eq y 'a) 1 2))))
-;;       (foo a)))
-;;   2)
+(deftest macrolet.13
+  (symbol-macrolet ((a b))
+    (macrolet ((foo (x)
+                    (let ((y (macroexpand x)))
+                      (if (eq y 'a) 1 2))))
+      (foo a)))
+  2)
 
-;; (deftest macrolet.14
-;;   (symbol-macrolet ((a b))
-;;     (macrolet ((foo (x &environment env)
-;;                     (let ((y (macroexpand-1 x env)))
-;;                       (if (eq y 'a) 1 2))))
-;;       (foo a)))
-;;   2)
+(deftest macrolet.14
+  (symbol-macrolet ((a b))
+    (macrolet ((foo (x)
+                    (let ((y (macroexpand-1 x)))
+                      (if (eq y 'a) 1 2))))
+      (foo a)))
+  2)
 
 (deftest macrolet.15
   (macrolet ((nil () ''a))
