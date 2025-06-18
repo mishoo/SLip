@@ -167,6 +167,49 @@
         (car lists)
         (rec (map1 #'cdr tails)))))
 
+;; every returns false as soon as any invocation of predicate
+;; returns false. If the end of a sequence is reached, every returns
+;; true. Thus, every returns true if and only if every invocation of
+;; predicate returns true.
+(def-efun every (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) t
+        (and (apply test (map1 #'car tails))
+             (scan (map1 #'cdr tails))))))
+
+;; some returns the first non-nil value which is returned by an
+;; invocation of predicate. If the end of a sequence is reached
+;; without any invocation of the predicate returning true, some
+;; returns false. Thus, some returns true if and only if some
+;; invocation of predicate returns true.
+(def-efun some (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) nil
+        (or (apply test (map1 #'car tails))
+            (scan (map1 #'cdr tails))))))
+
+;; notany returns false as soon as any invocation of predicate
+;; returns true. If the end of a sequence is reached, notany returns
+;; true. Thus, notany returns true if and only if it is not the case
+;; that any invocation of predicate returns true.
+(def-efun notany (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) t
+        (if (apply test (map1 #'car tails))
+            nil
+            (scan (map1 #'cdr tails))))))
+
+;; notevery returns true as soon as any invocation of predicate
+;; returns false. If the end of a sequence is reached, notevery
+;; returns false. Thus, notevery returns true if and only if it is
+;; not the case that every invocation of predicate returns true.
+(def-efun notevery (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) nil
+        (if (apply test (map1 #'car tails))
+            (scan (map1 #'cdr tails))
+            t))))
+
 ;;; setf
 
 (defmacro %mvb-internal (names form &body body)
@@ -245,10 +288,8 @@
                              `(,expander ,@temps ,@vals))
                             ((symbolp (car form))
                              (let ((setter (intern (strcat "(SETF " (car form) ")")
-                                                   (symbol-package (car form))))
-                                   (tmplist (gensym "setfargs")))
-                               `(let ((,tmplist (list ,@temps)))
-                                  (apply #',setter (cons ,(car vals) ,tmplist)))))
+                                                   (symbol-package (car form)))))
+                               `(,setter ,(car vals) ,@temps)))
                             ((error (strcat "Unknown SETF expander " (car form)))))))
          (when (eq '%mvb-internal (car store-form))
            ;; hack: for multiple store vars, fetch names directly from
@@ -262,40 +303,77 @@
                  `(,(car form) ,@temps)))))
     ((error (strcat "Invalid SETF place " form)))))
 
+(defun %call-default-setter (form value)
+  (let ((setter (intern (strcat "(SETF " (car form) ")")
+                        (symbol-package (car form)))))
+    (cond
+      ((or (safe-atom-p value)
+           (every #'safe-atom-p (cdr form)))
+       ;; it's safe to compute the value first.
+       `(,setter ,value ,@(cdr form)))
+      (t
+       (let ((tmpvars (map1 (lambda (val)
+                              (list (gensym) val))
+                            (cdr form))))
+         `(let (,@tmpvars)
+            (,setter ,value ,@(map1 #'car tmpvars))))))))
+
+(defun %make-set-form (place value)
+  (cond
+    ((consp place)
+     (multiple-value-bind (expander form setf-exp) (%get-setf-place place)
+       (cond
+         ((eq expander t)
+          ;; form is a symbol.
+          `(setq ,form ,value))
+         (setf-exp
+          ;; this got ugly, because I'd like to dig the values and bind
+          ;; whatever is “simple” via symbol-macrolet so the generated code
+          ;; would be smaller.
+          (multiple-value-bind (temps vals stores set get) (apply expander (cdr form))
+            (let rec ((simple nil)
+                      (complex nil))
+              (cond
+                ((null temps)
+                 ;; this is the final setter form.
+                 `(let ,(nreverse complex)
+                    (symbol-macrolet ,(nreverse simple)
+                      ,(cond
+                         ((cdr stores)
+                          `(multiple-value-bind ,stores ,value ,set))
+                         ((safe-atom-p value)
+                          `(symbol-macrolet ((,(car stores) ,value)) ,set))
+                         (t
+                          `(let ((,(car stores) ,value)) ,set))))))
+                ((let* ((val (%pop vals))
+                        (safe? (safe-atom-p val)))
+                   (rec (if safe?
+                            ;; if safe, we add it to the “simple” list (symbol-macrolet)
+                            (cons (list (%pop temps) val) simple)
+                            simple)
+                        (if safe?
+                            complex
+                            ;; if not safe, we add it to the “complex” list (let)
+                            (cons (list (%pop temps) val) complex)))))))))
+         ((and (null expander)
+               (symbolp (car form)))
+          ;; no global setter defined, but maybe there is a (SETF FOO) somewhere.
+          (%call-default-setter form value))
+         ((functionp expander)
+          (funcall (apply expander (cdr form)) value))
+         ((symbolp expander)
+          `(,expander ,@(cdr form) ,value))
+         ((error (strcat "Unknown SETF expander for " (car place) ": " expander))))))
+    ((symbolp place)
+     `(setq ,place ,value))
+    (t (error "Unsupported SETF syntax"))))
+
 (defun %setf (args)
   (when args
     (unless (cdr args)
       (error "Odd number of arguments in SETF"))
-    (cons
-     (cond
-       ((consp (car args))
-        (multiple-value-bind (expander form setf-exp) (%get-setf-place (car args))
-          (cond
-            ((eq expander t)
-             ;; form is a symbol.
-             `(setq ,form ,(cadr args)))
-            (setf-exp
-             (multiple-value-bind (temps vals stores set get) (apply expander (cdr form))
-               `(let (,@(map2 #'list temps vals))
-                  (multiple-value-bind ,stores ,(cadr args)
-                    ,set))))
-            ((and (null expander)
-                  (symbolp (car form)))
-             ;; no global setter defined, but maybe there is a (SETF FOO) somewhere.
-             (let ((setter (intern (strcat "(SETF " (car form) ")")
-                                   (symbol-package (car form))))
-                   (tmplist (gensym "setfargs")))
-               `(let ((,tmplist (list ,@(cdr form))))
-                  (apply #',setter (cons ,(cadr args) ,tmplist)))))
-            ((functionp expander)
-             (funcall (apply expander (cdr form)) (cadr args)))
-            ((symbolp expander)
-             `(,expander ,@(cdr form) ,(cadr args)))
-            ((error (strcat "Unknown SETF expander for " (caar args) ": " expander))))))
-       ((symbolp (car args))
-        `(setq ,(car args) ,(cadr args)))
-       (t (error "Unsupported SETF syntax")))
-     (%setf (cddr args)))))
+    (cons (%make-set-form (car args) (cadr args))
+          (%setf (cddr args)))))
 
 (def-emac setf args
   `(progn ,@(%setf args)))
@@ -533,49 +611,6 @@
 (def-efun remove (item list)
   (collect-if (lambda (x)
                 (not (eq x item))) list))
-
-;; every returns false as soon as any invocation of predicate
-;; returns false. If the end of a sequence is reached, every returns
-;; true. Thus, every returns true if and only if every invocation of
-;; predicate returns true.
-(def-efun every (test . lists)
-  (let scan ((tails lists))
-    (if (finished tails) t
-        (and (apply test (map1 #'car tails))
-             (scan (map1 #'cdr tails))))))
-
-;; some returns the first non-nil value which is returned by an
-;; invocation of predicate. If the end of a sequence is reached
-;; without any invocation of the predicate returning true, some
-;; returns false. Thus, some returns true if and only if some
-;; invocation of predicate returns true.
-(def-efun some (test . lists)
-  (let scan ((tails lists))
-    (if (finished tails) nil
-        (or (apply test (map1 #'car tails))
-            (scan (map1 #'cdr tails))))))
-
-;; notany returns false as soon as any invocation of predicate
-;; returns true. If the end of a sequence is reached, notany returns
-;; true. Thus, notany returns true if and only if it is not the case
-;; that any invocation of predicate returns true.
-(def-efun notany (test . lists)
-  (let scan ((tails lists))
-    (if (finished tails) t
-        (if (apply test (map1 #'car tails))
-            nil
-            (scan (map1 #'cdr tails))))))
-
-;; notevery returns true as soon as any invocation of predicate
-;; returns false. If the end of a sequence is reached, notevery
-;; returns false. Thus, notevery returns true if and only if it is
-;; not the case that every invocation of predicate returns true.
-(def-efun notevery (test . lists)
-  (let scan ((tails lists))
-    (if (finished tails) nil
-        (if (apply test (map1 #'car tails))
-            (scan (map1 #'cdr tails))
-            t))))
 
 (def-efun remove-duplicates (list &key (test #'eql) from-end)
   (labels ((rmv (list ret)

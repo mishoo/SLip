@@ -98,6 +98,8 @@
 
 (defun let-mexp (f)
   (cond
+    ((null (cadr f))
+     (progn-mexp `(progn ,@(all-mexp (cddr f)))))
     ((listp (cadr f))
      ;; normal let
      `(,(car f)
@@ -223,8 +225,7 @@
                            (list name :var :smac exp)))
                        (cadr f)))))
     (let ((%:*compiler-env* (%:extend-compiler-env `(:lex ,(as-vector defs)))))
-      `(symbol-macrolet ,(cadr f)
-         ,@(all-mexp (cddr f))))))
+      (progn-mexp `(progn ,@(all-mexp (cddr f)))))))
 
 (foreach `((block                 block-mexp)
            (catch                 funcall-mexp)
