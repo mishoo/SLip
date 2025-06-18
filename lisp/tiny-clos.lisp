@@ -26,21 +26,29 @@
 
 (export '(call-next-method
           initialize
-          object))
+          object
 
-(def-efun find-class (sym)
+          find-class find-generic defclass defgeneric make-instance defmethod
+          slot-ref slot-set class-name class-direct-slots class-direct-supers
+          class-slots class-cpl generic-methods method-specializers
+          method-procedure make-class make-generic make-method is-a add-method
+          class-of
+
+          ))
+
+(defun find-class (sym)
   (%get-symbol-prop sym :class))
 
 (defsetf find-class (sym) (class)
   `(%set-symbol-prop ,sym :class ,class))
 
-(def-efun find-generic (sym)
+(defun find-generic (sym)
   (%get-symbol-prop sym :generic))
 
 (defsetf find-generic (sym) (generic)
   `(%set-symbol-prop ,sym :generic ,generic))
 
-(def-emac defclass (name direct-supers direct-slots)
+(defmacro defclass (name direct-supers direct-slots)
   (%:maybe-xref-info name 'defclass)
   (unless direct-supers
     (setf direct-supers '(object)))
@@ -49,7 +57,7 @@
                                               `(find-class ',name))
                                             direct-supers)) ',direct-slots)))
 
-(def-emac defgeneric (name)
+(defmacro defgeneric (name)
   (let ((generic (gensym "GENERIC")))
     `(unless (find-generic ',name)
        (let ((,generic (make-generic)))
@@ -57,13 +65,13 @@
          (defun ,name args
            (apply (%get-entity-proc ,generic) args))))))
 
-(def-efun make-instance (class . initargs)
+(defun make-instance (class . initargs)
   (apply #'make (if (symbolp class)
                     (find-class class)
                     class)
          initargs))
 
-(def-emac defmethod (name args &rest body)
+(defmacro defmethod (name args &rest body)
   (let ((c-n-m (gensym "CALL-NEXT-METHOD")))
     `(add-method ',name
                  (make-method
@@ -180,12 +188,12 @@
            (slot-set new 'procedure (getf initargs 'procedure '()))
            new))))
 
-(def-efun slot-ref (object slot-name)
+(defun slot-ref (object slot-name)
   (let* ((info (lookup-slot-info (class-of object) slot-name))
          (getter (car info)))
     (funcall getter object)))
 
-(def-efun slot-set (object slot-name new-value)
+(defun slot-set (object slot-name new-value)
   (let* ((info (lookup-slot-info (class-of object) slot-name))
          (setter (cadr info)))
     (funcall setter object new-value)))
@@ -199,16 +207,16 @@
         (cdr entry)
         (error (strcat "No slot " slot-name)))))
 
-(def-efun class-name (class) (slot-ref class 'name))
-(def-efun class-direct-slots (class) (slot-ref class 'direct-slots))
-(def-efun class-direct-supers (class) (slot-ref class 'direct-supers))
-(def-efun class-slots (class) (slot-ref class 'slots))
-(def-efun class-cpl (class) (slot-ref class 'cpl))
+(defun class-name (class) (slot-ref class 'name))
+(defun class-direct-slots (class) (slot-ref class 'direct-slots))
+(defun class-direct-supers (class) (slot-ref class 'direct-supers))
+(defun class-slots (class) (slot-ref class 'slots))
+(defun class-cpl (class) (slot-ref class 'cpl))
 
-(def-efun generic-methods (generic) (slot-ref generic 'methods))
+(defun generic-methods (generic) (slot-ref generic 'methods))
 
-(def-efun method-specializers (method) (slot-ref method 'specializers))
-(def-efun method-procedure (method) (slot-ref method 'procedure))
+(defun method-specializers (method) (slot-ref method 'specializers))
+(defun method-procedure (method) (slot-ref method 'procedure))
 
 (defglobal *the-slots-of-a-class* '(name
                                     direct-supers
@@ -220,15 +228,15 @@
                                     getters-n-setters))
 
 (defglobal *getters-n-setters-for-class*
-    (labels ((make-em (slot-name index)
-               (list slot-name
-                     (lambda (obj) (%instance-ref obj index))
-                     (lambda (obj new-value) (%instance-set obj index new-value))))
-             (rec (rest index)
-               (when rest
-                 (cons (make-em (car rest) index)
-                       (rec (cdr rest) (+ index 1))))))
-      (rec *the-slots-of-a-class* 0)))
+           (labels ((make-em (slot-name index)
+                      (list slot-name
+                            (lambda (obj) (%instance-ref obj index))
+                            (lambda (obj new-value) (%instance-set obj index new-value))))
+                    (rec (rest index)
+                      (when rest
+                        (cons (make-em (car rest) index)
+                              (rec (cdr rest) (+ index 1))))))
+             (rec *the-slots-of-a-class* 0)))
 
 (defglobal <class> (%allocate-instance nil (length *the-slots-of-a-class*)))
 (setf (find-class 'class) <class>)
@@ -289,18 +297,18 @@
 ;;; API
 ;;;
 
-(def-efun make-class (name direct-supers direct-slots)
+(defun make-class (name direct-supers direct-slots)
   (make <class>
         'name name
         'direct-supers direct-supers
         'direct-slots direct-slots))
-(def-efun make-generic () (make <generic>))
-(def-efun make-method (specializers procedure)
+(defun make-generic () (make <generic>))
+(defun make-method (specializers procedure)
   (make <method>
         'specializers specializers
         'procedure procedure))
 
-(def-efun is-a (obj class)
+(defun is-a (obj class)
   (when class
     (when (symbolp class)
       (setf class (find-class class)))
@@ -340,7 +348,7 @@
                                                        'compute-method-more-specific?
                                                        'compute-apply-methods)))
 
-(def-efun add-method (generic method)
+(defun add-method (generic method)
   (setq generic (find-generic generic))
   (slot-set generic
             'methods
@@ -438,9 +446,9 @@
  (make-method (list <object>)
               (lambda (call-next-method object initargs)
                 (let looop ((arg initargs))
-                     (when arg
-                       (slot-set object (car arg) (cadr arg))
-                       (looop (cddr arg))))
+                  (when arg
+                    (slot-set object (car arg) (cadr arg))
+                    (looop (cddr arg))))
                 object)))
 
 (add-method
@@ -578,7 +586,7 @@
 (defglobal <output-stream> (defclass output-stream (stream) ()))
 (defglobal <unknown> (defclass unknown-class (primitive) ()))
 
-(def-efun class-of (x)
+(defun class-of (x)
   (cond ((%objectp x) (%instance-class x))
         ((consp x) <cons>)
         ((not x) <null>)
