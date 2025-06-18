@@ -43,7 +43,7 @@
                          (setf ,val (time-it *run-time*
                                              (multiple-value-list (catch 'test-error
                                                                     (funcall ,comp)))))
-                         (setf ,ok (equal ,val ,exp))
+                         (setf ,ok (equalp ,val ,exp))
                          (if ,ok
                              (format t " OK~%")
                              (format t " FAIL - ~A~%" ,val)))))

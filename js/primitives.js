@@ -122,6 +122,7 @@ function eq(a, b) {
 };
 
 function equal(a, b) {
+    if (eq(a, b)) return true;
     if (LispList.is(a) && LispList.is(b)) {
         while (a !== null && b !== null) {
             if (!equal(a.car, b.car)) return null;
@@ -130,18 +131,48 @@ function equal(a, b) {
             if (!LispCons.is(a) || !LispCons.is(b))
                 return equal(a, b);
         }
-        return a === b;
-    } else if (LispVector.is(a) && LispVector.is(b)) {
+        return true;
+    }
+    if (LispRegexp.is(a) && LispRegexp.is(b)) {
+        return a.toString() === b.toString();
+    }
+    return null;
+}
+
+function equalp(a, b) {
+    if (eq(a, b)) return true;
+    if (LispString.is(a) && LispString.is(b)) {
+        return a.toLowerCase() === b.toLowerCase();
+    }
+    if (LispList.is(a) && LispList.is(b)) {
+        while (a !== null && b !== null) {
+            if (!equalp(a.car, b.car)) return null;
+            a = a.cdr;
+            b = b.cdr;
+            if (!LispCons.is(a) || !LispCons.is(b))
+                return equalp(a, b);
+        }
+        return true;
+    }
+    if (LispVector.is(a) && LispVector.is(b)) {
         var i = a.length;
         if (i !== b.length) return null;
         while (--i >= 0) {
-            if (!equal(a[i], b[i])) return null;
+            if (!equalp(a[i], b[i])) return null;
         }
         return true;
-    } else if (LispRegexp.is(a) && LispRegexp.is(b)) {
-        return a.toString() == b.toString();
-    } else return eq(a, b);
-};
+    } else if (LispHash.is(a) && LispHash.is(b)) {
+        for (let [ key, val ] of a) {
+            if (!equalp(val, b.get(key)))
+                return null;
+        }
+        return true;
+    }
+    if (LispRegexp.is(a) && LispRegexp.is(b)) {
+        return a.toString() === b.toString();
+    }
+    return null;
+}
 
 defp("eq", false, function(m, nargs){
     checknargs(nargs, 2, 2);
@@ -164,10 +195,7 @@ defp("equal", false, function(m, nargs){
 defp("equalp", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var a = m.pop(), b = m.pop();
-    if (typeof a == "string" && typeof b == "string") {
-        return a.toLowerCase() == b.toLowerCase();
-    }
-    return equal(a, b);
+    return equalp(a, b);
 });
 
 function all_different(a) {
@@ -844,9 +872,14 @@ defp("letterp", false, function(m, nargs){
     defcmp(">=" , (a, b) => a >= b);
     defcmp("<"  , (a, b) => a < b);
     defcmp(">"  , (a, b) => a > b);
-    defcmp("-equal", (a, b) => a.toLowerCase() == b.toLowerCase());
+    defcmp("-equal", (a, b) => a.toLowerCase() === b.toLowerCase());
+    defcmp("-not-equal", (a, b) => a.toLowerCase() !== b.toLowerCase());
+    defcmp("-lessp", (a, b) => a.toLowerCase() < b.toLowerCase());
+    defcmp("-not-lessp", (a, b) => a.toLowerCase() >= b.toLowerCase());
+    defcmp("-greaterp", (a, b) => a.toLowerCase() > b.toLowerCase());
+    defcmp("-not-greaterp", (a, b) => a.toLowerCase() <= b.toLowerCase());
 })((name, cmp) => {
-    if (name != "-equal" && name != "/=") {
+    if (name.charAt(0) != "-" && name != "/=") {
         // numeric ops; numeric /= is defined elsewhere
         defp(name, false, function(m, nargs){
             checknargs(nargs, 1);
