@@ -246,10 +246,10 @@
      (go next))))
 
 (defmacro %incf (var)
-  `(setq ,var (1+ ,var)))
+  `(setq ,var (%op inc ,var)))
 
 (defmacro %decf (var)
-  `(setq ,var (1- ,var)))
+  `(setq ,var (%op dec ,var)))
 
 (defun foreach-index (lst func)
   (let ((index -1))
@@ -849,7 +849,7 @@
                              (add thisarg `(if ,values
                                                (%pop ,values)
                                                (%dbind-error-missing-arg ',thisarg)))))
-                          (rec optional? rest? key? aux? (cdr args) values (+ i 1)))))
+                          (rec optional? rest? key? aux? (cdr args) values (%op inc i)))))
 
                       ((consp thisarg)
                        (cond
@@ -898,7 +898,7 @@
                           (let ((sublist (gensym)))
                             (add sublist `(if ,values (%pop ,values) (error "Missing sublist")))
                             (rec nil nil nil nil thisarg sublist 0))))
-                       (rec optional? rest? key? aux? (cdr args) values (+ i 1))))))
+                       (rec optional? rest? key? aux? (cdr args) values (%op inc i))))))
                  (t (error "Invalid lambda-list"))))))
         (rec nil nil nil nil args topv 0))
       `(let* ((,topv ,values) ,@(nreverse decls))
@@ -1204,6 +1204,8 @@
              (comp-unwind-protect (cadr x) (cddr x) env val? more?))
             ((funcall)
              (comp-funcall (cadr x) (cddr x) env val? more?))
+            ((%op)
+             (comp-op (cadr x) (cddr x) env val? more?))
             (otherwise
              (cond
                ((aif (and (symbolp (car x))
@@ -1215,6 +1217,19 @@
                           (macro (car x) env))
                      (comp-macroexpand it x env val? more?)
                      (comp-call t (car x) (cdr x) env val? more?)))))))))
+
+     (comp-op (opname args env val? more?)
+       ;; We'll now compute the args (they'll remain on the stack) and generate
+       ;; an operator specified by the caller, who hopefully knows what it's
+       ;; doing. Such custom OP-s are assumed to be side-effect-free.
+       (cond
+         ((not val?)
+          ;; If the value is not needed, compile arguments for potential side
+          ;; effects.
+          (comp-seq args env nil t))
+         ((%seq (comp-list args env)
+                (gen (strcat opname))
+                (unless more? (gen "RET"))))))
 
      (comp-one-setq (name value env val? more?)
        (assert (symbolp name) "Only symbols can be SETQ")
@@ -1528,7 +1543,7 @@
          ((%memq (car args) names)
           (error (strcat "Duplicate function argument " (car args))))
          ((gen-simple-args (cdr args)
-                           (1+ n)
+                           (%op inc n)
                            (cons (car args) names)))))
 
      (make-true-list (lst)
@@ -1869,7 +1884,7 @@
                       (when code
                         (setq code (%exec-code code))
                         (%relocate-code code link-addr)
-                        (setq link-addr (+ link-addr (length code)))
+                        (setq link-addr (%op add link-addr (length code)))
                         (if is-first
                             (setq is-first nil)
                             (%stream-put out #\,))
@@ -1935,14 +1950,14 @@
                    (let ((,t-load (get-internal-run-time)))
                      (prog1 (apply #'%get-file-contents args)
                        (rplaca *load-timing*
-                               (+ (car *load-timing*)
-                                  (- (get-internal-run-time) ,t-load))))))
+                               (%op add (car *load-timing*)
+                                    (%op sub (get-internal-run-time) ,t-load))))))
                  (compile-string args
                    (let ((,t-comp (get-internal-run-time)))
                      (prog1 (apply #'compile-string args)
                        (rplaca (cdr *load-timing*)
-                               (+ (cadr *load-timing*)
-                                  (- (get-internal-run-time) ,t-comp)))))))
+                               (%op add (cadr *load-timing*)
+                                    (%op sub (get-internal-run-time) ,t-comp)))))))
             ,@body)))
      (t ,@body)))
 

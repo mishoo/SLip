@@ -535,11 +535,13 @@
             ((numberp (car nums))
              (+ (car nums) (cadr nums)))
             ((= 1 (cadr nums))
-             `(1+ ,(car nums)))
+             `(%:%op inc ,(car nums)))
             ((= -1 (cadr nums))
-             `(1- ,(car nums)))
+             `(%:%op dec ,(car nums)))
             ((> 0 (cadr nums))
-             `(- ,(car nums) ,(- (cadr nums))))))))
+             `(%:%op sub ,(car nums) ,(- (cadr nums))))))
+         (t
+          `(%:%op add ,(car nums) ,(cadr nums)))))
      (reduce-sub (nums)
        (cond
          ((not (cdr nums))
@@ -550,7 +552,11 @@
             ((numberp (car nums))
              (- (car nums) (cadr nums)))
             ((= 1 (cadr nums))
-             `(1- ,(car nums))))))))
+             `(%:%op dec ,(car nums)))
+            (t
+             `(%:%op sub ,(car nums) ,(cadr nums)))))
+         (t
+          `(%:%op sub ,(car nums) ,(cadr nums))))))
   (define-compiler-macro + (&whole form &rest nums)
     (or (and (null (cddr nums))
              (reduce-sum (mapcar #'reduce-form nums)))

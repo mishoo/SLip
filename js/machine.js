@@ -94,6 +94,10 @@ export const OP = {
     VALUES: 80,
     MVB: 81,
     POPBACK: 82,
+    ADD: 83,
+    SUB: 84,
+    INC: 85,
+    DEC: 86,
 };
 
 const OP_LEN = [
@@ -180,6 +184,10 @@ const OP_LEN = [
     1 /* VALUES */,
     1 /* MVB */,
     1 /* POPBACK */,
+    0 /* ADD */,
+    0 /* SUB */,
+    0 /* INC */,
+    0 /* DEC */,
 ];
 
 export function want_bound(name, val) {
@@ -1588,16 +1596,20 @@ let OP_RUN = [
             m.stack.replace(-n-1, m.stack.pop_ret());
         }
     },
+    /*OP.ADD*/ (m) => {
+        m.push(m.pop_number() + m.pop_number());
+    },
+    /*OP.SUB*/ (m) => {
+        m.push(-m.pop_number() + m.pop_number());
+    },
+    /*OP.INC*/ (m) => {
+        m.push(m.pop_number() + 1);
+    },
+    /*OP.DEC*/ (m) => {
+        m.push(m.pop_number() - 1);
+    },
 ];
 
 function vmrun(m) {
-    if (m.debug) {
-        console.log(
-            OP_REV[m.code[m.pc]],
-            ...m.code.slice(m.pc+1, m.pc+1+OP_LEN[m.code[m.pc]]),
-            m.stack.copy().reverse()
-        );
-        debugger;
-    }
     OP_RUN[m.code[m.pc++]](m);
 }

@@ -2205,11 +2205,6 @@ defp("%debugger", true, function(m, nargs){
     debugger;
 });
 
-defp("%step-debug-mode", true, function(m, nargs){
-    checknargs(nargs, 0, 0);
-    m.debug = true;
-});
-
 defp("%grok-xref-info", true, function(m, nargs){
     checknargs(nargs, 2, 2);
     var xref = m.pop();
