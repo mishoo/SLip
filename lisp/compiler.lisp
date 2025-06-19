@@ -245,10 +245,10 @@
      (funcall func (%pop lst))
      (go next))))
 
-(defmacro %incf (var)
+(defmacro incf (var)
   `(setq ,var (%op inc ,var)))
 
-(defmacro %decf (var)
+(defmacro decf (var)
   `(setq ,var (%op dec ,var)))
 
 (defun foreach-index (lst func)
@@ -256,7 +256,7 @@
     (tagbody
      next
      (when lst
-       (funcall func (%pop lst) (%incf index))
+       (funcall func (%pop lst) (incf index))
        (go next)))))
 
 (defun identity (x) x)
@@ -485,9 +485,9 @@
            (skip-ws)
            (if (%memq (peek) '(#\( #\`))
                (prog2
-                   (%incf in-qq)
+                   (incf in-qq)
                    (list 'quasiquote (read-token))
-                 (%decf in-qq))
+                 (decf in-qq))
                `(quote ,(read-token))))
 
          (read-comma ()
@@ -495,12 +495,12 @@
            (skip #\,)
            (skip-ws)
            (prog2
-               (%decf in-qq)
+               (decf in-qq)
                (if (eq (peek) #\@)
                    (progn (next)
                           (list 'qq-splice (read-token)))
                    (list 'qq-unquote (read-token)))
-             (%incf in-qq)))
+             (incf in-qq)))
 
          (read-list ()
            (let ((ret nil)
@@ -737,7 +737,7 @@
 ;;                          (eq type (cadr x)))
 ;;                     (return-from position
 ;;                       (list* i j (cddr x)))))
-;;               (%decf j)
+;;               (decf j)
 ;;               (go next)))
 ;;            (frame (env i)
 ;;              (when env
@@ -866,30 +866,24 @@
                                 (thisarg-p (caddr thisarg)))
                             (when thisarg-p
                               (add thisarg-p nil))
-                            (cond
-                              ((consp thisarg)
-                               (add (cadr thisarg)
-                                    (let ((val (gensym)))
+                            (let* ((val (gensym))
+                                   (setdef `(if (eq ,val '%not-found)
+                                                ,default
+                                                (progn
+                                                  ,@(when thisarg-p
+                                                      `((setq ,thisarg-p t)))
+                                                  ,val))))
+                              (cond
+                                ((consp thisarg)
+                                 (add (cadr thisarg)
                                       `(let ((,val (getf ,values ,(car thisarg)
                                                          '%not-found)))
-                                         (if (eq ,val '%not-found)
-                                             ,default
-                                             (progn
-                                               ,@(when thisarg-p
-                                                   `((setq ,thisarg-p t)))
-                                               ,val))))))
-                              (t
-                               (add thisarg
-                                    (let ((val (gensym)))
+                                         ,setdef)))
+                                ((add thisarg
                                       `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
                                                                           (find-package "KEYWORD"))
                                                          '%not-found)))
-                                         (if (eq ,val '%not-found)
-                                             ,default
-                                             (progn
-                                               ,@(when thisarg-p
-                                                   `((setq ,thisarg-p t)))
-                                               ,val)))))))))
+                                         ,setdef)))))))
                          (aux? (let ((thisarg (car thisarg))
                                      (value (cadr thisarg)))
                                  (add thisarg value)))
@@ -1576,7 +1570,7 @@
                         (when (or (%specialp name)
                                   (%memq name locally-special))
                           (<< (gen "BIND" name index)))
-                        (%incf index))
+                        (incf index))
                       (newdef (name defval supplied-p)
                         (unless supplied-p
                           (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
@@ -1740,7 +1734,7 @@
                                (lambda (name index)
                                  (when (or (%specialp name)
                                            (%memq name locally-special))
-                                   (%incf specials)
+                                   (incf specials)
                                    (<< (gen "BIND" name index)))))
                 (setq env (extenv env :lex (map1-vector #'maybe-special names)))
                 (declare-locally-special :except names)
@@ -1790,7 +1784,7 @@
                                (lambda (name index)
                                  (when (or (%specialp name)
                                            (%memq name locally-special))
-                                   (%incf specials)
+                                   (incf specials)
                                    (<< (gen "BIND" name index)))))
                 (setq env (extenv env :lex (map1-vector #'maybe-special names)))
                 (declare-locally-special :except names)
@@ -1819,9 +1813,9 @@
                             (gen "VAR")
                             (when (or (%specialp name)
                                       (%memq name locally-special))
-                              (%incf specials)
+                              (incf specials)
                               (gen "BIND" name index)))
-                        (%incf index)
+                        (incf index)
                         (vector-push envcell (maybe-special name)))
                       names vals)
                 (declare-locally-special :except names)
