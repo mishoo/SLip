@@ -67,13 +67,13 @@
           lambda-list-keywords
           &key &rest &body &whole &optional &aux &allow-other-keys
 
-          macroexpand-1 macroexpand defpackage in-package defparameter
-          defglobal every some notany notevery defsetf define-setf-expander
-          get-setf-expansion setf psetf push pop define-compiler-macro incf
-          decf dolist collect-if remove remove-duplicates merge stable-sort
-          dotimes do do* complement adjoin pushnew nth use-package
-          with-output-to-string prog prog* make-list make-array aref
-          copy-tree))
+          define-modify-macro macroexpand-1 macroexpand defpackage in-package
+          defparameter defglobal every some notany notevery defsetf
+          define-setf-expander get-setf-expansion setf psetf push pop
+          define-compiler-macro incf decf dolist collect-if remove
+          remove-duplicates merge stable-sort dotimes do do* complement adjoin
+          pushnew nth use-package with-output-to-string prog prog* make-list
+          make-array aref copy-tree))
 
   (%export exported boot)
   (%export exported main)
@@ -377,6 +377,33 @@
 (defmacro setf args
   `(progn ,@(%setf args)))
 
+(defun %make-modify-macro (place args function)
+  (cond
+    ((safe-atom-p place)
+     `(setq ,place (,function ,place ,@args)))
+    ((multiple-value-bind (temp-vars temp-vals stores set get)
+                          (get-setf-expansion place)
+       `(let* (,@(map2 #'list temp-vars temp-vals)
+               (,(car stores) (,function ,get ,@args)))
+          ,set)))))
+
+(defmacro define-modify-macro (name lambda-list function &optional docstring)
+  (let* ((place (make-symbol "place"))
+         (parsed (parse-lambda-list lambda-list))
+         (args (append (getf parsed :required)
+                       (map1 (lambda (arg)
+                               (if (consp arg) (car arg) arg))
+                             (getf parsed :optional)))))
+    (when (or (getf parsed :has-key)
+              (getf parsed :aux)
+              (getf parsed :aok))
+      (error "DEFINE-MODIFY-MACRO: only &optional and &rest lambda words are supported"))
+    `(defmacro ,name (,place ,@lambda-list)
+       ,@(when docstring (list docstring))
+       (%make-modify-macro ,place
+                           (list* ,@args ,(getf parsed :rest))
+                           ',function))))
+
 (defmacro psetf args
   (let ((temps nil)
         (places nil)
@@ -533,20 +560,8 @@
              (reduce-sub (mapcar #'reduce-form nums)))
         form)))
 
-(labels ((make-dementor (place delta inc)
-           (symbol-macrolet ((dement `(,inc ,place ,delta)))
-             (cond
-               ((safe-atom-p place)
-                `(setq ,place ,dement))
-               ((multiple-value-bind (temps value-forms store-vars store-form place)
-                                     (get-setf-expansion place)
-                  `(let* (,@(mapcar #'list temps value-forms)
-                          (,(car store-vars) ,dement))
-                     ,store-form)))))))
-  (defmacro incf (place &optional (add 1))
-    (make-dementor place add '+))
-  (defmacro decf (place &optional (sub 1))
-    (make-dementor place sub '-)))
+(define-modify-macro incf (&optional (add 1)) +)
+(define-modify-macro decf (&optional (add 1)) -)
 
 ;;; lists
 
