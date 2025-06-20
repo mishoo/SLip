@@ -98,6 +98,14 @@ export const OP = {
     SUB: 84,
     INC: 85,
     DEC: 86,
+    LT: 87,
+    LTE: 88,
+    GT: 89,
+    GTE: 90,
+    NUMEQ: 91,
+    NUMNEQ: 92,
+    PLUSP: 93,
+    MINUSP: 94,
 };
 
 const OP_LEN = [
@@ -188,6 +196,14 @@ const OP_LEN = [
     0 /* SUB */,
     0 /* INC */,
     0 /* DEC */,
+    0 /* LT */,
+    0 /* LTE */,
+    0 /* GT */,
+    0 /* GTE */,
+    0 /* NUMEQ */,
+    0 /* NUMNEQ */,
+    0 /* PLUSP */,
+    0 /* MINUSP */,
 ];
 
 export function want_bound(name, val) {
@@ -1095,14 +1111,14 @@ export class LispMachine {
 }
 
 function frame(env, i) {
-    while (i-- > 0) env = env.cdr;
+    while (i > 0) env = env.cdr, i--;
     return env.car;
-};
+}
 
 function rewind(env, i) {
-    while (i-- > 0) env = env.cdr;
+    while (i > 0) env = env.cdr, i--;
     return env;
-};
+}
 
 function eq(a, b) {
     if (a === null) return b === null || b === S_NIL ? true : null;
@@ -1110,7 +1126,7 @@ function eq(a, b) {
     if (a === true) return b === true || b === S_T ? true : null;
     if (b === true) return a === true || a === S_T ? true : null;
     return a === b ? true : null;
-};
+}
 
 let CC_CODE = assemble([
     ["ARGS", 1],
@@ -1607,6 +1623,30 @@ let OP_RUN = [
     },
     /*OP.DEC*/ (m) => {
         m.push(m.pop_number() - 1);
+    },
+    /*OP.LT*/ (m) => {
+        m.push(m.pop_number() > m.pop_number() ? true : null);
+    },
+    /*OP.LTE*/ (m) => {
+        m.push(m.pop_number() >= m.pop_number() ? true : null);
+    },
+    /*OP.GT*/ (m) => {
+        m.push(m.pop_number() < m.pop_number() ? true : null);
+    },
+    /*OP.GTE*/ (m) => {
+        m.push(m.pop_number() <= m.pop_number() ? true : null);
+    },
+    /*OP.NUMEQ*/ (m) => {
+        m.push(m.pop_number() === m.pop_number() ? true : null);
+    },
+    /*OP.NUMNEQ*/ (m) => {
+        m.push(m.pop_number() !== m.pop_number() ? true : null);
+    },
+    /*OP.PLUSP*/ (m) => {
+        m.push(m.pop_number() > 0 ? true : null);
+    },
+    /*OP.MINUSP*/ (m) => {
+        m.push(m.pop_number() < 0 ? true : null);
     },
 ];
 

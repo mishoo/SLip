@@ -160,6 +160,16 @@
         (rec (cons (apply f (map1 #'car tails)) ret)
              (map1 #'cdr tails)))))
 
+(define-compiler-macro mapcar (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPCAR"))
+    ((null (cdr lists))
+     `(map1 ,func ,@lists))
+    ((null (cddr lists))
+     `(map2 ,func ,@lists))
+    (form)))
+
 (defun mapc (f . lists)
   (let rec ((tails lists))
     (if (finished tails)
@@ -397,7 +407,7 @@
     (when (or (getf parsed :has-key)
               (getf parsed :aux)
               (getf parsed :aok))
-      (error "DEFINE-MODIFY-MACRO: only &optional and &rest lambda words are supported"))
+      (error "DEFINE-MODIFY-MACRO: only &optional and &rest lambda words are expected"))
     `(defmacro ,name (,place ,@lambda-list)
        ,@(when docstring (list docstring))
        (%make-modify-macro ,place
@@ -479,23 +489,6 @@
 (defun (setf compiler-macro-function) (handler name)
   (setf (getf %:*compiler-macros* name) handler))
 
-(defmacro define-compiler-macro (name args &body body)
-  (multiple-value-bind (setter name) (%:maybe-setter name)
-    (%:maybe-xref-info name (if setter
-                                'compiler-macro-setf
-                                'compiler-macro))
-    (let ((form (if (eq '&whole (car args))
-                    (prog1
-                        (cadr args)
-                      (setq args (cddr args)))
-                    (gensym "form"))))
-      `(setf (compiler-macro-function ',(or setter name))
-             (%fn ,name (,form)
-                  (destructuring-bind ,args (if (eq 'funcall (car ,form))
-                                                (cddr ,form)
-                                                (cdr ,form))
-                    ,@body))))))
-
 (define-compiler-macro identity (x) x)
 
 (defun constantly (value)
@@ -505,66 +498,6 @@
 
 (defun (setf svref) (value vector index)
   (vector-set vector index value))
-
-(define-compiler-macro mapcar (&whole form func &rest lists)
-  (cond
-    ((null lists)
-     (error "Missing list argument to MAPCAR"))
-    ((null (cdr lists))
-     `(map1 ,func ,@lists))
-    ((null (cddr lists))
-     `(map2 ,func ,@lists))
-    (form)))
-
-(labels
-    ((reduce-form (form)
-       (aif (and (consp form)
-                 (compiler-macro-function (car form)))
-            (funcall it form)
-            form))
-     (reduce-sum (nums)
-       (cond
-         ((not nums) 0)
-         ((not (cdr nums)) (car nums))
-         ((when (and (numberp (car nums))
-                     (not (numberp (cadr nums))))
-            (setf nums (list (cadr nums) (car nums)))
-            nil))
-         ((numberp (cadr nums))
-          (cond
-            ((numberp (car nums))
-             (+ (car nums) (cadr nums)))
-            ((= 1 (cadr nums))
-             `(%:%op inc ,(car nums)))
-            ((= -1 (cadr nums))
-             `(%:%op dec ,(car nums)))
-            ((> 0 (cadr nums))
-             `(%:%op sub ,(car nums) ,(- (cadr nums))))))
-         (t
-          `(%:%op add ,(car nums) ,(cadr nums)))))
-     (reduce-sub (nums)
-       (cond
-         ((not (cdr nums))
-          (when (numberp (car nums))
-            (- (car nums))))
-         ((numberp (cadr nums))
-          (cond
-            ((numberp (car nums))
-             (- (car nums) (cadr nums)))
-            ((= 1 (cadr nums))
-             `(%:%op dec ,(car nums)))
-            (t
-             `(%:%op sub ,(car nums) ,(cadr nums)))))
-         (t
-          `(%:%op sub ,(car nums) ,(cadr nums))))))
-  (define-compiler-macro + (&whole form &rest nums)
-    (or (and (null (cddr nums))
-             (reduce-sum (mapcar #'reduce-form nums)))
-        form))
-  (define-compiler-macro - (&whole form &rest nums)
-    (or (and (null (cddr nums))
-             (reduce-sub (mapcar #'reduce-form nums)))
-        form)))
 
 (define-modify-macro incf (&optional (add 1)) +)
 (define-modify-macro decf (&optional (add 1)) -)

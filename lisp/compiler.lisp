@@ -30,15 +30,6 @@
            '*whole-form*
            '*load-timing*)
 
-(setq *read-table* nil)
-(setq *url-prefix* nil)
-(setq *unknown-functions* nil)
-(setq *unknown-variables* nil)
-(setq *compiler-env* nil)
-(setq *compiler-macros* nil)
-(setq *whole-form* nil)
-(setq *load-timing* nil)
-
 (setq *standard-output* (%make-output-stream))
 (setq *error-output* (%make-output-stream))
 (setq *trace-output* (%make-output-stream))
@@ -153,7 +144,7 @@
 (set-symbol-function!
  'maybe-xref-info
  (%fn maybe-xref-info (name type)
-      (if (boundp '*xref-info*)
+      (if *xref-info*
           (vector-push *xref-info*
                        #(name type *current-pos*)))))
 
@@ -246,10 +237,10 @@
      (go next))))
 
 (defmacro incf (var)
-  `(setq ,var (%op inc ,var)))
+  `(setq ,var (1+ ,var)))
 
 (defmacro decf (var)
-  `(setq ,var (%op dec ,var)))
+  `(setq ,var (1- ,var)))
 
 (defun foreach-index (lst func)
   (let ((index -1))
@@ -800,7 +791,7 @@
                       ((symbolp thisarg)
                        (case thisarg
                          (&whole
-                          (when (> i 0) (error "Misplaced &WHOLE"))
+                          (when (plusp i) (error "Misplaced &WHOLE"))
                           (let ((thisarg (cadr args)))
                             (unless thisarg
                               (error "Missing variable name for &WHOLE"))
@@ -849,7 +840,7 @@
                              (add thisarg `(if ,values
                                                (%pop ,values)
                                                (%dbind-error-missing-arg ',thisarg)))))
-                          (rec optional? rest? key? aux? (cdr args) values (%op inc i)))))
+                          (rec optional? rest? key? aux? (cdr args) values (1+ i)))))
 
                       ((consp thisarg)
                        (cond
@@ -892,7 +883,7 @@
                           (let ((sublist (gensym)))
                             (add sublist `(if ,values (%pop ,values) (error "Missing sublist")))
                             (rec nil nil nil nil thisarg sublist 0))))
-                       (rec optional? rest? key? aux? (cdr args) values (%op inc i))))))
+                       (rec optional? rest? key? aux? (cdr args) values (1+ i))))))
                  (t (error "Invalid lambda-list"))))))
         (rec nil nil nil nil args topv 0))
       `(let* ((,topv ,values) ,@(nreverse decls))
@@ -910,6 +901,130 @@
       (let ((args (gensym "ARGS")))
         `(%macro! ',name (%::%fn ,name ,args
                                  ,(%fn-destruct t lambda-list args body))))))
+
+;; let's define early some compiler macros, so that the compiler itself can
+;; benefit from them.
+
+(defmacro define-compiler-macro (name args &body body)
+  (multiple-value-bind (setter name) (%:maybe-setter name)
+    (%:maybe-xref-info name (if setter
+                                'compiler-macro-setf
+                                'compiler-macro))
+    (let ((form (if (eq '&whole (car args))
+                    (prog1
+                        (cadr args)
+                      (setq args (cddr args)))
+                    (gensym "form"))))
+      `(setq *compiler-macros*
+             (%putf *compiler-macros*
+                    ',(or setter name)
+                    (%fn ,name (,form)
+                         (destructuring-bind ,args (if (eq 'funcall (car ,form))
+                                                       (cddr ,form)
+                                                       (cdr ,form))
+                           ,@body)))))))
+
+(labels
+    ((reduce-form (form)
+       (aif (and (consp form)
+                 (compiler-macro-function (car form)))
+            (funcall it form)
+            form))
+
+     (reduce-sum (nums)
+       (cond
+         ((not nums) 0)
+         ((not (cdr nums)) (car nums))
+         ((when (and (numberp (car nums))
+                     (not (numberp (cadr nums))))
+            (setq nums (list (cadr nums) (car nums)))
+            nil))
+         ((numberp (cadr nums))
+          (cond
+            ((numberp (car nums))
+             (+ (car nums) (cadr nums)))
+            ((= 1 (cadr nums))
+             `(%:%op INC ,(car nums)))
+            ((= -1 (cadr nums))
+             `(%:%op DEC ,(car nums)))
+            ((minusp (cadr nums))
+             `(%:%op SUB ,(car nums) ,(- (cadr nums))))))
+         (t
+          `(%:%op ADD ,(car nums) ,(cadr nums)))))
+
+     (reduce-sub (nums)
+       (cond
+         ((not (cdr nums))
+          (when (numberp (car nums))
+            (- (car nums))))
+         ((numberp (cadr nums))
+          (cond
+            ((numberp (car nums))
+             (- (car nums) (cadr nums)))
+            ((= 1 (cadr nums))
+             `(%:%op DEC ,(car nums)))
+            (t
+             `(%:%op SUB ,(car nums) ,(cadr nums)))))
+         (t
+          `(%:%op SUB ,(car nums) ,(cadr nums))))))
+
+  (define-compiler-macro + (&whole form &rest nums)
+    (or (and (null (cddr nums))
+             (reduce-sum (map1 #'reduce-form nums)))
+        form))
+
+  (define-compiler-macro - (&whole form &rest nums)
+    (or (and (null (cddr nums))
+             (reduce-sub (map1 #'reduce-form nums)))
+        form))
+
+  (define-compiler-macro 1+ (value)
+    `(%op INC ,(reduce-form value)))
+
+  (define-compiler-macro 1- (value)
+    `(%op DEC ,(reduce-form value)))
+
+  (define-compiler-macro < (&whole form &rest nums)
+    (cond
+      ((cddr nums) form)
+      ((eq 0 (reduce-form (car nums)))
+       `(%op PLUSP ,(reduce-form (cadr nums))))
+      ((eq 0 (reduce-form (cadr nums)))
+       `(%op MINUSP ,(reduce-form (car nums))))
+      (t
+       `(%op LT ,(reduce-form (car nums)) ,(reduce-form (cadr nums))))))
+
+  (define-compiler-macro <= (&whole form &rest nums)
+    (if (cddr nums) form
+        `(%op LTE ,(reduce-form (car nums)) ,(reduce-form (cadr nums)))))
+
+  (define-compiler-macro > (&whole form &rest nums)
+    (cond
+      ((cddr nums) form)
+      ((eq 0 (reduce-form (car nums)))
+       `(%op MINUSP ,(reduce-form (cadr nums))))
+      ((eq 0 (reduce-form (cadr nums)))
+       `(%op PLUSP ,(reduce-form (car nums))))
+      (t
+       `(%op GT ,(reduce-form (car nums)) ,(reduce-form (cadr nums))))))
+
+  (define-compiler-macro >= (&whole form &rest nums)
+    (if (cddr nums) form
+        `(%op GTE ,(reduce-form (car nums)) ,(reduce-form (cadr nums)))))
+
+  (define-compiler-macro = (&whole form &rest nums)
+    (if (cddr nums) form
+        `(%op NUMEQ ,(reduce-form (car nums)) ,(reduce-form (cadr nums)))))
+
+  (define-compiler-macro /= (&whole form &rest nums)
+    (if (cddr nums) form
+        `(%op NUMNEQ ,(reduce-form (car nums)) ,(reduce-form (cadr nums)))))
+
+  (define-compiler-macro plusp (val)
+    `(%op PLUSP ,val))
+
+  (define-compiler-macro minusp (val)
+    `(%op MINUSP ,val)))
 
 (defun make-compiler-env ()
   ;; :lex should match the runtime lexical environment; both
@@ -1537,7 +1652,7 @@
          ((%memq (car args) names)
           (error (strcat "Duplicate function argument " (car args))))
          ((gen-simple-args (cdr args)
-                           (%op inc n)
+                           (1+ n)
                            (cons (car args) names)))))
 
      (make-true-list (lst)
@@ -1874,11 +1989,11 @@
              (*xref-info* #())
              (env (make-environment)))
          (labels ((comp1 (form)
-                    (let ((code (comp form env nil t)))
+                    (let ((code (with-env (comp form env nil t))))
                       (when code
                         (setq code (%exec-code code))
                         (%relocate-code code link-addr)
-                        (setq link-addr (%op add link-addr (length code)))
+                        (setq link-addr (+ link-addr (length code)))
                         (if is-first
                             (setq is-first nil)
                             (%stream-put out #\,))
@@ -1893,7 +2008,7 @@
            (rec)
            (let* ((xref *xref-info*)
                   (*xref-info* nil))
-             (when (and *current-file* (> (length xref) 0))
+             (when (and *current-file* (plusp (length xref)))
                (comp1 `(%grok-xref-info ,*current-file* ,xref))))
            (%stream-get out)))))
 
@@ -1944,14 +2059,14 @@
                    (let ((,t-load (get-internal-run-time)))
                      (prog1 (apply #'%get-file-contents args)
                        (rplaca *load-timing*
-                               (%op add (car *load-timing*)
-                                    (%op sub (get-internal-run-time) ,t-load))))))
+                               (+ (car *load-timing*)
+                                  (- (get-internal-run-time) ,t-load))))))
                  (compile-string args
                    (let ((,t-comp (get-internal-run-time)))
                      (prog1 (apply #'compile-string args)
                        (rplaca (cdr *load-timing*)
-                               (%op add (cadr *load-timing*)
-                                    (%op sub (get-internal-run-time) ,t-comp)))))))
+                               (+ (cadr *load-timing*)
+                                  (- (get-internal-run-time) ,t-comp)))))))
             ,@body)))
      (t ,@body)))
 

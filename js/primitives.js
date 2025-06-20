@@ -1677,6 +1677,9 @@ defp("%special!", true, function(m, nargs){
         checktype(name, LispSymbol);
         name.setv("special", true);
         name.setv("global", true);
+        if (name.value === false) {
+            name.value = null;
+        }
     }
     return null;
 });
@@ -1687,6 +1690,9 @@ defp("%global!", true, function(m, nargs){
         var name = m.pop();
         checktype(name, LispSymbol);
         name.setv("global", true);
+        if (name.value === false) {
+            name.value = null;
+        }
     }
     return null;
 });
