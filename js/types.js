@@ -540,9 +540,7 @@ const run = () => {
     setTimeout(run, 0);
 };
 
-const start = () => {
-    setTimeout(run, 0);
-};
+const start = () => setTimeout(run, 0);
 
 export class LispProcess {
     static type = "process";

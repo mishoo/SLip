@@ -146,7 +146,7 @@
  (%fn maybe-xref-info (name type)
       (if *xref-info*
           (vector-push *xref-info*
-                       #(name type *current-pos*)))))
+                       (vector name type *current-pos*)))))
 
 ;; better to avoid quasiquote here:
 (%macro! 'defmacro
@@ -462,7 +462,7 @@
            (case (peek)
              (#\\ (next) (read-char))
              (#\/ (read-regexp))
-             (#\( (list* 'vector (read-list)))
+             (#\( (apply #'vector (read-list)))
              (#\' (next) (list 'function (read-token)))
              (#\: (next) (make-symbol (read-symbol-name)))
              (#\. (next) (eval (read-token)))
@@ -548,7 +548,7 @@
 
 (defmacro with-seq-output (out . body)
   (let ((seq (gensym)))
-    `(let ((,seq #()))
+    `(let ((,seq (vector)))
        (flet ((,out args
                 (%seq-cat ,seq args)))
          ,@body)
@@ -1134,7 +1134,7 @@
        (extend-compiler-env rest env))
 
      (gen cmd
-       #( (as-vector cmd) ))
+       (vector (as-vector cmd)))
 
      (find-in-env (name type env)
        (find-in-compiler-env name type env))
@@ -1450,7 +1450,7 @@
                (%seq (gen "BLOCK")
                      (with-extenv (:lex (vector (list name :block label val?)))
                        (comp-seq forms env val? more?))
-                     #( label )
+                     (vector label)
                      (if more?
                          (gen "UNFR" 1 0)
                          (gen "RET")))))))
@@ -1498,7 +1498,7 @@
                 (<< (gen "BLOCK"))           ; define the tagbody entry
                 (foreach forms (lambda (x)
                                  (if (atom x)
-                                     (<< #( (cadddr (%pop tags)) )) ; label
+                                     (<< (vector (cadddr (%pop tags)))) ; label
                                      (<< (comp x env nil t)))))
                 (when val? (<< (gen "NIL"))) ; tagbody returns NIL
                 (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
@@ -1533,14 +1533,14 @@
                  (%seq pcode
                        (gen "TJUMP" l2)
                        ecode
-                       #( l2 )
+                       (vector l2)
                        (if more? nil (gen "RET")))))
               ((zerop (length ecode))
                (let ((l1 (mklabel)))
                  (%seq pcode
                        (gen "FJUMP" l1)
                        tcode
-                       #( l1 )
+                       (vector l1)
                        (if more? nil (gen "RET")))))
               (t
                (let ((l1 (mklabel))
@@ -1549,9 +1549,9 @@
                        (gen "FJUMP" l1)
                        tcode
                        (if more? (gen "JUMP" l2))
-                       #( l1 )
+                       (vector l1)
                        ecode
-                       (if more? #( l2 ))))))))))
+                       (if more? (vector l2))))))))))
 
      (comp-or (exps env val? more? &optional l1)
        (cond
@@ -1579,7 +1579,7 @@
                          (gen "TJUMPK" l1)
                          (gen "TJUMP" l1))
                      (comp-or (cdr exps) env val? more? l1)
-                     #( l1 )
+                     (vector l1)
                      (gen "VALUES" 1)
                      (unless more? (gen "RET")))))))
          ((comp (car exps) env val? more?))))
@@ -1602,7 +1602,7 @@
                                    (comp-list args env)
                                    the-function
                                    (gen "CALL" (length args))
-                                   #( k )
+                                   (vector k)
                                    (unless val? (gen "POP")))))
                     (t (%seq (comp-list args env)
                              the-function
@@ -1698,7 +1698,7 @@
                                   (comp defval env t t))  ;; compile default value
                                 (gen "LSET" 0 index)      ;; set arg value in env
                                 (gen "POP")               ;; discard from stack
-                                #(l1))))
+                                (vector l1))))
                         (newarg name)))
                (<< (gen "XARGS"
                         (length required)
@@ -1946,7 +1946,7 @@
              (%seq (comp tag env t t)
                    (gen "CATCH" k1)
                    (comp-seq body env val? more?)
-                   #( k1 )
+                   (vector k1)
                    (if val?
                        (if more?
                            (gen "UNFR" 0 1)
@@ -1966,7 +1966,7 @@
              (%seq (gen "UPOPEN" k)
                    (comp form env val? t) ; if val? is T, this leaves it on the stack
                    (gen "UPEXIT")
-                   #( k )
+                   (vector k)
                    (comp-seq cleanup env nil t) ; result of cleanup code not needed
                    (gen "UPCLOSE")
                    (if more? nil (gen "RET"))))
@@ -1986,7 +1986,7 @@
              (out (%make-output-stream))
              (is-first t)
              (link-addr 0)
-             (*xref-info* #())
+             (*xref-info* (vector))
              (env (make-environment)))
          (labels ((comp1 (form)
                     (let ((code (with-env (comp form env nil t))))
@@ -2017,7 +2017,7 @@
 
 (defun read1-from-string (str)
   (let ((reader (lisp-reader str 'EOF)))
-    #( (cdr (funcall reader 'next)) (funcall reader 'pos) )))
+    (vector (cdr (funcall reader 'next)) (funcall reader 'pos))))
 
 (defun %with-undefined-warnings (thunk)
   (let ((*unknown-functions* nil)

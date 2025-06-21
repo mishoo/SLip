@@ -29,7 +29,7 @@
 
 (let ((%to-string (%js-eval "function to_string(obj) { return obj + '' }")))
   (def-print (unknown-class)
-    (<< "<UNKNOWN-CLASS " (%js-apply %to-string nil #(unknown-class)) ">")))
+    (<< "<UNKNOWN-CLASS " (%js-apply %to-string nil (vector unknown-class)) ">")))
 
 (def-print (object)
   (<< "<OBJECT")
