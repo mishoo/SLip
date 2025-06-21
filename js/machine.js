@@ -1,5 +1,6 @@
 import { LispCons } from "./list.js";
-import { LispType, LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
+import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject } from "./types.js";
+import { LispPrimitiveError } from "./error.js";
 import { repeat_string, pad_string } from "./utils.js";
 import { LispStack } from "./stack.js";
 
@@ -9,6 +10,12 @@ let S_QUOTE = LispSymbol.get("QUOTE");
 let S_NIL = LispSymbol.get("NIL");
 let S_T = LispSymbol.get("T");
 let S_ALLOW_OTHER_KEYS = KEYWORD_PACK.intern("ALLOW-OTHER-KEYS");
+
+export const STATUS_FINISHED = 0;
+export const STATUS_RUNNING = 1;
+export const STATUS_WAITING = 2;
+export const STATUS_LOCKED = 3;
+export const STATUS_HALTED = 4;
 
 export const OP = {
     NOP: 0,
@@ -755,8 +762,7 @@ function dump(thing) {
         return ret + ")";
     }
     if (Array.isArray(thing)) return `#(${thing.map(dump).join(" ")})`;
-    if (thing instanceof LispType) return thing.print();
-    return thing + "";
+    return String(thing);
 }
 
 const OP_REV = Object.keys(OP);
@@ -907,7 +913,7 @@ export class LispMachine {
         this.env = null;
         this.denv = pm ? pm.denv : null;
         this.n_args = null;
-        this.status = null;
+        this.status = STATUS_FINISHED;
         this.error = null;
         this.process = null;
         this.f = null;
@@ -1063,11 +1069,11 @@ export class LispMachine {
         try {
             while (quota-- > 0) {
                 if (this.pc === null) {
-                    this.status = "finished";
+                    this.status = STATUS_FINISHED;
                     break;
                 }
                 vmrun(this);
-                if (this.status != "running")
+                if (this.status !== STATUS_RUNNING)
                     break;
             }
         } catch(ex) {
@@ -1080,7 +1086,7 @@ export class LispMachine {
                 }
             }
             // we fucked up.
-            this.status = "halted";
+            this.status = STATUS_HALTED;
             err = this.error = ex;
         }
         return err;
@@ -1148,7 +1154,7 @@ function find_key_arg(item, array, start, end = array.length) {
 }
 
 let OP_RUN = [
-    null,
+    /*NOP*/ () => {},
     /*OP.LVAR*/ (m) => {
         let i = m.code[m.pc++];
         let j = m.code[m.pc++];

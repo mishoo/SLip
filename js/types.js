@@ -1,13 +1,10 @@
-import { LispMachine } from "./machine.js";
+import { LispMachine,
+         STATUS_RUNNING,
+         STATUS_WAITING,
+         STATUS_LOCKED } from "./machine.js";
+import { LispCons } from "./list.js";
 
-export class LispType {
-    static is(x) { return x instanceof LispType }
-    print() {
-        return "<" + this.constructor.type + ">";
-    }
-}
-
-export class LispChar extends LispType {
+export class LispChar {
     static type = "char";
     static is(x) { return x instanceof LispChar }
 
@@ -61,7 +58,6 @@ export class LispChar extends LispType {
     }
 
     constructor(val) {
-        super();
         this.value = val;
     }
 
@@ -81,7 +77,7 @@ export class LispChar extends LispType {
         return this.value.charCodeAt(0);
     }
 
-    print() {
+    toString() {
         var ch = this.value;
         return "#\\" + (LispChar.#NAMES_TO[ch] || ch);
     }
@@ -92,11 +88,10 @@ export class LispChar extends LispType {
     }
 }
 
-export class LispClosure extends LispType {
+export class LispClosure {
     static type = "function";
     static is(x) { return x instanceof LispClosure }
     constructor(code, name, env) {
-        super();
         this.code = code;
         this.name = name || null;
         this.env = env || null;
@@ -105,25 +100,15 @@ export class LispClosure extends LispType {
     copy() {
         return new LispClosure(this.code, this.name, this.env);
     }
-    print() {
+    toString() {
         return "<function" + (this.name ? " " + this.name : "") + ">";
     }
 }
 
-export class LispPrimitiveError extends LispType {
-    static type = "primitive-error";
-    static is(x) { return x instanceof LispPrimitiveError }
-    constructor(msg) {
-        super();
-        this.message = msg;
-    }
-}
-
-export class LispStream extends LispType {
+export class LispStream {
     static type = "stream";
     static is(x) { return x instanceof LispStream }
     constructor(text) {
-        super();
         this.text = text || "";
         this.line = 1;
         this.col = 0;
@@ -190,7 +175,7 @@ export class LispOutputStream extends LispStream {
     }
 }
 
-export class LispHash extends LispType {
+export class LispHash {
     static type = "simple-hash";
     static is(x) { return x instanceof LispHash }
     static fromObject(obj) {
@@ -199,7 +184,6 @@ export class LispHash extends LispType {
         return hash;
     }
     constructor(parent = null) {
-        super();
         this.data = new Map();
         this.parent = parent;
     }
@@ -256,19 +240,18 @@ export class LispHash extends LispType {
     }
 }
 
-export class LispObject extends LispType {
+export class LispObject {
     static type = "object";
     static is(x) { return x instanceof LispObject }
-    print() {
+    toString() {
         return "<object " + this.vector[0].vector[2] + ">";
     }
     constructor(size) {
-        super();
         this.vector = new Array(size).fill(null);
     }
 }
 
-export class LispPackage extends LispType {
+export class LispPackage {
     static type = "package";
     static is(x) { return x instanceof LispPackage }
     static #PACKAGES = Object.create(null);
@@ -285,14 +268,12 @@ export class LispPackage extends LispType {
     }
     static BASE_PACK = LispPackage.get("%");
     constructor(name) {
-        super();
         this.name = name + "";
         this.symbols = new LispHash();
         this.exports = [];
         this.uses = [];
     }
-    toString() { return this.name }
-    print() { return "<package " + this.name + ">" }
+    toString() { return "<package " + this.name + ">" }
     serialize(cache) {
         if (cache) {
             let id = cache.get(this);
@@ -396,9 +377,8 @@ export class LispPackage extends LispType {
     }
 }
 
-export class LispSymbol extends LispType {
+export class LispSymbol {
     static type = "symbol";
-    static #SYMBOLS = Object.create(null);
     static symname(sym) {
         return sym === null ? "NIL" : sym === true ? "T" : sym.name;
     }
@@ -406,16 +386,12 @@ export class LispSymbol extends LispType {
         return x === true || x === null || x instanceof LispSymbol;
     }
     static get(name, pak = LispPackage.BASE_PACK) {
-        var ret = pak ? pak.intern(name) : (LispSymbol.#SYMBOLS[name] || (
-            LispSymbol.#SYMBOLS[name] = new LispSymbol(name)
-        ));
-        return ret;
+        return pak.intern(name);
     }
     static keyword(name) {
         return this.get(name, LispPackage.get("KEYWORD"));
     }
     constructor(name, pak) {
-        super();
         if (name) {
             this.name = name + "";
             this.pak = pak || null;
@@ -425,7 +401,6 @@ export class LispSymbol extends LispType {
             this.function = null;
         }
     }
-    toString() { return this.print() }
     serialize(cache) {
         if (cache) {
             let id = cache.get(this);
@@ -456,7 +431,7 @@ export class LispSymbol extends LispType {
     global() {
         return this.getv("global");
     }
-    print() {
+    toString() {
         if (this.pak?.name == "KEYWORD")
             return ":" + this.name;
         return this.name;
@@ -476,11 +451,10 @@ export class LispSymbol extends LispType {
     }
 })(LispPackage.get("%"));
 
-export class LispMutex extends LispType {
+export class LispMutex {
     static type = "mutex";
     static is(x) { return x instanceof LispMutex }
     constructor(name) {
-        super();
         this.name = name || null;
         this.waiters = [];
         this.locked = null;
@@ -491,7 +465,7 @@ export class LispMutex extends LispType {
             return process;
         } else {
             this.waiters.push(process);
-            process.m.status = "locked";
+            process.m.status = STATUS_LOCKED;
             return null;
         }
     }
@@ -509,11 +483,32 @@ export class LispMutex extends LispType {
     }
 }
 
+export class LispQueue {
+    constructor() {
+        this.list = new LispCons(null, null);
+        this.tail = this.list;
+    }
+    push(el) {
+        this.tail = this.tail.cdr = new LispCons(el, null);
+    }
+    reenq(cell) {
+        this.tail = this.tail.cdr = cell;
+        cell.cdr = null;
+    }
+    pop() {
+        let cell = this.list.cdr;
+        if (!cell) return null;
+        if (!(this.list.cdr = cell.cdr)) {
+            this.tail = this.list;
+        }
+        return cell;
+    }
+}
+
 // many ideas from http://norstrulde.org/ilge10/ — Kudos Eric Bergstrome!
 
 class Message {
-    constructor(sender, target, signal, args) {
-        this.sender = sender;
+    constructor(target, signal, args) {
         this.target = target;
         this.signal = signal;
         this.args = args;
@@ -521,112 +516,96 @@ class Message {
 }
 
 let PID = 0;
-let QUEUE = [];
+let QUEUE = new LispQueue();
 
 const run = () => {
-    var start_time = Date.now();
-    while (Date.now() - start_time < 100) {
-        if (QUEUE.length == 0) break;
-        var p = QUEUE.shift();
+    let count = 2500, startTime = Date.now();
+    while (true) {
+        if (!--count) {
+            if (Date.now() - startTime > 100) break;
+            count = 2500;
+        }
+        let cell = QUEUE.pop();
+        if (!cell) return;
+        let p = cell.car;
         if (p instanceof LispProcess) {
             p.run(200);
-        }
-        else if (p instanceof Message) {
-            p.target.handle(p);
+            if (p.m.status === STATUS_RUNNING) {
+                // still running, re-enqueue; we avoid consing a new cell.
+                QUEUE.reenq(cell);
+            }
         }
         else throw new Error("Unknown object in scheduler queue");
     }
-    if (QUEUE.length > 0) setTimeout(run, 0);
+    setTimeout(run, 0);
 };
 
 const start = () => {
     setTimeout(run, 0);
 };
 
-export class LispProcess extends LispType {
+export class LispProcess {
     static type = "process";
     static is(x) { return x instanceof LispProcess }
 
     constructor(parent_machine, closure) {
-        super();
-        var pid = this.pid = ++PID;
+        this.pid = ++PID;
         var m = this.m = new LispMachine(parent_machine);
         this.receivers = null;
-        this.mailbox = [];
-        this.timeouts = Object.create(null);
+        this.mailbox = new LispQueue();
         this.noint = null;
         m.process = this;
         m.set_closure(closure);
         this.resume();
     }
 
-    print() {
+    toString() {
         return "<process " + this.pid + ">";
     }
 
-    resume(at_start) {
+    resume() {
         this.receivers = null;
-        this.m.status = "running";
-        if (at_start) QUEUE.unshift(this);
-        else QUEUE.push(this);
+        this.m.status = STATUS_RUNNING;
+        QUEUE.push(this);
         start();
     }
 
     run(quota) {
-        var m = this.m, err;
-        do {
-            if (m.status == "running") err = m.run(quota);
-            else break;
-            if (err) break;
-        } while (this.noint);
+        let err = this.m.run(quota);
         if (err) {
             console.error("Error in PID: ", this.pid);
-            console.log(m.backtrace());
+            console.log(this.m.backtrace());
             console.dir(err);
             console.dir(err.stack);
             console.log(this);
-        } else {
-            switch (m.status) {
-              case "running":
-                QUEUE.push(this);
-                break;
-              case "waiting":
-                this.checkmail();
-                break;
-            }
         }
     }
 
     sendmsg(target, signal, args) {
-        QUEUE.push(new Message(this, target, signal, args));
-        start();
-        return target;
-    }
-
-    sendmsg(target, signal, args) {
-        QUEUE.push(new Message(null, target, signal, args));
-        start();
+        let msg = new Message(target, signal, args);
+        target.handle(msg);
         return target;
     }
 
     receive(receivers) {
-        if (this.m.status != "running")
+        if (this.m.status !== STATUS_RUNNING)
             throw new Error("Process not running");
         this.receivers = receivers;
-        this.m.status = "waiting";
+        this.m.status = STATUS_WAITING;
         return false;
     }
 
     handle(msg) {
         this.mailbox.push(msg);
-        if (this.m.status == "waiting")
+        if (this.m.status === STATUS_WAITING)
             this.checkmail();
     }
 
     checkmail() {
-        if (this.mailbox.length > 0) {
-            var msg = this.mailbox.shift();
-            var f = this.receivers.get(msg.signal);
+        let cell = this.mailbox.pop();
+        if (cell) {
+            let msg = cell.car;
+            let f = this.receivers.get(msg.signal);
             if (f) {
                 this.m._callnext(f, msg.args);
                 this.resume();
@@ -636,25 +615,17 @@ export class LispProcess extends LispType {
         }
     }
 
-    has_timeouts() {
-        for (var i in this.timeouts) if (Object.hasOwn(this.timeouts, i)) return true;
-        return null;
-    }
-
     set_timeout(timeout, closure) {
         closure = closure.copy();
         closure.noval = true;
         var tm = setTimeout(() => {
-            delete this.timeouts[tm];
             this.m._callnext(closure, null);
-            this.resume(true);
+            this.resume();
         }, timeout);
-        this.timeouts[tm] = true;
         return tm;
     }
 
     clear_timeout(tm) {
-        delete this.timeouts[tm];
         clearTimeout(tm);
         return null;
     }

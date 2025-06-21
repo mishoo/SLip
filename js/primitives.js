@@ -1,5 +1,6 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
+import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject } from "./types.js";
+import { LispPrimitiveError } from "./error.js";
 import { LispMachine, OP } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
 
@@ -2058,8 +2059,7 @@ defp("%sendmsg", true, function(m, nargs){
     var signal = as_string(m.pop()), process = m.pop();
     checktype(process, LispProcess);
     checktype(signal, LispString);
-    if (m.process) return m.process.sendmsg(process, signal, args);
-    return LispProcess.sendmsg(process, signal, args);
+    return m.process.sendmsg(process, signal, args);
 });
 
 defp("%receive", true, function(m, nargs){

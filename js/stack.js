@@ -1,4 +1,4 @@
-import { LispPrimitiveError } from "./types.js";
+import { LispPrimitiveError } from "./error.js";
 
 class Values {
     constructor(vals) {
