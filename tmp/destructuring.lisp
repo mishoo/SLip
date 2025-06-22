@@ -1,4 +1,4 @@
-(in-package :turtle)
+(in-package :sl-user)
 
-(destructuring-bind ((foo bar) &key baz) data
-  (test))
+(destructuring-bind (&key ((:a (b c)) '(1 2) a-p)) '(:a (3 4))
+  (values a-p c b))

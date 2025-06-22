@@ -1,5 +1,6 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
+import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject } from "./types.js";
+import { LispPrimitiveError } from "./error.js";
 import { LispMachine, OP } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
 
@@ -122,6 +123,7 @@ function eq(a, b) {
 };
 
 function equal(a, b) {
+    if (eq(a, b)) return true;
     if (LispList.is(a) && LispList.is(b)) {
         while (a !== null && b !== null) {
             if (!equal(a.car, b.car)) return null;
@@ -130,18 +132,48 @@ function equal(a, b) {
             if (!LispCons.is(a) || !LispCons.is(b))
                 return equal(a, b);
         }
-        return a === b;
-    } else if (LispVector.is(a) && LispVector.is(b)) {
+        return true;
+    }
+    if (LispRegexp.is(a) && LispRegexp.is(b)) {
+        return a.toString() === b.toString();
+    }
+    return null;
+}
+
+function equalp(a, b) {
+    if (eq(a, b)) return true;
+    if (LispString.is(a) && LispString.is(b)) {
+        return a.toLowerCase() === b.toLowerCase();
+    }
+    if (LispList.is(a) && LispList.is(b)) {
+        while (a !== null && b !== null) {
+            if (!equalp(a.car, b.car)) return null;
+            a = a.cdr;
+            b = b.cdr;
+            if (!LispCons.is(a) || !LispCons.is(b))
+                return equalp(a, b);
+        }
+        return true;
+    }
+    if (LispVector.is(a) && LispVector.is(b)) {
         var i = a.length;
         if (i !== b.length) return null;
         while (--i >= 0) {
-            if (!equal(a[i], b[i])) return null;
+            if (!equalp(a[i], b[i])) return null;
         }
         return true;
-    } else if (LispRegexp.is(a) && LispRegexp.is(b)) {
-        return a.toString() == b.toString();
-    } else return eq(a, b);
-};
+    } else if (LispHash.is(a) && LispHash.is(b)) {
+        for (let [ key, val ] of a) {
+            if (!equalp(val, b.get(key)))
+                return null;
+        }
+        return true;
+    }
+    if (LispRegexp.is(a) && LispRegexp.is(b)) {
+        return a.toString() === b.toString();
+    }
+    return null;
+}
 
 defp("eq", false, function(m, nargs){
     checknargs(nargs, 2, 2);
@@ -164,10 +196,7 @@ defp("equal", false, function(m, nargs){
 defp("equalp", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var a = m.pop(), b = m.pop();
-    if (typeof a == "string" && typeof b == "string") {
-        return a.toLowerCase() == b.toLowerCase();
-    }
-    return equal(a, b);
+    return equalp(a, b);
 });
 
 function all_different(a) {
@@ -499,6 +528,7 @@ defp("%putf", true, function(m, nargs){
         if (nargs == 1) {
             name = m.pop();
             checktype(name, LispString);
+            if (name === "_reset") N = -1;
         }
         return new LispSymbol(name + (++N));
     });
@@ -573,6 +603,15 @@ defp("last", false, function(m, nargs) {
 defp("copy-list", false, function(m, nargs){
     checknargs(nargs, 1);
     return LispCons.copy(checktype(m.pop(), LispList));
+});
+
+defp("copy-seq", false, function (m, nargs) {
+    checknargs(nargs, 1);
+    let seq = m.pop();
+    if (seq === null) return null;
+    if (LispVector.is(seq)) return seq.slice();
+    if (LispString.is(seq)) return seq;
+    return LispCons.copy(checktype(seq, LispCons));
 });
 
 defp("append", false, function(m, nargs) {
@@ -834,9 +873,14 @@ defp("letterp", false, function(m, nargs){
     defcmp(">=" , (a, b) => a >= b);
     defcmp("<"  , (a, b) => a < b);
     defcmp(">"  , (a, b) => a > b);
-    defcmp("-equal", (a, b) => a.toLowerCase() == b.toLowerCase());
+    defcmp("-equal", (a, b) => a.toLowerCase() === b.toLowerCase());
+    defcmp("-not-equal", (a, b) => a.toLowerCase() !== b.toLowerCase());
+    defcmp("-lessp", (a, b) => a.toLowerCase() < b.toLowerCase());
+    defcmp("-not-lessp", (a, b) => a.toLowerCase() >= b.toLowerCase());
+    defcmp("-greaterp", (a, b) => a.toLowerCase() > b.toLowerCase());
+    defcmp("-not-greaterp", (a, b) => a.toLowerCase() <= b.toLowerCase());
 })((name, cmp) => {
-    if (name != "-equal" && name != "/=") {
+    if (name.charAt(0) != "-" && name != "/=") {
         // numeric ops; numeric /= is defined elsewhere
         defp(name, false, function(m, nargs){
             checknargs(nargs, 1);
@@ -1634,6 +1678,9 @@ defp("%special!", true, function(m, nargs){
         checktype(name, LispSymbol);
         name.setv("special", true);
         name.setv("global", true);
+        if (name.value === false) {
+            name.value = null;
+        }
     }
     return null;
 });
@@ -1644,6 +1691,9 @@ defp("%global!", true, function(m, nargs){
         var name = m.pop();
         checktype(name, LispSymbol);
         name.setv("global", true);
+        if (name.value === false) {
+            name.value = null;
+        }
     }
     return null;
 });
@@ -2009,8 +2059,7 @@ defp("%sendmsg", true, function(m, nargs){
     var signal = as_string(m.pop()), process = m.pop();
     checktype(process, LispProcess);
     checktype(signal, LispString);
-    if (m.process) return m.process.sendmsg(process, signal, args);
-    return LispProcess.sendmsg(process, signal, args);
+    return m.process.sendmsg(process, signal, args);
 });
 
 defp("%receive", true, function(m, nargs){
@@ -2160,11 +2209,6 @@ defp("%find-in-env", false, function(m, nargs){
 defp("%debugger", true, function(m, nargs){
     checknargs(nargs, 0, 0);
     debugger;
-});
-
-defp("%step-debug-mode", true, function(m, nargs){
-    checknargs(nargs, 0, 0);
-    m.debug = true;
 });
 
 defp("%grok-xref-info", true, function(m, nargs){

@@ -1,4 +1,4 @@
-import { LispType, LispPrimitiveError } from "./types.js";
+import { LispPrimitiveError } from "./error.js";
 
 function listp(thing) {
     return thing === null || thing instanceof LispCons;
@@ -22,13 +22,12 @@ const DOT = {
     toString() { return "DOT" }
 };
 
-export class LispCons extends LispType {
+export class LispCons {
     static type = "cons";
     static is(x) { return x instanceof LispCons }
     static DOT = DOT;
     static isList = listp;
     constructor(a, b) {
-        super();
         this.car = a;
         this.cdr = b;
     }
@@ -199,7 +198,7 @@ export class LispCons extends LispType {
     }
     static find(list, item, cmp) {
         while (list !== null && !cmp(list.car, item))
-            list = list.cdr;
+            list = cdr(list);
         return list;
     }
 

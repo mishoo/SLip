@@ -1,5 +1,6 @@
 import { LispCons } from "./list.js";
-import { LispType, LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispPrimitiveError, LispObject } from "./types.js";
+import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject } from "./types.js";
+import { LispPrimitiveError } from "./error.js";
 import { repeat_string, pad_string } from "./utils.js";
 import { LispStack } from "./stack.js";
 
@@ -9,6 +10,12 @@ let S_QUOTE = LispSymbol.get("QUOTE");
 let S_NIL = LispSymbol.get("NIL");
 let S_T = LispSymbol.get("T");
 let S_ALLOW_OTHER_KEYS = KEYWORD_PACK.intern("ALLOW-OTHER-KEYS");
+
+export const STATUS_FINISHED = 0;
+export const STATUS_RUNNING = 1;
+export const STATUS_WAITING = 2;
+export const STATUS_LOCKED = 3;
+export const STATUS_HALTED = 4;
 
 export const OP = {
     NOP: 0,
@@ -94,6 +101,18 @@ export const OP = {
     VALUES: 80,
     MVB: 81,
     POPBACK: 82,
+    ADD: 83,
+    SUB: 84,
+    INC: 85,
+    DEC: 86,
+    LT: 87,
+    LTE: 88,
+    GT: 89,
+    GTE: 90,
+    NUMEQ: 91,
+    NUMNEQ: 92,
+    PLUSP: 93,
+    MINUSP: 94,
 };
 
 const OP_LEN = [
@@ -180,6 +199,18 @@ const OP_LEN = [
     1 /* VALUES */,
     1 /* MVB */,
     1 /* POPBACK */,
+    0 /* ADD */,
+    0 /* SUB */,
+    0 /* INC */,
+    0 /* DEC */,
+    0 /* LT */,
+    0 /* LTE */,
+    0 /* GT */,
+    0 /* GTE */,
+    0 /* NUMEQ */,
+    0 /* NUMNEQ */,
+    0 /* PLUSP */,
+    0 /* MINUSP */,
 ];
 
 export function want_bound(name, val) {
@@ -244,20 +275,20 @@ class LispLongRet {
     run(m, addr, val = LispLongRet.#NO_RET) {
         // figure out if we need to execute cleanup hooks
         let doit;
-        (doit = () => {
+        (doit = (m) => {
             var p = m.denv;
             while (p && p !== this.denv) {
                 var c = p.car;
                 if (c instanceof LispCleanup) {
-                    m.after_cleanup = doit;
                     c.run(m);
+                    m.push(doit);
                     return;
                 }
                 p = p.cdr;
             }
             this.unwind(m, addr);
             if (val !== LispLongRet.#NO_RET) m.push(val);
-        })();
+        })(m);
     }
 }
 
@@ -731,8 +762,7 @@ function dump(thing) {
         return ret + ")";
     }
     if (Array.isArray(thing)) return `#(${thing.map(dump).join(" ")})`;
-    if (thing instanceof LispType) return thing.print();
-    return thing + "";
+    return String(thing);
 }
 
 const OP_REV = Object.keys(OP);
@@ -883,11 +913,10 @@ export class LispMachine {
         this.env = null;
         this.denv = pm ? pm.denv : null;
         this.n_args = null;
-        this.status = null;
+        this.status = STATUS_FINISHED;
         this.error = null;
         this.process = null;
         this.f = null;
-        this.after_cleanup = null;
         //this.trace = [];
     }
 
@@ -1040,11 +1069,11 @@ export class LispMachine {
         try {
             while (quota-- > 0) {
                 if (this.pc === null) {
-                    this.status = "finished";
+                    this.status = STATUS_FINISHED;
                     break;
                 }
                 vmrun(this);
-                if (this.status != "running")
+                if (this.status !== STATUS_RUNNING)
                     break;
             }
         } catch(ex) {
@@ -1057,7 +1086,7 @@ export class LispMachine {
                 }
             }
             // we fucked up.
-            this.status = "halted";
+            this.status = STATUS_HALTED;
             err = this.error = ex;
         }
         return err;
@@ -1088,14 +1117,14 @@ export class LispMachine {
 }
 
 function frame(env, i) {
-    while (i-- > 0) env = env.cdr;
+    while (i > 0) env = env.cdr, i--;
     return env.car;
-};
+}
 
 function rewind(env, i) {
-    while (i-- > 0) env = env.cdr;
+    while (i > 0) env = env.cdr, i--;
     return env;
-};
+}
 
 function eq(a, b) {
     if (a === null) return b === null || b === S_NIL ? true : null;
@@ -1103,7 +1132,7 @@ function eq(a, b) {
     if (a === true) return b === true || b === S_T ? true : null;
     if (b === true) return a === true || a === S_T ? true : null;
     return a === b ? true : null;
-};
+}
 
 let CC_CODE = assemble([
     ["ARGS", 1],
@@ -1125,7 +1154,7 @@ function find_key_arg(item, array, start, end = array.length) {
 }
 
 let OP_RUN = [
-    null,
+    /*NOP*/ () => {},
     /*OP.LVAR*/ (m) => {
         let i = m.code[m.pc++];
         let j = m.code[m.pc++];
@@ -1245,10 +1274,10 @@ let OP_RUN = [
         // no need to run it, we're already in
         // the right place.  just discard.
         m.denv = m.denv.cdr;
-        m.after_cleanup = null;
+        m.push(() => {});
     },
     /*OP.UPCLOSE*/ (m) => {
-        if (m.after_cleanup) m.after_cleanup(m);
+        m.pop()(m);
     },
     /*OP.CATCH*/ (m) => {
         let addr = m.code[m.pc++];
@@ -1589,16 +1618,44 @@ let OP_RUN = [
             m.stack.replace(-n-1, m.stack.pop_ret());
         }
     },
+    /*OP.ADD*/ (m) => {
+        m.push(m.pop_number() + m.pop_number());
+    },
+    /*OP.SUB*/ (m) => {
+        m.push(-m.pop_number() + m.pop_number());
+    },
+    /*OP.INC*/ (m) => {
+        m.push(m.pop_number() + 1);
+    },
+    /*OP.DEC*/ (m) => {
+        m.push(m.pop_number() - 1);
+    },
+    /*OP.LT*/ (m) => {
+        m.push(m.pop_number() > m.pop_number() ? true : null);
+    },
+    /*OP.LTE*/ (m) => {
+        m.push(m.pop_number() >= m.pop_number() ? true : null);
+    },
+    /*OP.GT*/ (m) => {
+        m.push(m.pop_number() < m.pop_number() ? true : null);
+    },
+    /*OP.GTE*/ (m) => {
+        m.push(m.pop_number() <= m.pop_number() ? true : null);
+    },
+    /*OP.NUMEQ*/ (m) => {
+        m.push(m.pop_number() === m.pop_number() ? true : null);
+    },
+    /*OP.NUMNEQ*/ (m) => {
+        m.push(m.pop_number() !== m.pop_number() ? true : null);
+    },
+    /*OP.PLUSP*/ (m) => {
+        m.push(m.pop_number() > 0 ? true : null);
+    },
+    /*OP.MINUSP*/ (m) => {
+        m.push(m.pop_number() < 0 ? true : null);
+    },
 ];
 
 function vmrun(m) {
-    if (m.debug) {
-        console.log(
-            OP_REV[m.code[m.pc]],
-            ...m.code.slice(m.pc+1, m.pc+1+OP_LEN[m.code[m.pc]]),
-            m.stack.copy().reverse()
-        );
-        debugger;
-    }
     OP_RUN[m.code[m.pc++]](m);
 }

@@ -1,4 +1,4 @@
-import { LispPrimitiveError } from "./types.js";
+import { LispPrimitiveError } from "./error.js";
 
 class Values {
     constructor(vals) {
@@ -35,7 +35,7 @@ export class LispStack {
     }
     top() {
         if (this.sp > 0) {
-            return value(this.data[this.sp - 1]);
+            return this.data[this.sp - 1] = value(this.data[this.sp - 1]);
         } else {
             throw new LispPrimitiveError("top() with an empty stack");
         }
@@ -46,7 +46,7 @@ export class LispStack {
     }
     replace(index, newval) {
         if (index < 0) index += this.sp;
-        let val = this.data[index];
+        let val = value(this.data[index]);
         this.data[index] = newval;
         return val;
     }

@@ -1,0 +1,2 @@
+# ignore FASL-s
+*.fasl -diff

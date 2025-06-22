@@ -51,6 +51,15 @@
   (load "test/handler-case.lisp")
   (load "test/ignore-errors.lisp")
   (load "test/error.lisp")
+  (load "test/places.lisp")
+
+  (load "test/cons/append.lisp")
+  (load "test/cons/member.lisp")
+  (load "test/cons/adjoin.lisp")
+  (load "test/cons/getf.lisp")
+  (load "test/cons/pop.lisp")
+  (load "test/cons/push.lisp")
+  (load "test/cons/pushnew.lisp")
 
   (format t "Network time: ~Ams~%Compile time: ~Ams~%"
           (car timing)

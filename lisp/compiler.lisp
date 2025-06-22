@@ -30,46 +30,19 @@
            '*whole-form*
            '*load-timing*)
 
-(setq *read-table* nil)
-(setq *url-prefix* nil)
-(setq *unknown-functions* nil)
-(setq *unknown-variables* nil)
-(setq *compiler-env* nil)
-(setq *compiler-macros* nil)
-(setq *whole-form* nil)
-(setq *load-timing* nil)
-
 (setq *standard-output* (%make-output-stream))
 (setq *error-output* (%make-output-stream))
 (setq *trace-output* (%make-output-stream))
 
-;; (defmacro cond (clauses)
-;;   (when clauses
-;;     (let ((first (car clauses)))
-;;       (if (cdr first)
-;;           `(if ,(car first)
-;;                (progn ,@(cdr first))
-;;                (cond ,@(cdr clauses)))
-;;           `(or ,(car first)
-;;                (cond ,@(cdr clauses)))))))
-;;
-;; Since we don't yet have quasiquote, I've macro-expanded it below. It's
-;; horrible to write it manually.
-(%macro! 'cond
-         (%fn cond clauses
-              (if clauses
-                  (let ((first (car clauses)))
-                    (if (cdr first)
-                        (list 'if
-                              (car first)
-                              (cons 'progn
-                                    (cdr first))
-                              (cons 'cond
-                                    (cdr clauses)))
-                        (list 'or
-                              (car first)
-                              (cons 'cond
-                                    (cdr clauses))))))))
+(defmacro cond clauses
+  (when clauses
+    (let ((first (car clauses)))
+      (if (cdr first)
+          `(if ,(car first)
+               (progn ,@(cdr first))
+               (cond ,@(cdr clauses)))
+          `(or ,(car first)
+               (cond ,@(cdr clauses)))))))
 
 ;; props to http://norstrulde.org/ilge10/ - pasting here the original version,
 ;; because it's small and beautiful and it's the heart of quasiquotation:
@@ -133,9 +106,11 @@
              (list 'cons first second)))))
       (qq (x)
         (cond
-          ((numberp x) x)
-          ((stringp x) x)
-          ((regexpp x) x)
+          ((or (numberp x)
+               (stringp x)
+               (regexpp x)
+               (vectorp x))
+           x)
           ((not (consp x))
            (if x (list 'quote x)))
           ((eq 'qq-unquote (car x))
@@ -150,22 +125,10 @@
            (opt-cons x)))))
    #'qq))
 
-(set-symbol-function!
- 'maybe-xref-info
- (%fn maybe-xref-info (name type)
-      (if (boundp '*xref-info*)
-          (vector-push *xref-info*
-                       #(name type *current-pos*)))))
-
-;; better to avoid quasiquote here:
-(%macro! 'defmacro
-         (%fn defmacro (name args . body)
-              (if (%primitivep name)
-                  (error (strcat "Cannot DEFMACRO on primitive " name)))
-              (maybe-xref-info name 'defmacro)
-              (list '%macro!
-                    (list 'quote name)
-                    (list* '%fn name args body))))
+(defun maybe-xref-info (name type)
+  (when *xref-info*
+    (vector-push *xref-info*
+                 (vector name type *current-pos*))))
 
 (defmacro quasiquote (thing)
   (qq thing))
@@ -245,10 +208,10 @@
      (funcall func (%pop lst))
      (go next))))
 
-(defmacro %incf (var)
+(defmacro incf (var)
   `(setq ,var (1+ ,var)))
 
-(defmacro %decf (var)
+(defmacro decf (var)
   `(setq ,var (1- ,var)))
 
 (defun foreach-index (lst func)
@@ -256,7 +219,7 @@
     (tagbody
      next
      (when lst
-       (funcall func (%pop lst) (%incf index))
+       (funcall func (%pop lst) (incf index))
        (go next)))))
 
 (defun identity (x) x)
@@ -270,13 +233,13 @@
        (rec (cdr lst) (cons (car lst) ret)))
       ((rec (cdr lst) ret)))))
 
-(defun index-of (el lst)
-  (let rec ((lst lst)
-            (index 0))
-    (when lst
-      (if (eq el (car lst))
-          index
-          (rec (cdr lst) (1+ index))))))
+;; (defun index-of (el lst)
+;;   (let rec ((lst lst)
+;;             (index 0))
+;;     (when lst
+;;       (if (eq el (car lst))
+;;           index
+;;           (rec (cdr lst) (1+ index))))))
 
 (defmacro prog2 (exp1 exp2 . body)
   `(progn
@@ -302,13 +265,6 @@
     (exps (car exps))
     (t t)))
 
-(defmacro member (item lst)
-  `(%memq ,item ,lst))
-
-;; will be redefined later to also check compiler env for symbol-macrolet
-(defun safe-atom-p (thing)
-  (symbolp thing))
-
 (defmacro case (expr . cases)
   (let* ((safe (safe-atom-p expr))
          (vexpr (if safe
@@ -320,14 +276,14 @@
                     nil)
                    ((consp (caar cases))
                     (if (cdaar cases)
-                        `(if (member ,vexpr ',(caar cases))
+                        `(if (%memq ,vexpr ',(caar cases))
                              (progn ,@(cdar cases))
                              ,(recur (cdr cases)))
                         `(if (eq ,vexpr ',(caaar cases))
                              (progn ,@(cdar cases))
                              ,(recur (cdr cases)))))
                    ((and (not (cdr cases))
-                         (member (caar cases) '(otherwise t)))
+                         (%memq (caar cases) '(otherwise t)))
                     `(progn ,@(cdar cases)))
                    ((not (caar cases))
                     (recur (cdr cases)))
@@ -375,13 +331,13 @@
 
          (skip-ws ()
            (read-while (lambda (ch)
-                         (member ch '(#\Space
-                                      #\Newline
-                                      #\Tab
-                                      #\Page
-                                      #\Line_Separator
-                                      #\Paragraph_Separator
-                                      #\NO-BREAK_SPACE)))))
+                         (%memq ch '(#\Space
+                                     #\Newline
+                                     #\Tab
+                                     #\Page
+                                     #\Line_Separator
+                                     #\Paragraph_Separator
+                                     #\NO-BREAK_SPACE)))))
 
          (skip (expected)
            (unless (eq (next) expected)
@@ -412,7 +368,7 @@
          (read-regexp ()
            (let ((str (read-escaped #\/ #\/ t))
                  (mods (downcase (read-while (lambda (ch)
-                                               (member ch '(#\g #\m #\i #\y)))))))
+                                               (%memq ch '(#\g #\m #\i #\y)))))))
              (make-regexp str mods)))
 
          (skip-comment ()
@@ -424,10 +380,10 @@
                          (or
                           (letterp ch)
                           (char<= #\0 ch #\9)
-                          (member ch
-                                  '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
-                                    #\@ #\! #\? #\& #\= #\< #\>
-                                    #\[ #\] #\{ #\} #\/ #\^ #\#)))))))
+                          (%memq ch
+                                 '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
+                                   #\@ #\! #\? #\& #\= #\< #\>
+                                   #\[ #\] #\{ #\} #\/ #\^ #\#)))))))
              (upcase str)))
 
          (read-symbol ()
@@ -474,7 +430,7 @@
            (case (peek)
              (#\\ (next) (read-char))
              (#\/ (read-regexp))
-             (#\( (list* 'vector (read-list)))
+             (#\( (apply #'vector (read-list)))
              (#\' (next) (list 'function (read-token)))
              (#\: (next) (make-symbol (read-symbol-name)))
              (#\. (next) (eval (read-token)))
@@ -486,11 +442,11 @@
          (read-quasiquote ()
            (skip #\`)
            (skip-ws)
-           (if (member (peek) '(#\( #\`))
+           (if (%memq (peek) '(#\( #\`))
                (prog2
-                   (%incf in-qq)
+                   (incf in-qq)
                    (list 'quasiquote (read-token))
-                 (%decf in-qq))
+                 (decf in-qq))
                `(quote ,(read-token))))
 
          (read-comma ()
@@ -498,12 +454,12 @@
            (skip #\,)
            (skip-ws)
            (prog2
-               (%decf in-qq)
+               (decf in-qq)
                (if (eq (peek) #\@)
                    (progn (next)
                           (list 'qq-splice (read-token)))
                    (list 'qq-unquote (read-token)))
-             (%incf in-qq)))
+             (incf in-qq)))
 
          (read-list ()
            (let ((ret nil)
@@ -560,7 +516,7 @@
 
 (defmacro with-seq-output (out . body)
   (let ((seq (gensym)))
-    `(let ((,seq #()))
+    `(let ((,seq (vector)))
        (flet ((,out args
                 (%seq-cat ,seq args)))
          ,@body)
@@ -576,10 +532,10 @@
   `(return-from nil ,val))
 
 (defun lambda-keyword-p (sym)
-  (member sym '(&optional &rest &body &key &aux &allow-other-keys)))
+  (%memq sym '(&optional &rest &body &key &aux &allow-other-keys)))
 
 (defun macro-keyword-p (sym)
-  (member sym '(&whole &environment)))
+  (%memq sym '(&whole &environment)))
 
 (defun ordinary-lambda-list-p (args)
   (let dig ((args args)
@@ -591,7 +547,7 @@
       ((consp (car args))
        (when (and seen (symbolp (caar args)))
          (dig (cdr args) t)))
-      ((member (car args) '(&rest &body))
+      ((%memq (car args) '(&rest &body))
        (when (symbolp (cadr args))
          (dig (cddr args) seen)))
       ((lambda-keyword-p (car args))
@@ -621,7 +577,7 @@
          (add (name)
            (unless (symp name)
              (error (strcat "Invalid name in lambda list " name)))
-           (when (member name all)
+           (when (%memq name all)
              (error (strcat "Duplicate name in lambda list " name)))
            (push name all)
            name)
@@ -740,7 +696,7 @@
 ;;                          (eq type (cadr x)))
 ;;                     (return-from position
 ;;                       (list* i j (cddr x)))))
-;;               (%decf j)
+;;               (decf j)
 ;;               (go next)))
 ;;            (frame (env i)
 ;;              (when env
@@ -803,7 +759,7 @@
                       ((symbolp thisarg)
                        (case thisarg
                          (&whole
-                          (when (> i 0) (error "Misplaced &WHOLE"))
+                          (when (plusp i) (error "Misplaced &WHOLE"))
                           (let ((thisarg (cadr args)))
                             (unless thisarg
                               (error "Missing variable name for &WHOLE"))
@@ -837,7 +793,7 @@
                           (rec nil nil nil t (cdr args) values i))
 
                          (t
-                          (when (member thisarg names)
+                          (when (%memq thisarg names)
                             (error (strcat "Argument seen twice: " thisarg)))
                           (push thisarg names)
                           (cond
@@ -846,12 +802,13 @@
                             (aux?
                              (add thisarg nil))
                             (key?
-                             (add thisarg `(getf ,values ,(intern (symbol-name thisarg) (find-package "KEYWORD")))))
+                             (add thisarg `(getf ,values ,(intern (symbol-name thisarg)
+                                                                  (find-package "KEYWORD")))))
                             (t
                              (add thisarg `(if ,values
                                                (%pop ,values)
                                                (%dbind-error-missing-arg ',thisarg)))))
-                          (rec optional? rest? key? aux? (cdr args) values (+ i 1)))))
+                          (rec optional? rest? key? aux? (cdr args) values (1+ i)))))
 
                       ((consp thisarg)
                        (cond
@@ -868,17 +825,24 @@
                                 (thisarg-p (caddr thisarg)))
                             (when thisarg-p
                               (add thisarg-p nil))
-                            (add thisarg
-                                 (let ((val (gensym)))
-                                   `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
-                                                                       (find-package "KEYWORD"))
-                                                      '%not-found)))
-                                      (if (eq ,val '%not-found)
-                                          ,default
-                                          (progn
-                                            ,@(when thisarg-p
-                                                `((setq ,thisarg-p t)))
-                                            ,val)))))))
+                            (let* ((val (gensym))
+                                   (setdef `(if (eq ,val '%not-found)
+                                                ,default
+                                                (progn
+                                                  ,@(when thisarg-p
+                                                      `((setq ,thisarg-p t)))
+                                                  ,val))))
+                              (cond
+                                ((consp thisarg)
+                                 (add (cadr thisarg)
+                                      `(let ((,val (getf ,values ,(car thisarg)
+                                                         '%not-found)))
+                                         ,setdef)))
+                                ((add thisarg
+                                      `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
+                                                                          (find-package "KEYWORD"))
+                                                         '%not-found)))
+                                         ,setdef)))))))
                          (aux? (let ((thisarg (car thisarg))
                                      (value (cadr thisarg)))
                                  (add thisarg value)))
@@ -887,7 +851,7 @@
                           (let ((sublist (gensym)))
                             (add sublist `(if ,values (%pop ,values) (error "Missing sublist")))
                             (rec nil nil nil nil thisarg sublist 0))))
-                       (rec optional? rest? key? aux? (cdr args) values (+ i 1))))))
+                       (rec optional? rest? key? aux? (cdr args) values (1+ i))))))
                  (t (error "Invalid lambda-list"))))))
         (rec nil nil nil nil args topv 0))
       `(let* ((,topv ,values) ,@(nreverse decls))
@@ -905,6 +869,130 @@
       (let ((args (gensym "ARGS")))
         `(%macro! ',name (%::%fn ,name ,args
                                  ,(%fn-destruct t lambda-list args body))))))
+
+;; let's define early some compiler macros, so that the compiler itself can
+;; benefit from them.
+
+(defmacro define-compiler-macro (name args &body body)
+  (multiple-value-bind (setter name) (%:maybe-setter name)
+    (%:maybe-xref-info name (if setter
+                                'compiler-macro-setf
+                                'compiler-macro))
+    (let ((form (if (eq '&whole (car args))
+                    (prog1
+                        (cadr args)
+                      (setq args (cddr args)))
+                    (gensym "form"))))
+      `(setq *compiler-macros*
+             (%putf *compiler-macros*
+                    ',(or setter name)
+                    (%fn ,name (,form)
+                         (destructuring-bind ,args (if (eq 'funcall (car ,form))
+                                                       (cddr ,form)
+                                                       (cdr ,form))
+                           ,@body)))))))
+
+(labels
+    ((reduce-form (form)
+       (aif (and (consp form)
+                 (compiler-macro-function (car form)))
+            (funcall it form)
+            form))
+
+     (reduce-sum (nums)
+       (cond
+         ((not nums) 0)
+         ((not (cdr nums)) (car nums))
+         ((when (and (numberp (car nums))
+                     (not (numberp (cadr nums))))
+            (setq nums (list (cadr nums) (car nums)))
+            nil))
+         ((numberp (cadr nums))
+          (cond
+            ((numberp (car nums))
+             (+ (car nums) (cadr nums)))
+            ((= 1 (cadr nums))
+             `(%:%op INC ,(car nums)))
+            ((= -1 (cadr nums))
+             `(%:%op DEC ,(car nums)))
+            ((minusp (cadr nums))
+             `(%:%op SUB ,(car nums) ,(- (cadr nums))))))
+         (t
+          `(%:%op ADD ,(car nums) ,(cadr nums)))))
+
+     (reduce-sub (nums)
+       (cond
+         ((not (cdr nums))
+          (when (numberp (car nums))
+            (- (car nums))))
+         ((numberp (cadr nums))
+          (cond
+            ((numberp (car nums))
+             (- (car nums) (cadr nums)))
+            ((= 1 (cadr nums))
+             `(%:%op DEC ,(car nums)))
+            (t
+             `(%:%op SUB ,(car nums) ,(cadr nums)))))
+         (t
+          `(%:%op SUB ,(car nums) ,(cadr nums))))))
+
+  (define-compiler-macro + (&whole form &rest nums)
+    (or (and (null (cddr nums))
+             (reduce-sum (map1 #'reduce-form nums)))
+        form))
+
+  (define-compiler-macro - (&whole form &rest nums)
+    (or (and (null (cddr nums))
+             (reduce-sub (map1 #'reduce-form nums)))
+        form))
+
+  (define-compiler-macro 1+ (value)
+    `(%op INC ,(reduce-form value)))
+
+  (define-compiler-macro 1- (value)
+    `(%op DEC ,(reduce-form value)))
+
+  (define-compiler-macro < (&whole form &rest nums)
+    (cond
+      ((cddr nums) form)
+      ((eq 0 (reduce-form (car nums)))
+       `(%op PLUSP ,(reduce-form (cadr nums))))
+      ((eq 0 (reduce-form (cadr nums)))
+       `(%op MINUSP ,(reduce-form (car nums))))
+      (t
+       `(%op LT ,(reduce-form (car nums)) ,(reduce-form (cadr nums))))))
+
+  (define-compiler-macro <= (&whole form &rest nums)
+    (if (cddr nums) form
+        `(%op LTE ,(reduce-form (car nums)) ,(reduce-form (cadr nums)))))
+
+  (define-compiler-macro > (&whole form &rest nums)
+    (cond
+      ((cddr nums) form)
+      ((eq 0 (reduce-form (car nums)))
+       `(%op MINUSP ,(reduce-form (cadr nums))))
+      ((eq 0 (reduce-form (cadr nums)))
+       `(%op PLUSP ,(reduce-form (car nums))))
+      (t
+       `(%op GT ,(reduce-form (car nums)) ,(reduce-form (cadr nums))))))
+
+  (define-compiler-macro >= (&whole form &rest nums)
+    (if (cddr nums) form
+        `(%op GTE ,(reduce-form (car nums)) ,(reduce-form (cadr nums)))))
+
+  (define-compiler-macro = (&whole form &rest nums)
+    (if (cddr nums) form
+        `(%op NUMEQ ,(reduce-form (car nums)) ,(reduce-form (cadr nums)))))
+
+  (define-compiler-macro /= (&whole form &rest nums)
+    (if (cddr nums) form
+        `(%op NUMNEQ ,(reduce-form (car nums)) ,(reduce-form (cadr nums)))))
+
+  (define-compiler-macro plusp (val)
+    `(%op PLUSP ,val))
+
+  (define-compiler-macro minusp (val)
+    `(%op MINUSP ,val)))
 
 (defun make-compiler-env ()
   ;; :lex should match the runtime lexical environment; both
@@ -972,15 +1060,18 @@
           (case (caar decl)
             (special (setq specials (append specials (cdar decl)))))
           (rec (cdr decl))))
-      `(:special ,specials))))
+      `(:special ,(filter specials (lambda (sym)
+                                     (not (%specialp sym))))))))
 
 (defmacro with-declarations (exps &body body)
   `(multiple-value-bind (,exps declarations) (dig-declarations ,exps)
      (setq declarations (zip-declarations declarations))
-     (let ((locally-special (filter (getf declarations :special)
-                                    (lambda (sym)
-                                      (not (%specialp sym))))))
-       (labels ((declare-locally-special (&key except)
+     (let ((locally-special (getf declarations :special)))
+       (labels ((maybe-special (name)
+                  (if (%memq name locally-special)
+                      (list name :var :special t)
+                      (list name :var)))
+                (declare-locally-special (&key except)
                   (when locally-special
                     (setq env (extenv env :lex
                                       (cons '%skip-count
@@ -990,7 +1081,7 @@
                                              (if except
                                                  (filter locally-special
                                                          (lambda (name)
-                                                           (not (member name except))))
+                                                           (not (%memq name except))))
                                                  locally-special))))))))
          ,@body))))
 
@@ -1011,7 +1102,7 @@
        (extend-compiler-env rest env))
 
      (gen cmd
-       #( (as-vector cmd) ))
+       (vector (as-vector cmd)))
 
      (find-in-env (name type env)
        (find-in-compiler-env name type env))
@@ -1066,13 +1157,15 @@
             (%macro sym)))
 
      (unknown-function (sym)
-       (unless (member sym *unknown-functions*)
-         (push sym *unknown-functions*)))
+       (unless (symbol-function sym)
+         (unless (%memq sym *unknown-functions*)
+           (push sym *unknown-functions*)))
+       sym)
 
      (unknown-variable (sym env)
        (unless (or (%globalp sym)
                    (find-special sym env))
-         (unless (member sym *unknown-variables*)
+         (unless (%memq sym *unknown-variables*)
            (push sym *unknown-variables*)))
        sym)
 
@@ -1084,113 +1177,159 @@
 
      (comp (x env val? more?)
        (cond
-         ((symbolp x) (cond
-                        ((eq x nil) (comp-const nil val? more?))
-                        ((eq x t) (comp-const t val? more?))
-                        ((keywordp x) (comp-const x val? more?))
-                        (t (comp-var x env val? more?))))
-         ((atom x) (comp-const x val? more?))
-         (t (case (car x)
-              (quote
-               (arg-count x 1 1)
-               (comp-const (cadr x) val? more?))
-              (progn (comp-seq (cdr x) env val? more?))
-              (locally (comp-decl-seq (cdr x) env val? more?))
-              ((prog1)
-               (arg-count x 1)
-               (comp-prog1 (cadr x) (cddr x) env val? more?))
-              ((progv)
-               (arg-count x 2)
-               (comp-progv (cadr x) (caddr x) (cdddr x) env val? more?))
-              ((multiple-value-prog1)
-               (arg-count x 1)
-               (comp-multiple-value-prog1 (cadr x) (cddr x) env val? more?))
-              (%pop
-               (arg-count x 1 1)
-               (comp-pop (cadr x) env val? more?))
-              (setq
-               (arg-count x 2 2)
-               (assert (symbolp (cadr x)) "Only symbols can be SETQ")
-               (let* ((name (cadr x))
-                      (value (caddr x))
-                      (local (when (not (%globalp name))
-                               (find-var name env))))
+         ((symbolp x)
+          (cond
+            ((eq x nil) (comp-const nil val? more?))
+            ((eq x t) (comp-const t val? more?))
+            ((keywordp x) (comp-const x val? more?))
+            (t (comp-var x env val? more?))))
+         ((atom x)
+          (comp-const x val? more?))
+         ((case (car x)
+            ((quote)
+             (arg-count x 1 1)
+             (comp-const (cadr x) val? more?))
+            ((progn)
+             (comp-seq (cdr x) env val? more?))
+            ((locally)
+             (comp-decl-seq (cdr x) env val? more?))
+            ((prog1)
+             (arg-count x 1)
+             (comp-prog1 (cadr x) (cddr x) env val? more?))
+            ((progv)
+             (arg-count x 2)
+             (comp-progv (cadr x) (caddr x) (cdddr x) env val? more?))
+            ((multiple-value-prog1)
+             (arg-count x 1)
+             (comp-multiple-value-prog1 (cadr x) (cddr x) env val? more?))
+            ((%pop)
+             (arg-count x 1 1)
+             (comp-pop (cadr x) env val? more?))
+            ((setq)
+             (comp-setq (cdr x) env val? more?))
+            ((if)
+             (arg-count x 2 3)
+             (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
+            ((or)
+             (comp-or (cdr x) env val? more?))
+            ((not null)
+             (arg-count x 1 1)
+             (if val?
+                 (%seq (comp (cadr x) env t t)
+                       (gen "NOT")
+                       (if more? nil (gen "RET")))
+                 (comp (cadr x) env nil more?)))
+            ((c/c)
+             (arg-count x 0 0)
+             (if val? (gen "CC")))
+            ((let)
+             (comp-let (cadr x) (cddr x) env val? more?))
+            ((let*)
+             (comp-let* (cadr x) (cddr x) env val? more?))
+            ((multiple-value-bind)
+             (comp-mvb (cadr x) (caddr x) (cdddr x) env val? more?))
+            ((values)
+             (comp-values (cdr x) env val? more?))
+            ((labels)
+             (comp-flets (cadr x) (cddr x) env t val? more?))
+            ((flet)
+             (comp-flets (cadr x) (cddr x) env nil val? more?))
+            ((macrolet)
+             (comp-macrolet (cadr x) (cddr x) env val? more?))
+            ((symbol-macrolet)
+             (comp-symbol-macrolet (cadr x) (cddr x) env val? more?))
+            ((lambda λ)
+             (when val?
+               (%seq (comp-lambda nil (cadr x) (cddr x) env)
+                     (unless more? (gen "RET")))))
+            ((%fn)
+             (when val?
+               (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
+                     (unless more? (gen "RET")))))
+            ((function)
+             (arg-count x 1 1)
+             (let ((sym (function-name (cadr x))))
+               (when val?
                  (cond
-                   ((and local (eq :smac (caddr local)))
-                    ;; setq on symbol macro should be treated as setf on expansion
-                    (comp `(setf ,(cadddr local) ,value) env val? more?))
+                   ((when (and (consp sym)
+                               (eq 'lambda (car sym)))
+                      (comp sym env t more?)))
                    (t
-                    (%seq (comp value env t t)
-                          (gen-set name env local)
-                          (unless val? (gen "POP"))
-                          (unless more? (gen "RET")))))))
-              (if (arg-count x 2 3)
-                  (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
-              (or (comp-or (cdr x) env val? more?))
-              ((not null)
-               (arg-count x 1 1)
-               (if val?
-                   (%seq (comp (cadr x) env t t)
-                         (gen "NOT")
-                         (if more? nil (gen "RET")))
-                   (comp (cadr x) env nil more?)))
-              (c/c
-               (arg-count x 0 0)
-               (if val? (gen "CC")))
-              (let (comp-let (cadr x) (cddr x) env val? more?))
-              (let* (comp-let* (cadr x) (cddr x) env val? more?))
-              (multiple-value-bind (comp-mvb (cadr x) (caddr x) (cdddr x) env val? more?))
-              (values (comp-values (cdr x) env val? more?))
-              (labels (comp-flets (cadr x) (cddr x) env t val? more?))
-              (flet (comp-flets (cadr x) (cddr x) env nil val? more?))
-              (macrolet (comp-macrolet (cadr x) (cddr x) env val? more?))
-              (symbol-macrolet (comp-symbol-macrolet (cadr x) (cddr x) env val? more?))
-              ((lambda λ)
-               (when val?
-                 (%seq (comp-lambda nil (cadr x) (cddr x) env)
-                       (unless more? (gen "RET")))))
-              (%fn
-               (when val?
-                 (%seq (comp-lambda (cadr x) (caddr x) (cdddr x) env)
-                       (unless more? (gen "RET")))))
-              (function
-               (arg-count x 1 1)
-               (let ((sym (function-name (cadr x))))
-                 (when val?
-                   (cond
-                     ((when (and (consp sym)
-                                 (eq 'lambda (car sym)))
-                        (comp sym env t more?)))
-                     (t
-                      (assert (symbolp sym) "FUNCTION requires a symbol")
-                      (let ((local (find-func sym env)))
-                        (%seq (if local
-                                  (gen "LVAR" (car local) (cadr local))
-                                  (progn
-                                    (unless (symbol-function sym)
-                                      (unknown-function sym))
-                                    (gen "FGVAR" sym)))
-                              (unless more? (gen "RET")))))))))
-              (tagbody (comp-tagbody (cdr x) env val? more?))
-              (go
-               (arg-count x 1 1)
-               (comp-go (cadr x) env))
-              (block (comp-block (cadr x) (cddr x) env val? more?))
-              (return-from (arg-count x 1 2) (comp-return (cadr x) (caddr x) env))
-              (catch (comp-catch (cadr x) (cddr x) env val? more?))
-              (throw (arg-count x 2 2) (comp-throw (cadr x) (caddr x) env))
-              (unwind-protect (comp-unwind-protect (cadr x) (cddr x) env val? more?))
-              (funcall (comp-funcall (cadr x) (cddr x) env val? more?))
-              (t (cond
-                   ((aif (and (symbolp (car x))
-                              (compiler-macro-function (car x)))
-                         (let ((form (funcall it x)))
-                           (unless (eq form x)
-                             (comp form env val? more?)))))
-                   ((aif (and (symbolp (car x))
-                              (macro (car x) env))
-                         (comp-macroexpand it x env val? more?)
-                         (comp-call t (car x) (cdr x) env val? more?)))))))))
+                    (assert (symbolp sym) "FUNCTION requires a symbol")
+                    (let ((local (find-func sym env)))
+                      (%seq (if local
+                                (gen "LVAR" (car local) (cadr local))
+                                (gen "FGVAR" (unknown-function sym)))
+                            (unless more? (gen "RET")))))))))
+            ((tagbody)
+             (comp-tagbody (cdr x) env val? more?))
+            ((go)
+             (arg-count x 1 1)
+             (comp-go (cadr x) env))
+            ((block)
+             (arg-count x 1)
+             (comp-block (cadr x) (cddr x) env val? more?))
+            ((return-from)
+             (arg-count x 1 2)
+             (comp-return (cadr x) (caddr x) env))
+            ((catch)
+             (comp-catch (cadr x) (cddr x) env val? more?))
+            ((throw)
+             (arg-count x 2 2)
+             (comp-throw (cadr x) (caddr x) env))
+            ((unwind-protect)
+             (comp-unwind-protect (cadr x) (cddr x) env val? more?))
+            ((funcall)
+             (comp-funcall (cadr x) (cddr x) env val? more?))
+            ((%op)
+             (comp-op (cadr x) (cddr x) env val? more?))
+            (otherwise
+             (cond
+               ((aif (and (symbolp (car x))
+                          (compiler-macro-function (car x)))
+                     (let ((form (funcall it x)))
+                       (unless (eq form x)
+                         (comp form env val? more?)))))
+               ((aif (and (symbolp (car x))
+                          (macro (car x) env))
+                     (comp-macroexpand it x env val? more?)
+                     (comp-call t (car x) (cdr x) env val? more?)))))))))
+
+     (comp-op (opname args env val? more?)
+       ;; We'll now compute the args (they'll remain on the stack) and generate
+       ;; an operator specified by the caller, who hopefully knows what it's
+       ;; doing. Such custom OP-s are assumed to be side-effect-free.
+       (cond
+         ((not val?)
+          ;; If the value is not needed, compile arguments for potential side
+          ;; effects.
+          (comp-seq args env nil t))
+         ((%seq (comp-list args env)
+                (gen (strcat opname))
+                (unless more? (gen "RET"))))))
+
+     (comp-one-setq (name value env val? more?)
+       (assert (symbolp name) "Only symbols can be SETQ")
+       (let* ((local (when (not (%globalp name))
+                       (find-var name env))))
+         (cond
+           ((and local (eq :smac (caddr local)))
+            ;; setq on symbol macro should be treated as setf on expansion
+            (comp `(setf ,(cadddr local) ,value) env val? more?))
+           (t
+            (%seq (comp value env t t)
+                  (gen-set name env local)
+                  (unless val? (gen "POP"))
+                  (unless more? (gen "RET")))))))
+
+     (comp-setq (exps env val? more?)
+       (cond
+         ((not exps)
+          (comp-const nil val? more?))
+         ((not (cddr exps))
+          (comp-one-setq (car exps) (cadr exps) env val? more?))
+         (t (%seq (comp-one-setq (car exps) (cadr exps) env nil t)
+                  (comp-setq (cddr exps) env val? more?)))))
 
      (comp-const (x val? more?)
        (when val?
@@ -1266,34 +1405,20 @@
        (with-seq-output <<
          (let rec ((exps exps))
            (when exps
-             (cond
-               ((and (consp (car exps))
-                     (eq '%ooo (caar exps)))
-                ;; “out-of-order” operator: evaluate this item *after* the rest of
-                ;; the list, but leave values on the stack in the proper order.
-                (cond
-                  ((cdr exps)
-                   (<< (gen "NIL"))
-                   (rec (cdr exps))
-                   (<< (comp (cadar exps) env t t)
-                       (gen "POPBACK" (length (cdr exps)))))
-                  (t
-                   (<< (comp (cadar exps) env t t)))))
-               (t
-                (<< (comp (car exps) env t t))
-                (rec (cdr exps))))))))
+             (<< (comp (car exps) env t t))
+             (rec (cdr exps))))))
 
      (comp-block (name forms env val? more?)
        (assert (symbolp name) (strcat "BLOCK expects a symbol, got: " name))
        (let ((body (and (not (find-block name env))
                         (catch name
-                          (comp-seq forms env val? more?)))))
+                          (with-env (comp-seq forms env val? more?))))))
          (or body
              (let ((label (gensym "block")))
                (%seq (gen "BLOCK")
                      (with-extenv (:lex (vector (list name :block label val?)))
                        (comp-seq forms env val? more?))
-                     #( label )
+                     (vector label)
                      (if more?
                          (gen "UNFR" 1 0)
                          (gen "RET")))))))
@@ -1341,7 +1466,7 @@
                 (<< (gen "BLOCK"))           ; define the tagbody entry
                 (foreach forms (lambda (x)
                                  (if (atom x)
-                                     (<< #( (cadddr (%pop tags)) )) ; label
+                                     (<< (vector (cadddr (%pop tags)))) ; label
                                      (<< (comp x env nil t)))))
                 (when val? (<< (gen "NIL"))) ; tagbody returns NIL
                 (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
@@ -1376,14 +1501,14 @@
                  (%seq pcode
                        (gen "TJUMP" l2)
                        ecode
-                       #( l2 )
+                       (vector l2)
                        (if more? nil (gen "RET")))))
               ((zerop (length ecode))
                (let ((l1 (mklabel)))
                  (%seq pcode
                        (gen "FJUMP" l1)
                        tcode
-                       #( l1 )
+                       (vector l1)
                        (if more? nil (gen "RET")))))
               (t
                (let ((l1 (mklabel))
@@ -1392,9 +1517,9 @@
                        (gen "FJUMP" l1)
                        tcode
                        (if more? (gen "JUMP" l2))
-                       #( l1 )
+                       (vector l1)
                        ecode
-                       (if more? #( l2 ))))))))))
+                       (if more? (vector l2))))))))))
 
      (comp-or (exps env val? more? &optional l1)
        (cond
@@ -1422,7 +1547,7 @@
                          (gen "TJUMPK" l1)
                          (gen "TJUMP" l1))
                      (comp-or (cdr exps) env val? more? l1)
-                     #( l1 )
+                     (vector l1)
                      (gen "VALUES" 1)
                      (unless more? (gen "RET")))))))
          ((comp (car exps) env val? more?))))
@@ -1445,7 +1570,7 @@
                                    (comp-list args env)
                                    the-function
                                    (gen "CALL" (length args))
-                                   #( k )
+                                   (vector k)
                                    (unless val? (gen "POP")))))
                     (t (%seq (comp-list args env)
                              the-function
@@ -1469,19 +1594,13 @@
                            (gen "PRIM" f (length args))
                            (unless val? (gen "POP"))
                            (unless more? (gen "RET")))))
-                (t
-                 (unless (symbol-function f)
-                   (unknown-function f))
-                 (mkret (gen "FGVAR" f))))))
+                ((mkret (gen "FGVAR" (unknown-function f)))))))
            ((and (not local)
                  (consp f)
                  (eq (car f) 'quote)
                  (symbolp (cadr f)))
             ;; (funcall 'stuff ...)
-            (let ((f (cadr f)))
-              (unless (symbol-function f)
-                (unknown-function f))
-              (mkret (gen "FGVAR" f))))
+            (mkret (gen "FGVAR" (unknown-function (cadr f)))))
            ((and (consp f)
                  (eq (car f) 'lambda)
                  (not (cadr f)))
@@ -1493,12 +1612,12 @@
        (cond
          ((null args) (gen "ARGS" n))
          ((symbolp args)
-          (when (member args names)
+          (when (%memq args names)
             (error (strcat "Duplicate function argument " args)))
           (gen "ARG_" n))
          ((lambda-keyword-p (car args))
           (throw '$xargs '$xargs))
-         ((member (car args) names)
+         ((%memq (car args) names)
           (error (strcat "Duplicate function argument " (car args))))
          ((gen-simple-args (cdr args)
                            (1+ n)
@@ -1530,13 +1649,11 @@
            (with-seq-output <<
              (setq env (extenv env :lex envcell))
              (labels ((newarg (name)
-                        (vector-push envcell (if (member name locally-special)
-                                                 (list name :var :special t)
-                                                 (list name :var)))
+                        (vector-push envcell (maybe-special name))
                         (when (or (%specialp name)
-                                  (member name locally-special))
+                                  (%memq name locally-special))
                           (<< (gen "BIND" name index)))
-                        (%incf index))
+                        (incf index))
                       (newdef (name defval supplied-p)
                         (unless supplied-p
                           (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
@@ -1549,7 +1666,7 @@
                                   (comp defval env t t))  ;; compile default value
                                 (gen "LSET" 0 index)      ;; set arg value in env
                                 (gen "POP")               ;; discard from stack
-                                #(l1))))
+                                (vector l1))))
                         (newarg name)))
                (<< (gen "XARGS"
                         (length required)
@@ -1571,8 +1688,7 @@
                                 (defval (cadr aux)))
                             (when defval
                               (<< (with-env (comp defval env t t))
-                                  (gen "LSET" 0 index)
-                                  (gen "POP")))
+                                  (gen "VAR")))
                             (newarg name))))
                (declare-locally-special :except names)
                (<< (with-env (comp-lambda-body name body env))))))))
@@ -1588,16 +1704,11 @@
                            (foreach-index args
                                           (lambda (name index)
                                             (when (or (%specialp name)
-                                                      (member name locally-special))
+                                                      (%memq name locally-special))
                                               (<< (gen "BIND" name index)))))
                            (cond
                              (args
-                              (setq env (extenv env :lex (map1-vector
-                                                          (lambda (name)
-                                                            (if (member name locally-special)
-                                                                (list name :var :special t)
-                                                                (list name :var)))
-                                                          args)))
+                              (setq env (extenv env :lex (map1-vector #'maybe-special args)))
                               (declare-locally-special :except args)
                               (<< (with-env (comp-lambda-body name body env))))
                              (t
@@ -1625,7 +1736,7 @@
                              (unless vars?
                                (setq x (function-name x)))
                              (when (and (not vars?)
-                                        (member x names))
+                                        (%memq x names))
                                (error "Duplicate name in LABELS/FLET/MACROLET"))
                              (push x names)))
          (list (nreverse names) (nreverse vals))))
@@ -1705,15 +1816,10 @@
                 (foreach-index names
                                (lambda (name index)
                                  (when (or (%specialp name)
-                                           (member name locally-special))
-                                   (%incf specials)
+                                           (%memq name locally-special))
+                                   (incf specials)
                                    (<< (gen "BIND" name index)))))
-                (setq env (extenv env :lex (map1-vector
-                                            (lambda (name)
-                                              (if (member name locally-special)
-                                                  (list name :var :special t)
-                                                  (list name :var)))
-                                            names)))
+                (setq env (extenv env :lex (map1-vector #'maybe-special names)))
                 (declare-locally-special :except names)
                 (cond
                   (more?
@@ -1760,15 +1866,10 @@
                 (foreach-index names
                                (lambda (name index)
                                  (when (or (%specialp name)
-                                           (member name locally-special))
-                                   (%incf specials)
+                                           (%memq name locally-special))
+                                   (incf specials)
                                    (<< (gen "BIND" name index)))))
-                (setq env (extenv env :lex (map1-vector
-                                            (lambda (name)
-                                              (if (member name locally-special)
-                                                  (list name :var :special t)
-                                                  (list name :var)))
-                                            names)))
+                (setq env (extenv env :lex (map1-vector #'maybe-special names)))
                 (declare-locally-special :except names)
                 (cond
                   (more?
@@ -1794,13 +1895,11 @@
                         (<< (with-env (comp x env t t))
                             (gen "VAR")
                             (when (or (%specialp name)
-                                      (member name locally-special))
-                              (%incf specials)
+                                      (%memq name locally-special))
+                              (incf specials)
                               (gen "BIND" name index)))
-                        (%incf index)
-                        (vector-push envcell (if (member name locally-special)
-                                                 (list name :var :special t)
-                                                 (list name :var))))
+                        (incf index)
+                        (vector-push envcell (maybe-special name)))
                       names vals)
                 (declare-locally-special :except names)
                 (cond
@@ -1815,7 +1914,7 @@
              (%seq (comp tag env t t)
                    (gen "CATCH" k1)
                    (comp-seq body env val? more?)
-                   #( k1 )
+                   (vector k1)
                    (if val?
                        (if more?
                            (gen "UNFR" 0 1)
@@ -1835,7 +1934,7 @@
              (%seq (gen "UPOPEN" k)
                    (comp form env val? t) ; if val? is T, this leaves it on the stack
                    (gen "UPEXIT")
-                   #( k )
+                   (vector k)
                    (comp-seq cleanup env nil t) ; result of cleanup code not needed
                    (gen "UPCLOSE")
                    (if more? nil (gen "RET"))))
@@ -1843,7 +1942,7 @@
 
      (compile (exp)
        (assert (and (consp exp)
-                    (member (car exp) '(%fn lambda λ)))
+                    (%memq (car exp) '(%fn lambda λ)))
                "Expecting (LAMBDA (...) ...) in COMPILE")
        (%eval-bytecode (comp exp (make-environment) t nil)))
 
@@ -1855,10 +1954,10 @@
              (out (%make-output-stream))
              (is-first t)
              (link-addr 0)
-             (*xref-info* #())
+             (*xref-info* (vector))
              (env (make-environment)))
          (labels ((comp1 (form)
-                    (let ((code (comp form env nil t)))
+                    (let ((code (with-env (comp form env nil t))))
                       (when code
                         (setq code (%exec-code code))
                         (%relocate-code code link-addr)
@@ -1877,7 +1976,7 @@
            (rec)
            (let* ((xref *xref-info*)
                   (*xref-info* nil))
-             (when (and *current-file* (> (length xref) 0))
+             (when (and *current-file* (plusp (length xref)))
                (comp1 `(%grok-xref-info ,*current-file* ,xref))))
            (%stream-get out)))))
 
@@ -1886,12 +1985,12 @@
 
 (defun read1-from-string (str)
   (let ((reader (lisp-reader str 'EOF)))
-    #( (cdr (funcall reader 'next)) (funcall reader 'pos) )))
+    (vector (cdr (funcall reader 'next)) (funcall reader 'pos))))
 
 (defun %with-undefined-warnings (thunk)
   (let ((*unknown-functions* nil)
         (*unknown-variables* nil))
-    (unwind-protect
+    (multiple-value-prog1
         (funcall thunk)
       (foreach *unknown-functions*
                (lambda (sym)
@@ -1926,13 +2025,13 @@
              (t-comp (gensym)))
          `(flet ((%get-file-contents args
                    (let ((,t-load (get-internal-run-time)))
-                     (prog1 (apply (symbol-function '%get-file-contents) args)
+                     (prog1 (apply #'%get-file-contents args)
                        (rplaca *load-timing*
                                (+ (car *load-timing*)
                                   (- (get-internal-run-time) ,t-load))))))
                  (compile-string args
                    (let ((,t-comp (get-internal-run-time)))
-                     (prog1 (apply (symbol-function 'compile-string) args)
+                     (prog1 (apply #'compile-string args)
                        (rplaca (cdr *load-timing*)
                                (+ (cadr *load-timing*)
                                   (- (get-internal-run-time) ,t-comp)))))))

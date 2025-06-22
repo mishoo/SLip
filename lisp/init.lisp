@@ -12,23 +12,25 @@
   (%use-package main user)
   (setq exported
         '(atom quasiquote defmacro defun when unless labels flet foreach
-          prog1 prog2 or and cond member case otherwise mapcar with-cc aif it push
+          prog1 prog2 or and cond member case otherwise mapcar mapc with-cc aif it push
           error warn without-interrupts
-          eval compile load function unwind-protect
+          eval compile load function functionp unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
           quote lambda λ let let* if progn progv setq t nil not
           tagbody go block return return-from
           *package* *read-table*
           elt rplaca rplacd nth nthcdr last reverse nreverse append nconc nreconc revappend
           char-name char-code name-char code-char upcase downcase
-          charp char-equal char= char< char<= char> char>= char/= letterp digitp
-          stringp string-equal string= string< string<= string> string>= string/=
+          charp char= char< char<= char> char>= char/= letterp digitp
+          stringp string= string< string<= string> string>= string/=
+          char-equal char-not-equal char-lessp char-greaterp char-not-lessp char-not-greaterp
+          string-equal string-not-equal string-lessp string-greaterp string-not-lessp string-not-greaterp
           make-regexp regexp-test regexp-exec replace-regexp quote-regexp regexpp
           vectorp vector svref vector-push vector-pop make-vector
           getf
-          list list* copy-list listp cons consp eq eql equal equalp gensym length
+          list list* copy-list copy-seq listp cons consp eq eql equal equalp gensym length
           declare locally type ignore special optimize speed debug space fixnum integer unsigned-byte
-          identity
+          identity constantly
 
           most-positive-fixnum most-negative-fixnum
 
@@ -49,7 +51,7 @@
           car cdr caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr
           cddar cdddr caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
           cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
-          first second third fourth rest
+          first second third fourth fifth rest destructuring-bind
 
           boundp makunbound fboundp fmakunbound
 
@@ -60,8 +62,19 @@
           values multiple-value-bind multiple-value-call values-list
           multiple-value-list multiple-value-setq multiple-value-prog1
 
+          *standard-output* *error-output* *trace-output*
+
           lambda-list-keywords
-          &key &rest &body &whole &optional &aux &allow-other-keys))
+          &key &rest &body &whole &optional &aux &allow-other-keys
+
+          define-modify-macro macroexpand-1 macroexpand defpackage in-package
+          defparameter defglobal every some notany notevery defsetf
+          define-setf-expander get-setf-expansion setf psetf push pop
+          define-compiler-macro incf decf dolist collect-if remove
+          remove-duplicates merge stable-sort dotimes do do* complement adjoin
+          pushnew nth use-package with-output-to-string prog prog* make-list
+          make-array aref copy-tree))
+
   (%export exported boot)
   (%export exported main)
   (setq *package* main))
@@ -76,17 +89,7 @@
 (defmacro export (symbols &optional (package *package*))
   `(%export ,symbols ,package))
 
-(defmacro def-efun (name . rest)
-  `(progn
-     (export ',name)
-     (defun ,name ,@rest)))
-
-(defmacro def-emac (name . rest)
-  `(progn
-     (defmacro ,name ,@rest)
-     (export ',name)))
-
-(def-efun macroexpand-1 (form)
+(defun macroexpand-1 (form)
   (cond
     ((atom form)
      (or (%:find-symbol-macrolet-in-compiler-env form) form))
@@ -99,13 +102,13 @@
             (apply it (cdr form)))
           form))))
 
-(def-efun macroexpand (form)
+(defun macroexpand (form)
   (let ((result (macroexpand-1 form)))
     (if (eq result form)
         result
         (macroexpand result))))
 
-(def-emac defpackage (name &rest options)
+(defmacro defpackage (name &rest options)
   (let ((nicknames nil)
         (use nil)
         (pak (gensym "DEFPACKAGE")))
@@ -131,16 +134,16 @@
                options)
        ,pak)))
 
-(def-emac in-package (name)
+(defmacro in-package (name)
   (setq *package* (find-package name)) nil)
 
-(def-emac defparameter (name val)
+(defmacro defparameter (name val)
   (%special! name)
   (%::maybe-xref-info name 'defparameter)
   `(progn (%special! ',name)
           (setq ,name ,val)))
 
-(def-emac defglobal (name val)
+(defmacro defglobal (name val)
   (%global! name)
   (%::maybe-xref-info name 'defglobal)
   `(progn (%global! ',name)
@@ -157,12 +160,71 @@
         (rec (cons (apply f (map1 #'car tails)) ret)
              (map1 #'cdr tails)))))
 
+(define-compiler-macro mapcar (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPCAR"))
+    ((null (cdr lists))
+     `(map1 ,func ,@lists))
+    ((null (cddr lists))
+     `(map2 ,func ,@lists))
+    (form)))
+
+(defun mapc (f . lists)
+  (let rec ((tails lists))
+    (if (finished tails)
+        (car lists)
+        (rec (map1 #'cdr tails)))))
+
+;; every returns false as soon as any invocation of predicate
+;; returns false. If the end of a sequence is reached, every returns
+;; true. Thus, every returns true if and only if every invocation of
+;; predicate returns true.
+(defun every (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) t
+        (and (apply test (map1 #'car tails))
+             (scan (map1 #'cdr tails))))))
+
+;; some returns the first non-nil value which is returned by an
+;; invocation of predicate. If the end of a sequence is reached
+;; without any invocation of the predicate returning true, some
+;; returns false. Thus, some returns true if and only if some
+;; invocation of predicate returns true.
+(defun some (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) nil
+        (or (apply test (map1 #'car tails))
+            (scan (map1 #'cdr tails))))))
+
+;; notany returns false as soon as any invocation of predicate
+;; returns true. If the end of a sequence is reached, notany returns
+;; true. Thus, notany returns true if and only if it is not the case
+;; that any invocation of predicate returns true.
+(defun notany (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) t
+        (if (apply test (map1 #'car tails))
+            nil
+            (scan (map1 #'cdr tails))))))
+
+;; notevery returns true as soon as any invocation of predicate
+;; returns false. If the end of a sequence is reached, notevery
+;; returns false. Thus, notevery returns true if and only if it is
+;; not the case that every invocation of predicate returns true.
+(defun notevery (test . lists)
+  (let scan ((tails lists))
+    (if (finished tails) nil
+        (if (apply test (map1 #'car tails))
+            (scan (map1 #'cdr tails))
+            t))))
+
 ;;; setf
 
 (defmacro %mvb-internal (names form &body body)
   `(multiple-value-bind ,names ,form ,@body))
 
-(def-emac defsetf (access-fn lambda-list &optional store-vars &body body)
+(defmacro defsetf (access-fn lambda-list &optional store-vars &body body)
   (maybe-xref-info access-fn 'defsetf)
   (cond
     ((symbolp lambda-list)
@@ -170,59 +232,73 @@
     ((> (length store-vars) 1)
      (let ((arg (gensym "setfarg")))
        `(%set-symbol-prop ',access-fn :setf
-                          (%fn ,access-fn (,@lambda-list ,arg)
-                               (symbol-macrolet
-                                   (,@(map1 (lambda (sym)
-                                              `(,sym ',sym))
-                                            store-vars))
-                                 `(%mvb-internal ,'(,@store-vars) ,,arg
-                                    ,,@body))))))
+                          (%fn ,access-fn (,@lambda-list)
+                               (lambda (,arg)
+                                 (symbol-macrolet
+                                     (,@(map1 (lambda (sym)
+                                                `(,sym ',sym))
+                                              store-vars))
+                                   `(%mvb-internal ,'(,@store-vars) ,,arg
+                                                   ,,@body)))))))
     (t
      `(%set-symbol-prop ',access-fn :setf
-                        (%fn ,access-fn (,@lambda-list ,@store-vars) ,@body)))))
+                        (%fn ,access-fn (,@lambda-list)
+                             (lambda ,store-vars ,@body))))))
+
+(defmacro define-setf-expander (access-fn lambda-list &body body)
+  (maybe-xref-info access-fn 'define-setf-expander)
+  `(%set-symbol-prop ',access-fn :setf-exp
+                     (%fn ,access-fn (,@lambda-list)
+                          ,@body)))
 
 (defun %get-setf-place (form)
-  (let ((expander (let dig ()
-                    ;; XXX: return T when form is a symbol (for some reason).
-                    ;;      not sure this is correct, but it works.
-                    (or (symbolp form)
-                        (%get-symbol-prop (car form) :setf)
-                        (let ((exp (macroexpand-1 form)))
-                          (unless (eq exp form)
-                            (setq form exp)
-                            (dig)))))))
-    (values expander form)))
+  (let dig ((form form))
+    (if (symbolp form)
+        ;; XXX: return T when form is a symbol (for some reason).
+        ;;      not sure this is correct, but it works.
+        (values t form)
+        (aif (%get-symbol-prop (car form) :setf-exp)
+             (values it form t)
+             (aif (%get-symbol-prop (car form) :setf)
+                  (values it form)
+                  (let ((exp (macroexpand-1 form)))
+                    (if (eq exp form)
+                        (values nil form)
+                        (dig exp))))))))
 
-(def-efun get-setf-expansion (form)
+(defun get-setf-expansion (form)
   (cond
     ((symbolp form)
      ;; could be symbol macro.
      (let ((exp (macroexpand-1 form)))
        (unless (eq exp form)
          (return-from get-setf-expansion (get-setf-expansion exp))))
-     (let ((vals (list (gensym "val"))))
+     (let ((vals (list (gensym "new"))))
        (values nil nil vals `(setq ,form ,@vals) form)))
     ((consp form)
-     (multiple-value-bind (expander form) (%get-setf-place form)
+     (multiple-value-bind (expander form setf-exp)
+                          (%get-setf-place form)
        (when (eq expander t)
          ;; XXX: see above in `%get-setf-place'. We receive T when we got down
          ;; to a symbol. By recursing here we also expand an eventual
          ;; symbol-macrolet on that symbol.
          (return-from get-setf-expansion (get-setf-expansion form)))
+       (when setf-exp
+         (return-from get-setf-expansion (apply expander (cdr form))))
        (let* ((temps (map1 (lambda (subform)
                              (gensym "temp"))
                            (cdr form)))
               (vals (list (gensym "new")))
               (store-form (cond
                             ((functionp expander)
-                             (apply expander (append temps vals)))
+                             (funcall (apply expander temps) (car vals)))
                             ((and expander
                                   (symbolp expander))
                              `(,expander ,@temps ,@vals))
                             ((symbolp (car form))
                              (let ((setter (intern (strcat "(SETF " (car form) ")")
                                                    (symbol-package (car form)))))
-                               `(,setter ,@vals ,@temps)))
+                               `(,setter ,(car vals) ,@temps)))
                             ((error (strcat "Unknown SETF expander " (car form)))))))
          (when (eq '%mvb-internal (car store-form))
            ;; hack: for multiple store vars, fetch names directly from
@@ -236,35 +312,109 @@
                  `(,(car form) ,@temps)))))
     ((error (strcat "Invalid SETF place " form)))))
 
+(defun %call-default-setter (form value)
+  (let ((setter (intern (strcat "(SETF " (car form) ")")
+                        (symbol-package (car form)))))
+    (cond
+      ((or (safe-atom-p value)
+           (every #'safe-atom-p (cdr form)))
+       ;; it's safe to compute the value first.
+       `(,setter ,value ,@(cdr form)))
+      (t
+       (let ((tmpvars (map1 (lambda (val)
+                              (list (gensym) val))
+                            (cdr form))))
+         `(let (,@tmpvars)
+            (,setter ,value ,@(map1 #'car tmpvars))))))))
+
+(defun %make-set-form (place value)
+  (cond
+    ((consp place)
+     (multiple-value-bind (expander form setf-exp) (%get-setf-place place)
+       (cond
+         ((eq expander t)
+          ;; form is a symbol.
+          `(setq ,form ,value))
+         (setf-exp
+          ;; this got ugly, because I'd like to dig the values and bind
+          ;; whatever is “simple” via symbol-macrolet so the generated code
+          ;; would be smaller.
+          (multiple-value-bind (temps vals stores set get) (apply expander (cdr form))
+            (let rec ((simple nil)
+                      (complex nil))
+              (cond
+                ((null temps)
+                 ;; this is the final setter form.
+                 `(let ,(nreverse complex)
+                    (symbol-macrolet ,(nreverse simple)
+                      ,(cond
+                         ((cdr stores)
+                          `(multiple-value-bind ,stores ,value ,set))
+                         ((safe-atom-p value)
+                          `(symbol-macrolet ((,(car stores) ,value)) ,set))
+                         (t
+                          `(let ((,(car stores) ,value)) ,set))))))
+                ((let* ((val (%pop vals))
+                        (safe? (safe-atom-p val)))
+                   (rec (if safe?
+                            ;; if safe, we add it to the “simple” list (symbol-macrolet)
+                            (cons (list (%pop temps) val) simple)
+                            simple)
+                        (if safe?
+                            complex
+                            ;; if not safe, we add it to the “complex” list (let)
+                            (cons (list (%pop temps) val) complex)))))))))
+         ((and (null expander)
+               (symbolp (car form)))
+          ;; no global setter defined, but maybe there is a (SETF FOO) somewhere.
+          (%call-default-setter form value))
+         ((functionp expander)
+          (funcall (apply expander (cdr form)) value))
+         ((symbolp expander)
+          `(,expander ,@(cdr form) ,value))
+         ((error (strcat "Unknown SETF expander for " (car place) ": " expander))))))
+    ((symbolp place)
+     `(setq ,place ,value))
+    (t (error "Unsupported SETF syntax"))))
+
 (defun %setf (args)
   (when args
     (unless (cdr args)
       (error "Odd number of arguments in SETF"))
-    (cons
-     (cond
-       ((consp (car args))
-        (multiple-value-bind (expander form) (%get-setf-place (car args))
-          (cond
-            ((and (null expander)
-                  (symbolp (car form)))
-             ;; no global setter defined, but maybe there is a (SETF FOO) somewhere.
-             (let ((setter (intern (strcat "(SETF " (car form) ")")
-                                   (symbol-package (car form)))))
-               `(,setter ,(cadr args) ,@(cdr form))))
-            ((functionp expander)
-             (apply expander (append (cdr form) (list (cadr args)))))
-            ((symbolp expander)
-             `(,expander ,@(cdr form) ,(cadr args)))
-            ((error (strcat "Unknown SETF expander for " (caar args) ": " expander))))))
-       ((symbolp (car args))
-        `(setq ,(car args) ,(cadr args)))
-       (t (error "Unsupported SETF syntax")))
-     (%setf (cddr args)))))
+    (cons (%make-set-form (car args) (cadr args))
+          (%setf (cddr args)))))
 
-(def-emac setf args
+(defmacro setf args
   `(progn ,@(%setf args)))
 
-(def-emac psetf args
+(defun %make-modify-macro (place args function)
+  (cond
+    ((safe-atom-p place)
+     `(setq ,place (,function ,place ,@args)))
+    ((multiple-value-bind (temp-vars temp-vals stores set get)
+                          (get-setf-expansion place)
+       `(let* (,@(map2 #'list temp-vars temp-vals)
+               (,(car stores) (,function ,get ,@args)))
+          ,set)))))
+
+(defmacro define-modify-macro (name lambda-list function &optional docstring)
+  (let* ((place (make-symbol "place"))
+         (parsed (parse-lambda-list lambda-list))
+         (args (append (getf parsed :required)
+                       (map1 (lambda (arg)
+                               (if (consp arg) (car arg) arg))
+                             (getf parsed :optional)))))
+    (when (or (getf parsed :has-key)
+              (getf parsed :aux)
+              (getf parsed :aok))
+      (error "DEFINE-MODIFY-MACRO: only &optional and &rest lambda words are expected"))
+    `(defmacro ,name (,place ,@lambda-list)
+       ,@(when docstring (list docstring))
+       (%make-modify-macro ,place
+                           (list* ,@args ,(getf parsed :rest))
+                           ',function))))
+
+(defmacro psetf args
   (let ((temps nil)
         (places nil)
         (values nil))
@@ -286,11 +436,8 @@
                  `(setf ,var ,set))
                places temps))))
 
-(defsetf car (x) (val)
-  `(rplaca ,x ,val))
-
-(defsetf cdr (x) (val)
-  `(rplacd ,x ,val))
+(defsetf car rplaca)
+(defsetf cdr rplacd)
 
 (defun (setf symbol-function) (func sym)
   (%::maybe-xref-info sym 'defun)
@@ -299,7 +446,7 @@
 (defun (setf symbol-value) (value sym)
   (set-symbol-value! sym value))
 
-(def-emac push (obj place)
+(defmacro push (obj place)
   (cond
     ((safe-atom-p place)
      `(setq ,place (cons ,obj ,place)))
@@ -311,7 +458,7 @@
             (let ((,(car store-vars) (cons ,item ,get-form)))
               ,store-form)))))))
 
-(def-emac pop (place)
+(defmacro pop (place)
   (let ((v (gensym "place")))
     (cond
       ((safe-atom-p place)
@@ -324,130 +471,40 @@
             ,store-form
             (car ,v)))))))
 
-(defsetf getf (place indicator) (value)
-  (let ((vval (gensym)))
-    (cond
-      ((safe-atom-p place)
-       (if (safe-atom-p value)
-           `(progn
-              (setf ,place (%:%putf ,place ,indicator ,value))
-              ,value)
-           `(let (,vval)
-              (setf ,place (%:%putf ,place ,indicator (setq ,vval ,value)))
-              ,vval)))
-      ((multiple-value-bind (temps value-forms store-vars store-form get-form)
-                            (get-setf-expansion place)
-         `(let* (,vval
-                 ,@(map2 #'list temps value-forms)
-                 (,(car store-vars) (%:%putf ,get-form ,indicator (setq ,vval ,value))))
-            ,store-form
-            ,vval))))))
+(define-setf-expander getf (place indicator &optional default)
+  (multiple-value-bind (place-tempvars place-tempvals stores set get)
+                       (get-setf-expansion place)
+    (let ((vindicator (gensym "indicator"))
+          (vdefault (gensym "default"))
+          (newval (gensym "newval")))
+      (values `(,@place-tempvars ,vindicator ,vdefault)
+              `(,@place-tempvals ,indicator ,default)
+              `(,newval)
+              `(let ((,(car stores) (%:%putf ,get ,vindicator ,newval))
+                     ,@(cdr stores))
+                 ,set
+                 ,newval)
+              `(getf ,get ,vindicator ,vdefault)))))
 
 (defun (setf compiler-macro-function) (handler name)
   (setf (getf %:*compiler-macros* name) handler))
 
-(def-emac define-compiler-macro (name args &body body)
-  (multiple-value-bind (setter name) (%:maybe-setter name)
-    (%:maybe-xref-info name (if setter
-                                'compiler-macro-setf
-                                'compiler-macro))
-    (let ((form (if (eq '&whole (car args))
-                    (prog1
-                        (cadr args)
-                      (setq args (cddr args)))
-                    (gensym "form"))))
-      `(setf (compiler-macro-function ',(or setter name))
-             (%fn ,name (,form)
-                  (destructuring-bind ,args (if (eq 'funcall (car ,form))
-                                                (cddr ,form)
-                                                (cdr ,form))
-                    ,@body))))))
+(define-compiler-macro identity (x) x)
+
+(defun constantly (value)
+  (lambda args
+    (declare (ignore args))
+    value))
 
 (defun (setf svref) (value vector index)
   (vector-set vector index value))
 
-(define-compiler-macro (setf svref) (value vector index)
-  (cond
-    ((or (safe-atom-p value)
-         (and (safe-atom-p vector)
-              (safe-atom-p index)))
-     `(vector-set ,vector ,index ,value))
-    ((let ((v (gensym)))
-       `(let ((,v ,value))
-          (vector-set ,vector ,index ,v))))))
-
-(define-compiler-macro mapcar (&whole form func &rest lists)
-  (cond
-    ((null lists)
-     (error "Missing list argument to MAPCAR"))
-    ((null (cdr lists))
-     `(map1 ,func ,@lists))
-    ((null (cddr lists))
-     `(map2 ,func ,@lists))
-    (form)))
-
-(labels
-    ((reduce-form (form)
-       (aif (and (consp form)
-                 (compiler-macro-function (car form)))
-            (funcall it form)
-            form))
-     (reduce-sum (nums)
-       (cond
-         ((not nums) 0)
-         ((not (cdr nums)) (car nums))
-         ((when (and (numberp (car nums))
-                     (not (numberp (cadr nums))))
-            (setf nums (list (cadr nums) (car nums)))
-            nil))
-         ((numberp (cadr nums))
-          (cond
-            ((numberp (car nums))
-             (+ (car nums) (cadr nums)))
-            ((= 1 (cadr nums))
-             `(1+ ,(car nums)))
-            ((= -1 (cadr nums))
-             `(1- ,(car nums)))
-            ((> 0 (cadr nums))
-             `(- ,(car nums) ,(- (cadr nums))))))))
-     (reduce-sub (nums)
-       (cond
-         ((not (cdr nums))
-          (when (numberp (car nums))
-            (- (car nums))))
-         ((numberp (cadr nums))
-          (cond
-            ((numberp (car nums))
-             (- (car nums) (cadr nums)))
-            ((= 1 (cadr nums))
-             `(1- ,(car nums))))))))
-  (define-compiler-macro + (&whole form &rest nums)
-    (or (and (null (cddr nums))
-             (reduce-sum (mapcar #'reduce-form nums)))
-        form))
-  (define-compiler-macro - (&whole form &rest nums)
-    (or (and (null (cddr nums))
-             (reduce-sub (mapcar #'reduce-form nums)))
-        form)))
-
-(labels ((make-dementor (place delta inc)
-           (symbol-macrolet ((dement `(,inc ,place ,delta)))
-             (cond
-               ((safe-atom-p place)
-                `(setq ,place ,dement))
-               ((multiple-value-bind (temps value-forms store-vars store-form place)
-                                     (get-setf-expansion place)
-                  `(let* (,@(mapcar #'list temps value-forms)
-                          (,(car store-vars) ,dement))
-                     ,store-form)))))))
-  (def-emac incf (place &optional (add 1))
-    (make-dementor place add '+))
-  (def-emac decf (place &optional (sub 1))
-    (make-dementor place sub '-)))
+(define-modify-macro incf (&optional (add 1)) +)
+(define-modify-macro decf (&optional (add 1)) -)
 
 ;;; lists
 
-(def-emac dolist ((var list-form &rest result-form) &body body)
+(defmacro dolist ((var list-form &rest result-form) &body body)
   (let ((list (gensym "list"))
         (next (gensym "next"))
         (end (gensym "end")))
@@ -476,72 +533,29 @@
                (push vtail tails)
                (push `(,name (cdr ,vlist)) syms)
                (push `(,vadd (el)
-                       `(setf ,',vtail (setf (cdr ,',vtail)
-                                             (cons ,el nil))))
+                       (setf ,vtail (setf (cdr ,vtail)
+                                          (cons el nil))))
                      adders))))
       (foreach names #'mk-collector)
       `(let* (,@(mapcar (lambda (name) `(,name (list nil)))
                         lists)
               ,@(mapcar #'list tails lists))
-         (macrolet (,@adders)
+         (flet (,@adders)
            (symbol-macrolet (,@syms)
              ,@body))))))
 
-(def-efun collect-if (test list)
+(defun collect-if (test list)
   (with-collectors (elements)
     (dolist (el list)
       (when (funcall test el)
         (elements el)))
     elements))
 
-(def-efun remove (item list)
+(defun remove (item list)
   (collect-if (lambda (x)
                 (not (eq x item))) list))
 
-;; every returns false as soon as any invocation of predicate
-;; returns false. If the end of a sequence is reached, every returns
-;; true. Thus, every returns true if and only if every invocation of
-;; predicate returns true.
-(def-efun every (test . lists)
-  (let scan ((tails lists))
-    (if (finished tails) t
-        (and (apply test (map1 #'car tails))
-             (scan (map1 #'cdr tails))))))
-
-;; some returns the first non-nil value which is returned by an
-;; invocation of predicate. If the end of a sequence is reached
-;; without any invocation of the predicate returning true, some
-;; returns false. Thus, some returns true if and only if some
-;; invocation of predicate returns true.
-(def-efun some (test . lists)
-  (let scan ((tails lists))
-    (if (finished tails) nil
-        (or (apply test (map1 #'car tails))
-            (scan (map1 #'cdr tails))))))
-
-;; notany returns false as soon as any invocation of predicate
-;; returns true. If the end of a sequence is reached, notany returns
-;; true. Thus, notany returns true if and only if it is not the case
-;; that any invocation of predicate returns true.
-(def-efun notany (test . lists)
-  (let scan ((tails lists))
-    (if (finished tails) t
-        (if (apply test (map1 #'car tails))
-            nil
-            (scan (map1 #'cdr tails))))))
-
-;; notevery returns true as soon as any invocation of predicate
-;; returns false. If the end of a sequence is reached, notevery
-;; returns false. Thus, notevery returns true if and only if it is
-;; not the case that every invocation of predicate returns true.
-(def-efun notevery (test . lists)
-  (let scan ((tails lists))
-    (if (finished tails) nil
-        (if (apply test (map1 #'car tails))
-            (scan (map1 #'cdr tails))
-            t))))
-
-(def-efun remove-duplicates (list &key (test #'eql) from-end)
+(defun remove-duplicates (list &key (test #'eql) from-end)
   (labels ((rmv (list ret)
              (if list
                  (let ((current (car list)))
@@ -554,7 +568,7 @@
         (nreverse (rmv list nil))
         (rmv (reverse list) nil))))
 
-(def-efun merge (a b predicate)
+(defun merge (a b predicate)
   (let* ((ret (list nil))
          (p ret))
     (macrolet ((add (cell)
@@ -570,7 +584,7 @@
              (b (add b))))
       (cdr ret))))
 
-(def-efun stable-sort (list predicate)
+(defun stable-sort (list predicate)
   (let sort ((list list))
     (cond ((not list) nil)
           ((not (cdr list)) list)
@@ -593,12 +607,15 @@
 (defmacro fourth (list)
   `(car (cdddr ,list)))
 
+(defmacro fifth (list)
+  `(car (cddddr ,list)))
+
 (defmacro rest (list)
   `(cdr ,list))
 
 ;;; basic looping
 
-(def-emac dotimes ((var count-form &rest result-form) &body body)
+(defmacro dotimes ((var count-form &rest result-form) &body body)
   (let ((count (gensym))
         (next (gensym "next"))
         (end (gensym "end")))
@@ -619,7 +636,7 @@
 
 ;;; do and do* differ by exactly two characters, but oh well... copy-paste FTW.
 
-(def-emac do (vars (end-test-form &rest result-form) &body body)
+(defmacro do (vars (end-test-form &rest result-form) &body body)
   (let ((next (gensym "next"))
         (end (gensym "end"))
         (step (apply #'nconc (mapcar (lambda (var)
@@ -642,7 +659,7 @@
             ,end)
            ,@result-form)))))
 
-(def-emac do* (vars (end-test-form &rest result-form) &body body)
+(defmacro do* (vars (end-test-form &rest result-form) &body body)
   (let ((next (gensym "next"))
         (end (gensym "end"))
         (step (apply #'nconc (mapcar (lambda (var)
@@ -665,13 +682,72 @@
             ,end)
            ,@result-form)))))
 
-(def-efun nth (n list)
+(defun complement (f)
+  (lambda args
+    (not (apply f args))))
+
+(defun member (item lst &key test test-not key)
+  (when test-not
+    (when test
+      (error "MEMBER: both TEST and TEST-NOT are given"))
+    (setf test (complement test-not)))
+  (let ((no-test (or (not test) (eq test #'eq) (eq test #'eql)))
+        (no-key (or (not key) (eq key #'identity))))
+    (cond
+      (no-key
+       (if no-test
+           (%:%memq item lst)
+           (let rec ((lst lst))
+             (when lst
+               (if (funcall test item (car lst))
+                   lst
+                   (rec (cdr lst)))))))
+      (no-test
+       (let rec ((lst lst))
+         (when lst
+           (if (eq item (funcall key (car lst)))
+               lst
+               (rec (cdr lst))))))
+      (t
+       (let rec ((lst lst))
+         (when lst
+           (if (funcall test item (funcall key (car lst)))
+               lst
+               (rec (cdr lst)))))))))
+
+(define-compiler-macro member (&whole form item lst &key test test-not key)
+  (cond
+    ((and (not test-not)
+          (or (not test) (member test (list `#'eql #'eql `#'eq #'eq 'eql 'eq ''eql ''eq)
+                                 :test #'equal))
+          (or (not key) (member key (list `#'identity #'identity 'identity ''identity)
+                                :test #'equal)))
+     `(%:%memq ,item ,lst))
+    (t form)))
+
+(defun adjoin (item lst &rest args &key test test-not key)
+  (if (apply #'member (if key (funcall key item) item) lst args)
+      lst
+      (cons item lst)))
+
+(defmacro pushnew (obj place &rest args &key test test-not key)
+  (let ((vobj (gensym "obj"))
+        (vcurr (gensym "curr")))
+    (multiple-value-bind (temps vals stores set get)
+                         (get-setf-expansion place)
+      `(let* ((,vobj ,obj)
+              ,@(mapcar #'list temps vals)
+              (,vcurr ,get))
+         (let ((,(car stores) (adjoin ,vobj ,vcurr ,@args)))
+           ,set)))))
+
+(defun nth (n list)
   (car (nthcdr n list)))
 
 (defun (setf nth) (value n list)
   (setf (car (nthcdr n list)) value))
 
-(def-emac use-package (source &optional (target *package*))
+(defmacro use-package (source &optional (target *package*))
   `(%use-package (find-package ,source) (find-package ,target)))
 
 ;;; multiple values
@@ -709,7 +785,7 @@
                         syms)
               ,(caar syms))))))))
 
-(def-emac with-output-to-string ((var &optional string) &body body)
+(defmacro with-output-to-string ((var &optional string) &body body)
   `(let ((,var (%make-output-stream)))
      ,@(when string
          `((%stream-put ,var ,string)))
@@ -725,35 +801,33 @@
            (or (hash-get ,memo ,(car args))
                (hash-add ,memo ,(car args) (progn ,@body))))))))
 
-(define-compiler-macro identity (x) x)
-
-(def-emac prog (bindings &body body)
+(defmacro prog (bindings &body body)
   (multiple-value-bind (body declarations) (%:dig-declarations body)
     `(block nil
        (let ,bindings
          (declare ,@declarations)
          (tagbody ,@body)))))
 
-(def-emac prog* (bindings &body body)
+(defmacro prog* (bindings &body body)
   (multiple-value-bind (body declarations) (%:dig-declarations body)
     `(block nil
        (let* ,bindings
          (declare ,@declarations)
          (tagbody ,@body)))))
 
-(def-efun make-list (size &key initial-element)
+(defun make-list (size &key initial-element)
   (let ((list nil))
     (dotimes (i size list)
       (setq list (cons initial-element list)))))
 
-(def-efun make-array (dimensions &key
-                                 element-type
-                                 initial-element
-                                 initial-contents
-                                 adjustable
-                                 fill-pointer
-                                 displaced-to
-                                 displaced-index-offset)
+(defun make-array (dimensions &key
+                              element-type
+                              initial-element
+                              initial-contents
+                              adjustable
+                              fill-pointer
+                              displaced-to
+                              displaced-index-offset)
   (when (listp dimensions)
     (error "make-array: multi-dimensional arrays not supported (yet?)"))
   (make-vector dimensions initial-element initial-contents))
@@ -769,7 +843,7 @@
     (t
      `(make-vector ,dimensions ,initial-element ,initial-contents))))
 
-(def-efun aref (array &rest pos)
+(defun aref (array &rest pos)
   (when (cdr pos)
     (error "aref: multi-dimensional arrays not supported (yet?)"))
   (svref array (car pos)))
@@ -785,12 +859,6 @@
     (error "(setf aref): multi-dimensional arrays not supported (yet?)"))
   (setf (svref array (car pos)) value))
 
-(define-compiler-macro (setf aref) (&whole form value array &rest pos)
-  (cond
-    ((cdr pos) form)
-    (t
-     `(setf (svref ,array ,(car pos)) ,value))))
-
 (defun (setf elt) (value seq index)
   (cond
     ((vectorp seq)
@@ -802,9 +870,31 @@
     (t
      (error "SETF ELT: Unknown sequence"))))
 
-(defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
+(defun copy-tree (tree)
+  (if (consp tree)
+      (cons (copy-tree (car tree))
+            (copy-tree (cdr tree)))
+      tree))
 
-(export '(*standard-output*
-          *error-output*
-          *trace-output*
-          destructuring-bind))
+(defun (setf cadr) (value list)
+  (setf (car (cdr list)) value))
+
+(define-setf-expander values (&rest places)
+  (with-collectors (temp-vars temp-vals store-main-vars store-other-vars setters getters)
+    (dolist (place places)
+      (multiple-value-bind (place-temps place-vals place-stores place-set place-get)
+                           (get-setf-expansion place)
+        (foreach place-temps #'temp-vars)
+        (foreach place-vals #'temp-vals)
+        (foreach (cdr place-stores) #'store-other-vars)
+        (store-main-vars (car place-stores))
+        (setters place-set)
+        (getters place-get)))
+    (values temp-vars
+            temp-vals
+            store-main-vars
+            `(let (,@store-other-vars)
+               (values ,@setters))
+            `(values ,@getters))))
+
+(defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))

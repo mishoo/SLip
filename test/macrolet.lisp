@@ -120,21 +120,21 @@
 
 ;;; Interaction with symbol-macrolet
 
-;; (deftest macrolet.13
-;;   (symbol-macrolet ((a b))
-;;     (macrolet ((foo (x &environment env)
-;;                     (let ((y (macroexpand x env)))
-;;                       (if (eq y 'a) 1 2))))
-;;       (foo a)))
-;;   2)
+(deftest macrolet.13
+  (symbol-macrolet ((a b))
+    (macrolet ((foo (x)
+                    (let ((y (macroexpand x)))
+                      (if (eq y 'a) 1 2))))
+      (foo a)))
+  2)
 
-;; (deftest macrolet.14
-;;   (symbol-macrolet ((a b))
-;;     (macrolet ((foo (x &environment env)
-;;                     (let ((y (macroexpand-1 x env)))
-;;                       (if (eq y 'a) 1 2))))
-;;       (foo a)))
-;;   2)
+(deftest macrolet.14
+  (symbol-macrolet ((a b))
+    (macrolet ((foo (x)
+                    (let ((y (macroexpand-1 x)))
+                      (if (eq y 'a) 1 2))))
+      (foo a)))
+  2)
 
 (deftest macrolet.15
   (macrolet ((nil () ''a))
@@ -216,26 +216,26 @@
 
 ;;; More key parameters
 
-;; (deftest macrolet.26
-;;   (macrolet ((%m (&key ((:a b))) `(quote ,b)))
-;;     (values (%m)
-;;             (%m :a x)))
-;;   nil
-;;   x)
+(deftest macrolet.26
+  (macrolet ((%m (&key ((:a b))) `(quote ,b)))
+    (values (%m)
+            (%m :a x)))
+  nil
+  x)
 
-;; (deftest macrolet.27
-;;   (macrolet ((%m (&key ((:a (b c)))) `(quote (,c ,b))))
-;;     (%m :a (1 2)))
-;;   (2 1))
+(deftest macrolet.27
+  (macrolet ((%m (&key ((:a (b c)))) `(quote (,c ,b))))
+    (%m :a (1 2)))
+  (2 1))
 
-;; (deftest macrolet.28
-;;   (macrolet ((%m (&key ((:a (b c)) '(3 4))) `(quote (,c ,b))))
-;;     (values (%m :a (1 2))
-;;             (%m :a (1 2) :a (10 11))
-;;             (%m)))
-;;   (2 1)
-;;   (2 1)
-;;   (4 3))
+(deftest macrolet.28
+  (macrolet ((%m (&key ((:a (b c)) '(3 4))) `(quote (,c ,b))))
+    (values (%m :a (1 2))
+            (%m :a (1 2) :a (10 11))
+            (%m)))
+  (2 1)
+  (2 1)
+  (4 3))
 
 (deftest macrolet.29
   (macrolet ((%m (&key a (b a)) `(quote (,a ,b))))
@@ -273,15 +273,15 @@
   (9 nil)
   (10 nil))
 
-;; (deftest macrolet.31
-;;   (macrolet ((%m (&key ((:a (b c)) '(3 4) a-p))
-;;                  `(quote (,(notnot a-p) ,c ,b))))
-;;     (values (%m :a (1 2))
-;;             (%m :a (1 2) :a (10 11))
-;;             (%m)))
-;;   (t 2 1)
-;;   (t 2 1)
-;;   (nil 4 3))
+(deftest macrolet.31
+  (macrolet ((%m (&key ((:a (b c)) '(3 4) a-p))
+                 `(quote (,(notnot a-p) ,c ,b))))
+    (values (%m :a (1 2))
+            (%m :a (1 2) :a (10 11))
+            (%m)))
+  (t 2 1)
+  (t 2 1)
+  (nil 4 3))
 
 ;;; Allow-other-keys tests
 
@@ -311,15 +311,15 @@
   nil
   t)
 
-;; (deftest macrolet.34
-;;   (macrolet ((%m (&key &allow-other-keys) :good))
-;;     (values
-;;      (%m)
-;;      (%m :foo t)
-;;      (%m :allow-other-keys nil :foo t)))
-;;   :good
-;;   :good
-;;   :good)
+(deftest macrolet.34
+  (macrolet ((%m (&key &allow-other-keys) :good))
+    (values
+     (%m)
+     (%m :foo t)
+     (%m :allow-other-keys nil :foo t)))
+  :good
+  :good
+  :good)
 
 (deftest macrolet.35
   (macrolet ((%m (&key a b &allow-other-keys) `(quote (,a ,b))))
