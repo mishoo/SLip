@@ -34,33 +34,15 @@
 (setq *error-output* (%make-output-stream))
 (setq *trace-output* (%make-output-stream))
 
-;; (defmacro cond (clauses)
-;;   (when clauses
-;;     (let ((first (car clauses)))
-;;       (if (cdr first)
-;;           `(if ,(car first)
-;;                (progn ,@(cdr first))
-;;                (cond ,@(cdr clauses)))
-;;           `(or ,(car first)
-;;                (cond ,@(cdr clauses)))))))
-;;
-;; Since we don't yet have quasiquote, I've macro-expanded it below. It's
-;; horrible to write it manually.
-(%macro! 'cond
-         (%fn cond clauses
-              (if clauses
-                  (let ((first (car clauses)))
-                    (if (cdr first)
-                        (list 'if
-                              (car first)
-                              (cons 'progn
-                                    (cdr first))
-                              (cons 'cond
-                                    (cdr clauses)))
-                        (list 'or
-                              (car first)
-                              (cons 'cond
-                                    (cdr clauses))))))))
+(defmacro cond clauses
+  (when clauses
+    (let ((first (car clauses)))
+      (if (cdr first)
+          `(if ,(car first)
+               (progn ,@(cdr first))
+               (cond ,@(cdr clauses)))
+          `(or ,(car first)
+               (cond ,@(cdr clauses)))))))
 
 ;; props to http://norstrulde.org/ilge10/ - pasting here the original version,
 ;; because it's small and beautiful and it's the heart of quasiquotation:
@@ -124,9 +106,11 @@
              (list 'cons first second)))))
       (qq (x)
         (cond
-          ((numberp x) x)
-          ((stringp x) x)
-          ((regexpp x) x)
+          ((or (numberp x)
+               (stringp x)
+               (regexpp x)
+               (vectorp x))
+           x)
           ((not (consp x))
            (if x (list 'quote x)))
           ((eq 'qq-unquote (car x))
@@ -141,22 +125,10 @@
            (opt-cons x)))))
    #'qq))
 
-(set-symbol-function!
- 'maybe-xref-info
- (%fn maybe-xref-info (name type)
-      (if *xref-info*
-          (vector-push *xref-info*
-                       (vector name type *current-pos*)))))
-
-;; better to avoid quasiquote here:
-(%macro! 'defmacro
-         (%fn defmacro (name args . body)
-              (if (%primitivep name)
-                  (error (strcat "Cannot DEFMACRO on primitive " name)))
-              (maybe-xref-info name 'defmacro)
-              (list '%macro!
-                    (list 'quote name)
-                    (list* '%fn name args body))))
+(defun maybe-xref-info (name type)
+  (when *xref-info*
+    (vector-push *xref-info*
+                 (vector name type *current-pos*))))
 
 (defmacro quasiquote (thing)
   (qq thing))
@@ -292,10 +264,6 @@
     ((cdr exps) `(when ,(car exps) (and ,@(cdr exps))))
     (exps (car exps))
     (t t)))
-
-;; will be redefined later to also check compiler env for symbol-macrolet
-(defun safe-atom-p (thing)
-  (symbolp thing))
 
 (defmacro case (expr . cases)
   (let* ((safe (safe-atom-p expr))
