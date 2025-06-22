@@ -170,7 +170,9 @@
   (apply #'vector (sort (mapcar #'package-name (%list-packages)) #'string<)))
 
 (define-handler :set-package (name)
-  (setf *package* (find-package name)))
+  (let ((pak (find-package name)))
+    (unless pak (error "There's no package named ~S" name))
+    (setf *package* (find-package name))))
 
 (defglobal
     *thread*
