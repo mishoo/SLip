@@ -296,8 +296,7 @@
                                   (symbolp expander))
                              `(,expander ,@temps ,@vals))
                             ((symbolp (car form))
-                             (let ((setter (intern (strcat "(SETF " (car form) ")")
-                                                   (symbol-package (car form)))))
+                             (let ((setter (maybe-setter `(setf ,(car form)))))
                                `(,setter ,(car vals) ,@temps)))
                             ((error (strcat "Unknown SETF expander " (car form)))))))
          (when (eq '%mvb-internal (car store-form))
@@ -313,8 +312,7 @@
     ((error (strcat "Invalid SETF place " form)))))
 
 (defun %call-default-setter (form value)
-  (let ((setter (intern (strcat "(SETF " (car form) ")")
-                        (symbol-package (car form)))))
+  (let ((setter (maybe-setter `(setf ,(car form)))))
     (cond
       ((or (safe-atom-p value)
            (every #'safe-atom-p (cdr form)))
@@ -327,6 +325,35 @@
          `(let (,@tmpvars)
             (,setter ,value ,@(map1 #'car tmpvars))))))))
 
+(defun %call-setf-expansion (temps vals stores set value)
+  ;; this got ugly, because I'd like to dig the values and bind
+  ;; whatever is “simple” via symbol-macrolet so the generated code
+  ;; would be smaller.
+  (let rec ((simple nil)
+            (complex nil))
+    (cond
+      ((null temps)
+       ;; this is the final setter form.
+       `(let ,(nreverse complex)
+          (symbol-macrolet ,(nreverse simple)
+            ,(cond
+               ((cdr stores)
+                `(multiple-value-bind ,stores ,value ,set))
+               ((safe-atom-p value)
+                `(symbol-macrolet ((,(car stores) ,value)) ,set))
+               (t
+                `(let ((,(car stores) ,value)) ,set))))))
+      ((let* ((val (%pop vals))
+              (safe? (safe-atom-p val)))
+         (rec (if safe?
+                  ;; if safe, we add it to the “simple” list (symbol-macrolet)
+                  (cons (list (%pop temps) val) simple)
+                  simple)
+              (if safe?
+                  complex
+                  ;; if not safe, we add it to the “complex” list (let)
+                  (cons (list (%pop temps) val) complex))))))))
+
 (defun %make-set-form (place value)
   (cond
     ((consp place)
@@ -336,34 +363,9 @@
           ;; form is a symbol.
           `(setq ,form ,value))
          (setf-exp
-          ;; this got ugly, because I'd like to dig the values and bind
-          ;; whatever is “simple” via symbol-macrolet so the generated code
-          ;; would be smaller.
-          (multiple-value-bind (temps vals stores set get) (apply expander (cdr form))
-            (let rec ((simple nil)
-                      (complex nil))
-              (cond
-                ((null temps)
-                 ;; this is the final setter form.
-                 `(let ,(nreverse complex)
-                    (symbol-macrolet ,(nreverse simple)
-                      ,(cond
-                         ((cdr stores)
-                          `(multiple-value-bind ,stores ,value ,set))
-                         ((safe-atom-p value)
-                          `(symbol-macrolet ((,(car stores) ,value)) ,set))
-                         (t
-                          `(let ((,(car stores) ,value)) ,set))))))
-                ((let* ((val (%pop vals))
-                        (safe? (safe-atom-p val)))
-                   (rec (if safe?
-                            ;; if safe, we add it to the “simple” list (symbol-macrolet)
-                            (cons (list (%pop temps) val) simple)
-                            simple)
-                        (if safe?
-                            complex
-                            ;; if not safe, we add it to the “complex” list (let)
-                            (cons (list (%pop temps) val) complex)))))))))
+          (multiple-value-bind (temps vals stores set)
+                               (apply expander (cdr form))
+            (%call-setf-expansion temps vals stores set value)))
          ((and (null expander)
                (symbolp (car form)))
           ;; no global setter defined, but maybe there is a (SETF FOO) somewhere.
@@ -391,11 +393,12 @@
   (cond
     ((safe-atom-p place)
      `(setq ,place (,function ,place ,@args)))
-    ((multiple-value-bind (temp-vars temp-vals stores set get)
+    (t
+     (multiple-value-bind (temp-vars temp-vals stores set get)
                           (get-setf-expansion place)
-       `(let* (,@(map2 #'list temp-vars temp-vals)
-               (,(car stores) (,function ,get ,@args)))
-          ,set)))))
+       (%call-setf-expansion
+        temp-vars temp-vals stores set
+        `(,function ,get ,@args))))))
 
 (defmacro define-modify-macro (name lambda-list function &optional docstring)
   (let* ((place (make-symbol "place"))
@@ -488,8 +491,6 @@
 
 (defun (setf compiler-macro-function) (handler name)
   (setf (getf %:*compiler-macros* name) handler))
-
-(define-compiler-macro identity (x) x)
 
 (defun constantly (value)
   (lambda args
@@ -682,10 +683,6 @@
             ,end)
            ,@result-form)))))
 
-(defun complement (f)
-  (lambda args
-    (not (apply f args))))
-
 (defun member (item lst &key test test-not key)
   (when test-not
     (when test
@@ -749,16 +746,6 @@
 
 (defmacro use-package (source &optional (target *package*))
   `(%use-package (find-package ,source) (find-package ,target)))
-
-;;; multiple values
-
-(defmacro multiple-value-call (fn &rest values)
-  `(apply ,fn (nconc ,@(mapcar (lambda (form)
-                                 `(multiple-value-list ,form))
-                               values))))
-
-(defun values-list (list)
-  (apply #'values list))
 
 (defmacro multiple-value-setq ((&rest places) value-form)
   (cond
