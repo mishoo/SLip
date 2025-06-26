@@ -1866,6 +1866,8 @@
           (comp-decl-seq body env val? more?))
          ((symbolp bindings)
           (comp-named-let bindings (%pop body) body env val? more?))
+         ((null body)
+          (comp-seq `(,@(cadr (get-bindings bindings t)) nil) env val? more?))
          ((with-seq-output <<
             (with-declarations body
               (let* ((bindings (get-bindings bindings t))
@@ -1892,6 +1894,12 @@
        (cond
          ((null bindings)
           (comp-decl-seq body env val? more?))
+         ((and (null (cdr body))
+               (consp (car body))
+               (eq 'let* (caar body)))
+          (comp-let* (append bindings (cadar body))
+                     (cddar body)
+                     env val? more?))
          ((with-seq-output <<
             (with-declarations body
               (let* ((bindings (get-bindings bindings t))
