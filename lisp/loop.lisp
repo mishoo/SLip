@@ -488,16 +488,22 @@
 (defparser (minimize minimizing) args
   (extremizing "min" 'min args))
 
+(defun parse-with-and (args)
+  (setf args (parse-clause args))
+  (if (iskw (car args) 'and)
+      (parse-with-and (cdr args))
+      args))
+
 (defun parse-conditional (args negated)
   (let ((condition (pop args))
         (then-body (let* ((loop-iterate (cons nil nil))
                           (*loop-iterate* loop-iterate))
-                     (setf args (parse-clause args))
+                     (setf args (parse-with-and args))
                      (cdr loop-iterate)))
         (else-body (when (iskw (car args) 'else)
                      (let* ((loop-iterate (cons nil nil))
                             (*loop-iterate* loop-iterate))
-                       (setf args (parse-clause (cdr args)))
+                       (setf args (parse-with-and (cdr args)))
                        (cdr loop-iterate)))))
     (let ((form `(if ,(if negated
                           `(not ,condition)
