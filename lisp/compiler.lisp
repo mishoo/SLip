@@ -224,6 +224,15 @@
 
 (defun identity (x) x)
 
+(defun complement (f)
+  (lambda args
+    (not (apply f args))))
+
+(defun constantly (value)
+  (lambda args
+    (declare (ignore args))
+    value))
+
 (defun filter (lst &optional (pred #'identity))
   (let rec ((lst lst)
             (ret nil))
@@ -994,6 +1003,8 @@
   (define-compiler-macro minusp (val)
     `(%op MINUSP ,val)))
 
+(define-compiler-macro identity (x) x)
+
 (defun make-compiler-env ()
   ;; :lex should match the runtime lexical environment; both
   ;; variables and functions are stored there, but the compiler
@@ -1698,8 +1709,8 @@
             (let ((code
                    (catch '$xargs
                      (with-seq-output <<
-                       (<< (gen-simple-args args 0 nil))
                        (with-declarations body
+                         (<< (gen-simple-args args 0 nil))
                          (let ((args (make-true-list args)))
                            (foreach-index args
                                           (lambda (name index)
@@ -1855,6 +1866,8 @@
           (comp-decl-seq body env val? more?))
          ((symbolp bindings)
           (comp-named-let bindings (%pop body) body env val? more?))
+         ((null body)
+          (comp-seq `(,@(cadr (get-bindings bindings t)) nil) env val? more?))
          ((with-seq-output <<
             (with-declarations body
               (let* ((bindings (get-bindings bindings t))
@@ -1881,6 +1894,12 @@
        (cond
          ((null bindings)
           (comp-decl-seq body env val? more?))
+         ((and (null (cdr body))
+               (consp (car body))
+               (eq 'let* (caar body)))
+          (comp-let* (append bindings (cadar body))
+                     (cddar body)
+                     env val? more?))
          ((with-seq-output <<
             (with-declarations body
               (let* ((bindings (get-bindings bindings t))
@@ -2055,6 +2074,16 @@
   (let ((*package* *package*)
         (*read-table* *read-table*))
     (%load url)))
+
+;;; multiple values
+
+(defmacro multiple-value-call (fn &rest values)
+  `(apply ,fn (nconc ,@(map1 (lambda (form)
+                               `(multiple-value-list ,form))
+                             values))))
+
+(defun values-list (list)
+  (apply #'values list))
 
 (%global! '*core-files*)
 (setq *core-files*
