@@ -130,8 +130,8 @@ const OP_LEN = [
     1 /* TJUMP */,
     1 /* FJUMP */,
     0 /* BLOCK */,
-    1 /* LJUMP */,
-    1 /* LRET */,
+    2 /* LJUMP */,
+    2 /* LRET */,
     0 /* NOT */,
     0 /* SETCC */,
     1 /* SAVE */,
@@ -188,7 +188,7 @@ const OP_LEN = [
     0 /* CDDDAR */,
     0 /* CDDDDR */,
     0 /* PROGV */,
-    1 /* LRET2 */,
+    2 /* LRET2 */,
     2 /* LJUMP2 */,
     5 /* XARGS */,
     2 /* LPOP */,
@@ -377,16 +377,14 @@ var optimize = (function(){
             code.splice(i, 2, [ "TJUMPK", code[i+1][1] ]);
             return true;
         }
-        if (/^(?:JUMP|LJUMP|RET)$/.test(el[0])) {
+        if (/^(?:JUMP|LJUMP|RET|LRET|CALL)$/.test(el[0])) {
             for (var j = i + 1; j < code.length; ++j) {
-                if (code[j] instanceof LispSymbol) {
-                    let len = j - i - 1;
-                    if (len > 0) {
-                        code.splice(i + 1, len);
-                        return true;
-                    }
-                    break;
-                }
+                if (code[j] instanceof LispSymbol) break;
+            }
+            let len = j - i - 1;
+            if (len > 0) {
+                code.splice(i + 1, len);
+                return true;
             }
         }
         switch (el[0]) {
@@ -545,19 +543,8 @@ var optimize = (function(){
                 return true;
             }
             break;
-          case "CALL":
           case "RET":
-          case "LRET":
-            for (var j = i; ++j < code.length;) {
-                if (code[j] instanceof LispSymbol) {
-                    break;
-                }
-            }
-            if (j - i - 1 > 0) {
-                code.splice(i + 1, j - i - 1);
-                return true;
-            }
-            if (el[0] == "RET" && i+2 < code.length && code[i+1] instanceof LispSymbol && code[i+2][0] == "RET") {
+            if (i+2 < code.length && code[i+1] instanceof LispSymbol && code[i+2][0] == "RET") {
                 // RET; L1; RET --> L1; RET
                 code.splice(i, 3, code[i+1], el);
                 return true;
@@ -571,7 +558,12 @@ var optimize = (function(){
                     code.splice(i + 1, 1);
                     return true;
                 }
-                if ([ "RET", "LRET", "LJUMP" ].includes(code[i+1][0])) {
+                if ([ "RET" ].includes(code[i+1][0])) {
+                    code.splice(i, 1);
+                    return true;
+                }
+                if ([ "LRET", "LJUMP" ].includes(code[i+1][0]) && el[2] === 0) {
+                    code[i+1][2] += el[1];
                     code.splice(i, 1);
                     return true;
                 }
@@ -677,7 +669,7 @@ function constantp(x) {
         || Array.isArray(x);
 }
 
-function is_jump_instruction(op) {
+function op_has_label(op) {
     switch (op) {
       case OP.JUMP:
       case OP.TJUMP:
@@ -717,7 +709,7 @@ function assemble(code) {
             ret[i] = assemble(ret[i]);
             break;
           default:
-            if (is_jump_instruction(op))
+            if (op_has_label(op))
                 ret[i] = ret[i].value;
         }
         i += OP_LEN[op];
@@ -728,7 +720,7 @@ function assemble(code) {
 function relocate(code, offset) {
     for (let i = 0; i < code.length;) {
         let op = code[i++];
-        if (is_jump_instruction(op))
+        if (op_has_label(op))
             code[i] += offset;
         i += OP_LEN[op];
     }
@@ -773,10 +765,10 @@ export function disassemble(code) {
         let labels = Object.create(null);
         for (let i = 0; i < code.length;) {
             let op = code[i++];
-            if (is_jump_instruction(op)) {
+            if (op_has_label(op)) {
                 let addr = code[i];
                 if (!labels[addr]) {
-                    labels[addr] = "L" + (++lab);
+                    labels[addr] = LispSymbol.get("L" + (++lab));
                 }
             }
             i += OP_LEN[op];
@@ -799,12 +791,10 @@ export function disassemble(code) {
               case OP.CONST:
                 data = dump(code[i]);
                 break;
-              case OP.LJUMP:
-                data = code[i];
-                break;
               default:
-                if (is_jump_instruction(op)) {
-                    data = labels[code[i]];
+                if (op_has_label(op)) {
+                    data = [ labels[code[i]], ...code.slice(i + 1, i + OP_LEN[op]) ].map(el =>
+                        pad_string(dump(el), 8)).join("");
                     break;
                 }
                 data = code.slice(i, i + OP_LEN[op]).map(el =>
@@ -1220,12 +1210,15 @@ let OP_RUN = [
     },
     /*OP.LJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        m.pop().run(m, addr);
+        let fr = m.code[m.pc++];
+        frame(m.env, fr)[0].run(m, addr);
     },
     /*OP.LRET*/ (m) => {
         let noval = m.f.noval;
         let addr = m.code[m.pc++];
-        let bret = m.pop(), retval = m.stack.pop_ret();
+        let fr = m.code[m.pc++];
+        let retval = m.stack.pop_ret();
+        let bret = frame(m.env, fr)[0];
         if (!noval) {
             bret.run(m, addr, retval);
         } else {
@@ -1483,20 +1476,10 @@ let OP_RUN = [
         m.dynpush(frame);
     },
     /*OP.LRET2*/ (m) => {
-        error("Deprecated instruction LRET2");
-        let noval = m.f.noval;
-        let fr = m.code[m.pc++];
-        let retval = m.stack.pop_ret();
-        frame(m.env, fr)[0].run(m);
-        if (!noval) {
-            m.stack.push(retval);
-        }
+        error("Unused instruction slot");
     },
     /*OP.LJUMP2*/ (m) => {
-        error("Deprecated instruction LJUMP2");
-        let addr = m.code[m.pc++];
-        let fr = m.code[m.pc++];
-        frame(m.env, fr)[0].run(m, addr);
+        error("Unused instruction slot");
     },
     /*OP.XARGS*/ (m) => {
         let required = m.code[m.pc++];

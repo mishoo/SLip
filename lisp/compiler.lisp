@@ -998,10 +998,10 @@
         `(%op NUMNEQ ,(reduce-form (car nums)) ,(reduce-form (cadr nums)))))
 
   (define-compiler-macro plusp (val)
-    `(%op PLUSP ,val))
+    `(%op PLUSP ,(reduce-form val)))
 
   (define-compiler-macro minusp (val)
-    `(%op MINUSP ,val)))
+    `(%op MINUSP ,(reduce-form val))))
 
 (define-compiler-macro identity (x) x)
 
@@ -1442,10 +1442,9 @@
               (label (%pop data))
               (val? (%pop data)))
          (%seq (comp value env val? t)
-               (gen "LVAR" (car block) (cadr block))
                (if val?
-                   (gen "LRET" label)
-                   (gen "LJUMP" label)))))
+                   (gen "LRET" label (car block))
+                   (gen "LJUMP" label (car block))))))
 
      (comp-tagbody (forms env val? more?)
        ;; a TAGBODY introduces a single return point in the lexical
@@ -1487,10 +1486,8 @@
        (let ((pos (find-tag tag env)))
          (assert pos (strcat "TAG " tag " not found"))
          (let* ((tbody (find-tagbody (caddr pos) env))
-                (i (car tbody))
-                (j (cadr tbody)))
-           (%seq (gen "LVAR" i j)
-                 (gen "LJUMP" (cadddr pos))))))
+                (i (car tbody)))
+           (gen "LJUMP" (cadddr pos) i))))
 
      (comp-if (pred then else env val? more?)
        (cond
@@ -1640,69 +1637,63 @@
              (list lst)
              (cons (car lst) (make-true-list (cdr lst))))))
 
-     (comp-extended-lambda (name args body env)
-       (let* ((args (parse-lambda-list args))
-              (required (getf args :required))
-              (optional (getf args :optional))
-              (rest (getf args :rest))
-              (key (getf args :key))
-              (has-key (getf args :has-key))
-              (aux (getf args :aux))
-              (allow-other-keys (getf args :aok))
-              (names (append required
-                             (map1 #'car optional)
-                             (when rest (list rest))
-                             (map1 #'cadar key)
-                             (map1 #'car aux)))
-              (index 0)
-              (envcell (vector)))
-         (with-declarations body
-           (with-seq-output <<
-             (setq env (extenv env :lex envcell))
-             (labels ((newarg (name)
-                        (vector-push envcell (maybe-special name))
-                        (when (or (%specialp name)
-                                  (%memq name locally-special))
-                          (<< (gen "BIND" name index)))
-                        (incf index))
-                      (newdef (name defval supplied-p)
-                        (unless supplied-p
-                          (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
-                        (newarg supplied-p)
-                        (when defval
-                          (let ((l1 (mklabel)))
-                            (<< (gen "LVAR" 0 (1- index)) ;; supplied-p
-                                (gen "TJUMP" l1)          ;; if T then it's passed
-                                (with-env
-                                  (comp defval env t t))  ;; compile default value
-                                (gen "LSET" 0 index)      ;; set arg value in env
-                                (gen "POP")               ;; discard from stack
-                                (vector l1))))
-                        (newarg name)))
-               (<< (gen "XARGS"
-                        (length required)
-                        (length optional)
-                        (if rest 1 0)
-                        (when has-key (map1-vector #'caar key))
-                        allow-other-keys))
-               (foreach required #'newarg)
-               (foreach optional
-                        (lambda (opt)
-                          (newdef (car opt) (cadr opt) (caddr opt))))
-               (when rest (newarg rest))
-               (foreach key
-                        (lambda (key)
-                          (newdef (cadar key) (cadr key) (caddr key))))
-               (foreach aux
-                        (lambda (aux)
-                          (let ((name (car aux))
-                                (defval (cadr aux)))
-                            (when defval
-                              (<< (with-env (comp defval env t t))
-                                  (gen "VAR")))
-                            (newarg name))))
-               (declare-locally-special :except names)
-               (<< (with-env (comp-lambda-body name body env))))))))
+     (comp-extended-lambda
+         (name body env
+               &key required optional rest key has-key aux aok
+               &aux (names (append required
+                                   (map1 #'car optional)
+                                   (when rest (list rest))
+                                   (map1 #'cadar key)
+                                   (map1 #'car aux)))
+               (index 0)
+               (envcell (vector)))
+       (with-declarations body
+         (with-seq-output <<
+           (setq env (extenv env :lex envcell))
+           (labels ((newarg (name)
+                      (vector-push envcell (maybe-special name))
+                      (when (or (%specialp name)
+                                (%memq name locally-special))
+                        (<< (gen "BIND" name index)))
+                      (incf index))
+                    (newdef (name defval supplied-p)
+                      (unless supplied-p
+                        (setq supplied-p (gensym (strcat name "-SUPPLIED-P"))))
+                      (newarg supplied-p)
+                      (when defval
+                        (let ((l1 (mklabel)))
+                          (<< (gen "LVAR" 0 (1- index)) ;; supplied-p
+                              (gen "TJUMP" l1)          ;; if T then it's passed
+                              (with-env
+                                (comp defval env t t))  ;; compile default value
+                              (gen "LSET" 0 index)      ;; set arg value in env
+                              (gen "POP")               ;; discard from stack
+                              (vector l1))))
+                      (newarg name)))
+             (<< (gen "XARGS"
+                      (length required)
+                      (length optional)
+                      (if rest 1 0)
+                      (when has-key (map1-vector #'caar key))
+                      aok))
+             (foreach required #'newarg)
+             (foreach optional
+                      (lambda (opt)
+                        (newdef (car opt) (cadr opt) (caddr opt))))
+             (when rest (newarg rest))
+             (foreach key
+                      (lambda (key)
+                        (newdef (cadar key) (cadr key) (caddr key))))
+             (foreach aux
+                      (lambda (aux)
+                        (let ((name (car aux))
+                              (defval (cadr aux)))
+                          (when defval
+                            (<< (with-env (comp defval env t t))
+                                (gen "VAR")))
+                          (newarg name))))
+             (declare-locally-special :except names)
+             (<< (with-env (comp-lambda-body name body env)))))))
 
      (comp-lambda (name args body env)
        (gen "FN"
@@ -1726,7 +1717,7 @@
                               (declare-locally-special)
                               (<< (with-env (comp-lambda-body name body env)))))))))))
               (if (eq code '$xargs)
-                  (comp-extended-lambda name args body env)
+                  (apply #'comp-extended-lambda name body env (parse-lambda-list args))
                   code))
             name))
 
