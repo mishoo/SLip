@@ -488,22 +488,22 @@
 (defparser (minimize minimizing) args
   (extremizing "min" 'min args))
 
-(defun parse-with-and (args)
+(defun maybe-more-clauses (args)
   (setf args (parse-clause args))
   (if (iskw (car args) 'and)
-      (parse-with-and (cdr args))
+      (maybe-more-clauses (cdr args))
       args))
 
 (defun parse-conditional (args negated)
   (let ((condition (pop args))
         (then-body (let* ((loop-iterate (cons nil nil))
                           (*loop-iterate* loop-iterate))
-                     (setf args (parse-with-and args))
+                     (setf args (maybe-more-clauses args))
                      (cdr loop-iterate)))
         (else-body (when (iskw (car args) 'else)
                      (let* ((loop-iterate (cons nil nil))
                             (*loop-iterate* loop-iterate))
-                       (setf args (parse-with-and (cdr args)))
+                       (setf args (maybe-more-clauses (cdr args)))
                        (cdr loop-iterate)))))
     (let ((form `(if ,(if negated
                           `(not ,condition)
@@ -611,11 +611,11 @@
     `(block ,*loop-block-name*
        (let (,@(cdr @loop-variables))
          (tagbody
-            ,@(cdr @loop-start)
+          ,@(cdr @loop-start)
           $loop-next
-            ,@(cdr @loop-iterate)
-            ,@(cdr @loop-body)
-            (go $loop-next)
+          ,@(cdr @loop-iterate)
+          ,@(cdr @loop-body)
+          (go $loop-next)
           $loop-end)
          ,@(cdr @loop-finish)))))
 
