@@ -458,7 +458,7 @@
        (let ((item (gensym "item")))
          `(let ((,item ,obj)
                 ,@(map2 #'list temps value-forms))
-            (let ((,(car store-vars) (cons ,item ,get-form)))
+            (symbol-macrolet ((,(car store-vars) (cons ,item ,get-form)))
               ,store-form)))))))
 
 (defmacro pop (place)
@@ -469,9 +469,9 @@
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                             (get-setf-expansion place)
          `(let* (,@(map2 #'list temps value-forms)
-                 (,v ,get-form)
-                 (,(car store-vars) (cdr ,v)))
-            ,store-form
+                 (,v ,get-form))
+            (symbol-macrolet ((,(car store-vars) (cdr ,v)))
+              ,store-form)
             (car ,v)))))))
 
 (define-setf-expander getf (place indicator &optional default)
@@ -483,8 +483,7 @@
       (values `(,@place-tempvars ,vindicator ,vdefault)
               `(,@place-tempvals ,indicator ,default)
               `(,newval)
-              `(let ((,(car stores) (%:%putf ,get ,vindicator ,newval))
-                     ,@(cdr stores))
+              `(symbol-macrolet ((,(car stores) (%:%putf ,get ,vindicator ,newval)))
                  ,set
                  ,newval)
               `(getf ,get ,vindicator ,vdefault)))))
@@ -735,7 +734,7 @@
       `(let* ((,vobj ,obj)
               ,@(mapcar #'list temps vals)
               (,vcurr ,get))
-         (let ((,(car stores) (adjoin ,vobj ,vcurr ,@args)))
+         (symbol-macrolet ((,(car stores) (adjoin ,vobj ,vcurr ,@args)))
            ,set)))))
 
 (defun nth (n list)
