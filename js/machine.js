@@ -941,10 +941,10 @@ export class LispMachine {
         return this.stack.pop_frame(n);
     }
 
-    pop_number(error) {
+    pop_number(err = error) {
         var n = this.pop();
         if (typeof n == "number") return n;
-        return error("Number expected, got " + dump(n), n);
+        return err("Number expected, got " + dump(n), n);
     }
 
     mkret(pc) {
