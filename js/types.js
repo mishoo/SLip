@@ -179,13 +179,10 @@ export class LispHash {
     static type = "simple-hash";
     static is(x) { return x instanceof LispHash }
     static fromObject(obj) {
-        var hash = new LispHash;
-        hash.data = new Map(Object.entries(obj));
-        return hash;
+        return new LispHash(Object.entries(obj));
     }
-    constructor(parent = null) {
-        this.data = new Map();
-        this.parent = parent;
+    constructor(init = null) {
+        this.data = new Map(init);
     }
     toObject() {
         let obj = Object.create(null);
@@ -193,13 +190,7 @@ export class LispHash {
         return obj;
     }
     get(key) {
-        let hash = this;
-        while (hash) {
-            if (hash.data.has(key))
-                return hash.data.get(key);
-            hash = hash.parent;
-        }
-        return null;
+        return this.data.get(key);
     }
     set(name, val) {
         this.data.set(name, val);
@@ -209,13 +200,7 @@ export class LispHash {
         this.data.delete(name);
     }
     has(key) {
-        let hash = this;
-        while (hash) {
-            if (hash.data.has(key))
-                return hash;
-            hash = hash.parent;
-        }
-        return null;
+        return this.data.has(key) ? true : null;
     }
     size() {
         return this.data.size;
@@ -224,7 +209,7 @@ export class LispHash {
         return "h(" + LispChar.sanitize(JSON.stringify(this.toObject())) + ")";
     }
     copy() {
-        return new LispHash(this);
+        return new LispHash(this.data);
     }
     keys() {
         return [ ...this.data.keys() ];

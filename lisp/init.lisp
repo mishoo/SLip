@@ -39,7 +39,7 @@
           abs sin asin cos acos tan atan exp log sqrt expt random
           min max
 
-          make-hash hashp hash-get hash-set hash-add hash-copy hash-keys hash-values
+          make-hash hashp hash-get hash-set hash-copy hash-keys hash-values
           hash-iterator iterator-next
 
           macroexpand-1 disassemble
@@ -786,7 +786,7 @@
          (defun ,name ,args
            (declare ,@declarations)
            (or (hash-get ,memo ,(car args))
-               (hash-add ,memo ,(car args) (progn ,@body))))))))
+               (hash-set ,memo ,(car args) (progn ,@body))))))))
 
 (defmacro prog (bindings &body body)
   (multiple-value-bind (body declarations) (%:dig-declarations body)

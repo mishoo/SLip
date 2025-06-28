@@ -1199,24 +1199,13 @@ defp("hash-get", false, function(m, nargs){
     var def = (nargs == 3) ? m.pop() : null;
     var key = m.pop(), hash = m.pop();
     checktype(hash, LispHash);
-    var h = hash.has(key);
-    if (h) return h.get(key);
-    return def;
-});
-
-defp("hash-add", true, function(m, nargs){
-    checknargs(nargs, 3, 3);
-    var val = m.pop(), key = m.pop(), hash = m.pop();
-    checktype(hash, LispHash);
-    return hash.set(key, val);
+    return hash.has(key) ? hash.get(key) : def;
 });
 
 defp("hash-set", true, function(m, nargs){
     checknargs(nargs, 3, 3);
     var val = m.pop(), key = m.pop(), hash = m.pop();
     checktype(hash, LispHash);
-    var h = hash.has(key);
-    if (h) return h.set(key, val);
     return hash.set(key, val);
 });
 

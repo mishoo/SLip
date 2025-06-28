@@ -31,7 +31,7 @@
 
 (defmacro def-format (char cmdargs &body body)
   (let ((v (gensym)))
-    `(hash-add *format-handlers* ,(upcase char)
+    `(hash-set *format-handlers* ,(upcase char)
                (lambda (output args colmod? atmod? . ,v)
                  (with-format-args ,cmdargs ,v ,@body)))))
 

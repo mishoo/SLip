@@ -1019,7 +1019,7 @@
          (when stuff
            (let ((key (car stuff))
                  (val (cadr stuff)))
-             (hash-add h key (cons val (hash-get h key)))
+             (hash-set h key (cons val (hash-get h key)))
              (rec (cddr stuff)))))
        h))
     (env)))
