@@ -785,9 +785,6 @@ export function disassemble(code) {
                 opcode = "FN " + code[i + 1];
                 data = "\n" + disassemble(code[i], level + 1);
                 break;
-              case OP.PRIM:
-                data = code[i] + " " + code[i + 1];
-                break;
               case OP.CONST:
                 data = dump(code[i]);
                 break;
