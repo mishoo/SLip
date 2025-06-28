@@ -211,14 +211,14 @@ function all_different(a) {
 defp("/=", false, function(m, nargs){
     checknargs(nargs, 1);
     if (nargs === 1) {
-        m.pop_number(error);
+        m.pop_number();
         return true;
     }
     if (nargs === 2) {
-        return m.pop_number(error) === m.pop_number(error) ? null : true;
+        return m.pop_number() === m.pop_number() ? null : true;
     }
     var a = [];
-    while (nargs-- > 0) a.push(m.pop_number(error));
+    while (nargs-- > 0) a.push(m.pop_number());
     return all_different(a);
 });
 
@@ -244,7 +244,7 @@ defp("not", false, function(m, nargs){
 defp("+", false, function(m, nargs){
     var ret = 0;
     while (nargs-- > 0) {
-        ret += m.pop_number(error);
+        ret += m.pop_number();
     }
     return ret;
 });
@@ -252,7 +252,7 @@ defp("+", false, function(m, nargs){
 defp("*", false, function(m, nargs){
     var ret = 1;
     while (nargs-- > 0) {
-        ret *= m.pop_number(error);
+        ret *= m.pop_number();
     }
     return ret;
 });
@@ -262,7 +262,7 @@ defp("-", false, function(m, nargs){
     var i = nargs;
     var a = [];
     while (--i >= 0) {
-        a[i] = m.pop_number(error);
+        a[i] = m.pop_number();
     }
     var ret = a[++i];
     if (nargs == 1) ret = -ret;
@@ -277,7 +277,7 @@ defp("/", false, function(m, nargs){
     var i = nargs;
     var a = [];
     while (--i >= 0) {
-        a[i] = m.pop_number(error);
+        a[i] = m.pop_number();
     }
     var ret = a[++i];
     if (nargs == 1) ret = 1/ret;
@@ -289,12 +289,12 @@ defp("/", false, function(m, nargs){
 
 defp("1+", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return m.pop_number(error) + 1;
+    return m.pop_number() + 1;
 });
 
 defp("1-", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return m.pop_number(error) - 1;
+    return m.pop_number() - 1;
 });
 
 [
@@ -317,7 +317,7 @@ defp("1-", false, function(m, nargs){
 
 defp("mod", false, function(m, nargs){
     checknargs(nargs, 2, 2);
-    var a = m.pop_number(error), b = m.pop_number(error);
+    var a = m.pop_number(), b = m.pop_number();
     return b % a;
 });
 
@@ -337,14 +337,14 @@ defp("mod", false, function(m, nargs){
     var func = f[1];
     defp(f[0], false, function(m, nargs){
         checknargs(nargs, 1, 1);
-        return func(m.pop_number(error));
+        return func(m.pop_number());
     });
 });
 
 defp("expt", false, function(m, nargs){
     checknargs(nargs, 2, 2);
-    let exp = m.pop_number(error);
-    let base = m.pop_number(error);
+    let exp = m.pop_number();
+    let base = m.pop_number();
     return Math.pow(base, exp);
 });
 
@@ -884,16 +884,16 @@ defp("letterp", false, function(m, nargs){
         // numeric ops; numeric /= is defined elsewhere
         defp(name, false, function(m, nargs){
             checknargs(nargs, 1);
-            let prev = m.pop_number(error);
+            let prev = m.pop_number();
             if (nargs === 1) {
                 return true;
             }
             if (nargs === 2) {
-                return cmp(m.pop_number(error), prev) ? true : null;
+                return cmp(m.pop_number(), prev) ? true : null;
             }
             let ret = true;
             while (--nargs > 0) {
-                let el = m.pop_number(error);
+                let el = m.pop_number();
                 if (ret && !cmp(el, prev)) ret = null;
                 prev = el;
             }
@@ -1067,27 +1067,27 @@ defp("threadp", false, function(m, nargs){
 
 defp("zerop", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var x = m.pop_number(error);
+    var x = m.pop_number();
     return x == 0 ? true : null;
 });
 defp("minusp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var x = m.pop_number(error);
+    var x = m.pop_number();
     return x < 0 ? true : null;
 });
 defp("plusp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var x = m.pop_number(error);
+    var x = m.pop_number();
     return x > 0 ? true : null;
 });
 defp("evenp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var x = m.pop_number(error);
+    var x = m.pop_number();
     return x % 2 == 0 ? true : null;
 });
 defp("oddp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var x = m.pop_number(error);
+    var x = m.pop_number();
     return x % 2 == 1 ? true : null;
 });
 

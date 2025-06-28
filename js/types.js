@@ -1,8 +1,12 @@
 import { LispMachine,
          STATUS_RUNNING,
          STATUS_WAITING,
-         STATUS_LOCKED } from "./machine.js";
+         STATUS_LOCKED,
+         STATUS_HALTED,
+         LispRet,
+       } from "./machine.js";
 import { LispCons } from "./list.js";
+import { LispPrimitiveError } from "./error.js";
 
 export class LispChar {
     static type = "char";
@@ -95,7 +99,6 @@ export class LispClosure {
         this.code = code;
         this.name = name || null;
         this.env = env || null;
-        this.noval = false;
     }
     copy() {
         return new LispClosure(this.code, this.name, this.env);
@@ -504,23 +507,47 @@ let PID = 0;
 let QUEUE = new LispQueue();
 
 const run = () => {
-    let count = 2500, startTime = Date.now();
-    while (true) {
-        if (!--count) {
-            if (Date.now() - startTime > 100) break;
-            count = 2500;
-        }
-        let cell = QUEUE.pop();
-        if (!cell) return;
-        let p = cell.car;
-        if (p instanceof LispProcess) {
-            p.run(200);
-            if (p.m.status === STATUS_RUNNING) {
-                // still running, re-enqueue; we avoid consing a new cell.
-                QUEUE.reenq(cell);
+    let count = 0, startTime = Date.now(), process, cell;
+    try {
+        while (true) {
+            if ((++count & 511) === 0) {
+                if (Date.now() - startTime > 10) {
+                    break;
+                }
+            }
+            cell = QUEUE.pop();
+            if (!cell) return;
+            process = cell.car;
+            if (process instanceof LispProcess) {
+                process.run(100);
+                if (process.m.status === STATUS_RUNNING) {
+                    // still running, re-enqueue; we avoid consing a new cell.
+                    QUEUE.reenq(cell);
+                }
+            }
+            else {
+                console.error("Unknown object in scheduler queue", process);
             }
         }
-        else throw new Error("Unknown object in scheduler queue");
+    } catch(ex) {
+        if (ex instanceof LispPrimitiveError) {
+            var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
+            if (process.m.status === STATUS_RUNNING) {
+                if (pe && pe.function) {
+                    // RETHROW as Lisp error.
+                    process.m._callnext(pe.function, LispCons.fromArray(["~A", ex.message]));
+                }
+                QUEUE.reenq(cell);
+            }
+        } else {
+            // we fucked up.
+            process.m.status = STATUS_HALTED;
+            console.error("Error in PID: ", process.pid);
+            console.log(process.m.backtrace());
+            console.dir(ex);
+            console.dir(ex.stack);
+            console.log(process);
+        }
     }
     setTimeout(run, 0);
 };
@@ -547,21 +574,15 @@ export class LispProcess {
     }
 
     resume() {
-        this.receivers = null;
         this.m.status = STATUS_RUNNING;
         QUEUE.push(this);
         start();
     }
 
     run(quota) {
-        let err = this.m.run(quota);
-        if (err) {
-            console.error("Error in PID: ", this.pid);
-            console.log(this.m.backtrace());
-            console.dir(err);
-            console.dir(err.stack);
-            console.log(this);
-        }
+        do {
+            this.m.run(quota);
+        } while (this.noint && this.m.status === STATUS_RUNNING);
     }
 
     sendmsg(target, signal, args) {
@@ -571,8 +592,9 @@ export class LispProcess {
     }
 
     receive(receivers) {
-        if (this.m.status !== STATUS_RUNNING)
+        if (this.m.status !== STATUS_RUNNING) {
             throw new Error("Process not running");
+        }
         this.receivers = receivers;
         this.m.status = STATUS_WAITING;
         return false;
@@ -600,9 +622,10 @@ export class LispProcess {
 
     set_timeout(timeout, closure) {
         closure = closure.copy();
-        closure.noval = true;
         var tm = setTimeout(() => {
-            this.m._callnext(closure, null);
+            this.m.push(new LispRet(this.m, this.m.pc, true));
+            this.m.n_args = 0;
+            this.m._callnext(closure, false);
             this.resume();
         }, timeout);
         return tm;

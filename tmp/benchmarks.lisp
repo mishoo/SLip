@@ -25,3 +25,17 @@
       n
       (+ (fib (- n 1))
          (fib (- n 2)))))
+
+(defun test-timers ()
+  (let ((finished nil)
+        (count 0))
+    (labels ((timer ()
+               (cond
+                 (finished
+                  (format t "Stopping. ~A!~%" count))
+                 (t
+                  (format t "Woot ~A!~%" (incf count))
+                  (set-timeout 100 #'timer)))))
+      (timer)
+      (multiple-value-prog1 (test (fib 32))
+        (setf finished 'done)))))

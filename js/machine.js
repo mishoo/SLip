@@ -219,23 +219,27 @@ export function want_bound(name, val) {
 }
 
 // normal RET context
-class LispRet {
-    constructor(m, pc) {
+export class LispRet {
+    constructor(m, pc, noretval) {
         this.f = m.f;
         this.code = m.code;
         this.pc = pc;
         this.env = m.env;
         this.denv = m.denv;
         this.n_args = m.n_args;
+        this.noretval = noretval;
         //if (m.trace) this.trace = m.trace.slice();
     }
-    run(m) {
+    run(m, retval) {
         m.f = this.f;
         m.code = this.code;
         m.pc = this.pc;
         m.env = this.env;
         m.denv = this.denv;
         m.n_args = this.n_args;
+        if (!this.noretval) {
+            m.push(retval);
+        }
         //if (this.trace) m.trace = this.trace;
     }
 }
@@ -252,7 +256,6 @@ class LispCleanup {
 
 // return context for TAGBODY and BLOCK
 class LispLongRet {
-    static #NO_RET = {};
     constructor(m) {
         this.f = m.f;
         this.code = m.code;
@@ -272,7 +275,7 @@ class LispLongRet {
         m.n_args = this.n_args;
         //if (this.trace) m.trace = this.trace;
     }
-    run(m, addr, val = LispLongRet.#NO_RET) {
+    run(m, addr, retval) {
         // figure out if we need to execute cleanup hooks
         let doit;
         (doit = (m) => {
@@ -287,7 +290,7 @@ class LispLongRet {
                 p = p.cdr;
             }
             this.unwind(m, addr);
-            if (val !== LispLongRet.#NO_RET) m.push(val);
+            if (arguments.length === 3) m.push(retval);
         })(m);
     }
 }
@@ -895,7 +898,7 @@ export class LispMachine {
 
     constructor(pm) {
         this.code = null;
-        this.pc = null;
+        this.pc = -1;
         this.stack = null;
         this.env = null;
         this.denv = pm ? pm.denv : null;
@@ -941,10 +944,10 @@ export class LispMachine {
         return this.stack.pop_frame(n);
     }
 
-    pop_number(err = error) {
+    pop_number() {
         var n = this.pop();
-        if (typeof n == "number") return n;
-        return err("Number expected, got " + dump(n), n);
+        if (typeof n === "number") return n;
+        return error("Number expected, got " + dump(n), n);
     }
 
     mkret(pc) {
@@ -960,9 +963,8 @@ export class LispMachine {
     }
 
     loop() {
-        while (this.pc < this.code.length) {
+        while (this.pc >= 0 && this.pc < this.code.length) {
             vmrun(this);
-            if (this.pc === null) break;
         }
         return this.stack.sp > 0 ? this.pop() : null;
     }
@@ -980,7 +982,7 @@ export class LispMachine {
         //var save_trace = this.trace;
         this.code = closure.code;
         this.env = closure.env;
-        this.stack = new LispStack().restore([ new LispRet(this, null) ].concat(args));
+        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
@@ -1010,16 +1012,14 @@ export class LispMachine {
 
     _call(closure, args) {
         args = LispCons.toArray(args);
-        this.stack = new LispStack().restore([ new LispRet(this, null) ].concat(args));
+        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
         this.code = closure.code;
         this.env = closure.env;
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
-        while (true) {
-            if (this.pc === null) return this.pop();
-            vmrun(this);
-        }
+        while (this.pc >= 0) vmrun(this);
+        return this.pop();
     }
 
     _callnext(closure, args) {
@@ -1042,7 +1042,7 @@ export class LispMachine {
     }
 
     set_closure(closure, ...args) {
-        this.stack = new LispStack().restore([ new LispRet(this, null) ].concat(args));
+        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
         this.code = closure.code;
         this.env = closure.env;
         this.n_args = args.length;
@@ -1052,31 +1052,14 @@ export class LispMachine {
     }
 
     run(quota) {
-        var err = null;
-        try {
-            while (quota-- > 0) {
-                if (this.pc === null) {
-                    this.status = STATUS_FINISHED;
-                    break;
-                }
-                vmrun(this);
-                if (this.status !== STATUS_RUNNING)
-                    break;
+        while (quota-- > 0) {
+            if (this.pc < 0) {
+                this.status = STATUS_FINISHED;
+                break;
             }
-        } catch(ex) {
-            if (ex instanceof LispPrimitiveError) {
-                var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
-                if (pe && pe.function) {
-                    // RETHROW as Lisp error.
-                    this._callnext(pe.function, LispCons.fromArray([ "~A", ex.message ]));
-                    return null;
-                }
-            }
-            // we fucked up.
-            this.status = STATUS_HALTED;
-            err = this.error = ex;
+            vmrun(this);
+            if (this.status !== STATUS_RUNNING) break;
         }
-        return err;
     }
 
     dump(expr) {
@@ -1211,16 +1194,11 @@ let OP_RUN = [
         frame(m.env, fr)[0].run(m, addr);
     },
     /*OP.LRET*/ (m) => {
-        let noval = m.f.noval;
         let addr = m.code[m.pc++];
         let fr = m.code[m.pc++];
         let retval = m.stack.pop_ret();
         let bret = frame(m.env, fr)[0];
-        if (!noval) {
-            bret.run(m, addr, retval);
-        } else {
-            bret.run(m, addr);
-        }
+        bret.run(m, addr, retval);
     },
     /*OP.NOT*/ (m) => {
         m.push(m.pop() === null ? true : null);
@@ -1233,14 +1211,10 @@ let OP_RUN = [
         m.push(m.mkret(addr));
     },
     /*OP.RET*/ (m) => {
-        let noval = m.f.noval;
         // using m.stack directly, rather than m.pop, since we'd like
         // to keep multiple values around for the caller.
         let retval = m.stack.pop_ret();
-        m.stack.pop().run(m);
-        if (!noval) {
-            m.stack.push(retval);
-        }
+        m.stack.pop().run(m, retval);
     },
     /*OP.CALL*/ (m) => {
         let count = m.code[m.pc++];
