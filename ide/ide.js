@@ -793,7 +793,6 @@ ${fasls.map(f => `;;     - ${f}\n`).join("")}\
 export function make_desktop(load_files = []) {
     window.addEventListener("beforeunload", ev => {
         ev.preventDefault();
-        return ev.returnValue = true;
     });
     var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL({ ls_keyName: ".slip" });
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {

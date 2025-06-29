@@ -1160,7 +1160,7 @@
                (gen "GSET" (unknown-variable name env)))))
 
      (mklabel ()
-       (gensym "label"))
+       (gensym "L"))
 
      (macro (sym env)
        (aif (find-func sym env)
@@ -1346,12 +1346,12 @@
      (comp-const (x val? more?)
        (when val?
          (%seq (gen "CONST" x)
-               (if more? nil (gen "RET")))))
+               (unless more? (gen "RET")))))
 
      (comp-var (x env val? more?)
        (when val?
          (%seq (gen-var x env)
-               (if more? nil (gen "RET")))))
+               (unless more? (gen "RET")))))
 
      (comp-seq (exps env val? more?)
        (cond
@@ -1471,8 +1471,7 @@
            (cond
              ((null tags)
               (<< (comp-seq forms env nil t)
-                  (when val? (gen "NIL"))
-                  (unless more? (gen "RET"))))
+                  (comp-const nil val? more?)))
              ((with-extenv (:tags (as-vector tags) :lex (vector (list tbody :tagbody)))
                 (<< (gen "BLOCK"))           ; define the tagbody entry
                 (foreach forms (lambda (x)
@@ -1533,8 +1532,7 @@
      (comp-or (exps env val? more? &optional l1)
        (cond
          ((null exps)
-          (%seq (when val? (gen "NIL"))
-                (unless more? (gen "RET"))))
+          (comp-const nil val? more?))
          ((and (consp (car exps))
                (eq 'or (caar exps)))
           (comp-or (append (cdar exps) (cdr exps))
@@ -1931,8 +1929,7 @@
                            (gen "UNFR" 0 1)
                            (gen "RET"))
                        (gen "POP"))))
-           (%seq (when val? (gen "NIL"))
-                 (unless more? (gen "RET")))))
+           (comp-const nil val? more?)))
 
      (comp-throw (tag ret env)
        (%seq (comp tag env t t)

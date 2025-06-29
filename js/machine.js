@@ -1120,7 +1120,7 @@ function find_key_arg(item, array, start, end = array.length) {
 }
 
 let OP_RUN = [
-    /*NOP*/ () => {},
+    /*OP.NOP*/ () => {},
     /*OP.LVAR*/ (m) => {
         let i = m.code[m.pc++];
         let j = m.code[m.pc++];
@@ -1203,8 +1203,11 @@ let OP_RUN = [
         let retval = m.n_args === 0 ? null
             : m.n_args === 1 ? m.stack.pop_ret()
             : error(`Too many arguments in continuation call (${m.n_args})`);
-        // m.env *is* the continuation object. (class LispCC above)
+        // m.env *is* the continuation object (class LispCC above).
         m.env.run(m);
+        // top of stack is expected to contain a return object (class
+        // LispRet) that will reinstate the code and address that
+        // call/cc was returing to.
         m.stack.pop().run(m, retval);
     },
     /*OP.SAVE*/ (m) => {
@@ -1330,14 +1333,12 @@ let OP_RUN = [
     /*OP.LIST*/ (m) => {
         let count = m.code[m.pc++];
         let p = null, n = count;
-        if (n === -1) n = m.n_args;
         while (n-- > 0) p = new LispCons(m.pop(), p);
         m.push(p);
     },
     /*OP.LIST_*/ (m) => {
         let count = m.code[m.pc++];
         let p = m.pop(), n = count;
-        if (n === -1) n = m.n_args;
         while (--n > 0) p = new LispCons(m.pop(), p);
         m.push(p);
     },
