@@ -42,30 +42,29 @@
 
 ;; shift, reset, yield. https://lisperator.net/pltut/cps-evaluator/yield
 
-(defglobal pstack nil)
-(defglobal goto nil)
-
-(defun reset (thunk)
-  (call/cc (lambda (k)
-             (push k pstack)
-             (funcall goto thunk))))
-
-(defun shift (f)
-  (call/cc
-   (lambda (k)
-     (funcall goto (lambda ()
-                     (funcall f (lambda (v)
-                                  (call/cc
-                                   (lambda (k1)
-                                     (push k1 pstack)
-                                     (funcall k v))))))))))
+(defparameter pstack nil)
 
 (let ((v (call/cc (lambda (k)
-                    (setf goto k)
+                    (setf (symbol-function 'goto) k)
                     (funcall k nil)))))
   (when v
     (let ((r (funcall v)))
       (funcall (pop pstack) r))))
+
+(defun reset (thunk)
+  (call/cc (lambda (k)
+             (push k pstack)
+             (goto thunk))))
+
+(defun shift (f)
+  (call/cc
+   (lambda (k)
+     (goto (lambda ()
+             (funcall f (lambda (&optional v)
+                          (call/cc
+                           (lambda (k1)
+                             (push k1 pstack)
+                             (funcall k v))))))))))
 
 (defun call-with-yield (func)
   (let ((yield (lambda (val)
@@ -76,7 +75,22 @@
       (reset (lambda ()
                (funcall func val))))))
 
-(defparameter tmp (call-with-yield
-                   (lambda (yield)
-                     (loop for i from 1 to 10 do (funcall yield i))
-                     'done)))
+(defmacro defun/yield (name args &body body)
+  (let ((func (gensym (symbol-name name))))
+    `(macrolet ((yield (val)
+                  `(shift (lambda (k)
+                            (setf ,',func k)
+                            ,val))))
+       (let (,func)
+         (setf ,func (%:%fn ,name ,args ,@body))
+         (setf (symbol-function ',name)
+               (lambda args
+                 (reset (lambda ()
+                          (apply ,func args)))))))))
+
+(defun/yield fib ()
+  (let rec ((a 1)
+            (b 1))
+    (yield b)
+    (rec b (+ a b))))
+

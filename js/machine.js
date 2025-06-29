@@ -1105,11 +1105,7 @@ function eq(a, b) {
 }
 
 let CC_CODE = assemble([
-    ["ARGS", 1],
-    ["LVAR", 1, 0],
     ["SETCC"],
-    ["LVAR", 0, 0],
-    ["RET"]
 ]);
 
 function error(msg) {
@@ -1204,7 +1200,12 @@ let OP_RUN = [
         m.push(m.pop() === null ? true : null);
     },
     /*OP.SETCC*/ (m) => {
-        m.stack.top().run(m);
+        let retval = m.n_args === 0 ? null
+            : m.n_args === 1 ? m.stack.pop_ret()
+            : error(`Too many arguments in continuation call (${m.n_args})`);
+        // m.env *is* the continuation object. (class LispCC above)
+        m.env.run(m);
+        m.stack.pop().run(m, retval);
     },
     /*OP.SAVE*/ (m) => {
         let addr = m.code[m.pc++];
@@ -1341,7 +1342,7 @@ let OP_RUN = [
         m.push(p);
     },
     /*OP.CC*/ (m) => {
-        m.push(new LispClosure(CC_CODE, null, new LispCons([m.mkcont()])));
+        m.push(new LispClosure(CC_CODE, null, m.mkcont()));
     },
     /*OP.CAR*/ (m) => {
         m.push(LispCons.car(m.pop()));
