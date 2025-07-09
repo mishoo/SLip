@@ -459,11 +459,8 @@ defp("reverse", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop();
     if (LispList.is(x)) return LispCons.reverse(x);
-    if (LispVector.is(x)) return [...x].reverse();
-    if (LispString.is(x)) {
-        for (var i = x.length, ret = ""; --i >= 0;) ret += x.charAt(i);
-        return ret;
-    }
+    if (LispVector.is(x)) return x.slice().reverse();
+    if (LispString.is(x)) return [...x].reverse().join("");
     error("Unrecognized sequence in reverse");
 });
 
@@ -472,6 +469,7 @@ defp("nreverse", true, function(m, nargs){
     var x = m.pop();
     if (LispList.is(x)) return LispCons.nreverse(x);
     if (LispVector.is(x)) return x.reverse();
+    if (LispString.is(x)) return [...x].reverse().join("");
     error("Unrecognized sequence in nreverse");
 });
 
@@ -1210,7 +1208,9 @@ defp("hash-get", false, function(m, nargs){
     var def = (nargs == 3) ? m.pop() : null;
     var key = m.pop(), hash = m.pop();
     checktype(hash, LispHash);
-    return hash.has(key) ? hash.get(key) : def;
+    var exists = hash.has(key);
+    m.stack.set_values_array(exists ? [ hash.get(key), true ] : [ def, null ]);
+    return false;
 });
 
 defp("hash-set", true, function(m, nargs){

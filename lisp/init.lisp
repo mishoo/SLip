@@ -12,7 +12,7 @@
   (%use-package main user)
   (setq exported
         '(atom quasiquote defmacro defun when unless labels flet foreach
-          prog1 prog2 or and cond member case otherwise mapcar mapc with-cc aif it push
+          prog1 prog2 or and cond member case otherwise mapcar mapc aif it push
           error warn without-interrupts
           eval compile load function functionp unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
@@ -784,10 +784,26 @@
   (let ((memo (gensym "memo")))
     (multiple-value-bind (body declarations) (%:dig-declarations body)
       `(let ((,memo (make-hash)))
+         (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
          (defun ,name ,args
            (declare ,@declarations)
            (or (hash-get ,memo ,(car args))
                (hash-set ,memo ,(car args) (progn ,@body))))))))
+
+(defmacro defun-memoize2 (name args &body body)
+  (let ((memo (gensym "memo")))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(let ((,memo (make-hash)))
+         (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
+         (defun ,name ,args
+           (declare ,@declarations)
+           (aif (hash-get ,memo ,(car args))
+                (or (hash-get it ,(cadr args))
+                    (hash-set it ,(cadr args) (progn ,@body)))
+                (let ((val (progn ,@body)))
+                  (hash-set ,memo ,(car args)
+                            (make-hash ,(cadr args) val))
+                  val)))))))
 
 (defmacro prog (bindings &body body)
   (multiple-value-bind (body declarations) (%:dig-declarations body)
