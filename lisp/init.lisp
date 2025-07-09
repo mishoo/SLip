@@ -73,7 +73,9 @@
           define-compiler-macro incf decf dolist collect-if remove
           remove-duplicates merge stable-sort dotimes do do* complement adjoin
           pushnew nth use-package with-output-to-string prog prog* make-list
-          make-array aref copy-tree))
+          make-array aref copy-tree
+
+          sxhash))
 
   (%export exported boot)
   (%export exported main)

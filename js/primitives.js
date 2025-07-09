@@ -68,6 +68,8 @@ function boxit(stuff) {
     return stuff;
 };
 
+var PRIMITIVES_XREF = [];
+
 function defp(name, seff, func) {
     name = name.toUpperCase();
     var sym = BASE_PACK.intern(name);
@@ -79,6 +81,15 @@ function defp(name, seff, func) {
     sym.setv("primitive-side-effects", seff ? true : null);
     sym.function = new LispClosure([ OP.PRIM, sym, -1, OP.RET ], sym);
     ALL_PRIMITIVES = new LispCons(sym, ALL_PRIMITIVES);
+
+    // add XREF info
+    let stack = new Error().stack;
+    if (stack) {
+        stack = stack.trim().split(/[\n\r]+/);
+        let callsite = stack.pop();
+        let m = /(\d+):(\d+)$/.exec(callsite);
+        PRIMITIVES_XREF.push([ sym, "PRIMITIVE", +m[1] ]);
+    }
 };
 
 /// utilities
@@ -200,7 +211,7 @@ defp("equalp", false, function(m, nargs){
 });
 
 function all_different(a) {
-    for (var i = a.length; --i >= 0;) {
+    for (var i = a.length; --i > 0;) {
         for (var j = i; --j >= 0;) {
             if (a[i] === a[j]) return null;
         }
@@ -2200,10 +2211,7 @@ defp("%debugger", true, function(m, nargs){
     debugger;
 });
 
-defp("%grok-xref-info", true, function(m, nargs){
-    checknargs(nargs, 2, 2);
-    let xref = m.pop();
-    let filename = m.pop();
+function grok_xref_info(xref, filename) {
     xref.forEach(function(data){
         let sym = data[0], type = data[1], pos = data[2];
         if (sym instanceof LispSymbol) {
@@ -2218,6 +2226,13 @@ defp("%grok-xref-info", true, function(m, nargs){
         }
     });
     LispMachine.XREF[filename] = xref;
+}
+
+defp("%grok-xref-info", true, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let xref = m.pop();
+    let filename = m.pop();
+    grok_xref_info(xref, filename);
     return null;
 });
 
@@ -2431,3 +2446,5 @@ defp("sxhash", false, function(m, nargs){
     else error("I don't know how to generate hash for this object type");
     return murmurhash3_32_gc(x);
 });
+
+grok_xref_info(PRIMITIVES_XREF, "js/primitives.js");

@@ -24,6 +24,7 @@ function webdav_url(filename) {
 Ymacs_Keymap.get("emacs").defineKeys({
     "C-\\"    : "switch_to_buffer",
     "C-z"     : "switch_to_buffer",
+    "M-,"     : "sl_xref_back_history",
 });
 
 function webdav_load(filename, cont) {
@@ -90,7 +91,6 @@ let Ymacs_Keymap_SL = Ymacs_Keymap.define("slip", {
     "S-Tab"                                 : "sl_complete_symbol",
     //"Tab"                                   : "sl_complete_symbol_indent",
     "M-."                                   : "sl_xref_symbol",
-    "M-,"                                   : "sl_xref_back_history",
 });
 
 let PENDING_COMMANDS = {};
@@ -357,7 +357,7 @@ Ymacs_Buffer.newCommands({
                 var ymacs = this.ymacs;
                 var buf = ymacs.getBuffer(filename);
                 function cont(buf) {
-                    buf.cmd("goto_char", position);
+                    buf.cmd("goto_line", position);
                     buf.cmd("ensure_caret_visible");
                 }
                 ymacs.listenOnce("onBufferSwitch", cont);
