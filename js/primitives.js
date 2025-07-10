@@ -322,7 +322,6 @@ defp("1-", false, function(m, nargs){
         checktype(divisor, LispNumber);
         let quot = func(number / divisor);
         m.stack.set_values_array([ quot, number - quot * divisor ]);
-        return false;
     });
 });
 
@@ -1210,7 +1209,6 @@ defp("hash-get", false, function(m, nargs){
     checktype(hash, LispHash);
     var exists = hash.has(key);
     m.stack.set_values_array(exists ? [ hash.get(key), true ] : [ def, null ]);
-    return false;
 });
 
 defp("hash-set", true, function(m, nargs){
@@ -1527,6 +1525,7 @@ defp("%ls-set-file-contents", true, function(m, nargs){
     checktype(path, LispString);
     checktype(content, LispString);
     ls_set_file_contents(path, content);
+    return null;
 });
 
 defp("%ls-delete-path", true, function(m, nargs){
@@ -1534,21 +1533,25 @@ defp("%ls-delete-path", true, function(m, nargs){
     let path = m.pop();
     checktype(path, LispString);
     ls_delete(path);
+    return null;
 });
 
 defp("%ls-clear-store", true, function(m, nargs){
     checknargs(nargs, 0, 0);
     ls_clear();
+    return null;
 });
 
 defp("%ls-purge-fasls", true, function(m, nargs){
     checknargs(nargs, 0, 0);
     ls_purge_fasls();
+    return null;
 });
 
 defp("%ls-dump-store", true, function(m, nargs){
     checknargs(nargs, 0, 0);
     ls_dump();
+    return null;
 });
 
 defp("%ls-webdav-save-all", true, function(m, nargs){
@@ -1559,6 +1562,7 @@ defp("%ls-webdav-save-all", true, function(m, nargs){
         checktype(prefix, LispString);
     }
     ls_webdav_save_all(prefix);
+    return null;
 });
 
 /* -----[ /local storage ]----- */
@@ -1623,7 +1627,7 @@ defp("apply", true, function(m, nargs){
         nargs++;
     }
     m.n_args = nargs - 2;
-    return m._callnext(func, false);
+    return m._callnext(func);
 });
 
 defp("funcall", true, function(m, nargs){
@@ -1632,12 +1636,11 @@ defp("funcall", true, function(m, nargs){
     if (func instanceof LispSymbol) func = func.function;
     checktype(func, LispClosure);
     m.n_args = nargs - 1;
-    return m._callnext(func, false);
+    return m._callnext(func);
 });
 
 defp("values", false, function(m, nargs){
     m.stack.set_values(nargs);
-    return false;
 });
 
 defp("multiple-value-list", false, function(m, nargs){
@@ -1678,7 +1681,7 @@ defp("%special!", true, function(m, nargs){
         checktype(name, LispSymbol);
         name.setv("special", true);
         name.setv("global", true);
-        if (name.value === false) {
+        if (name.value === undefined) {
             name.value = null;
         }
     }
@@ -1691,7 +1694,7 @@ defp("%global!", true, function(m, nargs){
         var name = m.pop();
         checktype(name, LispSymbol);
         name.setv("global", true);
-        if (name.value === false) {
+        if (name.value === undefined) {
             name.value = null;
         }
     }
@@ -1957,14 +1960,14 @@ defp("boundp", false, function(m, nargs){
     let sym = m.pop();
     checktype(sym, LispSymbol);
     let binding = m.find_dvar(sym);
-    return binding.value === false || binding.value === undefined ? null : true;
+    return binding.value === undefined ? null : true;
 });
 
 defp("makunbound", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     let sym = m.pop();
     checktype(sym, LispSymbol);
-    m.find_dvar(sym).value = false;
+    m.find_dvar(sym).value = undefined;
     return sym;
 });
 

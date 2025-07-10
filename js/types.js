@@ -383,7 +383,7 @@ export class LispSymbol {
         if (name) {
             this.name = name + "";
             this.pak = pak || null;
-            this.value = false;
+            this.value = undefined;
             this.vlist = Object.create(null);
             this.primitive = null;
             this.function = null;
@@ -625,7 +625,7 @@ export class LispProcess {
         var tm = setTimeout(() => {
             this.m.push(new LispRet(this.m, this.m.pc, true));
             this.m.n_args = 0;
-            this.m._callnext(closure, false);
+            this.m._callnext(closure);
             this.resume();
         }, timeout);
         return tm;

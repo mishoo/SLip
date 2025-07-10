@@ -214,7 +214,7 @@ const OP_LEN = [
 ];
 
 export function want_bound(name, val) {
-    if (val === false || val === undefined) error(`Symbol ${dump(name)} not bound`);
+    if (val === undefined) error(`Symbol ${dump(name)} not bound`);
     return val;
 }
 
@@ -1024,7 +1024,7 @@ export class LispMachine {
 
     _callnext(closure, args) {
         //if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
-        if (args !== false) {
+        if (args !== undefined) {
             this.push(this.mkret(this.pc));
             let n = 0;
             while (args !== null) {
@@ -1038,7 +1038,7 @@ export class LispMachine {
         this.env = closure.env;
         this.pc = 0;
         this.f = closure;
-        return false;
+        // must return undefined.
     }
 
     set_closure(closure, ...args) {
@@ -1318,7 +1318,7 @@ let OP_RUN = [
         let nargs = m.code[m.pc++];
         if (nargs === -1) nargs = m.n_args;
         let ret = name.primitive(m, nargs);
-        if (ret !== false) m.push(ret ?? null);
+        if (ret !== undefined) m.push(ret ?? null);
     },
     /*OP.NIL*/ (m) => {
         m.push(null);
@@ -1439,7 +1439,7 @@ let OP_RUN = [
         let values = m.pop(), count = 0, frame = [];
         for (let names = m.pop(); names !== null; names = LispCons.cdr(names), count++) {
             let name = LispCons.car(names);
-            let val = false;
+            let val = undefined;
             if (values !== null) {
                 val = LispCons.car(values);
                 values = LispCons.cdr(values);
@@ -1501,14 +1501,14 @@ let OP_RUN = [
                     if (pos !== null) {
                         frame[index] = true; // argument-passed-p
                         frame[index + 1] = stack[pos + 1];
-                        stack[pos] = false;
+                        stack[pos] = undefined;
                         if (pos == i) i += 2;
                     }
                 }
                 if (!allow_other_keys) {
                     while (i < n) {
                         let arg = stack[i];
-                        if (arg !== false && arg !== S_ALLOW_OTHER_KEYS && !key.includes(arg)) {
+                        if (arg !== undefined && arg !== S_ALLOW_OTHER_KEYS && !key.includes(arg)) {
                             error(`Unknown keyword argument ${dump(arg)}`);
                         }
                         i += 2;
