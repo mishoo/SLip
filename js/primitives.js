@@ -9,7 +9,7 @@ let KEYWORD_PACK = LispPackage.get("KEYWORD");
 
 var S_NIL = LispSymbol.get("NIL");
 var S_T = LispSymbol.get("T");
-var ALL_PRIMITIVES = null;
+var ALL_PRIMITIVES = false;
 
 var LispList = {
     is: LispCons.isList,
@@ -57,15 +57,14 @@ var LispIterator = {
     // widely supported..
     is: function(x) {
         return x != null
-            && typeof x == "object"
+            && typeof x === "object"
             && x.next instanceof Function;
     },
     type: "iterator"
 };
 
 function boxit(stuff) {
-    if (stuff === undefined || stuff === false) return null;
-    return stuff;
+    return stuff ?? false;
 };
 
 var PRIMITIVES_XREF = [];
@@ -78,7 +77,7 @@ function defp(name, seff, func) {
         writable: false,
     });
     sym.primitive = func;
-    sym.setv("primitive-side-effects", seff ? true : null);
+    sym.setv("primitive-side-effects", seff);
     sym.function = new LispClosure([ OP.PRIM, sym, -1, OP.RET ], sym);
     ALL_PRIMITIVES = new LispCons(sym, ALL_PRIMITIVES);
 
@@ -117,7 +116,7 @@ function as_string(thing) {
 };
 
 function as_list(thing) {
-    if (!LispList.is(thing)) return new LispCons(thing, null);
+    if (!LispList.is(thing)) return new LispCons(thing, false);
     return thing;
 };
 
@@ -126,18 +125,18 @@ function as_list(thing) {
 /* -----[ conditionals ]----- */
 
 function eq(a, b) {
-    return (a === S_NIL && b === null)
-        || (a === null && b === S_NIL)
+    return (a === S_NIL && b === false)
+        || (a === false && b === S_NIL)
         || (a === S_T && b === true)
         || (a === true && b === S_T)
-        || a === b ? true : null;
-};
+        || a === b;
+}
 
 function equal(a, b) {
     if (eq(a, b)) return true;
     if (LispList.is(a) && LispList.is(b)) {
-        while (a !== null && b !== null) {
-            if (!equal(a.car, b.car)) return null;
+        while (a !== false && b !== false) {
+            if (!equal(a.car, b.car)) return false;
             a = a.cdr;
             b = b.cdr;
             if (!LispCons.is(a) || !LispCons.is(b))
@@ -148,7 +147,7 @@ function equal(a, b) {
     if (LispRegexp.is(a) && LispRegexp.is(b)) {
         return a.toString() === b.toString();
     }
-    return null;
+    return false;
 }
 
 function equalp(a, b) {
@@ -157,8 +156,8 @@ function equalp(a, b) {
         return a.toLowerCase() === b.toLowerCase();
     }
     if (LispList.is(a) && LispList.is(b)) {
-        while (a !== null && b !== null) {
-            if (!equalp(a.car, b.car)) return null;
+        while (a !== false && b !== false) {
+            if (!equalp(a.car, b.car)) return false;
             a = a.cdr;
             b = b.cdr;
             if (!LispCons.is(a) || !LispCons.is(b))
@@ -168,22 +167,22 @@ function equalp(a, b) {
     }
     if (LispVector.is(a) && LispVector.is(b)) {
         var i = a.length;
-        if (i !== b.length) return null;
+        if (i !== b.length) return false;
         while (--i >= 0) {
-            if (!equalp(a[i], b[i])) return null;
+            if (!equalp(a[i], b[i])) return false;
         }
         return true;
     } else if (LispHash.is(a) && LispHash.is(b)) {
         for (let [ key, val ] of a) {
             if (!equalp(val, b.get(key)))
-                return null;
+                return false;
         }
         return true;
     }
     if (LispRegexp.is(a) && LispRegexp.is(b)) {
         return a.toString() === b.toString();
     }
-    return null;
+    return false;
 }
 
 defp("eq", false, function(m, nargs){
@@ -213,7 +212,7 @@ defp("equalp", false, function(m, nargs){
 function all_different(a) {
     for (var i = a.length; --i > 0;) {
         for (var j = i; --j >= 0;) {
-            if (a[i] === a[j]) return null;
+            if (a[i] === a[j]) return false;
         }
     }
     return true;
@@ -226,7 +225,7 @@ defp("/=", false, function(m, nargs){
         return true;
     }
     if (nargs === 2) {
-        return m.pop_number() === m.pop_number() ? null : true;
+        return m.pop_number() !== m.pop_number();
     }
     var a = [];
     while (nargs-- > 0) a.push(m.pop_number());
@@ -242,12 +241,12 @@ defp("char/=", false, function(m, nargs){
 
 defp("null", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return m.pop() === null ? true : null;
+    return m.pop() === false;
 });
 
 defp("not", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return m.pop() === null ? true : null;
+    return m.pop() === false;
 });
 
 /* -----[ arithmetic ]----- */
@@ -405,8 +404,8 @@ defp("elt", false, function(m, nargs){
     var i = m.pop(), x = m.pop();
     checktype(i, LispNumber);
     if (LispCons.isList(x)) return LispCons.elt(x, i, error);
-    if (LispVector.is(x)) return i < x.length ? x[i] : null;
-    if (LispString.is(x)) return i < x.length ? LispChar.get(x.charAt(i)) : null;
+    if (LispVector.is(x)) return i < x.length ? x[i] : false;
+    if (LispString.is(x)) return i < x.length ? LispChar.get(x.charAt(i)) : false;
     error("Unrecognized sequence in elt");
 });
 
@@ -429,7 +428,7 @@ defp("nthcdr", false, function(m, nargs){
     var list = m.pop(), n = m.pop();
     checktype(n, LispInteger);
     var p = list;
-    while (p !== null && n-- > 0) {
+    while (p !== false && n-- > 0) {
         checktype(p, LispList);
         p = p.cdr;
     }
@@ -439,12 +438,12 @@ defp("nthcdr", false, function(m, nargs){
 defp("%nhalf-list", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     let a = m.pop(), b = a;
-    if (a === null) return null;
+    if (a === false) return false;
     while (true) {
         b = LispCons.cddr(b);
-        if (b === null) {
+        if (b === false) {
             b = a.cdr;
-            a.cdr = null;
+            a.cdr = false;
             return b;
         }
         if (a === b) {
@@ -479,12 +478,12 @@ defp("%memq", false, function(m, nargs){
         return LispCons.find(seq, item, eq);
     if (LispVector.is(seq)) {
         var pos = seq.indexOf(item);
-        return pos >= 0 ? pos : null;
+        return pos >= 0 ? pos : false;
     }
     if (LispString.is(seq)) {
         checktype(item, LispChar);
         var pos = seq.indexOf(item.value);
-        return pos >= 0 ? pos : null;
+        return pos >= 0 ? pos : false;
     }
     error("Unrecognized sequence in %memq");
 });
@@ -492,22 +491,22 @@ defp("%memq", false, function(m, nargs){
 defp("%assq", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var list = m.pop(), item = m.pop();
-    while (list !== null) {
+    while (list !== false) {
         checktype(list, LispList);
         checktype(list.car, LispCons);
         if (eq(list.car.car, item)) return list.car;
         list = list.cdr;
     }
-    return null;
+    return false;
 });
 
 defp("getf", false, function(m, nargs){
     checknargs(nargs, 2, 3);
-    var not_found = nargs == 3 ? m.pop() : null;
+    var not_found = nargs == 3 ? m.pop() : false;
     var item = m.pop(), list = m.pop();
-    while (list !== null) {
+    while (list !== false) {
         checktype(list, LispList);
-        if (list.cdr === null) error("Malformed plist");
+        if (list.cdr === false) error("Malformed plist");
         if (eq(list.car, item))
             return list.cdr.car;
         list = list.cdr.cdr;
@@ -519,7 +518,7 @@ defp("%putf", true, function(m, nargs){
     checknargs(nargs, 3, 3);
     var value = m.pop(), item = m.pop(), list = m.pop();
     var p = list;
-    while (p !== null) {
+    while (p !== false) {
         checktype(p, LispList);
         if (!p.cdr) error("Malformed plist");
         if (eq(p.car, item)) break;
@@ -564,32 +563,32 @@ defp("console.log", true, function(m, nargs){
     var a = [];
     while (nargs-- > 0) a.unshift(m.pop());
     console.log(a.map(LispMachine.dump).join(" "));
-    return null;
+    return false;
 });
 
 defp("console.dir", true, function(m, nargs){
     var a = [];
     while (nargs-- > 0) a.unshift(m.pop());
     console.log.apply(console, a);
-    return null;
+    return false;
 });
 
 defp("console.error", true, function(m, nargs){
     var a = [];
     while (nargs-- > 0) a.unshift(m.pop());
     console.error.apply(console, a);
-    return null;
+    return false;
 });
 
 defp("console.print", true, function(m, nargs){
     var a = [];
     while (nargs-- > 0) a.unshift(m.pop());
     console.log(a.join(" "));
-    return null;
+    return false;
 });
 
 defp("list", false, function(m, nargs) {
-    var p = null;
+    var p = false;
     while (nargs-- > 0)
         p = new LispCons(m.pop(), p);
     return p;
@@ -616,18 +615,18 @@ defp("copy-list", false, function(m, nargs){
 defp("copy-seq", false, function (m, nargs) {
     checknargs(nargs, 1);
     let seq = m.pop();
-    if (seq === null) return null;
+    if (seq === false) return false;
     if (LispVector.is(seq)) return seq.slice();
     if (LispString.is(seq)) return seq;
     return LispCons.copy(checktype(seq, LispCons));
 });
 
 defp("append", false, function(m, nargs) {
-    return nargs == 0 ? null : LispCons.append(m.pop_frame(nargs));
+    return nargs === 0 ? false : LispCons.append(m.pop_frame(nargs));
 });
 
 defp("nconc", true, function(m, nargs){
-    return nargs == 0 ? null : LispCons.nconc(m.pop_frame(nargs));
+    return nargs === 0 ? false : LispCons.nconc(m.pop_frame(nargs));
 });
 
 defp("revappend", true, function(m, nargs){
@@ -652,7 +651,7 @@ defp("vector", false, function(m, nargs){
 
 defp("make-vector", false, function(m, nargs){
     checknargs(nargs, 2, 3);
-    let contents = nargs === 3 ? m.pop() : null;
+    let contents = nargs === 3 ? m.pop() : false;
     let init = m.pop();
     let n = m.pop();
     checktype(n, LispNumber);
@@ -694,12 +693,12 @@ defp("vector-pop", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var vector = m.pop();
     checktype(vector, LispVector);
-    return vector.length > 0 ? vector.pop() : null;
+    return vector.length > 0 ? vector.pop() : false;
 });
 
 defp("vector-splice", true, function(m, nargs){
     checknargs(nargs, 3, 4);
-    var content = nargs == 4 ? m.pop() : null;
+    var content = nargs == 4 ? m.pop() : false;
     var len = m.pop();
     var start = m.pop();
     var vector = m.pop();
@@ -716,13 +715,13 @@ defp("vector-splice", true, function(m, nargs){
 
 defp("vector-subseq", false, function(m, nargs){
     checknargs(nargs, 1, 3);
-    var end = nargs == 3 ? m.pop() : null;
-    var start = nargs >= 2 ? m.pop() : null;
+    var end = nargs == 3 ? m.pop() : false;
+    var start = nargs >= 2 ? m.pop() : false;
     var vector = m.pop();
     checktype(vector, LispVector);
-    if (start !== null) checktype(start, LispNumber);
+    if (start !== false) checktype(start, LispNumber);
     else start = 0;
-    if (end !== null) checktype(end, LispNumber);
+    if (end !== false) checktype(end, LispNumber);
     else end = vector.length;
     return vector.slice(start, end);
 });
@@ -732,7 +731,7 @@ defp("svref", false, function(m, nargs){
     var index = m.pop(), vector = m.pop();
     checktype(vector, LispVector);
     checktype(index, LispNumber);
-    return index >= 0 && index < vector.length ? vector[index] : null;
+    return index >= 0 && index < vector.length ? vector[index] : false;
 });
 
 defp("vector-set", true, function(m, nargs){
@@ -749,7 +748,7 @@ function seq(m, nargs) {
     var ret = [];
     while (nargs-- > 0) {
         var x = m.pop();
-        if (x !== null) {
+        if (x !== false) {
             if (LispCons.is(x)) {
                 ret.unshift.apply(ret, LispCons.toArray(x));
             }
@@ -772,7 +771,7 @@ defp("%seq-cat", true, function(m, nargs){
     checktype(list, LispList);
     checktype(seq, LispVector);
     LispCons.forEach(list, function(x){
-        if (x !== null) {
+        if (x !== false) {
             if (LispCons.is(x)) {
                 seq.push.apply(seq, LispCons.toArray(x));
             }
@@ -812,14 +811,11 @@ defp("strcat", false, function(m, nargs){
 
 defp("substr", false, function(m, nargs){
     checknargs(nargs, 2, 3);
-    if (nargs == 3) {
-        var len = m.pop();
-        checktype(len, LispNumber);
-    }
+    var len = nargs == 3 ? m.pop_number() : false;
     var from = m.pop(), str = m.pop();
     checktype(from, LispNumber);
     checktype(str, LispString);
-    return from < str.length ? len !== null ? str.substr(from, len) : str.substr(from) : null;
+    return from < str.length ? len !== false ? str.substr(from, len) : str.substr(from) : false;
 });
 
 defp("downcase", false, function(m, nargs){
@@ -870,7 +866,7 @@ defp("letterp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var ch = m.pop();
     checktype(ch, LispChar);
-    return UNICODE.letter.test(ch.value) ? true : null;
+    return UNICODE.letter.test(ch.value);
 });
 
 // number/string/char comparators
@@ -897,12 +893,12 @@ defp("letterp", false, function(m, nargs){
                 return true;
             }
             if (nargs === 2) {
-                return cmp(m.pop_number(), prev) ? true : null;
+                return cmp(m.pop_number(), prev);
             }
             let ret = true;
             while (--nargs > 0) {
                 let el = m.pop_number();
-                if (ret && !cmp(el, prev)) ret = null;
+                if (ret && !cmp(el, prev)) ret = false;
                 prev = el;
             }
             return ret;
@@ -918,7 +914,7 @@ defp("letterp", false, function(m, nargs){
             while (--nargs > 0) {
                 let el = m.pop();
                 checktype(el, LispChar);
-                if (ret && !cmp(el.value, prev.value)) ret = null;
+                if (ret && !cmp(el.value, prev.value)) ret = false;
                 prev = el;
             }
             return ret;
@@ -933,7 +929,7 @@ defp("letterp", false, function(m, nargs){
         while (--nargs > 0) {
             let el = m.pop();
             checktype(el, LispString);
-            if (ret && !cmp(el, prev)) ret = null;
+            if (ret && !cmp(el, prev)) ret = false;
             prev = el;
         }
         return ret;
@@ -963,7 +959,7 @@ defp("regexp-test", false, function(m, nargs){
     var str = m.pop(), rx = m.pop();
     checktype(str, LispString);
     checktype(rx, LispRegexp);
-    return rx.test(str) ? true : null;
+    return rx.test(str) || false;
 });
 
 defp("regexp-exec", false, function(m, nargs){
@@ -971,7 +967,7 @@ defp("regexp-exec", false, function(m, nargs){
     var str = m.pop(), rx = m.pop();
     checktype(str, LispString);
     checktype(rx, LispRegexp);
-    return rx.exec(str);
+    return rx.exec(str) || false;
 });
 
 defp("replace-regexp", false, function(m, nargs){
@@ -994,17 +990,17 @@ defp("quote-regexp", false, function(m, nargs){
 
 defp("regexpp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispRegexp.is(m.pop()) ? true : null;
+    return LispRegexp.is(m.pop());
 });
 
 defp("stringp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispString.is(m.pop()) ? true : null;
+    return LispString.is(m.pop());
 });
 
 defp("charp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispChar.is(m.pop()) ? true : null;
+    return LispChar.is(m.pop());
 });
 
 defp("digitp", false, function(m, nargs){
@@ -1012,91 +1008,91 @@ defp("digitp", false, function(m, nargs){
     var ch = m.pop();
     checktype(ch, LispChar);
     ch = ch.value.charCodeAt(0);
-    return ch >= 48 && ch <= 57 ? true : null;
+    return ch >= 48 && ch <= 57;
 });
 
 defp("numberp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispNumber.is(m.pop()) ? true : null;
+    return LispNumber.is(m.pop());
 });
 
 defp("hashp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispHash.is(m.pop()) ? true : null;
+    return LispHash.is(m.pop());
 });
 
 defp("functionp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispClosure.is(m.pop()) ? true : null;
+    return LispClosure.is(m.pop());
 });
 
 defp("vectorp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispVector.is(m.pop()) ? true : null;
+    return LispVector.is(m.pop());
 });
 
 defp("listp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispCons.isList(m.pop()) ? true : null;
+    return LispCons.isList(m.pop());
 });
 
 defp("consp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispCons.is(m.pop()) ? true : null;
+    return LispCons.is(m.pop());
 });
 
 defp("atom", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispCons.is(m.pop()) ? null : true;
+    return !LispCons.is(m.pop());
 });
 
 defp("symbolp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop();
-    return LispSymbol.is(x) ? true : null;
+    return LispSymbol.is(x);
 });
 
 defp("packagep", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop();
-    return LispPackage.is(x) ? true : null;
+    return LispPackage.is(x);
 });
 
 defp("keywordp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop();
-    return x !== null && x !== true && LispSymbol.is(x) && x.pak === KEYWORD_PACK ? true : null;
+    return x !== false && x !== true && LispSymbol.is(x) && x.pak === KEYWORD_PACK;
 });
 
 defp("threadp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispProcess.is(m.pop()) ? true : null;
+    return LispProcess.is(m.pop());
 });
 
 defp("zerop", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop_number();
-    return x == 0 ? true : null;
+    return x === 0;
 });
 defp("minusp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop_number();
-    return x < 0 ? true : null;
+    return x < 0;
 });
 defp("plusp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop_number();
-    return x > 0 ? true : null;
+    return x > 0;
 });
 defp("evenp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop_number();
-    return x % 2 == 0 ? true : null;
+    return x % 2 === 0;
 });
 defp("oddp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop_number();
-    return x % 2 == 1 ? true : null;
+    return x % 2 === 1;
 });
 
 defp("parse-number", false, function(m, nargs){
@@ -1104,7 +1100,7 @@ defp("parse-number", false, function(m, nargs){
     var x = m.pop();
     checktype(x, LispString);
     var ret = parseFloat(x);
-    return isNaN(ret) ? null : ret;
+    return isNaN(ret) ? false : ret;
 });
 
 defp("parse-integer", false, function(m, nargs){
@@ -1114,7 +1110,7 @@ defp("parse-integer", false, function(m, nargs){
     var x = m.pop();
     checktype(x, LispString);
     var ret = parseInt(x, radix);
-    return isNaN(ret) ? null : ret;
+    return isNaN(ret) ? false : ret;
 });
 
 defp("number-fixed", false, function(m, nargs){
@@ -1139,7 +1135,7 @@ defp("%pad-string", false, function(m, nargs){
     checknargs(nargs, 2, 6);
     var min = nargs >= 6 ? m.pop() : 0;
     var inc = nargs >= 5 ? m.pop() : 1;
-    var left = nargs >= 4 ? m.pop() : null;
+    var left = nargs >= 4 ? m.pop() : false;
     var chr = nargs >= 3 ? as_string(m.pop()) : " ";
     var width = m.pop();
     var str = m.pop();
@@ -1149,14 +1145,14 @@ defp("%pad-string", false, function(m, nargs){
     checktype(inc, LispNumber);
     checktype(min, LispNumber);
     if (min > 0) {
-        if (left !== null) {
+        if (left !== false) {
             str = repeat_string(chr, min) + str;
         } else {
             str = str + repeat_string(chr, min);
         }
     }
     if (inc != 1) chr = repeat_string(chr, inc);
-    if (left !== null) {
+    if (left !== false) {
         while (str.length < width) str = chr + str;
     } else {
         while (str.length < width) str = str + chr;
@@ -1204,11 +1200,11 @@ defp("make-hash", false, function(m, nargs){
 
 defp("hash-get", false, function(m, nargs){
     checknargs(nargs, 2, 3);
-    var def = (nargs == 3) ? m.pop() : null;
+    var def = (nargs == 3) ? m.pop() : false;
     var key = m.pop(), hash = m.pop();
     checktype(hash, LispHash);
     var exists = hash.has(key);
-    m.stack.set_values_array(exists ? [ hash.get(key), true ] : [ def, null ]);
+    m.stack.set_values_array(exists ? [ hash.get(key), true ] : [ def, false ]);
 });
 
 defp("hash-set", true, function(m, nargs){
@@ -1336,8 +1332,8 @@ defp("%stream-get", false, function(m, nargs){
 
 defp("%get-file-contents", false, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var cont = nargs == 2 ? m.pop() : null;
-    if (cont !== null) checktype(cont, LispClosure);
+    var cont = nargs == 2 ? m.pop() : false;
+    if (cont !== false) checktype(cont, LispClosure);
     var url = m.pop();
     checktype(url, LispString);
 
@@ -1346,7 +1342,7 @@ defp("%get-file-contents", false, function(m, nargs){
         let content = ls_get_file_contents(url);
         if (content != null) {
             if (cont) {
-                return m._callnext(cont, new LispCons(content, null));
+                return m._callnext(cont, new LispCons(content, false));
             } else {
                 return content;
             }
@@ -1359,13 +1355,13 @@ defp("%get-file-contents", false, function(m, nargs){
         xhr.open("GET", url, true);
         xhr.onreadystatechange = function() {
             if (xhr.readyState == 4)
-                m._call(cont, new LispCons(xhr.status == 200 ? xhr.responseText : null, null));
+                m._call(cont, new LispCons(xhr.status == 200 ? xhr.responseText : false, false));
         };
         xhr.send(null);
     } else {
         xhr.open("GET", url, false); // XXX: synchronous is deprecated
         xhr.send(null);
-        return cont ? null : xhr.status == 200 ? xhr.responseText : null;
+        return cont ? false : xhr.status == 200 ? xhr.responseText : false;
     }
 });
 
@@ -1515,7 +1511,7 @@ defp("%ls-get-file-contents", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     let path = m.pop();
     checktype(path, LispString);
-    return ls_get_file_contents(path) ?? null;
+    return ls_get_file_contents(path) ?? false;
 });
 
 defp("%ls-set-file-contents", true, function(m, nargs){
@@ -1525,7 +1521,7 @@ defp("%ls-set-file-contents", true, function(m, nargs){
     checktype(path, LispString);
     checktype(content, LispString);
     ls_set_file_contents(path, content);
-    return null;
+    return false;
 });
 
 defp("%ls-delete-path", true, function(m, nargs){
@@ -1533,25 +1529,25 @@ defp("%ls-delete-path", true, function(m, nargs){
     let path = m.pop();
     checktype(path, LispString);
     ls_delete(path);
-    return null;
+    return false;
 });
 
 defp("%ls-clear-store", true, function(m, nargs){
     checknargs(nargs, 0, 0);
     ls_clear();
-    return null;
+    return false;
 });
 
 defp("%ls-purge-fasls", true, function(m, nargs){
     checknargs(nargs, 0, 0);
     ls_purge_fasls();
-    return null;
+    return false;
 });
 
 defp("%ls-dump-store", true, function(m, nargs){
     checknargs(nargs, 0, 0);
     ls_dump();
-    return null;
+    return false;
 });
 
 defp("%ls-webdav-save-all", true, function(m, nargs){
@@ -1562,26 +1558,26 @@ defp("%ls-webdav-save-all", true, function(m, nargs){
         checktype(prefix, LispString);
     }
     ls_webdav_save_all(prefix);
-    return null;
+    return false;
 });
 
 /* -----[ /local storage ]----- */
 
 defp("%input-stream-p", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispInputStream.is(m.pop()) ? true : null;
+    return LispInputStream.is(m.pop());
 });
 
 defp("%output-stream-p", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispOutputStream.is(m.pop()) ? true : null;
+    return LispOutputStream.is(m.pop());
 });
 
 /* -----[ object allocation utils ]----- */
 
 defp("%objectp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispObject.is(m.pop()) ? true : null;
+    return LispObject.is(m.pop());
 });
 
 defp("%object-vector", false, function(m, nargs){
@@ -1604,7 +1600,7 @@ defp("%macro", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var symbol = m.pop();
     checktype(symbol, LispSymbol);
-    return symbol !== null && symbol !== true ? symbol.macro() : null;
+    return symbol !== false && symbol !== true ? symbol.macro() : false;
 });
 
 defp("disassemble", false, function(m, nargs){
@@ -1621,7 +1617,7 @@ defp("apply", true, function(m, nargs){
     if (func instanceof LispSymbol) func = func.function;
     checktype(func, LispClosure);
     var args = m.pop();
-    while (args !== null) {
+    while (args !== false) {
         m.push(LispCons.car(args));
         args = args.cdr;
         nargs++;
@@ -1652,7 +1648,7 @@ defp("%primitivep", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return sym.primitive ? true : null;
+    return !!sym.primitive;
 });
 
 defp("%prim-side-effects", false, function(m, nargs){
@@ -1668,7 +1664,7 @@ defp("%macro!", true, function(m, nargs){
     checktype(func, LispClosure);
     checktype(sym, LispSymbol);
     sym.setv("macro", func);
-    sym.function = null;
+    sym.function = false;
     return sym;
 });
 
@@ -1682,10 +1678,10 @@ defp("%special!", true, function(m, nargs){
         name.setv("special", true);
         name.setv("global", true);
         if (name.value === undefined) {
-            name.value = null;
+            name.value = false;
         }
     }
-    return null;
+    return false;
 });
 
 defp("%global!", true, function(m, nargs){
@@ -1695,24 +1691,24 @@ defp("%global!", true, function(m, nargs){
         checktype(name, LispSymbol);
         name.setv("global", true);
         if (name.value === undefined) {
-            name.value = null;
+            name.value = false;
         }
     }
-    return null;
+    return false;
 });
 
 defp("%specialp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return sym !== null && sym !== true && sym.special() ? true : null;
+    return sym !== false && sym !== true && sym.special() ? true : false;
 });
 
 defp("%globalp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return sym !== null && sym !== true && sym.global() ? true : null;
+    return sym !== false && sym !== true && sym.global() ? true : false;
 });
 
 defp("%function-name", true, function(m, nargs){
@@ -1724,8 +1720,8 @@ defp("%function-name", true, function(m, nargs){
 
 defp("make-package", true, function(m, nargs){
     checknargs(nargs, 1, 3);
-    var nicknames = nargs >= 3 ? m.pop() : null;
-    var uses = nargs >= 2 ? m.pop() : null;
+    var nicknames = nargs >= 3 ? m.pop() : false;
+    var uses = nargs >= 2 ? m.pop() : false;
     var name = as_string(m.pop());
     checktype(name, LispString);
     var pak = LispPackage.get(name);
@@ -1751,9 +1747,9 @@ defp("make-symbol", true, function(m, nargs){
 
 defp("intern", true, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var pak = nargs == 2 ? m.pop() : null;
+    var pak = nargs == 2 ? m.pop() : false;
     var name = m.pop();
-    if (pak === null) {
+    if (pak === false) {
         pak = m.gvar(BASE_PACK.PACKAGE_VAR);
     }
     if (!LispPackage.is(pak)) {
@@ -1762,14 +1758,14 @@ defp("intern", true, function(m, nargs){
     checktype(pak, LispPackage);
     checktype(name, LispString);
     var sym = pak.find_or_intern(name);
-    return sym === S_NIL ? null : sym === S_T ? true : sym;
+    return sym === S_NIL ? false : sym === S_T ? true : sym;
 });
 
 defp("unintern", true, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var pak = nargs == 2 ? m.pop() : null;
+    var pak = nargs == 2 ? m.pop() : false;
     var name = as_string(m.pop());
-    if (pak === null) {
+    if (pak === false) {
         pak = m.gvar(BASE_PACK.PACKAGE_VAR);
     }
     if (!LispPackage.is(pak)) {
@@ -1783,9 +1779,9 @@ defp("unintern", true, function(m, nargs){
 
 defp("find-symbol", false, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var pak = nargs == 2 ? m.pop() : null;
+    var pak = nargs == 2 ? m.pop() : false;
     var name = as_string(m.pop());
-    if (pak === null) {
+    if (pak === false) {
         pak = m.gvar(BASE_PACK.PACKAGE_VAR);
     }
     if (!LispPackage.is(pak)) {
@@ -1800,9 +1796,9 @@ defp("find-symbol", false, function(m, nargs){
 
 defp("shadow", true, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var pak = nargs == 2 ? m.pop() : null;
+    var pak = nargs == 2 ? m.pop() : false;
     var syms = as_list(m.pop());
-    if (pak === null) {
+    if (pak === false) {
         pak = m.gvar(BASE_PACK.PACKAGE_VAR);
     }
     if (!LispPackage.is(pak)) {
@@ -1817,7 +1813,7 @@ defp("shadow", true, function(m, nargs){
 
 defp("%accessible-symbols", false, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var ext = nargs == 2 ? m.pop() : null;
+    var ext = nargs == 2 ? m.pop() : false;
     var pak = m.pop();
     checktype(pak, LispPackage);
     return ext ? pak.all_exported() : pak.all_accessible();
@@ -1835,7 +1831,7 @@ defp("%symbol-accessible", false, function(m, nargs){
     var pak = m.pop(), sym = m.pop();
     checktype(sym, LispSymbol);
     checktype(pak, LispPackage);
-    return pak.all_accessible().indexOf(sym) >= 0 ? true : null; // XXX: optimize this
+    return pak.all_accessible().indexOf(sym) >= 0; // XXX: optimize this
 });
 
 defp("%interned-symbols", false, function(m, nargs){
@@ -1925,7 +1921,7 @@ defp("symbol-package", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var symbol = m.pop();
     checktype(symbol, LispSymbol);
-    return symbol === null || symbol === true ? BASE_PACK : symbol.pak;
+    return symbol === false || symbol === true ? BASE_PACK : symbol.pak;
 });
 
 defp("%use-package", true, function(m, nargs){
@@ -1960,7 +1956,7 @@ defp("boundp", false, function(m, nargs){
     let sym = m.pop();
     checktype(sym, LispSymbol);
     let binding = m.find_dvar(sym);
-    return binding.value === undefined ? null : true;
+    return binding.value !== undefined;
 });
 
 defp("makunbound", false, function(m, nargs){
@@ -1977,7 +1973,7 @@ defp("set-symbol-value!", false, function(m, nargs){
     let sym = m.pop();
     if (sym === S_T)
         error("Veritas aeterna. (can't set SYMBOL-VALUE of T)");
-    if (sym === S_NIL || sym === null)
+    if (sym === S_NIL || sym === false)
         error("Nihil ex nihil. (can't set SYMBOL-VALUE of NIL)");
     checktype(sym, LispSymbol);
     let binding = m.find_dvar(sym);
@@ -1996,14 +1992,14 @@ defp("set-symbol-function!", true, function(m, nargs){
     var func = m.pop(), sym = m.pop();
     checktype(sym, LispSymbol);
     checktype(func, LispClosure);
-    sym.setv("macro", null);
+    sym.setv("macro", false);
     return sym.function = func;
 });
 
 defp("%set-symbol-prop", true, function(m, nargs){
     checknargs(nargs, 3, 3);
     var val = m.pop(), key = as_string(m.pop()), sym = m.pop();
-    if (sym === null) sym = S_NIL;
+    if (sym === false) sym = S_NIL;
     else if (sym === true) sym = S_T;
     checktype(key, LispString);
     checktype(sym, LispSymbol);
@@ -2013,7 +2009,7 @@ defp("%set-symbol-prop", true, function(m, nargs){
 defp("%get-symbol-prop", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var key = as_string(m.pop()), sym = m.pop();
-    if (sym === null) sym = S_NIL;
+    if (sym === false) sym = S_NIL;
     else if (sym === true) sym = S_T;
     checktype(key, LispString);
     checktype(sym, LispSymbol);
@@ -2037,7 +2033,7 @@ defp("current-thread", false, function(m, nargs){
 
 defp("make-mutex", true, function(m, nargs){
     checknargs(nargs, 0, 1);
-    var name = nargs == 1 ? m.pop() : null;
+    var name = nargs == 1 ? m.pop() : false;
     return new LispMutex(name);
 });
 
@@ -2057,7 +2053,7 @@ defp("mutex-release", true, function(m, nargs){
 
 defp("%sendmsg", true, function(m, nargs){
     checknargs(nargs, 2);
-    var args = null;
+    var args = false;
     while (nargs-- > 2) args = new LispCons(m.pop(), args);
     var signal = as_string(m.pop()), process = m.pop();
     checktype(process, LispProcess);
@@ -2086,7 +2082,7 @@ defp("clear-timeout", true, function(m, nargs){
 });
 
 defp("%no-interrupts", true, function(m, nargs){
-    if (!m.process) return null;
+    if (!m.process) return false;
     checknargs(nargs, 1, 2);
     var process = nargs == 2 ? m.pop() : m.process;
     var noint = m.pop();
@@ -2144,11 +2140,11 @@ defp("dom.subscribe", true, function(m, nargs){
                 "TARGET"   : ev.target,
                 "RELATED"  : ev.relatedTarget
             });
-            args = new LispCons(args, null);
+            args = new LispCons(args, false);
             m.process.sendmsg(process, e, args);
         }, true);
     });
-    return null;
+    return false;
 });
 
 /* -----[ conditions ]----- */
@@ -2180,7 +2176,7 @@ defp("%warn", true, function(m, nargs){
     } else {
         console.warn(message);
     }
-    return null;
+    return false;
 });
 
 /* -----[ other ]----- */
@@ -2191,7 +2187,7 @@ defp("%find-in-env", false, function(m, nargs){
     let env = checktype(m.pop(), LispList);
     let type = m.pop();
     let name = m.pop();
-    for (let i = 0; env !== null; env = env.cdr) {
+    for (let i = 0; env !== false; env = env.cdr) {
         let frame = env.car, skip = false;
         if (frame instanceof LispCons) {
             skip = frame.car === S_SKIP_COUNT;
@@ -2206,7 +2202,7 @@ defp("%find-in-env", false, function(m, nargs){
         }
         if (!skip) i++;
     }
-    return null;
+    return false;
 });
 
 defp("%debugger", true, function(m, nargs){
@@ -2219,7 +2215,7 @@ function grok_xref_info(xref, filename) {
         let sym = data[0], type = data[1], pos = data[2];
         if (sym instanceof LispSymbol) {
             let a = sym.getv("XREF");
-            if (a === null) a = sym.setv("XREF", []);
+            if (a === false) a = sym.setv("XREF", []);
             let idx = a.findIndex(def => def[0] === type);
             if (idx >= 0) {
                 a[idx] = [type, filename, pos];
@@ -2236,7 +2232,7 @@ defp("%grok-xref-info", true, function(m, nargs){
     let xref = m.pop();
     let filename = m.pop();
     grok_xref_info(xref, filename);
-    return null;
+    return false;
 });
 
 defp("%machine.dynamic-environment", false, function(m, nargs){
@@ -2252,8 +2248,8 @@ defp("%eval-bytecode", true, function(m, nargs){
     var code = m.pop();
     checktype(code, LispVector);
     code = LispMachine.assemble(code);
-    var f = new LispClosure(code, null, new LispCons([], null));
-    return m._callnext(f, null);
+    var f = new LispClosure(code, false, new LispCons([], false));
+    return m._callnext(f, false);
 });
 
 // The following is called only in COMPILE-STRING (that is, at
@@ -2274,8 +2270,8 @@ defp("%exec-code", true, function(m, nargs){
         [ "CONST", [...code] ],
         [ "RET" ]
     ]));
-    var f = new LispClosure(code, null, new LispCons([], null));
-    return m._callnext(f, null);
+    var f = new LispClosure(code, false, new LispCons([], false));
+    return m._callnext(f, false);
 });
 
 defp("%relocate-code", true, function(m, nargs){
@@ -2289,7 +2285,7 @@ defp("%relocate-code", true, function(m, nargs){
 
 defp("%serialize-code", false, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var cache = nargs == 2 ? m.pop() : null;
+    var cache = nargs == 2 ? m.pop() : false;
     var code = m.pop();
     checktype(code, LispVector);
     if (nargs == 2) checktype(cache, LispHash);

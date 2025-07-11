@@ -574,7 +574,7 @@ var optimize = (function(){
             break;
         }
         if (i+1 < code.length) {
-            if ((el[0] == "CONST" && el[1] === null) || el[0] == "NIL") {
+            if ((el[0] == "CONST" && el[1] === false) || el[0] == "NIL") {
                 switch (code[i+1][0]) {
                   case "FJUMP":
                   case "FJUMPK":
@@ -588,7 +588,7 @@ var optimize = (function(){
                     code.splice(i, 2, [ "T" ]);
                     return true;
                 }
-                if (el[0] == "CONST" && el[1] === null) {
+                if (el[0] == "CONST" && el[1] === false) {
                     code.splice(i, 1, [ "NIL" ]);
                     return true;
                 }
@@ -662,7 +662,7 @@ var optimize = (function(){
 
 function constantp(x) {
     return x === true
-        || x === null
+        || x === false
         || typeof x == "number"
         || typeof x == "string"
         || x instanceof RegExp
@@ -737,14 +737,14 @@ function indent(level) {
 }
 
 function dump(thing) {
-    if (thing === null) return "NIL";
+    if (thing === false) return "NIL";
     if (thing === true) return "T";
     if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
     if (thing instanceof LispCons) {
         if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
             return "'" + dump(LispCons.cadr(thing));
         var ret = "(", first = true;
-        while (thing !== null) {
+        while (thing !== false) {
             if (!first) ret += " ";
             else first = false;
             ret += dump(LispCons.car(thing));
@@ -815,7 +815,8 @@ export function disassemble(code) {
 
 function serialize_const(val, cache) {
     return function dump(val) {
-        if (val === null || val === true) return val + "";
+        if (val === false) return "!1";
+        if (val === true) return "!0";
         if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar) return val.serialize(cache);
         if (val instanceof RegExp) return val.toString();
         if (val instanceof LispCons) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
@@ -841,7 +842,7 @@ export function unserialize(code) {
             return cache[name];
         }
         let sym;
-        if (pak !== null) {
+        if (pak !== false) {
             pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
             sym = LispSymbol.get(name, pak);
         } else {
@@ -871,7 +872,7 @@ export function unserialize(code) {
 }
 
 function find_binding(env, symbol) {
-    while (env !== null) {
+    while (env !== false) {
         let el = env.car;
         if (el instanceof LispBinding && el.symbol === symbol)
             return el;
@@ -900,8 +901,8 @@ export class LispMachine {
         this.code = null;
         this.pc = -1;
         this.stack = null;
-        this.env = null;
-        this.denv = pm ? pm.denv : null;
+        this.env = false;
+        this.denv = pm ? pm.denv : false;
         this.n_args = null;
         this.status = STATUS_FINISHED;
         this.error = null;
@@ -966,7 +967,7 @@ export class LispMachine {
         while (this.pc >= 0 && this.pc < this.code.length) {
             vmrun(this);
         }
-        return this.stack.sp > 0 ? this.pop() : null;
+        return this.stack.sp > 0 ? this.pop() : false;
     }
 
     atomic_call(closure, args) {
@@ -1003,7 +1004,7 @@ export class LispMachine {
 
     _exec(code) {
         this.code = code;
-        this.env = null;
+        this.env = false;
         this.stack = new LispStack();
         this.pc = 0;
         this.f = null;
@@ -1027,7 +1028,7 @@ export class LispMachine {
         if (args !== undefined) {
             this.push(this.mkret(this.pc));
             let n = 0;
-            while (args !== null) {
+            while (args !== false) {
                 this.push(args.car);
                 args = args.cdr;
                 n++;
@@ -1097,11 +1098,11 @@ function rewind(env, i) {
 }
 
 function eq(a, b) {
-    if (a === null) return b === null || b === S_NIL ? true : null;
-    if (b === null) return a === null || a === S_NIL ? true : null;
-    if (a === true) return b === true || b === S_T ? true : null;
-    if (b === true) return a === true || a === S_T ? true : null;
-    return a === b ? true : null;
+    return (a === S_NIL && b === false)
+        || (a === false && b === S_NIL)
+        || (a === S_T && b === true)
+        || (a === true && b === S_T)
+        || a === b;
 }
 
 let CC_CODE = assemble([
@@ -1116,7 +1117,7 @@ function find_key_arg(item, array, start, end = array.length) {
     for (let i = start; i < end; i += 2) {
         if (eq(item, array[i])) return i;
     }
-    return null;
+    return false;
 }
 
 let OP_RUN = [
@@ -1170,11 +1171,11 @@ let OP_RUN = [
     },
     /*OP.TJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.pop() !== null) m.pc = addr;
+        if (m.pop() !== false) m.pc = addr;
     },
     /*OP.FJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.pop() === null) m.pc = addr;
+        if (m.pop() === false) m.pc = addr;
     },
     /*OP.BLOCK*/ (m) => {
         // this is moderately tricky: we can't do
@@ -1197,10 +1198,10 @@ let OP_RUN = [
         bret.run(m, addr, retval);
     },
     /*OP.NOT*/ (m) => {
-        m.push(m.pop() === null ? true : null);
+        m.push(m.pop() === false);
     },
     /*OP.SETCC*/ (m) => {
-        let retval = m.n_args === 0 ? null
+        let retval = m.n_args === 0 ? false
             : m.n_args === 1 ? m.stack.pop_ret()
             : error(`Too many arguments in continuation call (${m.n_args})`);
         // m.env *is* the continuation object (class LispCC above).
@@ -1285,7 +1286,7 @@ let OP_RUN = [
             console.error(m.f);
             error("Insufficient number of arguments");
         }
-        let p = null;
+        let p = false;
         while (passed-- > count) p = new LispCons(m.pop(), p);
         let frame = m.pop_frame(count);
         frame.push(p);
@@ -1318,10 +1319,10 @@ let OP_RUN = [
         let nargs = m.code[m.pc++];
         if (nargs === -1) nargs = m.n_args;
         let ret = name.primitive(m, nargs);
-        if (ret !== undefined) m.push(ret ?? null);
+        if (ret !== undefined) m.push(ret);
     },
     /*OP.NIL*/ (m) => {
-        m.push(null);
+        m.push(false);
     },
     /*OP.T*/ (m) => {
         m.push(true);
@@ -1332,7 +1333,7 @@ let OP_RUN = [
     },
     /*OP.LIST*/ (m) => {
         let count = m.code[m.pc++];
-        let p = null, n = count;
+        let p = false, n = count;
         while (n-- > 0) p = new LispCons(m.pop(), p);
         m.push(p);
     },
@@ -1343,7 +1344,7 @@ let OP_RUN = [
         m.push(p);
     },
     /*OP.CC*/ (m) => {
-        m.push(new LispClosure(CC_CODE, null, m.mkcont()));
+        m.push(new LispClosure(CC_CODE, false, m.mkcont()));
     },
     /*OP.CAR*/ (m) => {
         m.push(LispCons.car(m.pop()));
@@ -1437,10 +1438,10 @@ let OP_RUN = [
     },
     /*OP.PROGV*/ (m) => {
         let values = m.pop(), count = 0, frame = [];
-        for (let names = m.pop(); names !== null; names = LispCons.cdr(names), count++) {
+        for (let names = m.pop(); names !== false; names = LispCons.cdr(names), count++) {
             let name = LispCons.car(names);
             let val = undefined;
-            if (values !== null) {
+            if (values !== false) {
                 val = LispCons.car(values);
                 values = LispCons.cdr(values);
             }
@@ -1464,14 +1465,14 @@ let OP_RUN = [
         let n = m.n_args;
         let frame_len = required + 2 * optional + rest + 2 * kl;
         let min = required;
-        let max = rest || key || allow_other_keys ? null : required + optional;
+        let max = rest || key || allow_other_keys ? false : required + optional;
         if (n < required) {
             error(`Expecting at least ${min} arguments`);
         }
-        if (max !== null && n > max) {
+        if (max !== false && n > max) {
             error(`Expecting at most ${max} arguments`);
         }
-        let frame = new Array(frame_len).fill(null);
+        let frame = new Array(frame_len).fill(false);
         let stack = m.stack.pop_frame(n);
         let i = 0;
         let index = 0;
@@ -1492,13 +1493,13 @@ let OP_RUN = [
                 }
                 if (!allow_other_keys) {
                     let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, n);
-                    if (pos !== null) {
+                    if (pos !== false) {
                         allow_other_keys = stack[pos + 1];
                     }
                 }
                 for (let k = 0; k < kl; k++, index += 2) {
                     let pos = find_key_arg(key[k], stack, i, n);
-                    if (pos !== null) {
+                    if (pos !== false) {
                         frame[index] = true; // argument-passed-p
                         frame[index + 1] = stack[pos + 1];
                         stack[pos] = undefined;
@@ -1538,7 +1539,7 @@ let OP_RUN = [
     },
     /*OP.TJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.top() === null) {
+        if (m.top() === false) {
             m.pop();
         } else {
             m.pc = addr;
@@ -1546,7 +1547,7 @@ let OP_RUN = [
     },
     /*OP.FJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.top() === null) {
+        if (m.top() === false) {
             m.pop();
             m.pc = addr;
         }
@@ -1563,7 +1564,7 @@ let OP_RUN = [
         let n = m.code[m.pc++];
         let frame = m.stack.pop_values();
         m.env = new LispCons(frame, m.env);
-        while (frame.length < n) frame.push(null);
+        while (frame.length < n) frame.push(false);
         frame.length = n;
     },
     /*OP.POPBACK*/ (m) => {
@@ -1587,28 +1588,28 @@ let OP_RUN = [
         m.push(m.pop_number() - 1);
     },
     /*OP.LT*/ (m) => {
-        m.push(m.pop_number() > m.pop_number() ? true : null);
+        m.push(m.pop_number() > m.pop_number());
     },
     /*OP.LTE*/ (m) => {
-        m.push(m.pop_number() >= m.pop_number() ? true : null);
+        m.push(m.pop_number() >= m.pop_number());
     },
     /*OP.GT*/ (m) => {
-        m.push(m.pop_number() < m.pop_number() ? true : null);
+        m.push(m.pop_number() < m.pop_number());
     },
     /*OP.GTE*/ (m) => {
-        m.push(m.pop_number() <= m.pop_number() ? true : null);
+        m.push(m.pop_number() <= m.pop_number());
     },
     /*OP.NUMEQ*/ (m) => {
-        m.push(m.pop_number() === m.pop_number() ? true : null);
+        m.push(m.pop_number() === m.pop_number());
     },
     /*OP.NUMNEQ*/ (m) => {
-        m.push(m.pop_number() !== m.pop_number() ? true : null);
+        m.push(m.pop_number() !== m.pop_number());
     },
     /*OP.PLUSP*/ (m) => {
-        m.push(m.pop_number() > 0 ? true : null);
+        m.push(m.pop_number() > 0);
     },
     /*OP.MINUSP*/ (m) => {
-        m.push(m.pop_number() < 0 ? true : null);
+        m.push(m.pop_number() < 0);
     },
 ];
 

@@ -5,7 +5,7 @@ class Values {
         this.vals = vals;
     }
     first() {
-        return this.vals.length > 0 ? this.vals[0] : null;
+        return this.vals.length > 0 ? this.vals[0] : false;
     }
 }
 

@@ -1,5 +1,7 @@
 (in-package :sl-user)
 
+(format t "Loading tests takes a few seconds, please wait...~%")
+
 (let* ((timing (list 0 0))
        (%:*load-timing* timing))
   (load "test/deftest.lisp")

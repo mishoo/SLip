@@ -136,7 +136,7 @@ class Ymacs_SL extends Ymacs {
         if (typeof thing != "string")
             thing = MACHINE().dump(thing);
         sl_log(thing);
-        return null;
+        return false;
     }
     run_lisp(what, ...args) {
         args.unshift(++REQ_ID);
@@ -163,7 +163,7 @@ class Ymacs_SL extends Ymacs {
         if (code == null) {
             webdav_load(name, (error, code) => {
                 if (error) {
-                    code = null;
+                    code = false;
                 } else {
                     //this.ls_setFileContents(name, code);
                 }
@@ -244,16 +244,16 @@ function find_package(buffer, start) {
     if (buffer.getq("sl_repl_history")) {
         // for the REPL buffer, return null so that it
         // uses the current REPL package.
-        return null;
+        return false;
     }
     if (start == null) start = buffer.point();
     var pak = find_in_package(buffer, start);
     if (pak) try {
-        var exp = MACHINE().read(null, pak)[0];
+        var exp = MACHINE().read(false, pak)[0];
         pak = exp.cdr.car;
         return MACHINE().eval(pak);
     } catch(ex) {};
-    return null;
+    return false;
 };
 
 function sl_log(txt, { newline = true } = {}) {
@@ -444,7 +444,7 @@ Ymacs_Buffer.newCommands({
             this.cmd("newline");
         var m = this.getq("sl_repl_marker");
         if (m) m.destroy();
-        var pak = MACHINE().eval_string(null, "%::*PACKAGE*");
+        var pak = MACHINE().eval_string(false, "%::*PACKAGE*");
         var name = pak.name;
         this._disableUndo(() => {
             this.cmd("insert", name + "> ");
@@ -478,11 +478,11 @@ Ymacs_Buffer.newCommands({
         }
         self.cmd("goto_char", expr.end);
         self.cmd("sl_repl_prompt");
-        var pak1 = MACHINE().eval_string(null, "%::*PACKAGE*");
+        var pak1 = MACHINE().eval_string(false, "%::*PACKAGE*");
         self.ymacs.run_lisp("READ-EVAL-PRINT", code, function(ret){
             if (typeof ret != "string") ret = MACHINE().dump(ret);
             sl_log(ret);
-            var pak2 = MACHINE().eval_string(null, "%::*PACKAGE*");
+            var pak2 = MACHINE().eval_string(false, "%::*PACKAGE*");
             if (pak1 !== pak2) {
                 self.cmd("sl_repl_prompt");
                 sl_log(";; package changed.");
@@ -651,8 +651,7 @@ function set_repl_input(buf, text) {
     buf._replaceText(m, buf.getCodeSize(), text);
 };
 
-function eval_lisp(buf, expr, pack) {
-    if (!pack) pack = null;
+function eval_lisp(buf, expr, pack = false) {
     var start = new Date().getTime();
     get_repl_buffer().deleteOverlay("match-paren");
     buf.ymacs.run_lisp("EVAL-STRING", pack, expr, true, function(val){
@@ -707,12 +706,12 @@ Ymacs_Buffer.newMode("sl_mode", function(){
         if (pak) {
             pak = pak.replace(/^\(in-/, "(%::find-").replace(/\)/, ")"); // that's a pervert hack
             try {
-                pak = MACHINE().eval_string(null, pak);
+                pak = MACHINE().eval_string(false, pak);
             } catch(ex) {
-                pak = null;
+                pak = false;
             }
         } else {
-            pak = MACHINE().eval_string(null, "%::*PACKAGE*");
+            pak = MACHINE().eval_string(false, "%::*PACKAGE*");
         }
         if (pak) pak = pak.name;
         else pak = "<span style='color:red'>(package not defined)</span>";
