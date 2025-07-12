@@ -833,7 +833,7 @@
                               displaced-to
                               displaced-index-offset)
   (when (listp dimensions)
-    (error "make-array: multi-dimensional arrays not supported (yet?)"))
+    (error "MAKE-ARRAY: multi-dimensional arrays not supported (yet?)"))
   (make-vector dimensions initial-element initial-contents))
 
 (define-compiler-macro make-array (&whole form
@@ -849,7 +849,7 @@
 
 (defun aref (array &rest pos)
   (when (cdr pos)
-    (error "aref: multi-dimensional arrays not supported (yet?)"))
+    (error "AREF: multi-dimensional arrays not supported (yet?)"))
   (svref array (car pos)))
 
 (define-compiler-macro aref (&whole form array &rest pos)
@@ -860,7 +860,7 @@
 
 (defun (setf aref) (value array &rest pos)
   (when (cdr pos)
-    (error "(setf aref): multi-dimensional arrays not supported (yet?)"))
+    (error "SETF AREF: multi-dimensional arrays not supported (yet?)"))
   (setf (svref array (car pos)) value))
 
 (defun (setf elt) (value seq index)

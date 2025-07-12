@@ -1005,6 +1005,12 @@
 
 (define-compiler-macro identity (x) x)
 
+(define-compiler-macro eq (&whole form a b)
+  (cond
+    ((null a) `(null ,b))
+    ((null b) `(null ,a))
+    (t form)))
+
 (defun make-compiler-env ()
   ;; :lex should match the runtime lexical environment; both
   ;; variables and functions are stored there, but the compiler
@@ -1545,16 +1551,12 @@
              (comp (car exps) env val? more?))
             (l1
              (%seq (comp (car exps) env t t)
-                   (if val?
-                       (gen "TJUMPK" l1)
-                       (gen "TJUMP" l1))
+                   (gen (if val? "TJUMPK" "TJUMP") l1)
                    (comp-or (cdr exps) env val? more? l1)))
             (t
              (let ((l1 (mklabel)))
                (%seq (comp (car exps) env t t)
-                     (if val?
-                         (gen "TJUMPK" l1)
-                         (gen "TJUMP" l1))
+                     (gen (if val? "TJUMPK" "TJUMP") l1)
                      (comp-or (cdr exps) env val? more? l1)
                      (vector l1)
                      (gen "VALUES" 1)

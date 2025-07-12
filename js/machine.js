@@ -475,6 +475,7 @@ var optimize = (function(){
                     }
                     break;
                   case "NULL":
+                  case "NOT":
                     if (el[2] == 1) {
                         code.splice(i, 1, [ "NOT" ]);
                         return true;
