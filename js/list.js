@@ -1,7 +1,7 @@
 import { LispPrimitiveError } from "./error.js";
 
 function listp(thing) {
-    return thing === null || thing instanceof LispCons;
+    return thing === false || thing instanceof LispCons;
 }
 
 function check_list(list, func) {
@@ -10,12 +10,12 @@ function check_list(list, func) {
 
 function car(cell) {
     check_list(cell, "CAR");
-    return cell === null ? null : cell.car;
+    return cell === false ? false : cell.car;
 }
 
 function cdr(cell) {
     check_list(cell, "CDR");
-    return cell === null ? null : cell.cdr;
+    return cell === false ? false : cell.cdr;
 }
 
 const DOT = {
@@ -33,7 +33,7 @@ export class LispCons {
     }
     static forEach(p, callback) {
         var i = 0;
-        while (p !== null) {
+        while (p !== false) {
             callback(p.car, i++);
             p = p.cdr;
             if (!listp(p)) {
@@ -43,9 +43,9 @@ export class LispCons {
         }
     }
     static map(list, callback) {
-        var ret = null, p;
+        var ret = false, p;
         LispCons.forEach(list, function(el, i, dot){
-            var cell = new LispCons(null, null);
+            var cell = new LispCons(false, false);
             cell.car = callback(el, i, dot, cell);
             if (ret) p.cdr = cell;
             else ret = cell;
@@ -54,15 +54,15 @@ export class LispCons {
         return ret;
     }
     static last(list) {
-        while (list && cdr(list) !== null && listp(list.cdr)) {
+        while (list && cdr(list) !== false && listp(list.cdr)) {
             list = list.cdr;
         }
         return list;
     }
     static copy(list) {
-        let copy = new LispCons(null, null), p = copy;
-        while (list !== null) {
-            p = p.cdr = new LispCons(car(list), null);
+        let copy = new LispCons(false, false), p = copy;
+        while (list !== false) {
+            p = p.cdr = new LispCons(car(list), false);
             list = list.cdr;
             if (!listp(list)) {
                 p.cdr = list;
@@ -72,31 +72,31 @@ export class LispCons {
         return copy.cdr;
     }
     static reverse(list) {
-        var a = null;
-        while (list !== null) {
+        var a = false;
+        while (list !== false) {
             a = new LispCons(car(list), a);
             list = cdr(list);
         }
         return a;
     }
     static nreverse(list) {
-        if (list === null || cdr(list) === null) return list;
-        var p = null;
+        if (list === false || cdr(list) === false) return list;
+        var p = false;
         while (true) {
             var next = cdr(list);
             list.cdr = p;
             p = list;
-            if (next === null) return list;
+            if (next === false) return list;
             list = next;
         }
     }
     static append(lists) {
-        if (lists.length == 0) return null;
-        var ret = null, p = null;
+        if (lists.length == 0) return false;
+        var ret = false, p = false;
         while (lists.length > 1) {
             var l = lists.shift();
-            while (l !== null) {
-                var cell = new LispCons(car(l), null);
+            while (l !== false) {
+                var cell = new LispCons(car(l), false);
                 if (p) p.cdr = cell;
                 else ret = cell;
                 p = cell;
@@ -110,10 +110,10 @@ export class LispCons {
         return lists[0];
     }
     static nconc(lists) {
-        var ret = null, p = null;
+        var ret = false, p = false;
         for (var i = 0; i < lists.length; ++i) {
             var l = lists[i];
-            if (l === null) continue;
+            if (l === false) continue;
             if (!ret) ret = l;
             if (p) {
                 check_list(p, "nconc");
@@ -124,16 +124,16 @@ export class LispCons {
         return ret;
     }
     static nreconc(list, tail) {
-        if (list === null) return tail;
+        if (list === false) return tail;
         var tmp = list;
         list = LispCons.nreverse(list);
         tmp.cdr = tail;
         return list;
     }
     static revappend(list, tail) {
-        if (list === null) return tail;
-        var a = null, last = null;
-        while (list !== null) {
+        if (list === false) return tail;
+        var a = false, last = false;
+        while (list !== false) {
             a = new LispCons(car(list), a);
             if (!last) last = a;
             list = cdr(list);
@@ -142,7 +142,7 @@ export class LispCons {
         return a;
     }
     static fromArray(array, start = 0, end = array.length) {
-        let ret = null, p = null, dot = false;
+        let ret = false, p = false, dot = false;
         for (let i = start; i < end; ++i) {
             let el = array[i];
             if (el === DOT) {
@@ -150,7 +150,7 @@ export class LispCons {
             } else {
                 if (dot) p.cdr = el;
                 else {
-                    let cell = new LispCons(el, null);
+                    let cell = new LispCons(el, false);
                     if (ret) p.cdr = cell;
                     else ret = cell;
                     p = cell;
@@ -161,7 +161,7 @@ export class LispCons {
     }
     static len(list) {
         var len = 0;
-        while (list !== null) {
+        while (list !== false) {
             ++len;
             list = cdr(list);
         }
@@ -180,7 +180,7 @@ export class LispCons {
     }
     static isDotted(x) {
         var i = 0;
-        while (x !== null) {
+        while (x !== false) {
             if (!listp(x)) return i;
             x = x.cdr;
             i++;
@@ -190,14 +190,14 @@ export class LispCons {
     static elt(list, n, error) {
         var p = list;
         let i = n;
-        while (p !== null && i-- > 0) {
+        while (p !== false && i-- > 0) {
             p = cdr(p);
         }
-        if (error && p === null) error(`ELT: index ${n} is too large`);
+        if (error && p === false) error(`ELT: index ${n} is too large`);
         return car(p);
     }
     static find(list, item, cmp) {
-        while (list !== null && !cmp(list.car, item))
+        while (list !== false && !cmp(list.car, item))
             list = cdr(list);
         return list;
     }

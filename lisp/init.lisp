@@ -12,7 +12,7 @@
   (%use-package main user)
   (setq exported
         '(atom quasiquote defmacro defun when unless labels flet foreach
-          prog1 prog2 or and cond member case otherwise mapcar mapc with-cc aif it push
+          prog1 prog2 or and cond member case otherwise mapcar mapc aif it push
           error warn without-interrupts
           eval compile load function functionp unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
@@ -39,7 +39,7 @@
           abs sin asin cos acos tan atan exp log sqrt expt random
           min max
 
-          make-hash hashp hash-get hash-set hash-add hash-copy hash-keys hash-values
+          make-hash hashp hash-get hash-set hash-copy hash-keys hash-values
           hash-iterator iterator-next
 
           macroexpand-1 disassemble
@@ -73,7 +73,9 @@
           define-compiler-macro incf decf dolist collect-if remove
           remove-duplicates merge stable-sort dotimes do do* complement adjoin
           pushnew nth use-package with-output-to-string prog prog* make-list
-          make-array aref copy-tree))
+          make-array aref copy-tree
+
+          sxhash))
 
   (%export exported boot)
   (%export exported main)
@@ -458,7 +460,7 @@
        (let ((item (gensym "item")))
          `(let ((,item ,obj)
                 ,@(map2 #'list temps value-forms))
-            (let ((,(car store-vars) (cons ,item ,get-form)))
+            (symbol-macrolet ((,(car store-vars) (cons ,item ,get-form)))
               ,store-form)))))))
 
 (defmacro pop (place)
@@ -469,9 +471,9 @@
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                             (get-setf-expansion place)
          `(let* (,@(map2 #'list temps value-forms)
-                 (,v ,get-form)
-                 (,(car store-vars) (cdr ,v)))
-            ,store-form
+                 (,v ,get-form))
+            (symbol-macrolet ((,(car store-vars) (cdr ,v)))
+              ,store-form)
             (car ,v)))))))
 
 (define-setf-expander getf (place indicator &optional default)
@@ -483,8 +485,7 @@
       (values `(,@place-tempvars ,vindicator ,vdefault)
               `(,@place-tempvals ,indicator ,default)
               `(,newval)
-              `(let ((,(car stores) (%:%putf ,get ,vindicator ,newval))
-                     ,@(cdr stores))
+              `(symbol-macrolet ((,(car stores) (%:%putf ,get ,vindicator ,newval)))
                  ,set
                  ,newval)
               `(getf ,get ,vindicator ,vdefault)))))
@@ -735,7 +736,7 @@
       `(let* ((,vobj ,obj)
               ,@(mapcar #'list temps vals)
               (,vcurr ,get))
-         (let ((,(car stores) (adjoin ,vobj ,vcurr ,@args)))
+         (symbol-macrolet ((,(car stores) (adjoin ,vobj ,vcurr ,@args)))
            ,set)))))
 
 (defun nth (n list)
@@ -783,10 +784,26 @@
   (let ((memo (gensym "memo")))
     (multiple-value-bind (body declarations) (%:dig-declarations body)
       `(let ((,memo (make-hash)))
+         (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
          (defun ,name ,args
            (declare ,@declarations)
            (or (hash-get ,memo ,(car args))
-               (hash-add ,memo ,(car args) (progn ,@body))))))))
+               (hash-set ,memo ,(car args) (progn ,@body))))))))
+
+(defmacro defun-memoize2 (name args &body body)
+  (let ((memo (gensym "memo")))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(let ((,memo (make-hash)))
+         (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
+         (defun ,name ,args
+           (declare ,@declarations)
+           (aif (hash-get ,memo ,(car args))
+                (or (hash-get it ,(cadr args))
+                    (hash-set it ,(cadr args) (progn ,@body)))
+                (let ((val (progn ,@body)))
+                  (hash-set ,memo ,(car args)
+                            (make-hash ,(cadr args) val))
+                  val)))))))
 
 (defmacro prog (bindings &body body)
   (multiple-value-bind (body declarations) (%:dig-declarations body)
@@ -816,7 +833,7 @@
                               displaced-to
                               displaced-index-offset)
   (when (listp dimensions)
-    (error "make-array: multi-dimensional arrays not supported (yet?)"))
+    (error "MAKE-ARRAY: multi-dimensional arrays not supported (yet?)"))
   (make-vector dimensions initial-element initial-contents))
 
 (define-compiler-macro make-array (&whole form
@@ -832,7 +849,7 @@
 
 (defun aref (array &rest pos)
   (when (cdr pos)
-    (error "aref: multi-dimensional arrays not supported (yet?)"))
+    (error "AREF: multi-dimensional arrays not supported (yet?)"))
   (svref array (car pos)))
 
 (define-compiler-macro aref (&whole form array &rest pos)
@@ -843,7 +860,7 @@
 
 (defun (setf aref) (value array &rest pos)
   (when (cdr pos)
-    (error "(setf aref): multi-dimensional arrays not supported (yet?)"))
+    (error "SETF AREF: multi-dimensional arrays not supported (yet?)"))
   (setf (svref array (car pos)) value))
 
 (defun (setf elt) (value seq index)

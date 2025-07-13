@@ -8,6 +8,7 @@
 (in-package :ymacs)
 
 (import '(sl-ffi:defun-js))
+(import '(sl::defun-memoize2))
 (export '(make-dialog))
 
 (defun grep (list pred)
@@ -111,28 +112,35 @@
 (define-handler :compile-string (code filename)
   (compile-string code filename))
 
+(defun-memoize2 lev (a b)
+  (cond
+    ((zerop (length b))
+     (length a))
+    ((zerop (length a))
+     (length b))
+    ((eq (elt a 0) (elt b 0))
+     (lev (substr a 1)
+          (substr b 1)))
+    (t
+     (1+ (min (lev (substr a 1) b)
+              (lev a (substr b 1))
+              (lev (substr a 1)
+                   (substr b 1)))))))
+
 (labels ((symbol-completion (query all)
+           (setf all (mapcar #'symbol-name all))
            (let* ((rx (make-regexp (strcat "^"
                                            (replace-regexp
                                             #/[-_.\/]/g
                                             (quote-regexp (replace-regexp #/\./g query "-"))
                                             "[^-_./]*[-_./]"))
                                    "i"))
-                  (len (length query))
-                  (matching (grep all (lambda (sym)
-                                        (regexp-test rx (symbol-name sym))))))
-             (mapcar #'symbol-name
-                     (sort matching
-                           (lambda (syma symb)
-                             (let ((a (symbol-name syma))
-                                   (b (symbol-name symb)))
-                               (cond ((string-equal a query) nil)
-                                     ((string-equal b query) t)
-                                     ((eq (symbol-package syma) *package*) t)
-                                     ((eq (symbol-package symb) *package*) nil)
-                                     (t
-                                      (< (abs (- (length a) len))
-                                         (abs (- (length b) len))))))))))))
+                  (matching (grep all (lambda (name)
+                                        (regexp-test rx name)))))
+             (sort matching
+                   (lambda (a b)
+                     (< (lev a query)
+                        (lev b query)))))))
 
   (define-handler :list-symbol-completions (query)
     (let (m)

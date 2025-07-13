@@ -130,8 +130,8 @@ const OP_LEN = [
     1 /* TJUMP */,
     1 /* FJUMP */,
     0 /* BLOCK */,
-    1 /* LJUMP */,
-    1 /* LRET */,
+    2 /* LJUMP */,
+    2 /* LRET */,
     0 /* NOT */,
     0 /* SETCC */,
     1 /* SAVE */,
@@ -188,7 +188,7 @@ const OP_LEN = [
     0 /* CDDDAR */,
     0 /* CDDDDR */,
     0 /* PROGV */,
-    1 /* LRET2 */,
+    2 /* LRET2 */,
     2 /* LJUMP2 */,
     5 /* XARGS */,
     2 /* LPOP */,
@@ -214,28 +214,32 @@ const OP_LEN = [
 ];
 
 export function want_bound(name, val) {
-    if (val === false || val === undefined) error(`Symbol ${dump(name)} not bound`);
+    if (val === undefined) error(`Symbol ${dump(name)} not bound`);
     return val;
 }
 
 // normal RET context
-class LispRet {
-    constructor(m, pc) {
+export class LispRet {
+    constructor(m, pc, noretval) {
         this.f = m.f;
         this.code = m.code;
         this.pc = pc;
         this.env = m.env;
         this.denv = m.denv;
         this.n_args = m.n_args;
+        this.noretval = noretval;
         //if (m.trace) this.trace = m.trace.slice();
     }
-    run(m) {
+    run(m, retval) {
         m.f = this.f;
         m.code = this.code;
         m.pc = this.pc;
         m.env = this.env;
         m.denv = this.denv;
         m.n_args = this.n_args;
+        if (!this.noretval) {
+            m.push(retval);
+        }
         //if (this.trace) m.trace = this.trace;
     }
 }
@@ -252,7 +256,6 @@ class LispCleanup {
 
 // return context for TAGBODY and BLOCK
 class LispLongRet {
-    static #NO_RET = {};
     constructor(m) {
         this.f = m.f;
         this.code = m.code;
@@ -272,7 +275,7 @@ class LispLongRet {
         m.n_args = this.n_args;
         //if (this.trace) m.trace = this.trace;
     }
-    run(m, addr, val = LispLongRet.#NO_RET) {
+    run(m, addr, retval) {
         // figure out if we need to execute cleanup hooks
         let doit;
         (doit = (m) => {
@@ -287,7 +290,7 @@ class LispLongRet {
                 p = p.cdr;
             }
             this.unwind(m, addr);
-            if (val !== LispLongRet.#NO_RET) m.push(val);
+            if (arguments.length === 3) m.push(retval);
         })(m);
     }
 }
@@ -377,16 +380,14 @@ var optimize = (function(){
             code.splice(i, 2, [ "TJUMPK", code[i+1][1] ]);
             return true;
         }
-        if (/^(?:JUMP|LJUMP|RET)$/.test(el[0])) {
+        if (/^(?:JUMP|LJUMP|RET|LRET|CALL)$/.test(el[0])) {
             for (var j = i + 1; j < code.length; ++j) {
-                if (code[j] instanceof LispSymbol) {
-                    let len = j - i - 1;
-                    if (len > 0) {
-                        code.splice(i + 1, len);
-                        return true;
-                    }
-                    break;
-                }
+                if (code[j] instanceof LispSymbol) break;
+            }
+            let len = j - i - 1;
+            if (len > 0) {
+                code.splice(i + 1, len);
+                return true;
             }
         }
         switch (el[0]) {
@@ -474,6 +475,7 @@ var optimize = (function(){
                     }
                     break;
                   case "NULL":
+                  case "NOT":
                     if (el[2] == 1) {
                         code.splice(i, 1, [ "NOT" ]);
                         return true;
@@ -545,19 +547,8 @@ var optimize = (function(){
                 return true;
             }
             break;
-          case "CALL":
           case "RET":
-          case "LRET":
-            for (var j = i; ++j < code.length;) {
-                if (code[j] instanceof LispSymbol) {
-                    break;
-                }
-            }
-            if (j - i - 1 > 0) {
-                code.splice(i + 1, j - i - 1);
-                return true;
-            }
-            if (el[0] == "RET" && i+2 < code.length && code[i+1] instanceof LispSymbol && code[i+2][0] == "RET") {
+            if (i+2 < code.length && code[i+1] instanceof LispSymbol && code[i+2][0] == "RET") {
                 // RET; L1; RET --> L1; RET
                 code.splice(i, 3, code[i+1], el);
                 return true;
@@ -571,7 +562,12 @@ var optimize = (function(){
                     code.splice(i + 1, 1);
                     return true;
                 }
-                if ([ "RET", "LRET", "LJUMP" ].includes(code[i+1][0])) {
+                if ([ "RET" ].includes(code[i+1][0])) {
+                    code.splice(i, 1);
+                    return true;
+                }
+                if ([ "LRET", "LJUMP" ].includes(code[i+1][0]) && el[2] === 0) {
+                    code[i+1][2] += el[1];
                     code.splice(i, 1);
                     return true;
                 }
@@ -579,7 +575,7 @@ var optimize = (function(){
             break;
         }
         if (i+1 < code.length) {
-            if ((el[0] == "CONST" && el[1] === null) || el[0] == "NIL") {
+            if ((el[0] == "CONST" && el[1] === false) || el[0] == "NIL") {
                 switch (code[i+1][0]) {
                   case "FJUMP":
                   case "FJUMPK":
@@ -593,7 +589,7 @@ var optimize = (function(){
                     code.splice(i, 2, [ "T" ]);
                     return true;
                 }
-                if (el[0] == "CONST" && el[1] === null) {
+                if (el[0] == "CONST" && el[1] === false) {
                     code.splice(i, 1, [ "NIL" ]);
                     return true;
                 }
@@ -667,7 +663,7 @@ var optimize = (function(){
 
 function constantp(x) {
     return x === true
-        || x === null
+        || x === false
         || typeof x == "number"
         || typeof x == "string"
         || x instanceof RegExp
@@ -677,7 +673,7 @@ function constantp(x) {
         || Array.isArray(x);
 }
 
-function is_jump_instruction(op) {
+function op_has_label(op) {
     switch (op) {
       case OP.JUMP:
       case OP.TJUMP:
@@ -717,7 +713,7 @@ function assemble(code) {
             ret[i] = assemble(ret[i]);
             break;
           default:
-            if (is_jump_instruction(op))
+            if (op_has_label(op))
                 ret[i] = ret[i].value;
         }
         i += OP_LEN[op];
@@ -728,7 +724,7 @@ function assemble(code) {
 function relocate(code, offset) {
     for (let i = 0; i < code.length;) {
         let op = code[i++];
-        if (is_jump_instruction(op))
+        if (op_has_label(op))
             code[i] += offset;
         i += OP_LEN[op];
     }
@@ -742,14 +738,14 @@ function indent(level) {
 }
 
 function dump(thing) {
-    if (thing === null) return "NIL";
+    if (thing === false) return "NIL";
     if (thing === true) return "T";
     if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
     if (thing instanceof LispCons) {
         if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
             return "'" + dump(LispCons.cadr(thing));
         var ret = "(", first = true;
-        while (thing !== null) {
+        while (thing !== false) {
             if (!first) ret += " ";
             else first = false;
             ret += dump(LispCons.car(thing));
@@ -773,10 +769,10 @@ export function disassemble(code) {
         let labels = Object.create(null);
         for (let i = 0; i < code.length;) {
             let op = code[i++];
-            if (is_jump_instruction(op)) {
+            if (op_has_label(op)) {
                 let addr = code[i];
                 if (!labels[addr]) {
-                    labels[addr] = "L" + (++lab);
+                    labels[addr] = LispSymbol.get("L" + (++lab));
                 }
             }
             i += OP_LEN[op];
@@ -793,18 +789,13 @@ export function disassemble(code) {
                 opcode = "FN " + code[i + 1];
                 data = "\n" + disassemble(code[i], level + 1);
                 break;
-              case OP.PRIM:
-                data = code[i] + " " + code[i + 1];
-                break;
               case OP.CONST:
                 data = dump(code[i]);
                 break;
-              case OP.LJUMP:
-                data = code[i];
-                break;
               default:
-                if (is_jump_instruction(op)) {
-                    data = labels[code[i]];
+                if (op_has_label(op)) {
+                    data = [ labels[code[i]], ...code.slice(i + 1, i + OP_LEN[op]) ].map(el =>
+                        pad_string(dump(el), 8)).join("");
                     break;
                 }
                 data = code.slice(i, i + OP_LEN[op]).map(el =>
@@ -825,7 +816,8 @@ export function disassemble(code) {
 
 function serialize_const(val, cache) {
     return function dump(val) {
-        if (val === null || val === true) return val + "";
+        if (val === false) return "!1";
+        if (val === true) return "!0";
         if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar) return val.serialize(cache);
         if (val instanceof RegExp) return val.toString();
         if (val instanceof LispCons) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
@@ -851,7 +843,7 @@ export function unserialize(code) {
             return cache[name];
         }
         let sym;
-        if (pak !== null) {
+        if (pak !== false) {
             pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
             sym = LispSymbol.get(name, pak);
         } else {
@@ -881,7 +873,7 @@ export function unserialize(code) {
 }
 
 function find_binding(env, symbol) {
-    while (env !== null) {
+    while (env !== false) {
         let el = env.car;
         if (el instanceof LispBinding && el.symbol === symbol)
             return el;
@@ -908,10 +900,10 @@ export class LispMachine {
 
     constructor(pm) {
         this.code = null;
-        this.pc = null;
+        this.pc = -1;
         this.stack = null;
-        this.env = null;
-        this.denv = pm ? pm.denv : null;
+        this.env = false;
+        this.denv = pm ? pm.denv : false;
         this.n_args = null;
         this.status = STATUS_FINISHED;
         this.error = null;
@@ -954,9 +946,9 @@ export class LispMachine {
         return this.stack.pop_frame(n);
     }
 
-    pop_number(error) {
+    pop_number() {
         var n = this.pop();
-        if (typeof n == "number") return n;
+        if (typeof n === "number") return n;
         return error("Number expected, got " + dump(n), n);
     }
 
@@ -973,11 +965,10 @@ export class LispMachine {
     }
 
     loop() {
-        while (this.pc < this.code.length) {
+        while (this.pc >= 0 && this.pc < this.code.length) {
             vmrun(this);
-            if (this.pc === null) break;
         }
-        return this.stack.sp > 0 ? this.pop() : null;
+        return this.stack.sp > 0 ? this.pop() : false;
     }
 
     atomic_call(closure, args) {
@@ -993,7 +984,7 @@ export class LispMachine {
         //var save_trace = this.trace;
         this.code = closure.code;
         this.env = closure.env;
-        this.stack = new LispStack().restore([ new LispRet(this, null) ].concat(args));
+        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
@@ -1014,7 +1005,7 @@ export class LispMachine {
 
     _exec(code) {
         this.code = code;
-        this.env = null;
+        this.env = false;
         this.stack = new LispStack();
         this.pc = 0;
         this.f = null;
@@ -1023,24 +1014,22 @@ export class LispMachine {
 
     _call(closure, args) {
         args = LispCons.toArray(args);
-        this.stack = new LispStack().restore([ new LispRet(this, null) ].concat(args));
+        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
         this.code = closure.code;
         this.env = closure.env;
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
-        while (true) {
-            if (this.pc === null) return this.pop();
-            vmrun(this);
-        }
+        while (this.pc >= 0) vmrun(this);
+        return this.pop();
     }
 
     _callnext(closure, args) {
         //if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
-        if (args !== false) {
+        if (args !== undefined) {
             this.push(this.mkret(this.pc));
             let n = 0;
-            while (args !== null) {
+            while (args !== false) {
                 this.push(args.car);
                 args = args.cdr;
                 n++;
@@ -1051,11 +1040,11 @@ export class LispMachine {
         this.env = closure.env;
         this.pc = 0;
         this.f = closure;
-        return false;
+        // must return undefined.
     }
 
     set_closure(closure, ...args) {
-        this.stack = new LispStack().restore([ new LispRet(this, null) ].concat(args));
+        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
         this.code = closure.code;
         this.env = closure.env;
         this.n_args = args.length;
@@ -1065,31 +1054,14 @@ export class LispMachine {
     }
 
     run(quota) {
-        var err = null;
-        try {
-            while (quota-- > 0) {
-                if (this.pc === null) {
-                    this.status = STATUS_FINISHED;
-                    break;
-                }
-                vmrun(this);
-                if (this.status !== STATUS_RUNNING)
-                    break;
+        while (quota-- > 0) {
+            if (this.pc < 0) {
+                this.status = STATUS_FINISHED;
+                break;
             }
-        } catch(ex) {
-            if (ex instanceof LispPrimitiveError) {
-                var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
-                if (pe && pe.function) {
-                    // RETHROW as Lisp error.
-                    this._callnext(pe.function, LispCons.fromArray([ "~A", ex.message ]));
-                    return null;
-                }
-            }
-            // we fucked up.
-            this.status = STATUS_HALTED;
-            err = this.error = ex;
+            vmrun(this);
+            if (this.status !== STATUS_RUNNING) break;
         }
-        return err;
     }
 
     dump(expr) {
@@ -1127,19 +1099,15 @@ function rewind(env, i) {
 }
 
 function eq(a, b) {
-    if (a === null) return b === null || b === S_NIL ? true : null;
-    if (b === null) return a === null || a === S_NIL ? true : null;
-    if (a === true) return b === true || b === S_T ? true : null;
-    if (b === true) return a === true || a === S_T ? true : null;
-    return a === b ? true : null;
+    return (a === S_NIL && b === false)
+        || (a === false && b === S_NIL)
+        || (a === S_T && b === true)
+        || (a === true && b === S_T)
+        || a === b;
 }
 
 let CC_CODE = assemble([
-    ["ARGS", 1],
-    ["LVAR", 1, 0],
     ["SETCC"],
-    ["LVAR", 0, 0],
-    ["RET"]
 ]);
 
 function error(msg) {
@@ -1150,11 +1118,11 @@ function find_key_arg(item, array, start, end = array.length) {
     for (let i = start; i < end; i += 2) {
         if (eq(item, array[i])) return i;
     }
-    return null;
+    return false;
 }
 
 let OP_RUN = [
-    /*NOP*/ () => {},
+    /*OP.NOP*/ () => {},
     /*OP.LVAR*/ (m) => {
         let i = m.code[m.pc++];
         let j = m.code[m.pc++];
@@ -1204,11 +1172,11 @@ let OP_RUN = [
     },
     /*OP.TJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.pop() !== null) m.pc = addr;
+        if (m.pop() !== false) m.pc = addr;
     },
     /*OP.FJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.pop() === null) m.pc = addr;
+        if (m.pop() === false) m.pc = addr;
     },
     /*OP.BLOCK*/ (m) => {
         // this is moderately tricky: we can't do
@@ -1220,37 +1188,39 @@ let OP_RUN = [
     },
     /*OP.LJUMP*/ (m) => {
         let addr = m.code[m.pc++];
-        m.pop().run(m, addr);
+        let fr = m.code[m.pc++];
+        frame(m.env, fr)[0].run(m, addr);
     },
     /*OP.LRET*/ (m) => {
-        let noval = m.f.noval;
         let addr = m.code[m.pc++];
-        let bret = m.pop(), retval = m.stack.pop_ret();
-        if (!noval) {
-            bret.run(m, addr, retval);
-        } else {
-            bret.run(m, addr);
-        }
+        let fr = m.code[m.pc++];
+        let retval = m.stack.pop_ret();
+        let bret = frame(m.env, fr)[0];
+        bret.run(m, addr, retval);
     },
     /*OP.NOT*/ (m) => {
-        m.push(m.pop() === null ? true : null);
+        m.push(m.pop() === false);
     },
     /*OP.SETCC*/ (m) => {
-        m.stack.top().run(m);
+        let retval = m.n_args === 0 ? false
+            : m.n_args === 1 ? m.stack.pop_ret()
+            : error(`Too many arguments in continuation call (${m.n_args})`);
+        // m.env *is* the continuation object (class LispCC above).
+        m.env.run(m);
+        // top of stack is expected to contain a return object (class
+        // LispRet) that will reinstate the code and address that
+        // call/cc was returing to.
+        m.stack.pop().run(m, retval);
     },
     /*OP.SAVE*/ (m) => {
         let addr = m.code[m.pc++];
         m.push(m.mkret(addr));
     },
     /*OP.RET*/ (m) => {
-        let noval = m.f.noval;
         // using m.stack directly, rather than m.pop, since we'd like
         // to keep multiple values around for the caller.
         let retval = m.stack.pop_ret();
-        m.stack.pop().run(m);
-        if (!noval) {
-            m.stack.push(retval);
-        }
+        m.stack.pop().run(m, retval);
     },
     /*OP.CALL*/ (m) => {
         let count = m.code[m.pc++];
@@ -1317,7 +1287,7 @@ let OP_RUN = [
             console.error(m.f);
             error("Insufficient number of arguments");
         }
-        let p = null;
+        let p = false;
         while (passed-- > count) p = new LispCons(m.pop(), p);
         let frame = m.pop_frame(count);
         frame.push(p);
@@ -1350,10 +1320,10 @@ let OP_RUN = [
         let nargs = m.code[m.pc++];
         if (nargs === -1) nargs = m.n_args;
         let ret = name.primitive(m, nargs);
-        if (ret !== false) m.push(ret ?? null);
+        if (ret !== undefined) m.push(ret);
     },
     /*OP.NIL*/ (m) => {
-        m.push(null);
+        m.push(false);
     },
     /*OP.T*/ (m) => {
         m.push(true);
@@ -1364,20 +1334,18 @@ let OP_RUN = [
     },
     /*OP.LIST*/ (m) => {
         let count = m.code[m.pc++];
-        let p = null, n = count;
-        if (n === -1) n = m.n_args;
+        let p = false, n = count;
         while (n-- > 0) p = new LispCons(m.pop(), p);
         m.push(p);
     },
     /*OP.LIST_*/ (m) => {
         let count = m.code[m.pc++];
         let p = m.pop(), n = count;
-        if (n === -1) n = m.n_args;
         while (--n > 0) p = new LispCons(m.pop(), p);
         m.push(p);
     },
     /*OP.CC*/ (m) => {
-        m.push(new LispClosure(CC_CODE, null, new LispCons([m.mkcont()])));
+        m.push(new LispClosure(CC_CODE, false, m.mkcont()));
     },
     /*OP.CAR*/ (m) => {
         m.push(LispCons.car(m.pop()));
@@ -1471,10 +1439,10 @@ let OP_RUN = [
     },
     /*OP.PROGV*/ (m) => {
         let values = m.pop(), count = 0, frame = [];
-        for (let names = m.pop(); names !== null; names = LispCons.cdr(names), count++) {
+        for (let names = m.pop(); names !== false; names = LispCons.cdr(names), count++) {
             let name = LispCons.car(names);
-            let val = false;
-            if (values !== null) {
+            let val = undefined;
+            if (values !== false) {
                 val = LispCons.car(values);
                 values = LispCons.cdr(values);
             }
@@ -1483,20 +1451,10 @@ let OP_RUN = [
         m.dynpush(frame);
     },
     /*OP.LRET2*/ (m) => {
-        error("Deprecated instruction LRET2");
-        let noval = m.f.noval;
-        let fr = m.code[m.pc++];
-        let retval = m.stack.pop_ret();
-        frame(m.env, fr)[0].run(m);
-        if (!noval) {
-            m.stack.push(retval);
-        }
+        error("Unused instruction slot");
     },
     /*OP.LJUMP2*/ (m) => {
-        error("Deprecated instruction LJUMP2");
-        let addr = m.code[m.pc++];
-        let fr = m.code[m.pc++];
-        frame(m.env, fr)[0].run(m, addr);
+        error("Unused instruction slot");
     },
     /*OP.XARGS*/ (m) => {
         let required = m.code[m.pc++];
@@ -1508,14 +1466,14 @@ let OP_RUN = [
         let n = m.n_args;
         let frame_len = required + 2 * optional + rest + 2 * kl;
         let min = required;
-        let max = rest || key || allow_other_keys ? null : required + optional;
+        let max = rest || key || allow_other_keys ? false : required + optional;
         if (n < required) {
             error(`Expecting at least ${min} arguments`);
         }
-        if (max !== null && n > max) {
+        if (max !== false && n > max) {
             error(`Expecting at most ${max} arguments`);
         }
-        let frame = new Array(frame_len).fill(null);
+        let frame = new Array(frame_len).fill(false);
         let stack = m.stack.pop_frame(n);
         let i = 0;
         let index = 0;
@@ -1536,23 +1494,23 @@ let OP_RUN = [
                 }
                 if (!allow_other_keys) {
                     let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, n);
-                    if (pos !== null) {
+                    if (pos !== false) {
                         allow_other_keys = stack[pos + 1];
                     }
                 }
                 for (let k = 0; k < kl; k++, index += 2) {
                     let pos = find_key_arg(key[k], stack, i, n);
-                    if (pos !== null) {
+                    if (pos !== false) {
                         frame[index] = true; // argument-passed-p
                         frame[index + 1] = stack[pos + 1];
-                        stack[pos] = false;
+                        stack[pos] = undefined;
                         if (pos == i) i += 2;
                     }
                 }
                 if (!allow_other_keys) {
                     while (i < n) {
                         let arg = stack[i];
-                        if (arg !== false && arg !== S_ALLOW_OTHER_KEYS && !key.includes(arg)) {
+                        if (arg !== undefined && arg !== S_ALLOW_OTHER_KEYS && !key.includes(arg)) {
                             error(`Unknown keyword argument ${dump(arg)}`);
                         }
                         i += 2;
@@ -1582,7 +1540,7 @@ let OP_RUN = [
     },
     /*OP.TJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.top() === null) {
+        if (m.top() === false) {
             m.pop();
         } else {
             m.pc = addr;
@@ -1590,7 +1548,7 @@ let OP_RUN = [
     },
     /*OP.FJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
-        if (m.top() === null) {
+        if (m.top() === false) {
             m.pop();
             m.pc = addr;
         }
@@ -1607,7 +1565,7 @@ let OP_RUN = [
         let n = m.code[m.pc++];
         let frame = m.stack.pop_values();
         m.env = new LispCons(frame, m.env);
-        while (frame.length < n) frame.push(null);
+        while (frame.length < n) frame.push(false);
         frame.length = n;
     },
     /*OP.POPBACK*/ (m) => {
@@ -1631,28 +1589,28 @@ let OP_RUN = [
         m.push(m.pop_number() - 1);
     },
     /*OP.LT*/ (m) => {
-        m.push(m.pop_number() > m.pop_number() ? true : null);
+        m.push(m.pop_number() > m.pop_number());
     },
     /*OP.LTE*/ (m) => {
-        m.push(m.pop_number() >= m.pop_number() ? true : null);
+        m.push(m.pop_number() >= m.pop_number());
     },
     /*OP.GT*/ (m) => {
-        m.push(m.pop_number() < m.pop_number() ? true : null);
+        m.push(m.pop_number() < m.pop_number());
     },
     /*OP.GTE*/ (m) => {
-        m.push(m.pop_number() <= m.pop_number() ? true : null);
+        m.push(m.pop_number() <= m.pop_number());
     },
     /*OP.NUMEQ*/ (m) => {
-        m.push(m.pop_number() === m.pop_number() ? true : null);
+        m.push(m.pop_number() === m.pop_number());
     },
     /*OP.NUMNEQ*/ (m) => {
-        m.push(m.pop_number() !== m.pop_number() ? true : null);
+        m.push(m.pop_number() !== m.pop_number());
     },
     /*OP.PLUSP*/ (m) => {
-        m.push(m.pop_number() > 0 ? true : null);
+        m.push(m.pop_number() > 0);
     },
     /*OP.MINUSP*/ (m) => {
-        m.push(m.pop_number() < 0 ? true : null);
+        m.push(m.pop_number() < 0);
     },
 ];
 

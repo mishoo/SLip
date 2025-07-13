@@ -1,5 +1,7 @@
 (in-package :sl-user)
 
+(format t "Loading tests takes a few seconds, please wait...~%")
+
 (let* ((timing (list 0 0))
        (%:*load-timing* timing))
   (load "test/deftest.lisp")
@@ -17,6 +19,7 @@
   (load "test/defun.lisp")
   (load "test/flet.lisp")
   (load "test/labels.lisp")
+  (load "test/places.lisp")
 
   (load "test/values.lisp")
   (load "test/values-list.lisp")
@@ -51,7 +54,6 @@
   (load "test/handler-case.lisp")
   (load "test/ignore-errors.lisp")
   (load "test/error.lisp")
-  (load "test/places.lisp")
 
   (load "test/cons/append.lisp")
   (load "test/cons/member.lisp")

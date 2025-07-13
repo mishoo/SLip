@@ -5,7 +5,7 @@ class Values {
         this.vals = vals;
     }
     first() {
-        return this.vals.length > 0 ? this.vals[0] : null;
+        return this.vals.length > 0 ? this.vals[0] : false;
     }
 }
 
@@ -64,11 +64,13 @@ export class LispStack {
         }
     }
     pop_frame(len) {
-        if (this.sp < len) {
+        let sp = this.sp;
+        if (sp < len) {
             throw new LispPrimitiveError(`Insufficient stack elements in pop_frame (${this.sp}/${len})`);
         }
         let frame = new Array(len);
-        while (len > 0) frame[--len] = this.pop();
+        while (len > 0) frame[--len] = value(this.data[--sp]);
+        this.sp = sp;
         return frame;
     }
     copy() {
