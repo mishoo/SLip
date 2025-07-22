@@ -795,7 +795,7 @@ export function make_desktop(load_files = []) {
     });
     var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL({ ls_keyName: ".slip" });
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        ymacs.setColorTheme([ "ef-maris-dark" ]);
+        ymacs.setColorTheme([ "ef-elea-dark" ]);
     } else {
         ymacs.setColorTheme([ "ef-duo-light" ]);
     }

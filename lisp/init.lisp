@@ -499,7 +499,10 @@
     value))
 
 (defun (setf svref) (value vector index)
-  (vector-set vector index value))
+  (vector-set value vector index))
+
+(define-compiler-macro (setf svref) (value vector index)
+  `(vector-set ,value ,vector ,index))
 
 (define-modify-macro incf (&optional (add 1)) +)
 (define-modify-macro decf (&optional (add 1)) -)

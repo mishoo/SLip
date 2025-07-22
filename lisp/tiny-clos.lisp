@@ -103,27 +103,27 @@
   (defun %allocate-instance-internal (class nfields proc)
     (let* ((obj (%make-object (+ nfields 2)))
            (vec (%object-vector obj)))
-      (vector-set vec 0 class)
-      (vector-set vec 1 proc)
+      (setf (svref vec 0) class)
+      (setf (svref vec 1) proc)
       obj))
 
   (defun %instance-class (obj)
     (svref (%object-vector obj) 0))
 
   (defun %set-instance-class-to-self (obj)
-    (vector-set (%object-vector obj) 0 obj))
+    (setf (svref (%object-vector obj) 0) obj))
 
   (defun %get-entity-proc (obj)
     (svref (%object-vector obj) 1))
 
   (defun %set-entity-proc (obj proc)
-    (vector-set (%object-vector obj) 1 proc))
+    (setf (svref (%object-vector obj) 1) proc))
 
   (defun %instance-ref (obj index)
     (svref (%object-vector obj) (+ index 2)))
 
   (defun %instance-set (obj index new-value)
-    (vector-set (%object-vector obj) (+ index 2) new-value)))
+    (setf (svref (%object-vector obj) (+ index 2)) new-value)))
 
 (defun class-of (x)
   (cond ((%objectp x) (%instance-class x))

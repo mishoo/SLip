@@ -192,15 +192,6 @@
        (go next)))
     (nreverse ret)))
 
-(defun map2-vector (func lst1 lst2)
-  (let ((ret (vector)))
-    (tagbody
-     next
-     (when (and lst1 lst2)
-       (vector-push ret (funcall func (%pop lst1) (%pop lst2)))
-       (go next)))
-    ret))
-
 (defun foreach (lst func)
   (tagbody
    next

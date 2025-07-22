@@ -736,7 +736,7 @@ defp("svref", false, function(m, nargs){
 
 defp("vector-set", true, function(m, nargs){
     checknargs(nargs, 3, 3);
-    var val = m.pop(), index = m.pop(), vector = m.pop();
+    var index = m.pop(), vector = m.pop(), val = m.pop();
     checktype(vector, LispVector);
     checktype(index, LispNumber);
     if (index >= vector.length)
