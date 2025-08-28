@@ -375,19 +375,18 @@
            (%stream-skip-to input #\Newline))
 
          (read-symbol-name ()
-           (let ((str (read-while
-                       (lambda (ch)
-                         (or
-                          (letterp ch)
-                          (char<= #\0 ch #\9)
-                          (%memq ch
-                                 '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
-                                   #\@ #\! #\? #\& #\= #\< #\>
-                                   #\[ #\] #\{ #\} #\/ #\^ #\#)))))))
-             (upcase str)))
+           (read-while
+            (lambda (ch)
+              (or
+               (letterp ch)
+               (digitp ch)
+               (%memq ch
+                      '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
+                        #\@ #\! #\? #\& #\= #\< #\>
+                        #\[ #\] #\{ #\} #\/ #\^ #\#))))))
 
          (read-symbol ()
-           (let ((str (read-symbol-name)))
+           (let ((str (upcase (read-symbol-name))))
              (when (zerop (length str))
                (error (strcat "Bad character (or reader bug) in read-symbol: " (peek))))
              (aif (and (regexp-test #/^-?[0-9]*\.?[0-9]*$/ str)
@@ -432,9 +431,23 @@
              (#\/ (read-regexp))
              (#\( (apply #'vector (read-list)))
              (#\' (next) (list 'function (read-token)))
-             (#\: (next) (make-symbol (read-symbol-name)))
+             (#\: (next) (make-symbol (upcase (read-symbol-name))))
              (#\. (next) (eval (read-token)))
+             ((#\b #\B) (next) (read-base2-number))
+             ((#\x #\X) (next) (read-base16-number))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
+
+         (read-base2-number ()
+           (let ((digits (read-symbol-name)))
+             (if (regexp-test #/^[01]+$/ digits)
+                 (parse-integer digits 2)
+                 (croak (strcat "Bad base2 number: " digits)))))
+
+         (read-base16-number ()
+           (let ((digits (read-symbol-name)))
+             (if (regexp-test #/^[0-9a-f]+$/i digits)
+                 (parse-integer digits 16)
+                 (croak (strcat "Bad hex number: " digits)))))
 
          (read-quote ()
            `(quote ,(read-token)))
