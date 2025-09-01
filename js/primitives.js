@@ -1310,7 +1310,7 @@ defp("%stream-prev", true, function(m, nargs){
     return stream.prev();
 });
 
-defp("%make-output-stream", false, function(m, nargs){
+defp("%make-output-stream", false, function(_, nargs){
     checknargs(nargs, 0, 0);
     return new LispOutputStream();
 });
@@ -1532,19 +1532,19 @@ defp("%ls-delete-path", true, function(m, nargs){
     return false;
 });
 
-defp("%ls-clear-store", true, function(m, nargs){
+defp("%ls-clear-store", true, function(_, nargs){
     checknargs(nargs, 0, 0);
     ls_clear();
     return false;
 });
 
-defp("%ls-purge-fasls", true, function(m, nargs){
+defp("%ls-purge-fasls", true, function(_, nargs){
     checknargs(nargs, 0, 0);
     ls_purge_fasls();
     return false;
 });
 
-defp("%ls-dump-store", true, function(m, nargs){
+defp("%ls-dump-store", true, function(_, nargs){
     checknargs(nargs, 0, 0);
     ls_dump();
     return false;
@@ -1866,7 +1866,7 @@ defp("find-package", false, function(m, nargs){
     return LispPackage.get_existing(name);
 });
 
-defp("%list-packages", false, function(m, nargs){
+defp("%list-packages", false, function(_, nargs){
     checknargs(nargs, 0, 0);
     return LispCons.fromArray([...new Set(Object.values(LispPackage.all()))]);
 });
@@ -1932,7 +1932,7 @@ defp("%use-package", true, function(m, nargs){
     return current.use(imported);
 });
 
-defp("%all-primitives", false, function(m, nargs){
+defp("%all-primitives", false, function(_, nargs){
     checknargs(nargs, 0, 0);
     return ALL_PRIMITIVES;
 });
@@ -2205,7 +2205,7 @@ defp("%find-in-env", false, function(m, nargs){
     return false;
 });
 
-defp("%debugger", true, function(m, nargs){
+defp("%debugger", true, function(_, nargs){
     checknargs(nargs, 0, 0);
     debugger;
 });
@@ -2236,10 +2236,12 @@ defp("%grok-xref-info", true, function(m, nargs){
 });
 
 defp("%machine.dynamic-environment", false, function(m, nargs){
+    checknargs(nargs, 0, 0);
     return m.denv;
 });
 
 defp("%machine.stack", false, function(m, nargs){
+    checknargs(nargs, 0, 0);
     return [...m.stack.data];
 });
 
@@ -2326,27 +2328,27 @@ defp("%js-camelcase-name", true, function(m, nargs){
     if (m) {
         name = m[1].toUpperCase().replace(/-/g, "_");
     } else {
-        name = name.replace(/^\*([a-z])(.*)\*$/, function(str, p1, p2){
+        name = name.replace(/^\*([a-z])(.*)\*$/, function(_, p1, p2){
             return p1.toUpperCase() + p2;
         });
-        name = name.replace(/-([a-z])/g, function(str, p){
+        name = name.replace(/-([a-z])/g, function(_, p){
             return p.toUpperCase();
         });
     }
     return name;
 });
 
-defp("get-internal-run-time", false, function(m, nargs){
+defp("get-internal-run-time", false, function(_, nargs){
     checknargs(nargs, 0, 0);
     return performance.now();
 });
 
-defp("%get-time", false, function(m, nargs){
+defp("%get-time", false, function(_, nargs){
     checknargs(nargs, 0, 0);
     return Date.now();
 });
 
-defp("%local-date", false, function(m, nargs){
+defp("%local-date", false, function(_, nargs){
     checknargs(nargs, 0, 0);
     var time = new Date();
     return LispCons.fromArray([ time.getFullYear(),
@@ -2359,7 +2361,7 @@ defp("%local-date", false, function(m, nargs){
                                 time.getTimezoneOffset() ]);
 });
 
-defp("%utc-date", false, function(m, nargs){
+defp("%utc-date", false, function(_, nargs){
     checknargs(nargs, 0, 0);
     var time = new Date();
     return LispCons.fromArray([ time.getUTCFullYear(),
