@@ -24,17 +24,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(export '(call-next-method
-          initialize
-          object
+(export '(call-next-method object primitive number function hash class cons
+          vector string char regexp package null symbol
+          stream thread input-stream output-stream unknown-class
+          find-class defclass defgeneric make-instance defmethod
+          slot-value class-name is-a class-of))
 
-          find-class find-generic defclass defgeneric make-instance defmethod
-          slot-ref slot-set class-name class-direct-slots class-direct-supers
-          class-slots class-cpl generic-methods method-specializers
-          method-procedure make-class make-generic make-method is-a add-method
-          class-of
+(defpackage :sl-tiny-clos
+  (:use :sl :%))
 
-          ))
+(in-package :sl-tiny-clos)
 
 (defun find-class (sym)
   (%get-symbol-prop sym :class))
@@ -55,7 +54,8 @@
   `(setf (find-class ',name)
          (make-class ',name (list ,@(mapcar (lambda (name)
                                               `(find-class ',name))
-                                            direct-supers)) ',direct-slots)))
+                                            direct-supers))
+                     ',direct-slots)))
 
 (defmacro defgeneric (name)
   (let ((generic (gensym "GENERIC")))
@@ -197,6 +197,12 @@
   (let* ((info (lookup-slot-info (class-of object) slot-name))
          (setter (cadr info)))
     (funcall setter object new-value)))
+
+(defun slot-value (object slot-name)
+  (slot-ref object slot-name))
+
+(defun (setf slot-value) (new-value object slot-name)
+  (slot-set object slot-name new-value))
 
 (defun lookup-slot-info (class slot-name)
   (let* ((getters-n-setters (if (eq class <class>)
@@ -430,7 +436,7 @@
                     (setf one-step (lambda (tail)
                                      (lambda ()
                                        (if (not tail)
-                                           (error "No applicable methods/next methods")
+                                           (error (strcat "No applicable methods/next methods"))
                                            (apply (method-procedure (car tail))
                                                   (cons (funcall one-step (cdr tail)) args))))))
                     ((funcall one-step methods)))))))

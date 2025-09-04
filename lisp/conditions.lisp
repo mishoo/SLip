@@ -40,8 +40,8 @@
 (defglobal <condition> (find-class 'condition))
 
 (defmethod print-object ((c simple-condition) (out output-stream))
-  (let ((format-control (slot-ref c :format-control))
-        (format-arguments (slot-ref c :format-arguments)))
+  (let ((format-control (slot-value c :format-control))
+        (format-arguments (slot-value c :format-arguments)))
     (strcat
      "<" (class-name (class-of c)) ": "
      (apply #'format out format-control format-arguments)
@@ -122,10 +122,6 @@
      (error (condition)
        (values nil condition))))
 
-(defun existing-condition-name? (name)
-  (let ((class (find-class name)))
-    (and class (%memq <condition> (class-cpl class)))))
-
 (defun %condition (datum arguments default-class)
   (cond ((typep datum 'condition) datum)
         ((or (stringp datum)
@@ -133,8 +129,7 @@
          (make-instance default-class
                         :format-control datum
                         :format-arguments arguments))
-        ((existing-condition-name? datum)
-         (apply #'make-instance datum arguments))))
+        ((apply #'make-instance datum arguments))))
 
 (defun signal (datum . arguments)
   (let ((condition (%condition datum arguments 'simple-condition))
