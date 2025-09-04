@@ -13,26 +13,40 @@
 " ;; hack for Ymacs to get the right package
 
 (setq %::*package* (find-package "%"))
-(%special! '*read-table*
-           '*package*
-           '*standard-input*
-           '*current-file*
-           '*current-pos*
-           '*url-prefix*
-           '*unknown-functions*
-           '*unknown-variables*
-           '*compiler-env*
-           '*xref-info*
-           '*compiler-macros*
-           '*standard-output*
-           '*error-output*
-           '*trace-output*
-           '*whole-form*
-           '*load-timing*)
 
-(setq *standard-output* (%make-output-stream))
-(setq *error-output* (%make-output-stream))
-(setq *trace-output* (%make-output-stream))
+(defmacro defparameter (name val &optional documentation)
+  (%special! name)
+  (%::maybe-xref-info name 'defparameter)
+  `(progn
+     (%special! ',name)
+     (setq ,name ,val)))
+
+(defmacro defvar (name &optional (val nil val-passed-p) documentation)
+  (%special! name)
+  (%::maybe-xref-info name 'defvar)
+  `(progn
+     (%special! ',name)
+     ,@(when val-passed-p
+         `((unless (boundp ',name)
+             (setq ,name ,val))))))
+
+(defvar *read-table* nil)
+(defvar *package* nil)
+(defvar *standard-input* nil)
+(defvar *current-file* nil)
+(defvar *current-pos* nil)
+(defvar *url-prefix* nil)
+(defvar *unknown-functions* nil)
+(defvar *unknown-variables* nil)
+(defvar *compiler-env* nil)
+(defvar *xref-info* nil)
+(defvar *compiler-macros* nil)
+(defvar *whole-form* nil)
+(defvar *load-timing* nil)
+
+(defvar *standard-output* (%make-output-stream))
+(defvar *error-output* (%make-output-stream))
+(defvar *trace-output* (%make-output-stream))
 
 (defmacro cond clauses
   (when clauses

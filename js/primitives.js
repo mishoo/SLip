@@ -1677,9 +1677,6 @@ defp("%special!", true, function(m, nargs){
         checktype(name, LispSymbol);
         name.setv("special", true);
         name.setv("global", true);
-        if (name.value === undefined) {
-            name.value = false;
-        }
     }
     return false;
 });

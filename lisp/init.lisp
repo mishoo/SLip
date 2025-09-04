@@ -45,7 +45,7 @@
           macroexpand-1 disassemble
 
           make-package find-package make-symbol symbol-name symbol-package symbol-function
-          packagep symbolp keywordp intern shadow find-symbol package-name
+          packagep symbolp keywordp intern unintern shadow find-symbol package-name
           threadp make-thread current-thread set-timeout clear-timeout
 
           car cdr caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr
@@ -68,7 +68,7 @@
           &key &rest &body &whole &optional &aux &allow-other-keys
 
           define-modify-macro macroexpand-1 macroexpand defpackage in-package
-          defparameter defglobal every some notany notevery defsetf
+          defparameter defvar defglobal every some notany notevery defsetf
           define-setf-expander get-setf-expansion setf psetf push pop
           define-compiler-macro incf decf dolist collect-if remove
           remove-duplicates merge stable-sort dotimes do do* complement adjoin
@@ -138,12 +138,6 @@
 
 (defmacro in-package (name)
   (setq *package* (find-package name)) nil)
-
-(defmacro defparameter (name val)
-  (%special! name)
-  (%::maybe-xref-info name 'defparameter)
-  `(progn (%special! ',name)
-          (setq ,name ,val)))
 
 (defmacro defglobal (name val)
   (%global! name)
