@@ -305,16 +305,15 @@
              (let* ((args (pop args))
                     (var (cadr args)))
                (dig-var)))
-           (list-nconc *loop-variables* (list iter itval hash-var))
+           (list-nconc *loop-variables* (list iter hash-var))
            (when vkey (list-add *loop-variables* vkey))
            (when vval (list-add *loop-variables* vval))
-           (let ((next-item `((setf ,itval (iterator-next ,iter))
-                              (when (cdr ,itval)
-                                (go $loop-end))
-                              ,@(when vkey
-                                  `((setf ,vkey (svref (car ,itval) 0))))
-                              ,@(when vval
-                                  `((setf ,vval (svref (car ,itval) 1)))))))
+           (let ((next-item `((multiple-value-bind ($more $entry) (iterator-next ,iter)
+                                (unless $more (go $loop-end))
+                                ,@(when vkey
+                                    `((setf ,vkey (svref $entry 0))))
+                                ,@(when vval
+                                    `((setf ,vval (svref $entry 1))))))))
              (list-nconc *loop-start*
                          `((setf ,hash-var ,hash-form)
                            (setf ,iter (hash-iterator ,hash-var))

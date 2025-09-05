@@ -597,7 +597,7 @@
         ((consp x) <cons>)
         ((not x) <null>)
         ((symbolp x) <symbol>)
-        ((hashp x) <hash>)
+        ((hash-table-p x) <hash>)
         ((charp x) <char>)
         ((packagep x) <package>)
         ((functionp x) <function>)

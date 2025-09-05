@@ -200,13 +200,16 @@ export class LispHash {
         return val;
     }
     delete(name) {
-        this.data.delete(name);
+        return this.data.delete(name);
     }
     has(key) {
         return this.data.has(key);
     }
     size() {
         return this.data.size;
+    }
+    clear() {
+        this.data.clear();
     }
     serialize() {
         return "h(" + LispChar.sanitize(JSON.stringify(this.toObject())) + ")";

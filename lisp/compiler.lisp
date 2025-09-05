@@ -740,7 +740,7 @@
 
 (defun find-macrolet-in-compiler-env (name &optional (env *compiler-env*))
   (when env
-    (aif (find-in-compiler-env name :func (hash-get env :lex))
+    (aif (find-in-compiler-env name :func (gethash env :lex))
          (getf (cddr it) :macro))))
 
 (defun find-symbol-macrolet-in-compiler-env (name &optional (env *compiler-env*))
@@ -750,7 +750,7 @@
 
 (defun find-var-in-compiler-env (name &optional (env *compiler-env*))
   (when env
-    (find-in-compiler-env name :var (hash-get env :lex))))
+    (find-in-compiler-env name :var (gethash env :lex))))
 
 (defun safe-atom-p (thing &optional (env *compiler-env*))
   (and (atom thing)
@@ -1063,7 +1063,7 @@
          (when stuff
            (let ((key (car stuff))
                  (val (cadr stuff)))
-             (hash-set h key (cons val (hash-get h key)))
+             (%hash-set (cons val (gethash h key)) h key)
              (rec (cddr stuff)))))
        h))
     (env)))
@@ -1088,7 +1088,7 @@
            (cadr form))))
 
 (defun compiler-macro-function (name &optional (env *compiler-env*))
-  (unless (and env (find-in-compiler-env name :func (hash-get env :lex)))
+  (unless (and env (find-in-compiler-env name :func (gethash env :lex)))
     (getf *compiler-macros* name)))
 
 (defun dig-declarations (exps)
@@ -1163,19 +1163,19 @@
        (find-in-compiler-env name type env))
 
      (find-var (name env)
-       (find-in-env name :var (hash-get env :lex)))
+       (find-in-env name :var (gethash env :lex)))
 
      (find-func (name env)
-       (find-in-env name :func (hash-get env :lex)))
+       (find-in-env name :func (gethash env :lex)))
 
      (find-tag (name env)
-       (find-in-env name :tag (hash-get env :tags)))
+       (find-in-env name :tag (gethash env :tags)))
 
      (find-tagbody (name env)
-       (find-in-env name :tagbody (hash-get env :lex)))
+       (find-in-env name :tagbody (gethash env :lex)))
 
      (find-block (name env)
-       (find-in-env name :block (hash-get env :lex)))
+       (find-in-env name :block (gethash env :lex)))
 
      (find-macrolet (name env)
        (find-macrolet-in-compiler-env name env))
@@ -2119,6 +2119,7 @@
 (%global! '*core-files*)
 (setq *core-files*
       '("lisp/init.lisp"
+        "lisp/hash.lisp"
         "lisp/macroexpand.lisp"
         "lisp/tiny-clos.lisp"
         "lisp/printer.lisp"

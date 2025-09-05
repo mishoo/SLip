@@ -1016,7 +1016,7 @@ defp("numberp", false, function(m, nargs){
     return LispNumber.is(m.pop());
 });
 
-defp("hashp", false, function(m, nargs){
+defp("hash-table-p", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return LispHash.is(m.pop());
 });
@@ -1198,7 +1198,7 @@ defp("make-hash", false, function(m, nargs){
     return hash;
 });
 
-defp("hash-get", false, function(m, nargs){
+defp("gethash", false, function(m, nargs){
     checknargs(nargs, 2, 3);
     var def = (nargs == 3) ? m.pop() : false;
     var key = m.pop(), hash = m.pop();
@@ -1207,9 +1207,31 @@ defp("hash-get", false, function(m, nargs){
     m.stack.set_values_array(exists ? [ hash.get(key), true ] : [ def, false ]);
 });
 
-defp("hash-set", true, function(m, nargs){
+defp("hash-table-count", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var hash = m.pop();
+    checktype(hash, LispHash);
+    return hash.size();
+});
+
+defp("remhash", true, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    var hash = m.pop(), key = m.pop();
+    checktype(hash, LispHash);
+    return hash.delete(key);
+});
+
+defp("clrhash", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var hash = m.pop();
+    checktype(hash, LispHash);
+    hash.clear();
+    return hash;
+});
+
+defp("%hash-set", true, function(m, nargs){
     checknargs(nargs, 3, 3);
-    var val = m.pop(), key = m.pop(), hash = m.pop();
+    var key = m.pop(), hash = m.pop(), val = m.pop();
     checktype(hash, LispHash);
     return hash.set(key, val);
 });
@@ -1247,7 +1269,8 @@ defp("iterator-next", true, function(m, nargs){
     var it = m.pop();
     checktype(it, LispIterator);
     var result = it.next();
-    return new LispCons(boxit(result.value), boxit(result.done));
+    if (result.done) return false;
+    m.stack.set_values_array([ true, result.value ]);
 });
 
 /* -----[ simple streams ]----- */

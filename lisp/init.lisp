@@ -39,7 +39,7 @@
           abs sin asin cos acos tan atan exp log sqrt expt random
           min max
 
-          make-hash hashp hash-get hash-set hash-copy hash-keys hash-values
+          make-hash hash-table-p gethash remhash hash-copy hash-keys hash-values
           hash-iterator iterator-next
 
           macroexpand-1 disassemble
@@ -763,8 +763,8 @@
          (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
          (defun ,name ,args
            (declare ,@declarations)
-           (or (hash-get ,memo ,(car args))
-               (hash-set ,memo ,(car args) (progn ,@body))))))))
+           (or (gethash ,memo ,(car args))
+               (%hash-set (progn ,@body) ,memo ,(car args))))))))
 
 (defmacro defun-memoize2 (name args &body body)
   (let ((memo (gensym "memo")))
@@ -773,12 +773,11 @@
          (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
          (defun ,name ,args
            (declare ,@declarations)
-           (aif (hash-get ,memo ,(car args))
-                (or (hash-get it ,(cadr args))
-                    (hash-set it ,(cadr args) (progn ,@body)))
+           (aif (gethash ,memo ,(car args))
+                (or (gethash it ,(cadr args))
+                    (%hash-set (progn ,@body) it ,(cadr args)))
                 (let ((val (progn ,@body)))
-                  (hash-set ,memo ,(car args)
-                            (make-hash ,(cadr args) val))
+                  (%hash-set (make-hash ,(cadr args) val) ,memo ,(car args))
                   val)))))))
 
 (defmacro prog (bindings &body body)
