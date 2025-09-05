@@ -613,23 +613,3 @@
 (setf (find-class 'nil) <null>)
 (setf (find-class 't) <top>)
 
-(export '(class
-          char
-          object
-          hash
-          generic
-          method
-          cons
-          null
-          symbol
-          package
-          regexp
-          function
-          number
-          vector
-          string
-          thread
-          stream
-          input-stream
-          output-stream
-          unknown-class))
