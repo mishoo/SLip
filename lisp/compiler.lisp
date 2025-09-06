@@ -288,35 +288,54 @@
     (exps (car exps))
     (t t)))
 
-(defmacro case (expr . cases)
+(defun %ecase-error (expr cases)
+  (error (strcat (%dump expr)
+                 " fell through ECASE expression. Wanted: "
+                 (%dump cases))))
+
+(defun %case (expr cases errorp)
   (let* ((safe (safe-atom-p expr))
          (vexpr (if safe
                     expr
                     (gensym "CASE")))
+         (exps nil)
          (code (let recur ((cases cases))
                  (cond
                    ((null cases)
-                    nil)
+                    (when errorp
+                      `(%ecase-error ,vexpr ',(nreverse exps))))
                    ((consp (caar cases))
-                    (if (cdaar cases)
-                        `(if (%memq ,vexpr ',(caar cases))
-                             (progn ,@(cdar cases))
-                             ,(recur (cdr cases)))
-                        `(if (eq ,vexpr ',(caaar cases))
-                             (progn ,@(cdar cases))
-                             ,(recur (cdr cases)))))
+                    (cond
+                      ((cdaar cases)
+                       (foreach (caar cases) (lambda (x)
+                                               (push x exps)))
+                       `(if (%memq ,vexpr ',(caar cases))
+                            (progn ,@(cdar cases))
+                            ,(recur (cdr cases))))
+                      (t
+                       (push (caar cases) exps)
+                       `(if (eq ,vexpr ',(caaar cases))
+                            (progn ,@(cdar cases))
+                            ,(recur (cdr cases))))))
                    ((and (not (cdr cases))
                          (%memq (caar cases) '(otherwise t)))
                     `(progn ,@(cdar cases)))
                    ((not (caar cases))
                     (recur (cdr cases)))
                    (t
+                    (push (caar cases) exps)
                     `(if (eq ,vexpr ',(caar cases))
                          (progn ,@(cdar cases))
                          ,(recur (cdr cases))))))))
     (if safe
         code
         `(let ((,vexpr ,expr)) ,code))))
+
+(defmacro case (expr . cases)
+  (%case expr cases nil))
+
+(defmacro ecase (expr . cases)
+  (%case expr cases t))
 
 (defmacro aif (cond . rest)
   `(let ((it ,cond))
