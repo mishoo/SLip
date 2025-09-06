@@ -68,7 +68,7 @@
           &key &rest &body &whole &optional &aux &allow-other-keys
 
           define-modify-macro macroexpand-1 macroexpand defpackage in-package
-          defparameter defvar defglobal every some notany notevery defsetf
+          defparameter defvar defconstant defglobal every some notany notevery defsetf
           define-setf-expander get-setf-expansion setf psetf push pop
           define-compiler-macro incf decf dolist collect-if remove
           remove-duplicates merge stable-sort dotimes do do* complement adjoin

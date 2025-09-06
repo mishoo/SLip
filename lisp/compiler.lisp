@@ -30,6 +30,15 @@
          `((unless (boundp ',name)
              (setq ,name ,val))))))
 
+(defmacro defconstant (name val &optional documentation)
+  (%global! name)
+  (%set-symbol-prop name :constant t)
+  (%::maybe-xref-info name 'defconstant)
+  `(progn
+     (%global! ',name)
+     (%set-symbol-prop ',name :constant t)
+     (setq ,name ,val)))
+
 (defvar *read-table* nil)
 (defvar *package* nil)
 (defvar *standard-input* nil)
