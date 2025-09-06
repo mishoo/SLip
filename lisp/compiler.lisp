@@ -2122,6 +2122,7 @@
         "lisp/hash.lisp"
         "lisp/macroexpand.lisp"
         "lisp/format.lisp"
+        "lisp/struct.lisp"
         "lisp/tiny-clos.lisp"
         "lisp/printer.lisp"
         "lisp/ffi.lisp"

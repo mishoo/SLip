@@ -403,3 +403,9 @@
     `(let ((,t1 (get-internal-run-time)))
        (multiple-value-prog1 (progn ,@body)
          (format t "Evaluation time: ~Ams~%" (- (get-internal-run-time) ,t1))))))
+
+(defun error args
+  (%error (apply #'format args)))
+
+(defun warn args
+  (%error (apply #'format args)))
