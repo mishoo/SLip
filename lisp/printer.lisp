@@ -1,25 +1,9 @@
-(in-package :sl)
-
-(export '(print-object
-          print-object-to-string
-          *print-readably*
-          *print-escape*
-          *print-base*
-          *print-radix*
-          *print-pretty*))
-
 (defpackage :sl-print
   (:use :sl :%))
 
 (in-package :sl-print)
 
 (defgeneric print-object)
-
-(defparameter *print-readably* nil)
-(defparameter *print-escape* t)
-(defparameter *print-base* 10)
-(defparameter *print-radix* nil)
-(defparameter *print-pretty* t)
 
 (defmacro def-print ((type) &body body)
   `(defmethod print-object ((,type ,type) (out output-stream))
@@ -157,10 +141,6 @@
                   ((%symbol-accessible symbol pak)
                    (<< (package-name pak) "::")))))
         (<< (symbol-name symbol)))))
-
-(defun print-object-to-string (obj)
-  (with-output-to-string (out)
-    (print-object obj out)))
 
 ;;;; pretty printing
 ;;

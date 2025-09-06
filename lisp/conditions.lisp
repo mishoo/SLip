@@ -17,16 +17,12 @@
           make-condition
           assert
           error
-          warn
-          typep))
+          warn))
 
 (defpackage :sl-cond
   (:use :sl :%))
 
 (in-package :sl-cond)
-
-(defun typep (obj type)
-  (if (is-a obj type) t nil))
 
 (defclass condition () (datum))
 (defclass simple-condition (condition) (:format-control :format-arguments))
@@ -43,7 +39,7 @@
   (let ((format-control (slot-value c :format-control))
         (format-arguments (slot-value c :format-arguments)))
     (strcat
-     "<" (class-name (class-of c)) ": "
+     "<" (class-name (class-of c)) ": "
      (apply #'format out format-control format-arguments)
      ">")))
 

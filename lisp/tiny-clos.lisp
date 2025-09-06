@@ -28,7 +28,7 @@
           vector string char regexp package null symbol
           stream thread input-stream output-stream unknown-class
           find-class defclass defgeneric make-instance defmethod
-          slot-value class-name is-a class-of))
+          slot-value class-name typep class-of))
 
 (defpackage :sl-tiny-clos
   (:use :sl :%))
@@ -319,6 +319,9 @@
     (when (symbolp class)
       (setf class (find-class class)))
     (%memq class (class-cpl (class-of obj)))))
+
+(defun typep (obj type)
+  (if (is-a obj type) t nil))
 
 ;;
 ;; Initialization protocol

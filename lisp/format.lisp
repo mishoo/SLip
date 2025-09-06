@@ -1,17 +1,37 @@
 (in-package :sl)
 
-(export '(format formatter time))
+(export '(print-object
+          print-object-to-string
+          *print-readably*
+          *print-escape*
+          *print-base*
+          *print-radix*
+          *print-pretty*
+          format formatter time))
 
 (defpackage :sl-format
   (:use :sl :%))
 
 (in-package :sl-format)
 
+(defparameter *print-readably* nil)
+(defparameter *print-escape* t)
+(defparameter *print-base* 10)
+(defparameter *print-radix* nil)
+(defparameter *print-pretty* t)
+
 (import 'sl::defun-memoize)
 
 (defparameter *format-handlers* (make-hash))
 
 (defparameter *format-current-args* nil)
+
+(defun print-object-to-string (obj)
+  (with-output-to-string (out)
+    (print-object obj out)))
+
+(defun print-object (obj stream)
+  (%stream-put stream (%dump obj)))
 
 ;; check out some fine unhygienic macros
 
