@@ -449,8 +449,9 @@
               (<< #\Newline)
               (indent))
             (%pp-object (car exps))
-            (<< " ")
-            (%pp-object (cadr exps))
+            (when (cdr exps)
+              (<< " ")
+              (%pp-object (cadr exps)))
             (rec (cddr exps) nil)))))))
 
 (defgeneric pprint-object)
