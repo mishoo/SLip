@@ -3,6 +3,10 @@
 
 (in-package :sl-print)
 
+(import '(sl-struct::find-structure
+          sl-struct::structure-name
+          sl-struct::structure-slots))
+
 (defgeneric print-object)
 
 (defmacro def-print ((type) &body body)
@@ -95,6 +99,19 @@
           (t
            (<< ". ")
            (print-object list out)))))
+    (<< ")")))
+
+(def-print (structure)
+  (let* ((def (find-structure (svref structure 1)))
+         (name (structure-name def))
+         (slots (structure-slots def)))
+    (<< "#S(")
+    (print-object name out)
+    (foreach-index slots (lambda (slot index)
+                           (<< " ")
+                           (print-object (intern (strcat (getf slot :name)) "KEYWORD") out)
+                           (<< " ")
+                           (print-object (svref structure (+ index 2)) out)))
     (<< ")")))
 
 (def-print (vector)

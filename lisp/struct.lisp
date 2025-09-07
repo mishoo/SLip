@@ -1,6 +1,6 @@
 (in-package :sl)
 
-(export '(defstruct copy-structure))
+(export '(copy-structure defstruct))
 
 (defpackage :sl-struct
   (:use :sl :%))
@@ -44,6 +44,14 @@
   (assert-struct structure)
   (copy-seq structure))
 
+(setf (gethash *structures* 'structure)
+      #(%struct structure
+        structure
+        ((:name name :read-only t :type symbol)
+         (:name slots :read-only t :type list)
+         (:name include :read-only t :type symbol))
+        nil))
+
 (defun make-structure (name &key slots include)
   (when (find-structure name nil)
     (warn "Redefining structure ~S." name))
@@ -81,6 +89,7 @@
          (conc-name (strcat name "-"))
          (copier (intern (strcat "COPY-" name)))
          (print-function nil)
+         (print-object nil)
          (predicate (intern (strcat name "-P")))
          (include nil))
     (dolist (opt (cdr args)
@@ -90,6 +99,7 @@
                          conc-name
                          copier
                          print-function
+                         print-object
                          predicate
                          include))
       (when (symbolp opt)
@@ -106,10 +116,42 @@
          (setf predicate (cadr opt)))
         ((:print-function)
          (setf print-function (cadr opt)))
+        ((:print-object)
+         (setf print-object (cadr opt)))
         ((:include)
          (setf include (cadr opt)))
         (otherwise
          (error "Unsupported struct option ~S." (car opt)))))))
+
+(defun insert-defaults (parsed slots)
+  (labels ((find-slot (name)
+             (let rec ((slots slots))
+               (when slots
+                 (if (eq name (getf (car slots) :name))
+                     (car slots)
+                     (rec (cdr slots))))))
+           (do-one (arg)
+             (unless (cdr arg)
+               (let* ((name (if (consp (car arg)) (cadar arg) (car arg)))
+                      (slot (find-slot name)))
+                 (when slot
+                   (setf (cdr arg) (list (getf slot :initform)))))))
+           (do-all (args)
+             (foreach args #'do-one)))
+    (do-all (getf parsed :optional))
+    (do-all (getf parsed :key))
+    (do-all (getf parsed :aux))
+    `(,@(getf parsed :required)
+      ,@(aif (getf parsed :optional)
+             `(&optional ,@it))
+      ,@(aif (getf parsed :rest)
+             `(&rest ,it))
+      ,@(aif (getf parsed :key)
+             `(&key ,@it))
+      ,@(aif (getf parsed :aok)
+             `(&allow-other-keys))
+      ,@(aif (getf parsed :aux)
+             `(&aux ,@it)))))
 
 (defmacro defstruct (name-and-options &rest slot-description)
   (multiple-value-bind (struct-name
@@ -118,6 +160,7 @@
                         conc-name
                         copier
                         print-function
+                        print-object
                         predicate
                         include)
                        (parse-name-and-options name-and-options)
@@ -154,12 +197,13 @@
            ,@(when copier
                `((defun ,copier (obj)
                    (assert-struct obj ',struct-name)
-                   (copy-structure obj))))
+                   (copy-seq obj))))
            ,@(when constructor
                (cond
                  (constructor-arglist
                   (let* ((parsed (parse-lambda-list constructor-arglist))
-                         (ctor-args (getf parsed :names)))
+                         (ctor-args (getf parsed :names))
+                         (constructor-arglist (insert-defaults parsed slots)))
                     `((defun ,constructor ,constructor-arglist
                         (vector *stag* ',struct-name
                                 ,@(mapcar (lambda (slot)

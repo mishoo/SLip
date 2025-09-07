@@ -25,7 +25,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (export '(call-next-method object primitive number function hash class cons
-          vector string char regexp package null symbol
+          vector structure string char regexp package null symbol
           stream thread input-stream output-stream unknown-class
           find-class defclass defgeneric make-instance defmethod
           slot-value class-name typep class-of))
@@ -34,6 +34,8 @@
   (:use :sl :%))
 
 (in-package :sl-tiny-clos)
+
+(import '(sl-struct::structurep))
 
 (defun find-class (sym)
   (%get-symbol-prop sym :class))
@@ -593,6 +595,7 @@
 (defglobal <stream> (defclass stream (primitive) ()))
 (defglobal <input-stream> (defclass input-stream (stream) ()))
 (defglobal <output-stream> (defclass output-stream (stream) ()))
+(defglobal <structure> (defclass structure (primitive) ()))
 (defglobal <unknown> (defclass unknown-class (primitive) ()))
 
 (defun class-of (x)
@@ -605,6 +608,7 @@
         ((packagep x) <package>)
         ((functionp x) <function>)
         ((numberp x) <number>)
+        ((structurep x) <structure>)
         ((vectorp x) <vector>)
         ((stringp x) <string>)
         ((regexpp x) <regexp>)
