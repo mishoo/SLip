@@ -142,6 +142,7 @@
                     (svref obj ,idx))
                   ,@(unless (getf slot :read-only)
                       `((defun (setf ,name) (value obj)
+                          (assert-struct obj ',struct-name)
                           (setf (svref obj ,idx) value))))))))
         `(progn
            (make-structure ',struct-name
