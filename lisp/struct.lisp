@@ -18,13 +18,13 @@
           (substructp name sub)))))
 
 (defun structurep (thing &optional name)
-  (when (and (vectorp thing)
-             (eq *stag* (svref thing 0)))
-    (if name
-        (let ((x (svref thing 1)))
-          (or (eq x name)
-              (substructp name (find-structure x))))
-        t)))
+  (and (vectorp thing)
+       (eq *stag* (svref thing 0))
+       (if name
+           (let ((x (svref thing 1)))
+             (or (eq x name)
+                 (substructp name (find-structure x))))
+           t)))
 
 (defun assert-struct (thing &optional name)
   (unless (structurep thing name)
@@ -37,12 +37,12 @@
       (when errorp
         (error "No such structure ~S." name))))
 
+(defun (setf find-structure) (struct name)
+  (setf (gethash *structures* name) struct))
+
 (defun copy-structure (structure)
   (assert-struct structure)
   (copy-seq structure))
-
-(defun (setf find-structure) (struct name)
-  (setf (gethash *structures* name) struct))
 
 (defun make-structure (name &key slots include)
   (when (find-structure name nil)
@@ -83,7 +83,15 @@
          (print-function nil)
          (predicate (intern (strcat name "-P")))
          (include nil))
-    (dolist (opt (cdr args))
+    (dolist (opt (cdr args)
+                 (values name
+                         constructor
+                         constructor-arglist
+                         conc-name
+                         copier
+                         print-function
+                         predicate
+                         include))
       (when (symbolp opt)
         (setf opt (list opt)))
       (case (car opt)
@@ -101,15 +109,7 @@
         ((:include)
          (setf include (cadr opt)))
         (otherwise
-         (error "Unsupported struct option ~S." (car opt)))))
-    (values name
-            constructor
-            constructor-arglist
-            conc-name
-            copier
-            print-function
-            predicate
-            include)))
+         (error "Unsupported struct option ~S." (car opt)))))))
 
 (defmacro defstruct (name-and-options &rest slot-description)
   (multiple-value-bind (struct-name
@@ -128,7 +128,6 @@
            (slots (append (when include
                             (structure-slots include))
                           (mapcar #'parse-slot slot-description)))
-           (slot-names (mapcar (lambda (slot) (getf slot :name)) slots))
            (index 0))
       (labels
           ((accessor (slot-name)
@@ -181,5 +180,6 @@
                                                   `(,name ,initform))
                                                  (t name))))
                                            slots))
-                      (vector *stag* ',struct-name ,@slot-names))))))
+                      (vector *stag* ',struct-name
+                              ,@(mapcar (lambda (slot) (getf slot :name)) slots)))))))
            ',struct-name)))))

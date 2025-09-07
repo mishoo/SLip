@@ -307,13 +307,15 @@
                    ((consp (caar cases))
                     (cond
                       ((cdaar cases)
-                       (foreach (caar cases) (lambda (x)
-                                               (push x exps)))
+                       (when errorp
+                         (foreach (caar cases) (lambda (x)
+                                                 (push x exps))))
                        `(if (%memq ,vexpr ',(caar cases))
                             (progn ,@(cdar cases))
                             ,(recur (cdr cases))))
                       (t
-                       (push (caar cases) exps)
+                       (when errorp
+                         (push (caar cases) exps))
                        `(if (eq ,vexpr ',(caaar cases))
                             (progn ,@(cdar cases))
                             ,(recur (cdr cases))))))
@@ -323,7 +325,8 @@
                    ((not (caar cases))
                     (recur (cdr cases)))
                    (t
-                    (push (caar cases) exps)
+                    (when errorp
+                      (push (caar cases) exps))
                     `(if (eq ,vexpr ',(caar cases))
                          (progn ,@(cdar cases))
                          ,(recur (cdr cases))))))))
