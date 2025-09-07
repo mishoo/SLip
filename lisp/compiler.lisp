@@ -731,7 +731,8 @@
             :key key
             :has-key has-key
             :aux aux
-            :aok allow-other-keys))))
+            :aok allow-other-keys
+            :names all))))
 
 (defun %log (data)
   (console.dir data)
@@ -1708,12 +1709,8 @@
 
      (comp-extended-lambda
          (name body env
-               &key required optional rest key has-key aux aok
-               &aux (names (append required
-                                   (map1 #'car optional)
-                                   (when rest (list rest))
-                                   (map1 #'cadar key)
-                                   (map1 #'car aux)))
+               &key required optional rest key has-key aux aok names
+               &aux
                (index 0)
                (envcell (vector)))
        (with-declarations body
