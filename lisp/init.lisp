@@ -32,6 +32,8 @@
           declare locally type ignore special optimize speed debug space fixnum integer unsigned-byte
           identity constantly
 
+          export import
+
           most-positive-fixnum most-negative-fixnum
 
           numberp zerop plusp minusp evenp oddp parse-number parse-integer number-fixed number-string
@@ -70,8 +72,7 @@
           define-modify-macro macroexpand-1 macroexpand defpackage in-package
           defparameter defvar defconstant defglobal every some notany notevery defsetf
           define-setf-expander get-setf-expansion setf psetf push pop
-          define-compiler-macro incf decf dolist collect-if remove
-          remove-duplicates merge stable-sort dotimes do do* complement adjoin
+          define-compiler-macro incf decf dolist dotimes do do* complement adjoin
           pushnew nth use-package with-output-to-string prog prog* make-list
           make-array aref copy-tree
 
@@ -510,76 +511,6 @@
 
 ;;; lists
 
-(defmacro dolist ((var list-form &rest result-form) &body body)
-  (let ((list (gensym "list"))
-        (next (gensym "next"))
-        (end (gensym "end")))
-    (multiple-value-bind (body declarations) (%:dig-declarations body)
-      `(block nil
-         (let (,var (,list ,list-form))
-           (declare ,@declarations)
-           (tagbody
-            ,next
-            (unless ,list
-              (go ,end))
-            (setf ,var (pop ,list))
-            ,@body
-            (go ,next)
-            ,end
-            (setf ,var nil))
-           ,@result-form)))))
-
-(defun collect-if (test list)
-  (with-collectors (elements)
-    (dolist (el list)
-      (when (funcall test el)
-        (elements el)))
-    elements))
-
-(defun remove (item list)
-  (collect-if (lambda (x)
-                (not (eq x item))) list))
-
-(defun remove-duplicates (list &key (test #'eql) from-end)
-  (labels ((rmv (list ret)
-             (if list
-                 (let ((current (car list)))
-                   (rmv (collect-if (lambda (x)
-                                      (not (funcall test current x)))
-                                    (cdr list))
-                        (cons current ret)))
-                 ret)))
-    (if from-end
-        (nreverse (rmv list nil))
-        (rmv (reverse list) nil))))
-
-(defun merge (a b predicate)
-  (let* ((ret (list nil))
-         (p ret))
-    (macrolet ((add (cell)
-                 `(setf p (setf (cdr p) ,cell))))
-      (tagbody
-       next
-       (cond ((and a b)
-              (if (funcall predicate (car b) (car a))
-                  (setf b (cdr (add b)))
-                  (setf a (cdr (add a))))
-              (go next))
-             (a (add a))
-             (b (add b))))
-      (cdr ret))))
-
-(defun stable-sort (list predicate)
-  (let sort ((list list))
-    (cond ((not list) nil)
-          ((not (cdr list)) list)
-          (t (let ((a list)
-                   (b (%nhalf-list list)))
-               (merge (sort a) (sort b) predicate))))))
-
-(setf (symbol-function 'sort) #'stable-sort)
-(export '(sort export import))
-
 (defmacro first (list)
   `(car ,list))
 
@@ -598,7 +529,46 @@
 (defmacro rest (list)
   `(cdr ,list))
 
+(defmacro with-collectors ((&rest names) &body body)
+  (let (lists tails syms adders)
+    (flet ((mk-collector (name)
+             (let ((vlist (gensym))
+                   (vtail (gensym))
+                   (vadd name))
+               (push vlist lists)
+               (push vtail tails)
+               (push `(,name (cdr ,vlist)) syms)
+               (push `(,vadd (el)
+                       (setq ,vtail (rplacd ,vtail (cons el nil))))
+                     adders))))
+      (foreach names #'mk-collector)
+      `(let* (,@(map1 (lambda (name) `(,name (list nil)))
+                      lists)
+              ,@(map2 #'list tails lists))
+         (flet (,@adders)
+           (symbol-macrolet (,@syms)
+             ,@body))))))
+
 ;;; basic looping
+
+(defmacro dolist ((var list-form &rest result-form) &body body)
+  (let ((list (gensym "list"))
+        (next (gensym "next"))
+        (end (gensym "end")))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let (,var (,list ,list-form))
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (unless ,list
+              (go ,end))
+            (setf ,var (pop ,list))
+            ,@body
+            (go ,next)
+            ,end
+            (setf ,var nil))
+           ,@result-form)))))
 
 (defmacro dotimes ((var count-form &rest result-form) &body body)
   (let ((count (gensym))
