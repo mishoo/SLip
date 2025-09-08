@@ -405,7 +405,7 @@
          (format t "Evaluation time: ~Ams~%" (- (get-internal-run-time) ,t1))))))
 
 (defun error args
-  (%error (apply #'format args)))
+  (%error (apply #'format nil args)))
 
 (defun warn args
-  (%error (apply #'format args)))
+  (%warn (apply #'format nil args)))
