@@ -729,8 +729,8 @@ defp("vector-subseq", false, function(m, nargs){
 defp("svref", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var index = m.pop(), vector = m.pop();
-    checktype(vector, LispVector);
     checktype(index, LispNumber);
+    if (!LispString.is(vector)) checktype(vector, LispVector);
     return index >= 0 && index < vector.length ? vector[index] : false;
 });
 
@@ -1028,7 +1028,8 @@ defp("functionp", false, function(m, nargs){
 
 defp("vectorp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return LispVector.is(m.pop());
+    let arg = m.pop();
+    return LispVector.is(arg) || LispString.is(arg);
 });
 
 defp("listp", false, function(m, nargs){
