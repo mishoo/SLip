@@ -170,10 +170,14 @@
     (form)))
 
 (defun mapc (f . lists)
-  (let rec ((tails lists))
-    (if (finished tails)
-        (car lists)
-        (rec (map1 #'cdr tails)))))
+  (let ((first (car lists)))
+    (tagbody
+     :loop
+     (unless (finished lists)
+       (apply f (mapcar #'car lists))
+       (setq lists (mapcar #'cdr lists))
+       (go :loop)))
+    first))
 
 ;; every returns false as soon as any invocation of predicate
 ;; returns false. If the end of a sequence is reached, every returns

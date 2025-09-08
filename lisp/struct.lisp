@@ -44,14 +44,6 @@
   (assert-struct structure)
   (copy-seq structure))
 
-(setf (gethash *structures* 'structure)
-      #(%struct structure
-        structure
-        ((:name name :read-only t :type symbol)
-         (:name slots :read-only t :type list)
-         (:name include :read-only t :type symbol))
-        nil))
-
 (defun make-structure (name &key slots include)
   (when (find-structure name nil)
     (warn "Redefining structure ~S." name))
@@ -59,6 +51,11 @@
     (setf include (find-structure include)))
   (setf (find-structure name)
         (vector *stag* 'structure name slots include)))
+
+(make-structure 'structure
+                :slots '((:name name :read-only t :type symbol)
+                         (:name slots :read-only t :type list)
+                         (:name include :read-only t :type symbol)))
 
 (defun structure-name (struct)
   (assert-struct struct 'structure)
@@ -137,7 +134,7 @@
                  (when slot
                    (setf (cdr arg) (list (getf slot :initform)))))))
            (do-all (args)
-             (foreach args #'do-one)))
+             (mapc #'do-one args)))
     (do-all (getf parsed :optional))
     (do-all (getf parsed :key))
     (do-all (getf parsed :aux))

@@ -730,7 +730,10 @@ defp("svref", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var index = m.pop(), vector = m.pop();
     checktype(index, LispNumber);
-    if (!LispString.is(vector)) checktype(vector, LispVector);
+    if (LispString.is(vector)) {
+        return index >= 0 && index < vector.length ? LispChar.get(vector.charAt(index)) : false;
+    }
+    checktype(vector, LispVector);
     return index >= 0 && index < vector.length ? vector[index] : false;
 });
 

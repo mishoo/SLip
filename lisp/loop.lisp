@@ -623,6 +623,7 @@
       (expand-loop args)
       ;; simple loop
       `(block nil
-         (let $loop-next ()
-           ,@args
-           ($loop-next)))))
+         (tagbody
+          $loop-next
+          ,@args
+          (go $loop-next)))))
