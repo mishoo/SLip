@@ -2151,11 +2151,11 @@
         "lisp/macroexpand.lisp"
         "lisp/format.lisp"
         "lisp/struct.lisp"
+        "lisp/loop.lisp"
         "lisp/tiny-clos.lisp"
         "lisp/printer.lisp"
         "lisp/ffi.lisp"
         "lisp/conditions.lisp"
-        "lisp/loop.lisp"
         "ide/ide.lisp"))
 
 ;;;

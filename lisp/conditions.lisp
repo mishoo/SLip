@@ -14,10 +14,7 @@
           handler-case
           handler-bind
           ignore-errors
-          make-condition
-          assert
-          error
-          warn))
+          make-condition))
 
 (defpackage :sl-cond
   (:use :sl :%))
@@ -146,9 +143,6 @@
     (signal condition)
     ;; XXX: no debugger
     (%error condition)))
-
-(defun assert (cond . arguments)
-  (unless cond (apply #'error arguments)))
 
 (defun primitive-error (fmt . arguments)
   (error 'primitive-error :format-control fmt :format-arguments arguments))

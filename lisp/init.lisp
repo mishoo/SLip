@@ -13,7 +13,7 @@
   (setq exported
         '(atom quasiquote defmacro defun when unless labels flet foreach
           prog1 prog2 or and cond member case ecase otherwise mapcar mapc aif it push
-          error warn without-interrupts
+          error warn assert without-interrupts
           eval compile load function functionp unwind-protect
           apply funcall macrolet symbol-macrolet catch throw
           quote lambda λ let let* if progn progv setq t nil not
@@ -90,6 +90,9 @@
 
 (defmacro export (symbols &optional (package *package*))
   `(%export ,symbols ,package))
+
+(defun assert (cond . arguments)
+  (unless cond (apply #'error arguments)))
 
 (defun macroexpand-1 (form)
   (cond
