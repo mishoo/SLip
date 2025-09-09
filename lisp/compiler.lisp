@@ -929,26 +929,6 @@
         `(%macro! ',name (%::%fn ,name ,args
                                  ,(%fn-destruct t lambda-list args body))))))
 
-(defmacro with-collectors ((&rest names) &body body)
-  (let (lists tails syms adders)
-    (flet ((mk-collector (name)
-             (let ((vlist (gensym))
-                   (vtail (gensym))
-                   (vadd name))
-               (push vlist lists)
-               (push vtail tails)
-               (push `(,name (cdr ,vlist)) syms)
-               (push `(,vadd (el)
-                       (setq ,vtail (rplacd ,vtail (cons el nil))))
-                     adders))))
-      (foreach names #'mk-collector)
-      `(let* (,@(map1 (lambda (name) `(,name (list nil)))
-                      lists)
-              ,@(map2 #'list tails lists))
-         (flet (,@adders)
-           (symbol-macrolet (,@syms)
-             ,@body))))))
-
 ;; let's define early some compiler macros, so that the compiler itself can
 ;; benefit from them.
 

@@ -190,6 +190,23 @@
         (and (apply test (map1 #'car tails))
              (scan (map1 #'cdr tails))))))
 
+(defun every1 (test list)
+  (tagbody
+   :loop
+   (cond
+     ((null list)
+      (return-from every1 t))
+     ((funcall test (%pop list))
+      (go :loop)))))
+
+(define-compiler-macro every (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to EVERY"))
+    ((null (cdr lists))
+     `(every1 ,func ,@lists))
+    (form)))
+
 ;; some returns the first non-nil value which is returned by an
 ;; invocation of predicate. If the end of a sequence is reached
 ;; without any invocation of the predicate returning true, some
@@ -200,6 +217,22 @@
     (if (finished tails) nil
         (or (apply test (map1 #'car tails))
             (scan (map1 #'cdr tails))))))
+
+(defun some1 (test list)
+  (tagbody
+   :loop
+   (when list
+     (aif (funcall test (%pop list))
+          (return-from some1 it))
+     (go :loop))))
+
+(define-compiler-macro some (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to SOME"))
+    ((null (cdr lists))
+     `(some1 ,func ,@lists))
+    (form)))
 
 ;; notany returns false as soon as any invocation of predicate
 ;; returns true. If the end of a sequence is reached, notany returns
@@ -212,6 +245,24 @@
             nil
             (scan (map1 #'cdr tails))))))
 
+(defun notany1 (test list)
+  (tagbody
+   :loop
+   (cond
+     ((null list)
+      (return-from notany1 t))
+     ((funcall test (%pop list))
+      (return-from notany1 nil)))
+   (go :loop)))
+
+(define-compiler-macro notany (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to NOTANY"))
+    ((null (cdr lists))
+     `(notany1 ,func ,@lists))
+    (form)))
+
 ;; notevery returns true as soon as any invocation of predicate
 ;; returns false. If the end of a sequence is reached, notevery
 ;; returns false. Thus, notevery returns true if and only if it is
@@ -222,6 +273,25 @@
         (if (apply test (map1 #'car tails))
             (scan (map1 #'cdr tails))
             t))))
+
+(defun notevery1 (test list)
+  (tagbody
+   :loop
+   (cond
+     ((null list)
+      (return-from notevery1 nil))
+     ((funcall test (%pop list))
+      (go :loop))
+     (t
+      (return-from notevery1 t)))))
+
+(define-compiler-macro notevery (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to NOTEVERY"))
+    ((null (cdr lists))
+     `(notevery1 ,func ,@lists))
+    (form)))
 
 ;;; setf
 

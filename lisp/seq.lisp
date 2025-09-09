@@ -14,6 +14,8 @@
 
 (in-package :sl-seq)
 
+(import '(sl::with-collectors))
+
 (defun merge (a b predicate)
   (let* ((ret (list nil))
          (p ret))
@@ -142,7 +144,7 @@
      (collect-if (lambda (x)
                    (not (funcall test item x))) list))))
 
-(defun %erase-if (predicate list)
+(defun %erase-if (list predicate)
   (let* ((ret (cons nil list))
          (p ret))
     (tagbody
@@ -154,16 +156,16 @@
        (go :loop)))
     (cdr ret)))
 
-(defun %delete-duplicates (p test)
+(defun %delete-duplicates (list test)
   (tagbody
    :loop
-   (when p
-     (let ((current (car p)))
-       (setf p
-             (setf (cdr p)
-                   (%erase-if (lambda (x)
-                                (funcall test current x))
-                              (cdr p))))
+   (when list
+     (let ((current (car list)))
+       (setf list
+             (setf (cdr list)
+                   (%erase-if (cdr list)
+                              (lambda (x)
+                                (funcall test current x)))))
        (go :loop)))))
 
 (defun remove-duplicates (list &key key test test-not from-end)
@@ -176,27 +178,18 @@
   (%delete-duplicates list (make-subject-test test test-not key t))
   (if from-end list (nreverse list)))
 
-;; XXX: this is something like 4x faster than the standard `some' function.
-;; The difference is unacceptable. Should actually use `some', but have a
-;; compiler macro optimize it for the simple case (1-list, maybe 2-lists),
-;; like we do for `member'.
-(defun %some (pred list)
-  (dolist (el list)
-    (when (funcall pred el)
-      (return t))))
-
 (defun intersection (list1 list2 &key key test test-not)
   (let ((test (make-subject-test test test-not key t))
         (res nil))
     (dolist (item list1 res)
-      (when (%some (lambda (el) (funcall test item el)) list2)
+      (when (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
 (defun set-difference (list1 list2 &key key test test-not)
   (let ((test (make-subject-test test test-not key t))
         (res nil))
     (dolist (item list1 res)
-      (unless (%some (lambda (el) (funcall test item el)) list2)
+      (unless (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
 (defun find-if (predicate list &key key from-end)
