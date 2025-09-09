@@ -1,7 +1,13 @@
 (in-package :sl)
 
-(export '(collect-if remove remove-duplicates
-          sort stable-sort merge))
+(export '(sort stable-sort merge
+          collect-if
+          remove remove-if remove-if-not
+          find find-if find-if-not
+          position position-if position-if-not
+          count count-if count-if-not
+          remove-duplicates delete-duplicates
+          intersection set-difference))
 
 (defpackage :sl-seq
   (:use :sl :%))
@@ -43,9 +49,14 @@
 (defconstant *default-test* (list #'eql #'eq 'eql 'eq))
 (defconstant *default-key* (list #'identity 'identity))
 
-(defun make-subject-test (test key key-subject)
-  (when (member test *default-test*)
-    (setf test nil))
+(defun make-subject-test (test test-not key key-subject)
+  (cond
+    (test-not
+     (when test
+       (error "Both TEST and TEST-NOT are supplied"))
+     (setf test (complement test-not)))
+    ((member test *default-test*)
+     (setf test nil)))
   (when (member key *default-key*)
     (setf key nil))
   (if key
@@ -72,35 +83,169 @@
           (lambda (subject el)
             (eq subject el)))))
 
-(defun remove (item list &key test key count from-end)
+(defmacro update-for-key (predicate key)
+  `(when (and ,key (not (member ,key *default-key*)))
+     (setf ,predicate (let ((p ,predicate))
+                        (lambda (item)
+                          (funcall p (funcall ,key item)))))))
+
+(defun remove-if (predicate list &key key count from-end)
+  (update-for-key predicate key)
+  (cond
+    (count
+     (cond
+       (from-end
+        (nreverse (remove-if predicate (reverse list) :key key :count count)))
+       (t
+        (collect-if (lambda (x)
+                      (or (not (funcall predicate x))
+                          (<= count 0)
+                          (progn (decf count) nil)))
+                    list))))
+    (t
+     (collect-if (lambda (x)
+                   (not (funcall predicate x))) list))))
+
+(defun remove-if-not (predicate list &key key count from-end)
+  (update-for-key predicate key)
+  (cond
+    (count
+     (cond
+       (from-end
+        (nreverse (remove-if predicate (reverse list) :key key :count count)))
+       (t
+        (collect-if (lambda (x)
+                      (or (funcall predicate x)
+                          (<= count 0)
+                          (progn (decf count) nil)))
+                    list))))
+    (t
+     (collect-if (lambda (x)
+                   (funcall predicate x)) list))))
+
+(defun remove (item list &key key test test-not count from-end)
   (cond
     (count
      (cond
        (from-end
         (nreverse (remove item (reverse list)
-                          :test test :key key :count count)))
+                          :test test :test-not test-not :key key :count count)))
        (t
-        (setf test (make-subject-test test key nil))
+        (setf test (make-subject-test test test-not key nil))
         (collect-if (lambda (x)
                       (or (not (funcall test item x))
                           (<= count 0)
                           (progn (decf count) nil)))
                     list))))
     (t
-     (setf test (make-subject-test test key nil))
+     (setf test (make-subject-test test test-not key nil))
      (collect-if (lambda (x)
                    (not (funcall test item x))) list))))
 
-(defun remove-duplicates (list &key test key from-end)
-  (setf test (make-subject-test test key t))
-  (labels ((rmv (list ret)
-             (if list
-                 (let ((current (car list)))
-                   (rmv (collect-if (lambda (x)
-                                      (not (funcall test current x)))
-                                    (cdr list))
-                        (cons current ret)))
-                 ret)))
-    (if from-end
-        (nreverse (rmv list nil))
-        (rmv (reverse list) nil))))
+(defun %erase-if (predicate list)
+  (let* ((ret (cons nil list))
+         (p ret))
+    (tagbody
+     :loop
+     (when (cdr p)
+       (if (funcall predicate (cadr p))
+           (setf (cdr p) (cddr p))
+           (setf p (cdr p)))
+       (go :loop)))
+    (cdr ret)))
+
+(defun %delete-duplicates (p test)
+  (tagbody
+   :loop
+   (when p
+     (let ((current (car p)))
+       (setf p
+             (setf (cdr p)
+                   (%erase-if (lambda (x)
+                                (funcall test current x))
+                              (cdr p))))
+       (go :loop)))))
+
+(defun remove-duplicates (list &key key test test-not from-end)
+  (setf list (if from-end (copy-list list) (reverse list)))
+  (%delete-duplicates list (make-subject-test test test-not key t))
+  (if from-end list (nreverse list)))
+
+(defun delete-duplicates (list &key key test test-not from-end)
+  (unless from-end (setf list (nreverse list)))
+  (%delete-duplicates list (make-subject-test test test-not key t))
+  (if from-end list (nreverse list)))
+
+;; XXX: this is something like 4x faster than the standard `some' function.
+;; The difference is unacceptable. Should actually use `some', but have a
+;; compiler macro optimize it for the simple case (1-list, maybe 2-lists),
+;; like we do for `member'.
+(defun %some (pred list)
+  (dolist (el list)
+    (when (funcall pred el)
+      (return t))))
+
+(defun intersection (list1 list2 &key key test test-not)
+  (let ((test (make-subject-test test test-not key t))
+        (res nil))
+    (dolist (item list1 res)
+      (when (%some (lambda (el) (funcall test item el)) list2)
+        (push item res)))))
+
+(defun set-difference (list1 list2 &key key test test-not)
+  (let ((test (make-subject-test test test-not key t))
+        (res nil))
+    (dolist (item list1 res)
+      (unless (%some (lambda (el) (funcall test item el)) list2)
+        (push item res)))))
+
+(defun find-if (predicate list &key key from-end)
+  (update-for-key predicate key)
+  (dolist (el (if from-end (reverse list) list))
+    (when (funcall predicate el)
+      (return el))))
+
+(defun find-if-not (predicate list &key key from-end)
+  (update-for-key predicate key)
+  (dolist (el (if from-end (reverse list) list))
+    (unless (funcall predicate el)
+      (return el))))
+
+(defun find (item list &key key test test-not from-end)
+  (aif (member item (if from-end (reverse list) list)
+               :key key :test test :test-not test-not)
+       (car it)))
+
+(defun position-if (predicate list &key key from-end)
+  (update-for-key predicate key)
+  (loop for el in (if from-end (reverse list) list)
+        for index from 0
+        do (when (funcall predicate el)
+             (return (if from-end
+                         (- (length list) (1+ index))
+                         index)))))
+
+(defun position-if-not (predicate list &rest args)
+  (apply #'position-if (complement predicate) list args))
+
+(defun position (item list &key key test test-not from-end)
+  (setf test (make-subject-test test test-not key nil))
+  (loop for el in (if from-end (reverse list) list)
+        for index from 0
+        do (when (funcall test item el)
+             (return (if from-end
+                         (- (length list) (1+ index))
+                         index)))))
+
+(defun count-if (predicate list &key key from-end)
+  (update-for-key predicate key)
+  (loop for el in (if from-end (reverse list) list)
+        counting (funcall predicate el)))
+
+(defun count-if-not (predicate list &rest args)
+  (apply #'count-if (complement predicate) list args))
+
+(defun count (item list &key key test test-not from-end)
+  (setf test (make-subject-test test test-not key nil))
+  (loop for el in (if from-end (reverse list) list)
+        counting (funcall test item el)))
