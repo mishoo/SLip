@@ -63,6 +63,11 @@
   (load "test/cons/push.lisp")
   (load "test/cons/pushnew.lisp")
 
+  (load "test/count.lisp")
+  (load "test/count-if.lisp")
+  (load "test/count-if-not.lisp")
+  (load "test/find.lisp")
+
   (format t "Network time: ~Ams~%Compile time: ~Ams~%"
           (car timing)
           (cadr timing)))

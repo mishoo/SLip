@@ -192,6 +192,27 @@
       (unless (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
+
+
+(defmacro frobnicate-list-utility (&body body)
+  `((cond
+      ((not from-end)
+       (loop for el in (nthcdr start list)
+             for i from start
+             while (or (not end) (< i end))
+             ,@body))
+      (t
+       (loop with len = (length list)
+             for el in (if end
+                           (nthcdr (- len end) (reverse list))
+                           (reverse list))
+             for i downfrom (or end len)
+             while (> i start)
+             ,@body)))))
+
+
+
+
 (defun find-if (predicate list &key key from-end)
   (update-for-key predicate key)
   (dolist (el (if from-end (reverse list) list))
@@ -204,10 +225,22 @@
     (unless (funcall predicate el)
       (return el))))
 
-(defun find (item list &key key test test-not from-end)
-  (aif (member item (if from-end (reverse list) list)
-               :key key :test test :test-not test-not)
-       (car it)))
+(defun find (item list &key key test test-not (start 0) end from-end)
+  (setf test (make-subject-test test test-not key nil))
+  (cond
+    ((not from-end)
+     (loop for el in (nthcdr start list)
+           for i from start
+           while (or (not end) (< i end))
+           when (funcall test item el) do (return el)))
+    (t
+     (loop with len = (length list)
+           for el in (if end
+                         (nthcdr (- len end) (reverse list))
+                         (reverse list))
+           for i downfrom (or end len)
+           while (> i start)
+           when (funcall test item el) do (return el)))))
 
 (defun position-if (predicate list &key key from-end)
   (update-for-key predicate key)
@@ -230,15 +263,39 @@
                          (- (length list) (1+ index))
                          index)))))
 
-(defun count-if (predicate list &key key from-end)
+(defun count-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (loop for el in (if from-end (reverse list) list)
-        counting (funcall predicate el)))
+  (cond
+    ((not from-end)
+     (loop for el in (nthcdr start list)
+           for i from start
+           while (or (not end) (< i end))
+           count (funcall predicate el)))
+    (t
+     (loop with len = (length list)
+           for el in (if end
+                         (nthcdr (- len end) (reverse list))
+                         (reverse list))
+           for i downfrom (or end len)
+           while (> i start)
+           count (funcall predicate el)))))
 
 (defun count-if-not (predicate list &rest args)
   (apply #'count-if (complement predicate) list args))
 
-(defun count (item list &key key test test-not from-end)
+(defun count (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (loop for el in (if from-end (reverse list) list)
-        counting (funcall test item el)))
+  (cond
+    ((not from-end)
+     (loop for el in (nthcdr start list)
+           for i from start
+           while (or (not end) (< i end))
+           count (funcall test item el)))
+    (t
+     (loop with len = (length list)
+           for el in (if end
+                         (nthcdr (- len end) (reverse list))
+                         (reverse list))
+           for i downfrom (or end len)
+           while (> i start)
+           count (funcall test item el)))))
