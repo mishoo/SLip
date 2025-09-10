@@ -18,7 +18,7 @@
 
 (in-package :sl-loop)
 
-(defparameter *clause-parsers* (list))
+(defparameter *clause-parsers* (make-hash-table))
 
 (defparameter *loop-body* nil)
 (defparameter *loop-variables* nil)
@@ -39,7 +39,7 @@
   (let ((sym (car args)))
     (unless (symbolp sym)
       (error "Expecting loop clause, got ~A" sym))
-    (let ((parser (getf *clause-parsers* sym)))
+    (let ((parser (gethash *clause-parsers* (symbol-name sym))))
       (unless parser
         (error "Unknown loop clause ~A" sym))
       (apply parser (cdr args)))))
@@ -59,10 +59,7 @@
     ((symbolp name)
      (register-parser (symbol-name name) parser))
     ((stringp name)
-     (let ((symbol (intern name #.(find-package :sl)))
-           (kwsym (intern name #.(find-package :keyword))))
-       (setf (getf *clause-parsers* symbol) parser)
-       (setf (getf *clause-parsers* kwsym) parser)))))
+     (setf (gethash *clause-parsers* name) parser))))
 
 (defmacro defparser (symbol args &body body)
   `(labels ((parser ,args ,@body))
@@ -92,14 +89,28 @@
            (dsetq (car var) nil)
            (dsetq (cdr var) nil))))))
 
+(defun init-dsetq (var data)
+  (cond
+    ((consp var)
+     (let ((vdata (gensym "data")))
+       (list-add *loop-variables* (list vdata data))
+       (let rec ((var var) (data vdata))
+         (cond
+           ((not var) nil)
+           ((consp var)
+            (rec (car var) `(pop ,vdata))
+            (rec (cdr var) vdata))
+           ((symbolp var)
+            (list-add *loop-variables* (list var data)))))))
+    ((symbolp var)
+     (list-add *loop-variables* (list var data)))))
+
 (defun iskw (x name)
   (if (and name (symbolp x))
       (if (listp name)
           (or (iskw x (car name))
               (iskw x (cdr name)))
-          (or (eq x name)
-              (eq x (intern (symbol-name name)
-                            #.(find-package :keyword)))))))
+          (string= (symbol-name x) (symbol-name name)))))
 
 (defun parse-for-in (kind var args)
   (let ((seq (gensym "list"))
@@ -378,7 +389,7 @@
         (value (when (iskw (car args) '=)
                  (pop args)
                  (pop args))))
-    (list-nconc *loop-start* (dsetq variable value))
+    (init-dsetq variable value)
     (cond
       ;; ((iskw (car args) 'and)
       ;;  ;; XXX: this is incorrect, AND should produce "parallel" bindings, but
@@ -608,7 +619,7 @@
         (when args
           (rec (parse-clause args)))))
     `(block ,*loop-block-name*
-       (let (,@(cdr @loop-variables))
+       (let* (,@(cdr @loop-variables))
          (tagbody
           ,@(cdr @loop-start)
           $loop-next
