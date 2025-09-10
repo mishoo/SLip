@@ -49,9 +49,10 @@
 (defvar *unknown-variables* nil)
 (defvar *compiler-env* nil)
 (defvar *xref-info* nil)
-(defvar *compiler-macros* nil)
 (defvar *whole-form* nil)
 (defvar *load-timing* nil)
+
+(defvar *compiler-macros* (make-hash))
 
 (defvar *standard-output* (%make-output-stream))
 (defvar *error-output* (%make-output-stream))
@@ -942,14 +943,13 @@
                         (cadr args)
                       (setq args (cddr args)))
                     (gensym "form"))))
-      `(setq *compiler-macros*
-             (%putf *compiler-macros*
-                    ',(or setter name)
-                    (%fn ,name (,form)
-                         (destructuring-bind ,args (if (eq 'funcall (car ,form))
-                                                       (cddr ,form)
-                                                       (cdr ,form))
-                           ,@body)))))))
+      `(%hash-set (%fn ,name (,form)
+                       (destructuring-bind ,args (if (eq 'funcall (car ,form))
+                                                     (cddr ,form)
+                                                     (cdr ,form))
+                         ,@body))
+                  *compiler-macros*
+                  ',(or setter name)))))
 
 (labels
     ((reduce-form (form)
@@ -1101,7 +1101,7 @@
 
 (defun compiler-macro-function (name &optional (env *compiler-env*))
   (unless (and env (find-in-compiler-env name :func (gethash env :lex)))
-    (getf *compiler-macros* name)))
+    (gethash *compiler-macros* name)))
 
 (defun dig-declarations (exps)
   (let ((declarations nil)
