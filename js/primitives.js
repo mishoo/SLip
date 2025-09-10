@@ -142,7 +142,7 @@ function equal(a, b) {
             if (!LispCons.is(a) || !LispCons.is(b))
                 return equal(a, b);
         }
-        return true;
+        return eq(a, b);
     }
     if (LispRegexp.is(a) && LispRegexp.is(b)) {
         return a.toString() === b.toString();
@@ -163,7 +163,7 @@ function equalp(a, b) {
             if (!LispCons.is(a) || !LispCons.is(b))
                 return equalp(a, b);
         }
-        return true;
+        return eq(a, b);
     }
     if (LispVector.is(a) && LispVector.is(b)) {
         var i = a.length;
