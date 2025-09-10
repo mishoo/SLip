@@ -192,110 +192,57 @@
       (unless (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
-
-
 (defmacro frobnicate-list-utility (&body body)
-  `((cond
-      ((not from-end)
-       (loop for el in (nthcdr start list)
-             for i from start
-             while (or (not end) (< i end))
-             ,@body))
-      (t
-       (loop with len = (length list)
-             for el in (if end
-                           (nthcdr (- len end) (reverse list))
-                           (reverse list))
-             for i downfrom (or end len)
-             while (> i start)
-             ,@body)))))
+  `(cond
+     ((not from-end)
+      (loop for el in (nthcdr start list)
+            for index from start
+            while (or (not end) (< index end))
+            ,@body))
+     (t
+      (loop with len = (length list)
+            for el in (if end
+                          (nthcdr (- len end) (reverse list))
+                          (reverse list))
+            for index downfrom (1- (or end len))
+            while (>= index start)
+            ,@body))))
 
-
-
-
-(defun find-if (predicate list &key key from-end)
+(defun find-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (dolist (el (if from-end (reverse list) list))
-    (when (funcall predicate el)
-      (return el))))
+  (frobnicate-list-utility
+   when (funcall predicate el) do (return el)))
 
-(defun find-if-not (predicate list &key key from-end)
-  (update-for-key predicate key)
-  (dolist (el (if from-end (reverse list) list))
-    (unless (funcall predicate el)
-      (return el))))
+(defun find-if-not (predicate list &rest args)
+  (apply #'find-if (complement predicate) list args))
 
 (defun find (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (cond
-    ((not from-end)
-     (loop for el in (nthcdr start list)
-           for i from start
-           while (or (not end) (< i end))
-           when (funcall test item el) do (return el)))
-    (t
-     (loop with len = (length list)
-           for el in (if end
-                         (nthcdr (- len end) (reverse list))
-                         (reverse list))
-           for i downfrom (or end len)
-           while (> i start)
-           when (funcall test item el) do (return el)))))
+  (frobnicate-list-utility
+   when (funcall test item el) do (return el)))
 
-(defun position-if (predicate list &key key from-end)
+(defun position-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (loop for el in (if from-end (reverse list) list)
-        for index from 0
-        do (when (funcall predicate el)
-             (return (if from-end
-                         (- (length list) (1+ index))
-                         index)))))
+  (frobnicate-list-utility
+   when (funcall predicate el) do (return index)))
 
 (defun position-if-not (predicate list &rest args)
   (apply #'position-if (complement predicate) list args))
 
-(defun position (item list &key key test test-not from-end)
+(defun position (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (loop for el in (if from-end (reverse list) list)
-        for index from 0
-        do (when (funcall test item el)
-             (return (if from-end
-                         (- (length list) (1+ index))
-                         index)))))
+  (frobnicate-list-utility
+   when (funcall test item el) do (return index)))
 
 (defun count-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (cond
-    ((not from-end)
-     (loop for el in (nthcdr start list)
-           for i from start
-           while (or (not end) (< i end))
-           count (funcall predicate el)))
-    (t
-     (loop with len = (length list)
-           for el in (if end
-                         (nthcdr (- len end) (reverse list))
-                         (reverse list))
-           for i downfrom (or end len)
-           while (> i start)
-           count (funcall predicate el)))))
+  (frobnicate-list-utility
+   count (funcall predicate el)))
 
 (defun count-if-not (predicate list &rest args)
   (apply #'count-if (complement predicate) list args))
 
 (defun count (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (cond
-    ((not from-end)
-     (loop for el in (nthcdr start list)
-           for i from start
-           while (or (not end) (< i end))
-           count (funcall test item el)))
-    (t
-     (loop with len = (length list)
-           for el in (if end
-                         (nthcdr (- len end) (reverse list))
-                         (reverse list))
-           for i downfrom (or end len)
-           while (> i start)
-           count (funcall test item el)))))
+  (frobnicate-list-utility
+   count (funcall test item el)))
