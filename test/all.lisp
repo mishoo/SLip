@@ -67,6 +67,11 @@
   (load "test/count-if.lisp")
   (load "test/count-if-not.lisp")
   (load "test/find.lisp")
+  (load "test/find-if.lisp")
+  (load "test/find-if-not.lisp")
+  (load "test/position.lisp")
+  (load "test/position-if.lisp")
+  (load "test/position-if-not.lisp")
 
   (format t "Network time: ~Ams~%Compile time: ~Ams~%"
           (car timing)
