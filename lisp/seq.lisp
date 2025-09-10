@@ -194,24 +194,36 @@
 
 (defmacro frobnicate-list-utility (&body body)
   `(cond
-     ((not from-end)
-      (loop for el in (nthcdr start list)
-            for index from start
-            while (or (not end) (< index end))
-            ,@body))
+     (from-end
+      (cond
+        (end
+         (loop with len = (length list)
+               for el in (nthcdr (- len end) (reverse list))
+               for index downfrom (1- end)
+               while (>= index start)
+               ,@body))
+        (t
+         (loop with len = (length list)
+               for el in (reverse list)
+               for index downfrom (1- len)
+               while (>= index start)
+               ,@body))))
      (t
-      (loop with len = (length list)
-            for el in (if end
-                          (nthcdr (- len end) (reverse list))
-                          (reverse list))
-            for index downfrom (1- (or end len))
-            while (>= index start)
-            ,@body))))
+      (cond
+        (end
+         (loop for el in (nthcdr start list)
+               for index from start
+               while (< index end)
+               ,@body))
+        (t
+         (loop for el in (nthcdr start list)
+               for index from start
+               ,@body))))))
 
 (defun find-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
   (frobnicate-list-utility
-   when (funcall predicate el) do (return el)))
+   :when (funcall predicate el) :do (return el)))
 
 (defun find-if-not (predicate list &rest args)
   (apply #'find-if (complement predicate) list args))
@@ -219,12 +231,12 @@
 (defun find (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
   (frobnicate-list-utility
-   when (funcall test item el) do (return el)))
+   :when (funcall test item el) :do (return el)))
 
 (defun position-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
   (frobnicate-list-utility
-   when (funcall predicate el) do (return index)))
+   :when (funcall predicate el) :do (return index)))
 
 (defun position-if-not (predicate list &rest args)
   (apply #'position-if (complement predicate) list args))
@@ -232,12 +244,12 @@
 (defun position (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
   (frobnicate-list-utility
-   when (funcall test item el) do (return index)))
+   :when (funcall test item el) :do (return index)))
 
 (defun count-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
   (frobnicate-list-utility
-   count (funcall predicate el)))
+   :count (funcall predicate el)))
 
 (defun count-if-not (predicate list &rest args)
   (apply #'count-if (complement predicate) list args))
@@ -245,4 +257,4 @@
 (defun count (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
   (frobnicate-list-utility
-   count (funcall test item el)))
+   :count (funcall test item el)))

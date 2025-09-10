@@ -187,8 +187,8 @@
 (defun every (test . lists)
   (let scan ((tails lists))
     (if (finished tails) t
-        (and (apply test (map1 #'car tails))
-             (scan (map1 #'cdr tails))))))
+        (and (apply test (mapcar #'car tails))
+             (scan (mapcar #'cdr tails))))))
 
 (defun every1 (test list)
   (tagbody
@@ -215,8 +215,8 @@
 (defun some (test . lists)
   (let scan ((tails lists))
     (if (finished tails) nil
-        (or (apply test (map1 #'car tails))
-            (scan (map1 #'cdr tails))))))
+        (or (apply test (mapcar #'car tails))
+            (scan (mapcar #'cdr tails))))))
 
 (defun some1 (test list)
   (tagbody
@@ -241,9 +241,9 @@
 (defun notany (test . lists)
   (let scan ((tails lists))
     (if (finished tails) t
-        (if (apply test (map1 #'car tails))
+        (if (apply test (mapcar #'car tails))
             nil
-            (scan (map1 #'cdr tails))))))
+            (scan (mapcar #'cdr tails))))))
 
 (defun notany1 (test list)
   (tagbody
@@ -270,8 +270,8 @@
 (defun notevery (test . lists)
   (let scan ((tails lists))
     (if (finished tails) nil
-        (if (apply test (map1 #'car tails))
-            (scan (map1 #'cdr tails))
+        (if (apply test (mapcar #'car tails))
+            (scan (mapcar #'cdr tails))
             t))))
 
 (defun notevery1 (test list)
@@ -309,9 +309,9 @@
                           (%fn ,access-fn (,@lambda-list)
                                (lambda (,arg)
                                  (symbol-macrolet
-                                     (,@(map1 (lambda (sym)
-                                                `(,sym ',sym))
-                                              store-vars))
+                                     (,@(mapcar (lambda (sym)
+                                                  `(,sym ',sym))
+                                                store-vars))
                                    `(%mvb-internal ,'(,@store-vars) ,,arg
                                                    ,,@body)))))))
     (t
@@ -359,9 +359,9 @@
          (return-from get-setf-expansion (get-setf-expansion form)))
        (when setf-exp
          (return-from get-setf-expansion (apply expander (cdr form))))
-       (let* ((temps (map1 (lambda (subform)
-                             (gensym "temp"))
-                           (cdr form)))
+       (let* ((temps (mapcar (lambda (subform)
+                               (gensym "temp"))
+                             (cdr form)))
               (vals (list (gensym "new")))
               (store-form (cond
                             ((functionp expander)
@@ -393,11 +393,11 @@
        ;; it's safe to compute the value first.
        `(,setter ,value ,@(cdr form)))
       (t
-       (let ((tmpvars (map1 (lambda (val)
-                              (list (gensym) val))
-                            (cdr form))))
+       (let ((tmpvars (mapcar (lambda (val)
+                                (list (gensym) val))
+                              (cdr form))))
          `(let (,@tmpvars)
-            (,setter ,value ,@(map1 #'car tmpvars))))))))
+            (,setter ,value ,@(mapcar #'car tmpvars))))))))
 
 (defun %call-setf-expansion (temps vals stores set value)
   ;; this got ugly, because I'd like to dig the values and bind
@@ -478,9 +478,9 @@
   (let* ((place (make-symbol "place"))
          (parsed (parse-lambda-list lambda-list))
          (args (append (getf parsed :required)
-                       (map1 (lambda (arg)
-                               (if (consp arg) (car arg) arg))
-                             (getf parsed :optional)))))
+                       (mapcar (lambda (arg)
+                                 (if (consp arg) (car arg) arg))
+                               (getf parsed :optional)))))
     (when (or (getf parsed :has-key)
               (getf parsed :aux)
               (getf parsed :aok))
@@ -508,10 +508,10 @@
     (setf temps (nreverse temps)
           places (nreverse places)
           values (nreverse values))
-    `(let ,(map2 #'list temps values)
-       ,@(map2 (lambda (var set)
-                 `(setf ,var ,set))
-               places temps))))
+    `(let ,(mapcar #'list temps values)
+       ,@(mapcar (lambda (var set)
+                   `(setf ,var ,set))
+                 places temps))))
 
 (defsetf car rplaca)
 (defsetf cdr rplacd)
@@ -532,7 +532,7 @@
        (let ((item (gensym "item"))
              (newval (gensym "newval")))
          `(let* ((,item ,obj)
-                 ,@(map2 #'list temps value-forms)
+                 ,@(mapcar #'list temps value-forms)
                  (,newval (cons ,item ,get-form)))
             (symbol-macrolet ((,(car store-vars) ,newval))
               ,store-form)))))))
@@ -544,7 +544,7 @@
        `(%:%pop ,place))
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                             (get-setf-expansion place)
-         `(let* (,@(map2 #'list temps value-forms)
+         `(let* (,@(mapcar #'list temps value-forms)
                  (,v ,get-form))
             (symbol-macrolet ((,(car store-vars) (cdr ,v)))
               ,store-form)
@@ -600,33 +600,6 @@
 
 (defmacro rest (list)
   `(cdr ,list))
-
-(defmacro with-collectors ((&rest names) &body body)
-  (let (lists tails syms adders)
-    (flet ((mk-collector (arg)
-             (let* ((vlist (gensym))
-                    (vtail (gensym))
-                    (name (if (consp arg) (car arg) arg))
-                    (vadd (if (consp arg) (cadr arg) arg))
-                    (vconc (if (consp arg) (caddr arg))))
-               (push vlist lists)
-               (push vtail tails)
-               (push `(,name (cdr ,vlist)) syms)
-               (when vadd
-                 (push `(,vadd (el)
-                         (setq ,vtail (rplacd ,vtail (cons el nil))))
-                       adders))
-               (when vconc
-                 (push `(,vconc (lst)
-                         (setq ,vtail (last (rplacd ,vtail lst))))
-                       adders)))))
-      (foreach names #'mk-collector)
-      `(let (,@(map1 (lambda (name) `(,name (list nil)))
-                     lists))
-         (let (,@(map2 #'list tails lists))
-           (flet (,@adders)
-             (symbol-macrolet (,@syms)
-               ,@body)))))))
 
 ;;; basic looping
 
@@ -913,6 +886,33 @@
 
 (defun (setf cadr) (value list)
   (setf (car (cdr list)) value))
+
+(defmacro with-collectors ((&rest names) &body body)
+  (let (lists tails syms adders)
+    (flet ((mk-collector (arg)
+             (let* ((vlist (gensym))
+                    (vtail (gensym))
+                    (name (if (consp arg) (car arg) arg))
+                    (vadd (if (consp arg) (cadr arg) arg))
+                    (vconc (if (consp arg) (caddr arg))))
+               (push vlist lists)
+               (push vtail tails)
+               (push `(,name (cdr ,vlist)) syms)
+               (when vadd
+                 (push `(,vadd (el)
+                         (setq ,vtail (setf (cdr ,vtail) (cons el nil))))
+                       adders))
+               (when vconc
+                 (push `(,vconc (lst)
+                         (setq ,vtail (last (setf (cdr ,vtail) lst))))
+                       adders)))))
+      (foreach names #'mk-collector)
+      `(let (,@(mapcar (lambda (name) `(,name (list nil)))
+                       lists))
+         (let (,@(mapcar #'list tails lists))
+           (flet (,@adders)
+             (symbol-macrolet (,@syms)
+               ,@body)))))))
 
 (define-setf-expander values (&rest places)
   (with-collectors (temp-vars temp-vals store-main-vars store-other-vars setters getters)
