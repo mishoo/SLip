@@ -603,7 +603,7 @@
       ((symbolp args))
       ((not (consp args))
        (error "Bad macro lambda list"))
-      ((consp (car args))
+      ((listp (car args))
        (when (and seen (symbolp (caar args)))
          (dig (cdr args) t)))
       ((%memq (car args) '(&rest &body))

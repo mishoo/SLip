@@ -107,6 +107,12 @@
   "Like EQUALP, but guaranteed to return T for true."
   (apply #'values (mapcar #'notnot (multiple-value-list (equalp x y)))))
 
+(defun is-eq-p (x) #'(lambda (y) (eqt x y)))
+(defun is-not-eq-p (x) #'(lambda (y) (not (eqt x y))))
+
+(defun is-eql-p (x) #'(lambda (y) (eqlt x y)))
+(defun is-not-eql-p (x) #'(lambda (y) (not (eqlt x y))))
+
 (defmacro expand-in-current-env (form)
   (macroexpand form))
 

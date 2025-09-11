@@ -72,6 +72,12 @@
   (load "test/position.lisp")
   (load "test/position-if.lisp")
   (load "test/position-if-not.lisp")
+  (load "test/substitute.lisp")
+  (load "test/substitute-if.lisp")
+  (load "test/substitute-if-not.lisp")
+  (load "test/nsubstitute.lisp")
+  (load "test/nsubstitute-if.lisp")
+  (load "test/nsubstitute-if-not.lisp")
 
   (format t "Network time: ~Ams~%Compile time: ~Ams~%"
           (car timing)

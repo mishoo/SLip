@@ -6,6 +6,8 @@
           find find-if find-if-not
           position position-if position-if-not
           count count-if count-if-not
+          substitute substitute-if substitute-if-not
+          nsubstitute nsubstitute-if nsubstitute-if-not
           remove-duplicates delete-duplicates
           intersection set-difference))
 
@@ -192,69 +194,130 @@
       (unless (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
-(defmacro frobnicate-list-utility (&body body)
-  `(cond
-     (from-end
-      (cond
-        (end
-         (loop with len = (length list)
-               for el in (nthcdr (- len end) (reverse list))
-               for index downfrom (1- end)
-               while (>= index start)
-               ,@body))
-        (t
-         (loop with len = (length list)
-               for el in (reverse list)
-               for index downfrom (1- len)
-               while (>= index start)
-               ,@body))))
-     (t
-      (cond
-        (end
-         (loop for el in (nthcdr start list)
-               for index from start
-               while (< index end)
-               ,@body))
-        (t
-         (loop for el in (nthcdr start list)
-               for index from start
-               ,@body))))))
+(defmacro with-list-frobnicator ((&key replace) &body body)
+  (let* ((tail (when replace (gensym "tail")))
+         (reverse (if tail 'nreverse 'reverse))
+         (code `(cond
+                  (from-end
+                   (cond
+                     (end
+                      (loop with len = (length list)
+                            with list = (,reverse list)
+                            with froblist = (nthcdr (- len end) list)
+                            ,@(if tail
+                                  `(for ,tail on froblist for el = (car ,tail))
+                                  `(for el in froblist))
+                            for index downfrom (1- end)
+                            while (>= index start)
+                            ,@body))
+                     (t
+                      (loop with len = (length list)
+                            with list = (,reverse list)
+                            ,@(if tail
+                                  `(for ,tail on list for el = (car ,tail))
+                                  `(for el in list))
+                            for index downfrom (1- len)
+                            while (>= index start)
+                            ,@body))))
+                  (t
+                   (cond
+                     (end
+                      (loop with froblist = (nthcdr start list)
+                            ,@(if tail
+                                  `(for ,tail on froblist for el = (car ,tail))
+                                  `(for el in froblist))
+                            for index from start
+                            while (< index end)
+                            ,@body))
+                     (t
+                      (loop with froblist = (nthcdr start list)
+                            ,@(if tail
+                                  `(for ,tail on froblist for el = (car ,tail))
+                                  `(for el in froblist))
+                            for index from start
+                            ,@body)))))))
+    (cond
+      (replace
+       `(macrolet ((replace-with (val)
+                     `(setf (car ,',tail) ,val)))
+          ,code))
+      (code))))
 
 (defun find-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (frobnicate-list-utility
-   :when (funcall predicate el) :do (return el)))
+  (with-list-frobnicator ()
+    :when (funcall predicate el) :do (return el)))
 
 (defun find-if-not (predicate list &rest args)
   (apply #'find-if (complement predicate) list args))
 
 (defun find (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (frobnicate-list-utility
-   :when (funcall test item el) :do (return el)))
+  (with-list-frobnicator ()
+    :when (funcall test item el) :do (return el)))
 
 (defun position-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (frobnicate-list-utility
-   :when (funcall predicate el) :do (return index)))
+  (with-list-frobnicator ()
+    :when (funcall predicate el) :do (return index)))
 
 (defun position-if-not (predicate list &rest args)
   (apply #'position-if (complement predicate) list args))
 
 (defun position (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (frobnicate-list-utility
-   :when (funcall test item el) :do (return index)))
+  (with-list-frobnicator ()
+    :when (funcall test item el) :do (return index)))
 
 (defun count-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (frobnicate-list-utility
-   :count (funcall predicate el)))
+  (with-list-frobnicator ()
+    :count (funcall predicate el)))
 
 (defun count-if-not (predicate list &rest args)
   (apply #'count-if (complement predicate) list args))
 
 (defun count (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (frobnicate-list-utility
-   :count (funcall test item el)))
+  (with-list-frobnicator ()
+    :count (funcall test item el)))
+
+(defun substitute-if (newitem predicate list &key key (start 0) end from-end count destructive)
+  (update-for-key predicate key)
+  (unless destructive
+    ;; the frobnicator is destructive
+    (setf list (copy-list list)))
+  (with-list-frobnicator (:replace t)
+    :when (and (or (not count)
+                   (plusp count))
+               (funcall predicate el))
+    :do (progn
+          (replace-with newitem)
+          (when count (decf count)))
+    :finally (return (if from-end (nreverse list) list))))
+
+(defun substitute-if-not (newitem predicate list &rest args)
+  (apply #'substitute-if newitem (complement predicate) list args))
+
+(defun substitute (newitem item list &key key test test-not (start 0) end from-end count destructive)
+  (setf test (make-subject-test test test-not key nil))
+  (unless destructive
+    ;; the frobnicator is destructive
+    (setf list (copy-list list)))
+  (with-list-frobnicator (:replace t)
+    :when (and (or (not count)
+                   (plusp count))
+               (funcall test item el))
+    :do (progn
+          (replace-with newitem)
+          (when count (decf count)))
+    :finally (return (if from-end (nreverse list) list))))
+
+(defun nsubstitute-if (newitem predicate list &rest args)
+  (apply #'substitute-if newitem predicate list :destructive t args))
+
+(defun nsubstitute-if-not (newitem predicate list &rest args)
+  (apply #'substitute-if-not newitem predicate list :destructive t args))
+
+(defun nsubstitute (newitem item list &rest args)
+  (apply #'substitute newitem item list :destructive t args))
