@@ -3,6 +3,7 @@
 (defparameter *tests* (list))
 (defparameter *compile-time* 0)
 (defparameter *run-time* 0)
+(defparameter *log* t)
 
 (defmacro time-it (dest form)
   (let ((t1 (gensym)))
@@ -24,7 +25,8 @@
              (ok (gensym)))
         `(flet ((,name ()
                   (let (,val ,exp ,comp ,ok)
-                    (format t "#'~S ..." ',name)
+                    (when *log*
+                      (format t "#'~S ..." ',name))
                     (setf ,exp ',expected)
                     (handler-bind
                         ((error (lambda (condition)
@@ -44,11 +46,13 @@
                                              (multiple-value-list (catch 'test-error
                                                                     (funcall ,comp)))))
                          (setf ,ok (equalp ,val ,exp))
-                         (if ,ok
-                             (format t " OK~%")
-                             (format t " FAIL - ~A~%" ,val)))))
+                         (when *log*
+                           (if ,ok
+                               (format t " OK~%")
+                               (format t " FAIL - ~A~%" ,val))))))
                     ,(when notes
-                       `(format t "    ~A~%" ',notes))
+                       `(when *log*
+                          (format t "    ~A~%" ',notes)))
                     ,ok)))
            (setf (getf *tests* ',name) (%:make-hash :func #',name :notes ',notes))
            ',name)))))
@@ -59,30 +63,44 @@
 (defun test (name)
   (funcall (gethash :func (get-test name))))
 
-(defun run-tests (&optional match-name &key all)
-  (let ((*compile-time* 0)
-        (*run-time* 0))
-    (loop with ok
-          for (test name) on (reverse *tests*) by #'cddr
-          for index from 1
-          for notes = (gethash :notes test)
-          when (or all
-                   (and match-name
-                        (regexp-test match-name (symbol-name name)))
-                   (and (not match-name)
-                        (not (getf notes :slow))))
-          do (setf ok (funcall (gethash :func test)))
-          and count ok into success
-          and count (not ok) into failed
-          and sum *compile-time* into compile-time
-          and sum *run-time* into run-time
-          else count test into skipped
-          finally (format t "~A tests, ~A OK, ~A skipped, ~A FAILED~%~
-                             Compile time: ~,2Fms~%~
-                             Run time: ~,2Fms~%"
-                          index success skipped failed
-                          compile-time run-time))
-    'done))
+(defun run-tests (&rest args)
+  (let ((match-name (when (or (regexpp (car args))
+                              (stringp (car args))
+                              (null (and args (car args))))
+                      (pop args))))
+    (destructuring-bind (&key (all match-name allp)
+                              (log t logp)
+                              (match match-name))
+                        args
+      (let ((*compile-time* 0)
+            (*run-time* 0)
+            (*log* log))
+        (loop with ok
+              for (test name) on (reverse *tests*) by #'cddr
+              for index from 1
+              for notes = (gethash :notes test)
+              for this-slow = (getf notes :slow)
+              when (or (and all allp (not match))
+                       (and match
+                            (cond
+                              ((stringp match)
+                               (string-equal match (symbol-name name)))
+                              ((regexp-test match (symbol-name name))))
+                            (not (and (not all) allp this-slow)))
+                       (and (not match)
+                            (not this-slow)))
+              do (setf ok (funcall (gethash :func test)))
+              and count ok into success
+              and count (not ok) into failed
+              and sum *compile-time* into compile-time
+              and sum *run-time* into run-time
+              else count test into skipped
+              finally (format t "~A tests, ~A skipped, ~A OK, ~A FAILED~%~
+                                 Compile time: ~,2Fms~%~
+                                 Run time: ~,2Fms~%"
+                              index skipped success failed
+                              compile-time run-time))
+        'done))))
 
 ;;;; utils from ansi-test
 

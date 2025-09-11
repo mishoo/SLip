@@ -355,7 +355,7 @@
               (do ((trail list (cdr trail))
                    (head head (cdr head)))
                   ;; HEAD is n conses ahead of TRAIL;
-                  ;; when HEAD is at the last cons, return
+                  ;; when HEAD is NIL (or not a cons), return
                   ;; the data copied so far.
                   ((atom head)
                    copy)

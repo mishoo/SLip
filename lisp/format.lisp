@@ -402,7 +402,7 @@
   (let ((t1 (gensym)))
     `(let ((,t1 (get-internal-run-time)))
        (multiple-value-prog1 (progn ,@body)
-         (format t "Evaluation time: ~Ams~%" (- (get-internal-run-time) ,t1))))))
+         (format t "Evaluation time: ~,2Fms~%" (- (get-internal-run-time) ,t1))))))
 
 (defun error args
   (%error (apply #'format nil args)))
