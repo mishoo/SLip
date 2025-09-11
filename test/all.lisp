@@ -79,6 +79,6 @@
   (load "test/seq/nsubstitute-if.lisp")
   (load "test/seq/nsubstitute-if-not.lisp")
 
-  (format t "Network time: ~Ams~%Compile time: ~Ams~%"
+  (format t "Network time: ~,2Fms~%Compile time: ~,2Fms~%"
           (car timing)
           (cadr timing)))

@@ -72,7 +72,7 @@
             counting ok into success
             summing *compile-time* into compile-time
             summing *run-time* into run-time
-            finally (format t "~A tests, ~A OK~%Compile time: ~Ams~%Run time: ~Ams~%"
+            finally (format t "~A tests, ~A OK~%Compile time: ~,2Fms~%Run time: ~,2Fms~%"
                             test success
                             compile-time run-time))
       'done)))
