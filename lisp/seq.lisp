@@ -9,7 +9,8 @@
           substitute substitute-if substitute-if-not
           nsubstitute nsubstitute-if nsubstitute-if-not
           remove-duplicates delete-duplicates
-          intersection set-difference))
+          intersection set-difference
+          butlast subseq))
 
 (defpackage :sl-seq
   (:use :sl :%))
@@ -194,54 +195,52 @@
       (unless (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
-(defmacro with-list-frobnicator ((&key replace) &body body)
+(defmacro with-list-frobnicator ((&key replace (has-from-end t)) &body body)
   (let* ((tail (when replace (gensym "tail")))
-         (reverse (if tail 'nreverse 'reverse))
-         (code `(cond
-                  (from-end
-                   (cond
-                     (end
-                      (loop with len = (length list)
-                            with list = (,reverse list)
-                            with froblist = (nthcdr (- len end) list)
-                            ,@(if tail
-                                  `(for ,tail on froblist for el = (car ,tail))
-                                  `(for el in froblist))
-                            for index downfrom (1- end)
-                            while (>= index start)
-                            ,@body))
-                     (t
-                      (loop with len = (length list)
-                            with list = (,reverse list)
-                            ,@(if tail
-                                  `(for ,tail on list for el = (car ,tail))
-                                  `(for el in list))
-                            for index downfrom (1- len)
-                            while (>= index start)
-                            ,@body))))
-                  (t
-                   (cond
-                     (end
-                      (loop with froblist = (nthcdr start list)
-                            ,@(if tail
-                                  `(for ,tail on froblist for el = (car ,tail))
-                                  `(for el in froblist))
-                            for index from start
-                            while (< index end)
-                            ,@body))
-                     (t
-                      (loop with froblist = (nthcdr start list)
-                            ,@(if tail
-                                  `(for ,tail on froblist for el = (car ,tail))
-                                  `(for el in froblist))
-                            for index from start
-                            ,@body)))))))
-    (cond
-      (replace
-       `(macrolet ((replace-with (val)
-                     `(setf (car ,',tail) ,val)))
-          ,code))
-      (code))))
+         (reverse (if tail 'nreverse 'reverse)))
+    `(macrolet (,@(when tail
+                    `((replace-with (val)
+                                    `(setf (car ,',tail) ,val)))))
+       (cond
+         ,(when has-from-end
+            `(from-end
+              (cond
+                (end
+                 (loop with len = (length list)
+                       with list = (,reverse list)
+                       with froblist = (nthcdr (- len end) list)
+                       ,@(if tail
+                             `(for ,tail on froblist for el = (car ,tail))
+                             `(for el in froblist))
+                       for index downfrom (1- end)
+                       while (>= index start)
+                       ,@body))
+                (t
+                 (loop with len = (length list)
+                       with list = (,reverse list)
+                       ,@(if tail
+                             `(for ,tail on list for el = (car ,tail))
+                             `(for el in list))
+                       for index downfrom (1- len)
+                       while (>= index start)
+                       ,@body)))))
+         (t
+          (cond
+            (end
+             (loop with froblist = (nthcdr start list)
+                   ,@(if tail
+                         `(for ,tail on froblist for el = (car ,tail))
+                         `(for el in froblist))
+                   for index from start
+                   while (< index end)
+                   ,@body))
+            (t
+             (loop with froblist = (nthcdr start list)
+                   ,@(if tail
+                         `(for ,tail on froblist for el = (car ,tail))
+                         `(for el in froblist))
+                   for index from start
+                   ,@body))))))))
 
 (defun find-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
@@ -321,3 +320,36 @@
 
 (defun nsubstitute (newitem item list &rest args)
   (apply #'substitute newitem item list :destructive t args))
+
+
+
+;;; the following two are (slightly modified) from SBCL (list.lisp)
+
+;; like NTHCDR but doesn't fail on dotted lists
+(defun dotted-nthcdr (n list)
+  (do ((i n (1- i))
+       (result list (cdr result)))
+      ((not (plusp i)) result)
+    (when (atom result)
+      (return nil))))
+
+(defun butlast (list &optional (n 1))
+  (cond
+    ((zerop n)
+     (copy-list list))
+    (t
+     (let ((head (dotted-nthcdr n list)))
+       (and (consp head)                      ; there are at least n
+            (with-collectors (copy)           ; conses; copy!
+              (do ((trail list (cdr trail))
+                   (head head (cdr head)))
+                  ;; HEAD is n conses ahead of TRAIL;
+                  ;; when HEAD is at the last cons, return
+                  ;; the data copied so far.
+                  ((atom head)
+                   copy)
+                (copy (car trail)))))))))
+
+(defun subseq (list start &optional end)
+  (with-list-frobnicator (:has-from-end nil)
+    :collect el))
