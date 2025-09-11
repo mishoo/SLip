@@ -206,14 +206,15 @@
       (unless (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
-(defmacro with-list-frobnicator ((&key replace (has-from-end t)) &body body)
+(defmacro with-list-frobnicator ((&key replace (from-end t) alt) &body body)
   (let* ((tail (when replace (gensym "tail")))
-         (reverse (if tail 'nreverse 'reverse)))
+         (reverse (if tail 'nreverse 'reverse))
+         (alt-el (when alt (intern (strcat alt "-EL")))))
     `(macrolet (,@(when tail
                     `((replace-with (val)
                                     `(setf (car ,',tail) ,val)))))
        (cond
-         ,(when has-from-end
+         ,(when from-end
             `(from-end
               (cond
                 (end
@@ -242,6 +243,8 @@
                    ,@(if tail
                          `(for ,tail on froblist for el = (car ,tail))
                          `(for el in froblist))
+                   ,@(when alt
+                       `(for ,alt-el in ,alt))
                    for index from start
                    while (< index end)
                    ,@body))
@@ -250,6 +253,8 @@
                    ,@(if tail
                          `(for ,tail on froblist for el = (car ,tail))
                          `(for el in froblist))
+                   ,@(when alt
+                       `(for ,alt-el in ,alt))
                    for index from start
                    ,@body))))))))
 
@@ -362,8 +367,13 @@
                 (copy (car trail)))))))))
 
 (defun subseq (list start &optional end)
-  (with-list-frobnicator (:has-from-end nil)
+  (with-list-frobnicator (:from-end nil)
     :collect el))
+
+(defun (setf subseq) (newseq list start &optional end)
+  (with-list-frobnicator (:from-end nil :alt newseq :replace t)
+    :do (replace-with newseq-el)
+    :finally (return newseq)))
 
 ;; (defun sublis (alist tree &key key test test-not)
 ;;   (setf test (make-subject-test test test-not key nil))
