@@ -1609,6 +1609,8 @@
           (cond
             ((always-true-p (car exps))
              (comp (car exps) env val? more?))
+            ((null (car exps))
+             (comp-or (cdr exps) env val? more? l1))
             (l1
              (%seq (comp (car exps) env t t)
                    (gen (if val? "TJUMPK" "TJUMP") l1)
