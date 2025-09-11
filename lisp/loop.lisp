@@ -39,7 +39,7 @@
   (let ((sym (car args)))
     (unless (symbolp sym)
       (error "Expecting loop clause, got ~A" sym))
-    (let ((parser (gethash *clause-parsers* (symbol-name sym))))
+    (let ((parser (gethash (symbol-name sym) *clause-parsers*)))
       (unless parser
         (error "Unknown loop clause ~A" sym))
       (apply parser (cdr args)))))
@@ -59,7 +59,7 @@
     ((symbolp name)
      (register-parser (symbol-name name) parser))
     ((stringp name)
-     (setf (gethash *clause-parsers* name) parser))))
+     (setf (gethash name *clause-parsers*) parser))))
 
 (defmacro defparser (symbol args &body body)
   `(labels ((parser ,args ,@body))

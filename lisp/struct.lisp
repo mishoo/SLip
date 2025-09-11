@@ -33,12 +33,12 @@
         (error "Expected structure."))))
 
 (defun find-structure (name &optional (errorp t))
-  (or (gethash *structures* name)
+  (or (gethash name *structures*)
       (when errorp
         (error "No such structure ~S." name))))
 
 (defun (setf find-structure) (struct name)
-  (setf (gethash *structures* name) struct))
+  (setf (gethash name *structures*) struct))
 
 (defun copy-structure (structure)
   (assert-struct structure)

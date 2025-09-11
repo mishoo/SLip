@@ -780,7 +780,7 @@
 
 (defun find-macrolet-in-compiler-env (name &optional (env *compiler-env*))
   (when env
-    (aif (find-in-compiler-env name :func (gethash env :lex))
+    (aif (find-in-compiler-env name :func (gethash :lex env))
          (getf (cddr it) :macro))))
 
 (defun find-symbol-macrolet-in-compiler-env (name &optional (env *compiler-env*))
@@ -790,7 +790,7 @@
 
 (defun find-var-in-compiler-env (name &optional (env *compiler-env*))
   (when env
-    (find-in-compiler-env name :var (gethash env :lex))))
+    (find-in-compiler-env name :var (gethash :lex env))))
 
 (defun safe-atom-p (thing &optional (env *compiler-env*))
   (and (atom thing)
@@ -958,8 +958,8 @@
                                                      (cddr ,form)
                                                      (cdr ,form))
                          ,@body))
-                  *compiler-macros*
-                  ',(or setter name)))))
+                  ',(or setter name)
+                  *compiler-macros*))))
 
 (labels
     ((reduce-form (form)
@@ -1085,7 +1085,7 @@
          (when stuff
            (let ((key (car stuff))
                  (val (cadr stuff)))
-             (%hash-set (cons val (gethash h key)) h key)
+             (%hash-set (cons val (gethash key h)) key h)
              (rec (cddr stuff)))))
        h))
     (env)))
@@ -1110,8 +1110,8 @@
            (cadr form))))
 
 (defun compiler-macro-function (name &optional (env *compiler-env*))
-  (unless (and env (find-in-compiler-env name :func (gethash env :lex)))
-    (gethash *compiler-macros* name)))
+  (unless (and env (find-in-compiler-env name :func (gethash :lex env)))
+    (gethash name *compiler-macros*)))
 
 (defun dig-declarations (exps)
   (let ((declarations nil)
@@ -1185,19 +1185,19 @@
        (find-in-compiler-env name type env))
 
      (find-var (name env)
-       (find-in-env name :var (gethash env :lex)))
+       (find-in-env name :var (gethash :lex env)))
 
      (find-func (name env)
-       (find-in-env name :func (gethash env :lex)))
+       (find-in-env name :func (gethash :lex env)))
 
      (find-tag (name env)
-       (find-in-env name :tag (gethash env :tags)))
+       (find-in-env name :tag (gethash :tags env)))
 
      (find-tagbody (name env)
-       (find-in-env name :tagbody (gethash env :lex)))
+       (find-in-env name :tagbody (gethash :lex env)))
 
      (find-block (name env)
-       (find-in-env name :block (gethash env :lex)))
+       (find-in-env name :block (gethash :lex env)))
 
      (find-macrolet (name env)
        (find-macrolet-in-compiler-env name env))

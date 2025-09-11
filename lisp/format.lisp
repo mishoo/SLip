@@ -51,7 +51,7 @@
 
 (defmacro def-format (char cmdargs &body body)
   (let ((v (gensym)))
-    `(setf (gethash *format-handlers* ,(upcase char))
+    `(setf (gethash ,(upcase char) *format-handlers*)
            (lambda (output args colmod? atmod? . ,v)
              (with-format-args ,cmdargs ,v ,@body)))))
 
@@ -191,7 +191,7 @@
     (when list
       (let ((x (car list)))
         (cond ((listp x)
-               (let ((handler (gethash *format-handlers* (car x)))
+               (let ((handler (gethash (car x) *format-handlers*))
                      (cmdargs (cdr x)))
                  (setf args (apply handler stream args cmdargs))))
               (t
@@ -298,7 +298,7 @@
                  (if list
                      (let ((x (car list)))
                        (if (listp x)
-                           (let ((handler (gethash *format-handlers* (car x)))
+                           (let ((handler (gethash (car x) *format-handlers*))
                                  (cmdargs (cdr x)))
                              (setf *format-current-args*
                                    (apply handler output *format-current-args* cmdargs)))

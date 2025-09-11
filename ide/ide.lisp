@@ -41,7 +41,7 @@
         (pass-args (gensym)))
     `(labels ((,name ,args ,@body))
        (setf (symbol-function ',name) #',name)
-       (setf (gethash *handlers* ,(symbol-name what))
+       (setf (gethash ,(symbol-name what) *handlers*)
              (lambda (req-id . ,pass-args)
                (make-thread
                 (lambda ()

@@ -5,11 +5,11 @@
 (defpackage :sl-hash
   (:use :sl :%))
 
-(defun (setf gethash) (newvalue hash key)
-  (%hash-set newvalue hash key))
+(defun (setf gethash) (newvalue key hash)
+  (%hash-set newvalue key hash))
 
-(define-compiler-macro (setf gethash) (newvalue hash key)
-  `(%hash-set ,newvalue ,hash ,key))
+(define-compiler-macro (setf gethash) (newvalue key hash)
+  `(%hash-set ,newvalue ,key ,hash))
 
 (defun unsupported-test (test)
   (and test (not (or (eq test 'eq)

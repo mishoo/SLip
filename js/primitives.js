@@ -1206,7 +1206,7 @@ defp("make-hash", false, function(m, nargs){
 defp("gethash", false, function(m, nargs){
     checknargs(nargs, 2, 3);
     var def = (nargs == 3) ? m.pop() : false;
-    var key = m.pop(), hash = m.pop();
+    var hash = m.pop(), key = m.pop();
     checktype(hash, LispHash);
     var exists = hash.has(key);
     m.stack.set_values_array(exists ? [ hash.get(key), true ] : [ def, false ]);
@@ -1236,7 +1236,7 @@ defp("clrhash", true, function(m, nargs){
 
 defp("%hash-set", true, function(m, nargs){
     checknargs(nargs, 3, 3);
-    var key = m.pop(), hash = m.pop(), val = m.pop();
+    var hash = m.pop(), key = m.pop(), val = m.pop();
     checktype(hash, LispHash);
     return hash.set(key, val);
 });
