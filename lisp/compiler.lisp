@@ -183,6 +183,11 @@
 (defun warn (msg)
   (%warn msg))
 
+(defun error/wp (msg)
+  (error (if *current-pos*
+             (strcat msg " (" (or *current-file* "line") ":" *current-pos* ")")
+             msg)))
+
 (defmacro when (pred . body)
   `(if ,pred (progn ,@body)))
 
@@ -373,7 +378,9 @@
              (%stream-get out)))
 
          (croak (msg)
-           (error (strcat msg ", line: " (%stream-line input) ", col: " (%stream-col input))))
+           (when *current-file*
+             (setq *current-pos* (%stream-line input)))
+           (error/wp (strcat msg ", line: " (%stream-line input) ", col: " (%stream-col input))))
 
          (skip-ws ()
            (read-while (lambda (ch)
@@ -434,7 +441,7 @@
          (read-symbol ()
            (let ((str (upcase (read-symbol-name))))
              (when (zerop (length str))
-               (error (strcat "Bad character (or reader bug) in read-symbol: " (peek))))
+               (croak (strcat "Bad character (or reader bug) in read-symbol: " (peek))))
              (aif (and (regexp-test #/^-?[0-9]*\.?[0-9]*$/ str)
                        (parse-number str))
                   it
@@ -443,7 +450,7 @@
                              (sym (elt it 3))
                              (internal (string= (elt it 2) "::")))
                          (when (zerop (length sym))
-                           (error (strcat "Bad symbol name in " str)))
+                           (croak (strcat "Bad symbol name in " str)))
                          (cond
                            ((zerop (length pak))
                             ;; KEYWORD
@@ -455,7 +462,7 @@
                             (if internal
                                 (intern sym pak)
                                 (or (%find-exported-symbol sym pak)
-                                    (error (strcat "Symbol " sym " not accessible in package " pak)))))))
+                                    (croak (strcat "Symbol " sym " not accessible in package " pak)))))))
                        (intern str *package*)))))
 
          (read-char ()
@@ -501,7 +508,7 @@
          (read-quasiquote ()
            (skip #\`)
            (skip-ws)
-           (if (%memq (peek) '(#\( #\`))
+           (if (%memq (peek) '(#\( #\` #\'))
                (prog2
                    (incf in-qq)
                    (list 'quasiquote (read-token))
@@ -602,7 +609,7 @@
     (cond
       ((symbolp args))
       ((not (consp args))
-       (error "Bad macro lambda list"))
+       (error/wp "Bad macro lambda list"))
       ((listp (car args))
        (when (and seen (symbolp (caar args)))
          (dig (cdr args) t)))
@@ -626,7 +633,7 @@
         (allow-other-keys nil))
     (labels
         ((assert (p msg)
-           (if p p (error msg)))
+           (if p p (error/wp msg)))
 
          (symp (x)
            (and x (symbolp x)
@@ -635,9 +642,9 @@
 
          (add (name)
            (unless (symp name)
-             (error (strcat "Invalid name in lambda list " name)))
+             (error/wp (strcat "Invalid name in lambda list " name)))
            (when (%memq name all)
-             (error (strcat "Duplicate name in lambda list " name)))
+             (error/wp (strcat "Duplicate name in lambda list " name)))
            (push name all)
            name)
 
@@ -658,7 +665,7 @@
               (assert (not rest) "&rest already given")
               (setq rest (add args)))
              (t
-              (error "Bad lambda list"))))
+              (error/wp "Bad lambda list"))))
 
          (rec-rest (args)
            (when (cdr args)
@@ -666,7 +673,7 @@
                (&key (rec-key (cddr args)))
                (&aux (rec-aux (cddr args)))
                (otherwise
-                (error "Bad lambda list after &rest"))))
+                (error/wp "Bad lambda list after &rest"))))
            (setq rest (add (car args))))
 
          (rec-opt (args)
@@ -684,7 +691,7 @@
                 ((symp (car args))
                  (push (list (add (car args))) optional))
                 (t
-                 (error "Bad &optional parameter"))))))
+                 (error/wp "Bad &optional parameter"))))))
 
          (key-arg-names (arg)
            (cond
@@ -694,7 +701,7 @@
              ((symp arg)
               (list (intern (symbol-name arg) :keyword) (add arg)))
              (t
-              (error "Bad &key argument name"))))
+              (error/wp "Bad &key argument name"))))
 
          (rec-key (args)
            (setq has-key t)
@@ -714,7 +721,7 @@
                 ((symp (car args))
                  (push (list (key-arg-names (car args))) key))
                 (args
-                 (error "Bad &key parameter in lambda list"))))))
+                 (error/wp "Bad &key parameter in lambda list"))))))
 
          (rec-aux (args)
            (when (cdr args)
@@ -726,7 +733,7 @@
              ((symp (car args))
               (push (list (add (car args))) aux))
              (t
-              (error "Bad &aux parameter in lambda list")))))
+              (error/wp "Bad &aux parameter in lambda list")))))
 
       (rec args)
       (list :required required
@@ -792,7 +799,10 @@
                       (eq :smac (caddr it)))))))
 
 (defun %dbind-error-missing-arg (arg)
-  (error (strcat "Missing required argument: " arg)))
+  (error (strcat "DESTRUCTURING-BIND: Missing required argument: " arg)))
+
+(defun %dbind-error-missing-sublist ()
+  (error/wp "DESTRUCTURING-BIND: Missing sublist"))
 
 (defun %fn-destruct (macro? args values body)
   (let (names decls)
@@ -807,7 +817,7 @@
                   (add current val)
                   (rec nil nil nil nil name current 0)))
                (t
-                (error (strcat "Unknown destructuring pattern: " name)))))
+                (error/wp (strcat "Unknown destructuring pattern: " name)))))
            (rec (optional? rest? key? aux? args values i)
              (when args
                (cond
@@ -819,10 +829,10 @@
                       ((symbolp thisarg)
                        (case thisarg
                          (&whole
-                          (when (plusp i) (error "Misplaced &WHOLE"))
+                          (when (plusp i) (error/wp "Misplaced &WHOLE"))
                           (let ((thisarg (cadr args)))
                             (unless thisarg
-                              (error "Missing variable name for &WHOLE"))
+                              (error/wp "Missing variable name for &WHOLE"))
                             (add thisarg (if (and macro? (eq values topv))
                                              `(or *whole-form* ,values)
                                              values)))
@@ -830,31 +840,31 @@
 
                          (&optional
                           (when (or optional? rest? key? aux?)
-                            (error "Invalid &OPTIONAL"))
+                            (error/wp "Invalid &OPTIONAL"))
                           (rec t nil nil nil (cdr args) values i))
 
                          ((&rest &body)
                           (when (or rest? key? aux?)
-                            (error "Invalid &REST/&BODY"))
+                            (error/wp "Invalid &REST/&BODY"))
                           (let ((thisarg (cadr args)))
                             (unless thisarg
-                              (error "Missing variable name for &REST"))
+                              (error/wp "Missing variable name for &REST"))
                             (add thisarg values))
                           (rec nil t nil nil (cddr args) values i))
 
                          (&key
                           (when (or key? aux?)
-                            (error "Invalid &KEY"))
+                            (error/wp "Invalid &KEY"))
                           (rec nil nil t nil (cdr args) values i))
 
                          (&aux
                           (when aux?
-                            (error "Invalid &AUX"))
+                            (error/wp "Invalid &AUX"))
                           (rec nil nil nil t (cdr args) values i))
 
                          (t
                           (when (%memq thisarg names)
-                            (error (strcat "Argument seen twice: " thisarg)))
+                            (error/wp (strcat "Argument seen twice: " thisarg)))
                           (push thisarg names)
                           (cond
                             (optional?
@@ -906,13 +916,13 @@
                          (aux? (let ((thisarg (car thisarg))
                                      (value (cadr thisarg)))
                                  (add thisarg value)))
-                         (rest? (error "Invalid argument list following &REST/&BODY"))
+                         (rest? (error/wp "Invalid argument list following &REST/&BODY"))
                          (t
                           (let ((sublist (gensym)))
-                            (add sublist `(if ,values (%pop ,values) (error "Missing sublist")))
+                            (add sublist `(if ,values (%pop ,values) (%dbind-error-missing-sublist)))
                             (rec nil nil nil nil thisarg sublist 0))))
                        (rec optional? rest? key? aux? (cdr args) values (1+ i))))))
-                 (t (error "Invalid lambda-list"))))))
+                 (t (error/wp "Invalid lambda-list"))))))
         (rec nil nil nil nil args topv 0))
       `(let* ((,topv ,values) ,@(nreverse decls))
          ,@body))))
@@ -922,7 +932,7 @@
 
 (defmacro defmacro (name lambda-list . body)
   (when (%primitivep name)
-    (error (strcat "We shall not DEFMACRO on " name " (primitive function)")))
+    (error/wp (strcat "We shall not DEFMACRO on " name " (primitive function)")))
   (%::maybe-xref-info name 'defmacro)
   (if (ordinary-lambda-list-p lambda-list)
       `(%macro! ',name (%::%fn ,name ,lambda-list ,@body))
@@ -1154,7 +1164,7 @@
 
 (labels
     ((assert (p msg)
-       (if p p (error msg)))
+       (if p p (error/wp msg)))
 
      (arg-count (x min &optional max)
        (if max
@@ -1465,7 +1475,7 @@
                  (gen "GLPOP" name)
                  (aif (find-var name env)
                       (if (eq :smac (caddr it))
-                          (error "%POP called on symbol macro: " name)
+                          (error/wp "%POP called on symbol macro: " name)
                           (gen "LPOP" (car it) (cadr it)))
                       (gen "GLPOP" (unknown-variable name env))))
              (unless val? (gen "POP"))
@@ -1642,7 +1652,7 @@
                 (regexpp f)
                 (charp f)
                 (vectorp f))
-            (error (strcat f " is not a function")))
+            (error/wp (strcat f " is not a function")))
            ((and local (symbolp f))
             (let ((localfun (find-func f env)))
               (cond
@@ -1674,12 +1684,12 @@
          ((null args) (gen "ARGS" n))
          ((symbolp args)
           (when (%memq args names)
-            (error (strcat "Duplicate function argument " args)))
+            (error/wp (strcat "Duplicate function argument " args)))
           (gen "ARG_" n))
          ((lambda-keyword-p (car args))
           (throw '$xargs '$xargs))
          ((%memq (car args) names)
-          (error (strcat "Duplicate function argument " (car args))))
+          (error/wp (strcat "Duplicate function argument " (car args))))
          ((gen-simple-args (cdr args)
                            (1+ n)
                            (cons (car args) names)))))
@@ -1783,12 +1793,12 @@
                                         (setq x (car x)))
                                  (if vars?
                                      (push nil vals)
-                                     (error "Malformed LABELS/FLET/MACROLET")))
+                                     (error/wp "Malformed LABELS/FLET/MACROLET")))
                              (unless vars?
                                (setq x (function-name x)))
                              (when (and (not vars?)
                                         (%memq x names))
-                               (error "Duplicate name in LABELS/FLET/MACROLET"))
+                               (error/wp "Duplicate name in LABELS/FLET/MACROLET"))
                              (push x names)))
          (list (nreverse names) (nreverse vals))))
 

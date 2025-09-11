@@ -799,6 +799,7 @@ function strcat(m, n) {
             ret = arg + ret;
             break;
           default:
+            if (arg === false) continue;
             if (LispChar.is(arg)) ret = arg.value + ret;
             else if (LispSymbol.is(arg)) ret = LispSymbol.symname(arg) + ret;
             else if (LispPackage.is(arg)) ret = arg.name + ret;
