@@ -9,8 +9,8 @@
           substitute substitute-if substitute-if-not
           nsubstitute nsubstitute-if nsubstitute-if-not
           remove-duplicates delete-duplicates
-          intersection set-difference
-          butlast subseq))
+          intersection union set-difference
+          butlast sublis subseq))
 
 (defpackage :sl-seq
   (:use :sl :%))
@@ -188,6 +188,17 @@
       (when (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
+(defun union (list1 list2 &key key test test-not)
+  (multiple-value-bind (list1 list2)
+                       (if (< (length list1) (length list2))
+                           (values list2 list1)
+                           (values list1 list2))
+    (let ((test (make-subject-test test test-not key t))
+          (res list2))
+      (dolist (item list1 res)
+        (when (notany (lambda (el) (funcall test item el)) list2)
+          (push item res))))))
+
 (defun set-difference (list1 list2 &key key test test-not)
   (let ((test (make-subject-test test test-not key t))
         (res nil))
@@ -353,3 +364,12 @@
 (defun subseq (list start &optional end)
   (with-list-frobnicator (:has-from-end nil)
     :collect el))
+
+;; (defun sublis (alist tree &key key test test-not)
+;;   (setf test (make-subject-test test test-not key nil))
+;;   (let rec ((tree tree))
+;;     (when tree
+;;       (let* ((el (car tree))
+;;              (match (some (lambda (cell)
+;;                             (funcall test el (car cell)))
+;;                           alist)))))))

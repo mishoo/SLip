@@ -62,6 +62,7 @@
   (load "test/cons/pop.lisp")
   (load "test/cons/push.lisp")
   (load "test/cons/pushnew.lisp")
+  (load "test/cons/union.lisp")
 
   (load "test/seq/count.lisp")
   (load "test/seq/count-if.lisp")

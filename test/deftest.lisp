@@ -15,7 +15,7 @@
   (%:maybe-xref-info name 'deftest)
   (let ((notes
          (loop while (keywordp (car args))
-               collect (cons (pop args) (pop args)))))
+               nconc (list (pop args) (pop args)))))
     (destructuring-bind (form &rest expected) args
       (let* ((val (gensym))
              (exp (gensym))
@@ -50,32 +50,39 @@
                     ,(when notes
                        `(format t "    ~A~%" ',notes))
                     ,ok)))
-           (setf (getf *tests* ',name) #',name))))))
+           (setf (getf *tests* ',name) (%:make-hash :func #',name :notes ',notes))
+           ',name)))))
 
 (defun get-test (name)
   (getf *tests* name))
 
 (defun test (name)
-  (funcall (get-test name)))
+  (funcall (gethash :func (get-test name))))
 
-(defun run-tests (&optional match-name)
+(defun run-tests (&optional match-name &key all)
   (let ((*compile-time* 0)
         (*run-time* 0))
-    (let ((tests (if match-name
-                     (loop for (name func) on *tests* by #'cddr
-                           when (regexp-test match-name (symbol-name name))
-                           nconc (list name func))
-                     *tests*)))
-      (loop for (func name) on (reverse tests) by #'cddr
-            for test from 1
-            for ok = (funcall func)
-            counting ok into success
-            summing *compile-time* into compile-time
-            summing *run-time* into run-time
-            finally (format t "~A tests, ~A OK~%Compile time: ~,2Fms~%Run time: ~,2Fms~%"
-                            test success
-                            compile-time run-time))
-      'done)))
+    (loop with ok
+          for (test name) on (reverse *tests*) by #'cddr
+          for index from 1
+          for notes = (gethash :notes test)
+          when (or all
+                   (and match-name
+                        (regexp-test match-name (symbol-name name)))
+                   (and (not match-name)
+                        (not (getf notes :slow))))
+          do (setf ok (funcall (gethash :func test)))
+          and count ok into success
+          and count (not ok) into failed
+          and sum *compile-time* into compile-time
+          and sum *run-time* into run-time
+          else count test into skipped
+          finally (format t "~A tests, ~A OK, ~A skipped, ~A FAILED~%~
+                             Compile time: ~,2Fms~%~
+                             Run time: ~,2Fms~%"
+                          index success skipped failed
+                          compile-time run-time))
+    'done))
 
 ;;;; utils from ansi-test
 
@@ -173,3 +180,69 @@
               ,form))
        (eq (%f) (%f)))
      nil))
+
+(defun union-with-check (x y &key test test-not)
+  (let ((xcopy (make-scaffold-copy x))
+        (ycopy (make-scaffold-copy y)))
+    (let ((result (cond
+                   (test (union x y :test test))
+                   (test-not (union x y :test-not test-not))
+                   (t (union x y)))))
+      (if (and (check-scaffold-copy x xcopy)
+               (check-scaffold-copy y ycopy))
+          result
+        'failed))))
+
+(defun union-with-check-and-key (x y key &key test test-not)
+  (let ((xcopy (make-scaffold-copy x))
+        (ycopy (make-scaffold-copy y)))
+    (let ((result  (cond
+                   (test (union x y :key key :test test))
+                   (test-not (union x y :key key :test-not test-not))
+                   (t (union x y :key key)))))
+      (if (and (check-scaffold-copy x xcopy)
+               (check-scaffold-copy y ycopy))
+          result
+        'failed))))
+
+(defun check-union (x y z)
+  (and (listp x)
+       (listp y)
+       (listp z)
+       (loop for e in z always (or (member e x) (member e y)))
+       (loop for e in x always (member e z))
+       (loop for e in y always (member e z))
+       t))
+
+(defun split-list (x)
+  (cond
+    ((null x) (values nil nil))
+    ((null (cdr x)) (values x nil))
+    (t
+     (multiple-value-bind
+         (y z)
+         (split-list (cddr x))
+       (values (cons (car x) y) (cons (cadr x) z))))))
+
+(defun shuffle (x)
+  (cond
+   ((null x) nil)
+   ((null (cdr x)) x)
+   (t
+    (multiple-value-bind
+        (y z)
+        (split-list x)
+      (append (shuffle y) (shuffle z))))))
+
+(defun do-random-unions (size niters &optional (maxelem (* 2 size)))
+  (let ()
+    (loop
+     for i from 1 to niters do
+     (let ((x (shuffle (loop for j from 1 to size collect
+                             (random maxelem))))
+           (y (shuffle (loop for j from 1 to size collect
+                             (random maxelem)))))
+       (let ((z (union x y)))
+         (let ((is-good (check-union x y z)))
+           (unless is-good (return (values x y z)))))))
+    nil))
