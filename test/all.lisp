@@ -62,7 +62,9 @@
   (load "test/cons/pop.lisp")
   (load "test/cons/push.lisp")
   (load "test/cons/pushnew.lisp")
+  (load "test/cons/intersection.lisp")
   (load "test/cons/union.lisp")
+  (load "test/cons/set-difference.lisp")
 
   (load "test/seq/count.lisp")
   (load "test/seq/count-if.lisp")
@@ -80,6 +82,7 @@
   (load "test/seq/nsubstitute-if.lisp")
   (load "test/seq/nsubstitute-if-not.lisp")
 
-  (format t "Network time: ~,2Fms~%Compile time: ~,2Fms~%"
+  (format t "Network time: ~,2Fms~%~
+             Compile time: ~,2Fms~%"
           (car timing)
           (cadr timing)))
