@@ -1228,7 +1228,7 @@ defp("make-hash", false, function(m, nargs){
 
 defp("gethash", false, function(m, nargs){
     checknargs(nargs, 2, 3);
-    var def = (nargs == 3) ? m.pop() : false;
+    var def = (nargs === 3) ? m.pop() : false;
     var hash = m.pop(), key = m.pop();
     checktype(hash, LispHash);
     var exists = hash.has(key);
