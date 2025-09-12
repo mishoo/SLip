@@ -4,7 +4,8 @@
           assoc assoc-if assoc-if-not
           rassoc rassoc-if rassoc-if-not
           intersection union set-difference
-          butlast sublis))
+          subst-if subst-if-not subst
+          sublis butlast))
 
 (defpackage :sl-list
   (:use :sl :%))
@@ -134,6 +135,28 @@
     (dolist (item list1 res)
       (unless (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
+
+(defun subst-if (new predicate tree &key key)
+  (update-for-key predicate key)
+  (let rec ((tree tree))
+    (cond
+      ((funcall predicate tree)
+       new)
+      ((atom tree)
+       tree)
+      ((let ((car (rec (car tree)))
+             (cdr (rec (cdr tree))))
+         (if (and (eql car (car tree))
+                  (eql cdr (cdr tree)))
+             tree
+             (cons car cdr)))))))
+
+(defun subst-if-not (new predicate tree &rest args)
+  (apply #'subst-if new (complement predicate) tree args))
+
+(defun subst (new item tree &key key test test-not)
+  (setf test (make-subject-test test test-not key nil))
+  (subst-if new (lambda (el) (funcall test item el)) tree))
 
 (defun sublis (alist tree &key key test test-not)
   (setf test (make-subject-test test test-not key nil))

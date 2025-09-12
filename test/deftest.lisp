@@ -335,3 +335,22 @@
        (check-scaffold-copy a acopy)
        (check-scaffold-copy al alcopy)
        as))))
+
+(defun check-subst (new old tree &key (key 'no-key) test test-not)
+  "Call subst new old tree, with keyword arguments if present.
+   Check that the arguments are not changed."
+  (setf new (copy-tree new))
+  (setf old (copy-tree old))
+  (setf tree (copy-tree tree))
+  (let ((newcopy (make-scaffold-copy new))
+        (oldcopy (make-scaffold-copy old))
+        (treecopy (make-scaffold-copy tree)))
+    (let ((result
+           (apply #'subst new old tree
+                  `(,@(unless (eqt key 'no-key) `(:key ,key))
+                    ,@(when test `(:test ,test))
+                    ,@(when test-not `(:test-not ,test-not))))))
+      (and (check-scaffold-copy new newcopy)
+           (check-scaffold-copy old oldcopy)
+           (check-scaffold-copy tree treecopy)
+           result))))
