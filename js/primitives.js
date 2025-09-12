@@ -950,11 +950,11 @@ defp("letterp", false, function(m, nargs){
     defp("string" + name, false, function(m, nargs){
         // string ops
         checknargs(nargs, 1);
-        let prev = m.pop();
+        let prev = as_string(m.pop());
         checktype(prev, LispString);
         let ret = true;
         while (--nargs > 0) {
-            let el = m.pop();
+            let el = as_string(m.pop());
             checktype(el, LispString);
             if (ret && !cmp(el, prev)) ret = false;
             prev = el;
