@@ -65,6 +65,7 @@
   (load "test/cons/acons.lisp")
   (load "test/cons/pairlis.lisp")
   (load "test/cons/butlast.lisp")
+  (load "test/cons/sublis.lisp")
   (load "test/cons/assoc.lisp")
   (load "test/cons/assoc-if.lisp")
   (load "test/cons/assoc-if-not.lisp")

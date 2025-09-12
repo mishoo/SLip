@@ -317,3 +317,21 @@
      (cons nil (rev-assoc-list (cdr x))))
     (t
      (acons (cdar x) (caar x) (rev-assoc-list (cdr x))))))
+
+(defun check-sublis (a al &key (key 'no-key) test test-not)
+  "Apply sublis al a with various keys.  Check that
+   the arguments are not themselves changed.  Return nil
+   if the arguments do get changed."
+  (setf a (copy-tree a))
+  (setf al (copy-tree al))
+  (let ((acopy (make-scaffold-copy a))
+        (alcopy (make-scaffold-copy al)))
+    (let ((as
+           (apply #'sublis al a
+                  `(,@(when test `(:test ,test))
+                    ,@(when test-not `(:test-not ,test-not))
+                    ,@(unless (eqt key 'no-key) `(:key ,key))))))
+      (and
+       (check-scaffold-copy a acopy)
+       (check-scaffold-copy al alcopy)
+       as))))

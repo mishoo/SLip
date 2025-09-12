@@ -135,6 +135,21 @@
       (unless (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
+(defun sublis (alist tree &key key test test-not)
+  (setf test (make-subject-test test test-not key nil))
+  (let rec ((tree tree))
+    (cond
+      ((aif (assoc-if (lambda (key) (funcall test key tree)) alist)
+            (cdr it)))
+      ((atom tree)
+       tree)
+      ((let ((car (rec (car tree)))
+             (cdr (rec (cdr tree))))
+         (if (and (eql car (car tree))
+                  (eql cdr (cdr tree)))
+             tree
+             (cons car cdr)))))))
+
 ;;; the following two are (slightly modified) from SBCL (list.lisp)
 
 ;; like NTHCDR but doesn't fail on dotted lists

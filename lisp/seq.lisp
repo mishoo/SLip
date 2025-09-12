@@ -266,12 +266,3 @@
   (with-list-frobnicator (:from-end nil :alt newseq :replace t)
     :do (replace-with newseq-el)
     :finally (return newseq)))
-
-;; (defun sublis (alist tree &key key test test-not)
-;;   (setf test (make-subject-test test test-not key nil))
-;;   (let rec ((tree tree))
-;;     (when tree
-;;       (let* ((el (car tree))
-;;              (match (some (lambda (cell)
-;;                             (funcall test el (car cell)))
-;;                           alist)))))))
