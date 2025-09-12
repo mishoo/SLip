@@ -309,3 +309,11 @@
          (let ((is-good (check-set-difference x y z)))
            (unless is-good (return (values x y z)))))))
     nil))
+
+(defun rev-assoc-list (x)
+  (cond
+    ((null x) nil)
+    ((null (car x))
+     (cons nil (rev-assoc-list (cdr x))))
+    (t
+     (acons (cdar x) (caar x) (rev-assoc-list (cdr x))))))
