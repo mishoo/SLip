@@ -52,58 +52,45 @@
       (when (funcall test el)
         (elements el)))))
 
-(defun remove-if (predicate list &key key count from-end)
+(defun remove-if (predicate list &key key (start 0) end count from-end)
   (update-for-key predicate key)
   (cond
     (count
      (cond
        (from-end
-        (nreverse (remove-if predicate (reverse list) :key key :count count)))
+        (let* ((index (length list))
+               (end (or end index)))
+          (nreverse
+           (collect-if (lambda (x)
+                         (or (< (decf index) start)
+                             (and end (>= index end))
+                             (not (funcall predicate x))
+                             (<= count 0)
+                             (progn (decf count) nil)))
+                       (reverse list)))))
        (t
-        (collect-if (lambda (x)
-                      (or (not (funcall predicate x))
-                          (<= count 0)
-                          (progn (decf count) nil)))
-                    list))))
+        (let ((index -1))
+          (collect-if (lambda (x)
+                        (or (< (incf index) start)
+                            (and end (>= index end))
+                            (not (funcall predicate x))
+                            (<= count 0)
+                            (progn (decf count) nil)))
+                      list)))))
     (t
-     (collect-if (lambda (x)
-                   (not (funcall predicate x))) list))))
+     (let ((index -1))
+       (collect-if (lambda (x)
+                     (or (< (incf index) start)
+                         (and end (>= index end))
+                         (not (funcall predicate x)))) list)))))
 
-(defun remove-if-not (predicate list &key key count from-end)
-  (update-for-key predicate key)
-  (cond
-    (count
-     (cond
-       (from-end
-        (nreverse (remove-if predicate (reverse list) :key key :count count)))
-       (t
-        (collect-if (lambda (x)
-                      (or (funcall predicate x)
-                          (<= count 0)
-                          (progn (decf count) nil)))
-                    list))))
-    (t
-     (collect-if (lambda (x)
-                   (funcall predicate x)) list))))
+(defun remove-if-not (predicate list &rest args)
+  (apply #'remove-if (complement predicate) list args))
 
-(defun remove (item list &key key test test-not count from-end)
-  (cond
-    (count
-     (cond
-       (from-end
-        (nreverse (remove item (reverse list)
-                          :test test :test-not test-not :key key :count count)))
-       (t
-        (setf test (make-subject-test test test-not key nil))
-        (collect-if (lambda (x)
-                      (or (not (funcall test item x))
-                          (<= count 0)
-                          (progn (decf count) nil)))
-                    list))))
-    (t
-     (setf test (make-subject-test test test-not key nil))
-     (collect-if (lambda (x)
-                   (not (funcall test item x))) list))))
+(defun remove (item list &key key test test-not (start 0) end count from-end)
+  (setf test (make-subject-test test test-not key nil))
+  (remove-if (lambda (el) (funcall test item el)) list
+             :start start :end end :count count :from-end from-end))
 
 (defun %erase-if (list predicate)
   (let* ((ret (cons nil list))
