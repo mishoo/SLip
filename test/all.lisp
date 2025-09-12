@@ -62,6 +62,8 @@
   (load "test/cons/pop.lisp")
   (load "test/cons/push.lisp")
   (load "test/cons/pushnew.lisp")
+  (load "test/cons/acons.lisp")
+  (load "test/cons/pairlis.lisp")
   (load "test/cons/assoc.lisp")
   (load "test/cons/assoc-if.lisp")
   (load "test/cons/assoc-if-not.lisp")
@@ -87,6 +89,7 @@
   (load "test/seq/nsubstitute.lisp")
   (load "test/seq/nsubstitute-if.lisp")
   (load "test/seq/nsubstitute-if-not.lisp")
+  (load "test/seq/subseq.lisp")
 
   (format t "Network time: ~,2Fms~%~
              Compile time: ~,2Fms~%"

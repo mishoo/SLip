@@ -1,6 +1,6 @@
 (in-package :sl)
 
-(export '(acons
+(export '(acons pairlis
           assoc assoc-if assoc-if-not
           rassoc rassoc-if rassoc-if-not
           intersection union set-difference
@@ -15,6 +15,12 @@
 
 (defun acons (key datum alist)
   (cons (cons key datum) alist))
+
+(defun pairlis (keys data &optional alist)
+  (do ((keys keys (cdr keys))
+       (data data (cdr data))
+       (result alist (acons (car keys) (car data) result)))
+      ((or (null keys) (null data)) result)))
 
 (defconstant *default-test* (list #'eql #'eq 'eql 'eq))
 (defconstant *default-key* (list #'identity 'identity))
