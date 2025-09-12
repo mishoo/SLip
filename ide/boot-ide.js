@@ -107,7 +107,7 @@ import "../js/primitives.js";
         if (!nosave) log(`<b>Compiling ${filename}</b>`);
         var bytecode = machine.atomic_call(LispSymbol.get("%LOAD").function, [ filename ]);
         if (!nosave) {
-            log(`... <span style='color: green'>${performance.now() - time}ms, ${bytecode.length} chars</span>`);
+            log(`... <span style='color: green'>${(performance.now() - time).toFixed(2)}ms, ${bytecode.length} chars</span>`);
             var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
             save(fasl, bytecode, function(error){
                 if (error) {
