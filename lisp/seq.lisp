@@ -224,8 +224,7 @@
                        ,@(if tail
                              `(for ,tail on froblist for el = (car ,tail))
                              `(for el in froblist))
-                       for index downfrom (1- end)
-                       while (>= index start)
+                       for index downfrom (1- end) to start
                        ,@body))
                 (t
                  (loop with len = (length list)
@@ -233,8 +232,7 @@
                        ,@(if tail
                              `(for ,tail on list for el = (car ,tail))
                              `(for el in list))
-                       for index downfrom (1- len)
-                       while (>= index start)
+                       for index downfrom (1- len) to start
                        ,@body)))))
          (t
           (cond
@@ -245,8 +243,7 @@
                          `(for el in froblist))
                    ,@(when alt
                        `(for ,alt-el in ,alt))
-                   for index from start
-                   while (< index end)
+                   for index from start below end
                    ,@body))
             (t
              (loop with froblist = (nthcdr start list)
@@ -308,7 +305,9 @@
                (funcall predicate el))
     :do (progn
           (replace-with newitem)
-          (when count (decf count)))
+          (when count
+            (unless (plusp (decf count))
+              (return (if from-end (nreverse list) list)))))
     :finally (return (if from-end (nreverse list) list))))
 
 (defun substitute-if-not (newitem predicate list &rest args)
@@ -325,7 +324,9 @@
                (funcall test item el))
     :do (progn
           (replace-with newitem)
-          (when count (decf count)))
+          (when count
+            (unless (plusp (decf count))
+              (return (if from-end (nreverse list) list)))))
     :finally (return (if from-end (nreverse list) list))))
 
 (defun nsubstitute-if (newitem predicate list &rest args)
