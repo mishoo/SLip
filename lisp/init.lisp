@@ -880,10 +880,9 @@
      (error "SETF ELT: Unknown sequence"))))
 
 (defun copy-tree (tree)
-  (if (consp tree)
+  (if (atom tree) tree
       (cons (copy-tree (car tree))
-            (copy-tree (cdr tree)))
-      tree))
+            (copy-tree (cdr tree)))))
 
 (defun (setf cadr) (value list)
   (setf (car (cdr list)) value))
@@ -901,17 +900,16 @@
                (push `(,name (cdr ,vlist)) syms)
                (when vadd
                  (push `(,vadd (el)
-                         (setq ,vtail (setf (cdr ,vtail) (cons el nil))))
+                         `(setq ,',vtail (setf (cdr ,',vtail) (cons ,el nil))))
                        adders))
                (when vconc
                  (push `(,vconc (lst)
-                         (setq ,vtail (last (setf (cdr ,vtail) lst))))
+                         `(setq ,',vtail (last (setf (cdr ,',vtail) ,lst))))
                        adders)))))
       (foreach names #'mk-collector)
-      `(let (,@(mapcar (lambda (name) `(,name (list nil)))
-                       lists))
+      `(let (,@(mapcar (lambda (name) `(,name (list nil))) lists))
          (let (,@(mapcar #'list tails lists))
-           (flet (,@adders)
+           (macrolet (,@adders)
              (symbol-macrolet (,@syms)
                ,@body)))))))
 
@@ -920,9 +918,9 @@
     (dolist (place places)
       (multiple-value-bind (place-temps place-vals place-stores place-set place-get)
                            (get-setf-expansion place)
-        (foreach place-temps #'temp-vars)
-        (foreach place-vals #'temp-vals)
-        (foreach (cdr place-stores) #'store-other-vars)
+        (dolist (el place-temps) (temp-vars el))
+        (dolist (el place-vals) (temp-vals el))
+        (dolist (el (cdr place-stores)) (store-other-vars el))
         (store-main-vars (car place-stores))
         (setters place-set)
         (getters place-get)))
