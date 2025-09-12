@@ -63,18 +63,18 @@
    :key nil)
   (2 2 b b))
 
-;; (deftest sublis.9
-;;   (check-sublis  (list 0 3 8 20)
-;;                  '((1 . x) (5 . y) (10 . z))
-;;                 :test #'(lambda (x y) (and (realp x) (realp y) (< x y))))
-;;   (x y z 20))
+(deftest sublis.9
+  (check-sublis  (list 0 3 8 20)
+                 '((1 . x) (5 . y) (10 . z))
+                 :test #'(lambda (x y) (and (numberp x) (numberp y) (< x y))))
+  (x y z 20))
 
-;; (deftest sublis.10
-;;   (check-sublis  (list 0 3 8 20)
-;;                  '((1 . x) (5 . y) (10 . z))
-;;                 :test-not
-;;                 #'(lambda (x y) (not (and (realp x) (realp y) (< x y)))))
-;;   (x y z 20))
+(deftest sublis.10
+  (check-sublis  (list 0 3 8 20)
+                 '((1 . x) (5 . y) (10 . z))
+                 :test-not
+                 #'(lambda (x y) (not (and (numberp x) (numberp y) (< x y)))))
+  (x y z 20))
 
 (defharmless sublis.test-and-test-not.1
   (sublis '((a . 1) (b . 2)) (list 'a 'b 'c 'd)

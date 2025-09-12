@@ -44,22 +44,32 @@
     (setf key nil))
   (if key
       (if test
-          (if key-subject
-              (lambda (subject el)
-                (funcall test
-                         (funcall key subject)
-                         (funcall key el)))
-              (lambda (subject el)
-                (funcall test
-                         subject
-                         (funcall key el))))
-          (if key-subject
-              (lambda (subject el)
-                (eq (funcall key subject)
-                    (funcall key el)))
-              (lambda (subject el)
-                (eq subject
-                    (funcall key el)))))
+          (cond
+            ((eq key-subject :only)
+             (lambda (subject el)
+               (funcall test
+                        (funcall key subject)
+                        el)))
+            (key-subject
+             (lambda (subject el)
+               (funcall test
+                        (funcall key subject)
+                        (funcall key el))))
+            ((lambda (subject el)
+               (funcall test
+                        subject
+                        (funcall key el)))))
+          (cond
+            ((eq key-subject :only)
+             (lambda (subject el)
+               (eq (funcall key subject) el)))
+            (key-subject
+             (lambda (subject el)
+               (eq (funcall key subject)
+                   (funcall key el))))
+            ((lambda (subject el)
+               (eq subject
+                   (funcall key el))))))
       (or test #'eq)))
 
 (define-compiler-macro assoc (&whole form item lst &key test test-not key)
@@ -159,10 +169,10 @@
   (subst-if new (lambda (el) (funcall test item el)) tree))
 
 (defun sublis (alist tree &key key test test-not)
-  (setf test (make-subject-test test test-not key nil))
+  (setf test (make-subject-test test test-not key :only))
   (let rec ((tree tree))
     (cond
-      ((aif (assoc-if (lambda (key) (funcall test key tree)) alist)
+      ((aif (assoc-if (lambda (el) (funcall test tree el)) alist)
             (cdr it)))
       ((atom tree)
        tree)
