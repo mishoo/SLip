@@ -1,6 +1,7 @@
 (in-package :sl)
 
-(export '(intersection union set-difference butlast sublis))
+(export '(assoc assoc-if assoc-if-not
+          intersection union set-difference butlast sublis))
 
 (defpackage :sl-list
   (:use :sl :%))
@@ -49,7 +50,34 @@
       (or test #'eq)))
 
 (defun assoc (item list &key key test test-not)
-  (setf test (make-subject-test test test-not key)))
+  (setf test (make-subject-test test test-not key nil))
+  (cond
+    ((eq test #'eq)
+     (%:%assq item list))
+    ((dolist (pair list)
+       (when (and pair (funcall test item (car pair)))
+         (return pair))))))
+
+(define-compiler-macro assoc (&whole form item lst &key test test-not key)
+  (cond
+    ((and (not test-not)
+          (or (not test) (member test sl::+member-safe-test+ :test #'equal))
+          (or (not key) (member key sl::+member-safe-key+ :test #'equal)))
+     `(%:%assq ,item ,lst))
+    (t form)))
+
+(defun assoc-if (predicate list &key key)
+  (update-for-key predicate key)
+  (dolist (pair list)
+    (when (and pair (funcall predicate (car pair)))
+      (return pair))))
+
+(defun assoc-if-not (predicate list &key key)
+  (update-for-key predicate key)
+  (dolist (pair list)
+    (when pair
+      (unless (funcall predicate (car pair))
+        (return pair)))))
 
 (defun intersection (list1 list2 &key key test test-not)
   (let ((test (make-subject-test test test-not key t))

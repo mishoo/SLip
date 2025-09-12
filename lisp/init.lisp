@@ -20,7 +20,7 @@
           tagbody go block return return-from
           *package* *read-table*
           elt rplaca rplacd nth nthcdr last reverse nreverse append nconc nreconc revappend
-          char-name char-code name-char code-char upcase downcase
+          char schar char-name char-code name-char code-char upcase downcase string-upcase string-downcase
           charp char= char< char<= char> char>= char/= letterp digitp
           stringp string= string< string<= string> string>= string/=
           char-equal char-not-equal char-lessp char-greaterp char-not-lessp char-not-greaterp
@@ -718,13 +718,14 @@
                lst
                (rec (cdr lst)))))))))
 
+(defconstant +member-safe-test+ (list `#'eql #'eql `#'eq #'eq 'eql 'eq ''eql ''eq))
+(defconstant +member-safe-key+ (list `#'identity #'identity 'identity ''identity))
+
 (define-compiler-macro member (&whole form item lst &key test test-not key)
   (cond
     ((and (not test-not)
-          (or (not test) (member test (list `#'eql #'eql `#'eq #'eq 'eql 'eq ''eql ''eq)
-                                 :test #'equal))
-          (or (not key) (member key (list `#'identity #'identity 'identity ''identity)
-                                :test #'equal)))
+          (or (not test) (member test +member-safe-test+ :test #'equal))
+          (or (not key) (member key +member-safe-key+ :test #'equal)))
      `(%:%memq ,item ,lst))
     (t form)))
 

@@ -493,8 +493,10 @@ defp("%assq", false, function(m, nargs){
     var list = m.pop(), item = m.pop();
     while (list !== false) {
         checktype(list, LispList);
-        checktype(list.car, LispCons);
-        if (eq(list.car.car, item)) return list.car;
+        if (list.car !== false) {
+            checktype(list.car, LispCons);
+            if (eq(list.car.car, item)) return list.car;
+        }
         list = list.cdr;
     }
     return false;
@@ -737,6 +739,17 @@ defp("svref", false, function(m, nargs){
     return index >= 0 && index < vector.length ? vector[index] : false;
 });
 
+function schar(m, nargs){
+    checknargs(nargs, 2, 2);
+    let index = m.pop(), string = m.pop();
+    checktype(index, LispNumber);
+    checktype(string, LispString);
+    return index >= 0 && index < string.length ? LispChar.get(string.charAt(index)) : false;
+}
+
+defp("char", false, schar);
+defp("schar", false, schar);
+
 defp("vector-set", true, function(m, nargs){
     checknargs(nargs, 3, 3);
     var index = m.pop(), vector = m.pop(), val = m.pop();
@@ -836,6 +849,16 @@ defp("upcase", false, function(m, nargs){
     if (LispString.is(x)) return x.toUpperCase();
     if (LispChar.is(x)) return LispChar.get(x.value.toUpperCase());
     error("Unsupported argument type");
+});
+
+defp("string-downcase", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispString).toLowerCase();
+});
+
+defp("string-upcase", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispString).toUpperCase();
 });
 
 defp("char-name", false, function(m, nargs){
