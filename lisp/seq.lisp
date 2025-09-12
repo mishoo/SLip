@@ -9,15 +9,16 @@
           substitute substitute-if substitute-if-not
           nsubstitute nsubstitute-if nsubstitute-if-not
           remove-duplicates delete-duplicates
-          intersection union set-difference
-          butlast sublis subseq))
+          subseq))
 
 (defpackage :sl-seq
   (:use :sl :%))
 
 (in-package :sl-seq)
 
-(import '(sl::with-collectors))
+(import '(sl::with-collectors
+          sl-list::make-subject-test
+          sl-list::update-for-key))
 
 (defun merge (a b predicate)
   (let* ((ret (list nil))
@@ -50,49 +51,6 @@
     (dolist (el list elements)
       (when (funcall test el)
         (elements el)))))
-
-(defconstant *default-test* (list #'eql #'eq 'eql 'eq))
-(defconstant *default-key* (list #'identity 'identity))
-
-(defun make-subject-test (test test-not key key-subject)
-  (cond
-    (test-not
-     (when test
-       (error "Both TEST and TEST-NOT are supplied"))
-     (setf test (complement test-not)))
-    ((member test *default-test*)
-     (setf test nil)))
-  (when (member key *default-key*)
-    (setf key nil))
-  (if key
-      (if test
-          (if key-subject
-              (lambda (subject el)
-                (funcall test
-                         (funcall key subject)
-                         (funcall key el)))
-              (lambda (subject el)
-                (funcall test
-                         subject
-                         (funcall key el))))
-          (if key-subject
-              (lambda (subject el)
-                (eq (funcall key subject)
-                    (funcall key el)))
-              (lambda (subject el)
-                (eq subject
-                    (funcall key el)))))
-      (if test
-          (lambda (subject el)
-            (funcall test subject el))
-          (lambda (subject el)
-            (eq subject el)))))
-
-(defmacro update-for-key (predicate key)
-  `(when (and ,key (not (member ,key *default-key*)))
-     (setf ,predicate (let ((p ,predicate))
-                        (lambda (item)
-                          (funcall p (funcall ,key item)))))))
 
 (defun remove-if (predicate list &key key count from-end)
   (update-for-key predicate key)
@@ -180,31 +138,6 @@
   (unless from-end (setf list (nreverse list)))
   (%delete-duplicates list (make-subject-test test test-not key t))
   (if from-end list (nreverse list)))
-
-(defun intersection (list1 list2 &key key test test-not)
-  (let ((test (make-subject-test test test-not key t))
-        (res nil))
-    (dolist (item list1 res)
-      (when (some (lambda (el) (funcall test item el)) list2)
-        (push item res)))))
-
-(defun union (list1 list2 &key key test test-not)
-  (multiple-value-bind (list1 list2)
-                       (if (< (length list1) (length list2))
-                           (values list2 list1)
-                           (values list1 list2))
-    (let ((test (make-subject-test test test-not key t))
-          (res list2))
-      (dolist (item list1 res)
-        (when (notany (lambda (el) (funcall test item el)) list2)
-          (push item res))))))
-
-(defun set-difference (list1 list2 &key key test test-not)
-  (let ((test (make-subject-test test test-not key t))
-        (res nil))
-    (dolist (item list1 res)
-      (unless (some (lambda (el) (funcall test item el)) list2)
-        (push item res)))))
 
 (defmacro with-list-frobnicator ((&key replace (from-end t) alt) &body body)
   (let* ((tail (when replace (gensym "tail")))
@@ -337,35 +270,6 @@
 
 (defun nsubstitute (newitem item list &rest args)
   (apply #'substitute newitem item list :destructive t args))
-
-
-
-;;; the following two are (slightly modified) from SBCL (list.lisp)
-
-;; like NTHCDR but doesn't fail on dotted lists
-(defun dotted-nthcdr (n list)
-  (do ((i n (1- i))
-       (result list (cdr result)))
-      ((not (plusp i)) result)
-    (when (atom result)
-      (return nil))))
-
-(defun butlast (list &optional (n 1))
-  (cond
-    ((zerop n)
-     (copy-list list))
-    (t
-     (let ((head (dotted-nthcdr n list)))
-       (and (consp head)                      ; there are at least n
-            (with-collectors (copy)           ; conses; copy!
-              (do ((trail list (cdr trail))
-                   (head head (cdr head)))
-                  ;; HEAD is n conses ahead of TRAIL;
-                  ;; when HEAD is NIL (or not a cons), return
-                  ;; the data copied so far.
-                  ((atom head)
-                   copy)
-                (copy (car trail)))))))))
 
 (defun subseq (list start &optional end)
   (with-list-frobnicator (:from-end nil)

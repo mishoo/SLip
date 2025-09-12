@@ -2144,6 +2144,7 @@
         "lisp/format.lisp"
         "lisp/struct.lisp"
         "lisp/loop.lisp"
+        "lisp/list.lisp"
         "lisp/seq.lisp"
         "lisp/tiny-clos.lisp"
         "lisp/printer.lisp"
