@@ -71,7 +71,7 @@
 
           define-modify-macro macroexpand-1 macroexpand defpackage in-package
           defparameter defvar defconstant defglobal every some notany notevery defsetf
-          define-setf-expander get-setf-expansion setf psetf push pop
+          define-setf-expander get-setf-expansion setf psetf psetq push pop
           define-compiler-macro incf decf dolist dotimes do do* complement adjoin
           pushnew nth use-package with-output-to-string prog prog* make-list
           make-array aref copy-tree

@@ -454,7 +454,7 @@
       (%pp-object thing)
       (%pp-body-indent body))))
 
-(def-pretty-print (setq setf) (&rest exps)
+(def-pretty-print (setq setf psetq psetf) (&rest exps)
   (with-indent (%stream-col *pp-stream*)
     (with-parens
       (<< (%pp-symbol symbol) " ")

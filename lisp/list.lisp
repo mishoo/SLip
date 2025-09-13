@@ -4,8 +4,9 @@
           assoc assoc-if assoc-if-not
           rassoc rassoc-if rassoc-if-not
           intersection union set-difference
-          subst-if subst-if-not subst
-          sublis butlast))
+          subst-if subst-if-not subst sublis
+          sort stable-sort merge
+          butlast))
 
 (defpackage :sl-list
   (:use :sl :%))
@@ -26,11 +27,14 @@
 (defconstant *default-test* (list #'eql #'eq 'eql 'eq))
 (defconstant *default-key* (list #'identity 'identity))
 
-(defmacro update-for-key (predicate key)
-  `(when (and ,key (not (member ,key *default-key*)))
-     (setf ,predicate (let ((p ,predicate))
-                        (lambda (item)
-                          (funcall p (funcall ,key item)))))))
+(defmacro update-for-key (predicate key &optional (nargs 1))
+  (let ((args (loop repeat nargs collect (gensym))))
+    `(when (and ,key (not (member ,key *default-key*)))
+       (setf ,predicate (let ((p ,predicate))
+                          (lambda (,@args)
+                            (funcall p ,@(mapcar (lambda (arg)
+                                                   `(funcall ,key ,arg))
+                                                 args))))))))
 
 (defun make-subject-test (test test-not key key-subject)
   (cond
@@ -182,6 +186,40 @@
                   (eql cdr (cdr tree)))
              tree
              (cons car cdr)))))))
+
+(defun %merge (a b predicate)
+  (let* ((ret (list nil))
+         (p ret))
+    (macrolet ((add (cell)
+                 `(setf p (setf (cdr p) ,cell))))
+      (tagbody
+       :loop
+       (cond ((and a b)
+              (if (funcall predicate (car b) (car a))
+                  (setf b (cdr (add b)))
+                  (setf a (cdr (add a))))
+              (go :loop))
+             (a (add a))
+             (b (add b))))
+      (cdr ret))))
+
+(defun %merge-sort (list predicate)
+  (let sort ((list list))
+    (cond ((not list) nil)
+          ((not (cdr list)) list)
+          (t (let ((a list)
+                   (b (%nhalf-list list)))
+               (%merge (sort a) (sort b) predicate))))))
+
+(defun merge (list1 list2 predicate &key key)
+  (update-for-key predicate key 2)
+  (%merge list1 list2 predicate))
+
+(defun stable-sort (list predicate &key key)
+  (update-for-key predicate key 2)
+  (%merge-sort list predicate))
+
+(setf (symbol-function 'sort) #'stable-sort)
 
 ;;; the following two are (slightly modified) from SBCL (list.lisp)
 

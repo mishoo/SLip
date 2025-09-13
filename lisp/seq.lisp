@@ -1,7 +1,6 @@
 (in-package :sl)
 
-(export '(sort stable-sort merge
-          collect-if
+(export '(collect-if
           remove remove-if remove-if-not
           find find-if find-if-not
           position position-if position-if-not
@@ -19,32 +18,6 @@
 (import '(sl::with-collectors
           sl-list::make-subject-test
           sl-list::update-for-key))
-
-(defun merge (a b predicate)
-  (let* ((ret (list nil))
-         (p ret))
-    (macrolet ((add (cell)
-                 `(setf p (setf (cdr p) ,cell))))
-      (tagbody
-       :loop
-       (cond ((and a b)
-              (if (funcall predicate (car b) (car a))
-                  (setf b (cdr (add b)))
-                  (setf a (cdr (add a))))
-              (go :loop))
-             (a (add a))
-             (b (add b))))
-      (cdr ret))))
-
-(defun stable-sort (list predicate)
-  (let sort ((list list))
-    (cond ((not list) nil)
-          ((not (cdr list)) list)
-          (t (let ((a list)
-                   (b (%nhalf-list list)))
-               (merge (sort a) (sort b) predicate))))))
-
-(setf (symbol-function 'sort) #'stable-sort)
 
 (defun collect-if (test list)
   (with-collectors (elements)
