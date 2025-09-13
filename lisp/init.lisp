@@ -293,6 +293,32 @@
      `(notevery1 ,func ,@lists))
     (form)))
 
+(defmacro with-collectors ((&rest names) &body body)
+  (let (lists tails syms adders)
+    (flet ((mk-collector (arg)
+             (let* ((vlist (gensym))
+                    (vtail (gensym))
+                    (name (if (consp arg) (car arg) arg))
+                    (vadd (if (consp arg) (cadr arg) arg))
+                    (vconc (if (consp arg) (caddr arg))))
+               (push vlist lists)
+               (push vtail tails)
+               (push `(,name (cdr ,vlist)) syms)
+               (when vadd
+                 (push `(,vadd (el)
+                         `(setq ,',vtail (setf (cdr ,',vtail) (cons ,el nil))))
+                       adders))
+               (when vconc
+                 (push `(,vconc (lst)
+                         `(setq ,',vtail (last (setf (cdr ,',vtail) ,lst))))
+                       adders)))))
+      (foreach names #'mk-collector)
+      `(let (,@(mapcar (lambda (name) `(,name (list nil))) lists))
+         (let (,@(mapcar #'list tails lists))
+           (macrolet (,@adders)
+             (symbol-macrolet (,@syms)
+               ,@body)))))))
+
 ;;; setf
 
 (defmacro %mvb-internal (names form &body body)
@@ -491,28 +517,6 @@
                            (list* ,@args ,(getf parsed :rest))
                            ',function))))
 
-(defmacro psetf args
-  (let ((temps nil)
-        (places nil)
-        (values nil))
-    (let rec ((args args))
-      (cond
-        ((null args))
-        ((null (cadr args))
-         (error "Odd number of forms in psetf"))
-        (t
-         (push (gensym "psetf") temps)
-         (push (car args) places)
-         (push (cadr args) values)
-         (rec (cddr args)))))
-    (setf temps (nreverse temps)
-          places (nreverse places)
-          values (nreverse values))
-    `(let ,(mapcar #'list temps values)
-       ,@(mapcar (lambda (var set)
-                   `(setf ,var ,set))
-                 places temps))))
-
 (defsetf car %rplaca)
 (defsetf cdr %rplacd)
 
@@ -563,9 +567,6 @@
                  ,set
                  ,newval)
               `(getf ,get ,vindicator ,vdefault)))))
-
-(defun (setf compiler-macro-function) (handler name)
-  (setf (getf %:*compiler-macros* name) handler))
 
 (defun constantly (value)
   (lambda args
@@ -643,29 +644,6 @@
 
 ;;; do and do* differ by exactly two characters, but oh well... copy-paste FTW.
 
-(defmacro do (vars (end-test-form &rest result-form) &body body)
-  (let ((next (gensym "next"))
-        (end (gensym "end"))
-        (step (apply #'nconc (mapcar (lambda (var)
-                                       (when (> (length var) 2)
-                                         (list (car var) (caddr var))))
-                                     vars))))
-    (multiple-value-bind (body declarations) (%:dig-declarations body)
-      `(block nil
-         (let ,(mapcar (lambda (var)
-                         (list (car var) (cadr var)))
-                       vars)
-           (declare ,@declarations)
-           (tagbody
-            ,next
-            (when ,end-test-form
-              (go ,end))
-            ,@body
-            (psetf ,@step)
-            (go ,next)
-            ,end)
-           ,@result-form)))))
-
 (defmacro do* (vars (end-test-form &rest result-form) &body body)
   (let ((next (gensym "next"))
         (end (gensym "end"))
@@ -685,6 +663,46 @@
               (go ,end))
             ,@body
             (setf ,@step)
+            (go ,next)
+            ,end)
+           ,@result-form)))))
+
+(defmacro psetf args
+  (with-collectors (temps places vals)
+    (do* ((args args (cddr args)))
+         ((null args) `(let ,(mapcar #'list temps vals)
+                         ,@(mapcar (lambda (var set)
+                                     `(setf ,var ,set))
+                                   places temps)
+                         nil))
+      (when (null (cadr args))
+        (error "PSETF: Odd number of forms"))
+      (temps (gensym "psetf"))
+      (places (car args))
+      (vals (cadr args)))))
+
+(defmacro psetq args
+  `(psetf ,@args))
+
+(defmacro do (vars (end-test-form &rest result-form) &body body)
+  (let ((next (gensym "next"))
+        (end (gensym "end"))
+        (step (apply #'nconc (mapcar (lambda (var)
+                                       (when (> (length var) 2)
+                                         (list (car var) (caddr var))))
+                                     vars))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let ,(mapcar (lambda (var)
+                         (list (car var) (cadr var)))
+                       vars)
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (when ,end-test-form
+              (go ,end))
+            ,@body
+            (psetf ,@step)
             (go ,next)
             ,end)
            ,@result-form)))))
@@ -886,32 +904,6 @@
 
 (defun (setf cadr) (value list)
   (setf (car (cdr list)) value))
-
-(defmacro with-collectors ((&rest names) &body body)
-  (let (lists tails syms adders)
-    (flet ((mk-collector (arg)
-             (let* ((vlist (gensym))
-                    (vtail (gensym))
-                    (name (if (consp arg) (car arg) arg))
-                    (vadd (if (consp arg) (cadr arg) arg))
-                    (vconc (if (consp arg) (caddr arg))))
-               (push vlist lists)
-               (push vtail tails)
-               (push `(,name (cdr ,vlist)) syms)
-               (when vadd
-                 (push `(,vadd (el)
-                         `(setq ,',vtail (setf (cdr ,',vtail) (cons ,el nil))))
-                       adders))
-               (when vconc
-                 (push `(,vconc (lst)
-                         `(setq ,',vtail (last (setf (cdr ,',vtail) ,lst))))
-                       adders)))))
-      (foreach names #'mk-collector)
-      `(let (,@(mapcar (lambda (name) `(,name (list nil))) lists))
-         (let (,@(mapcar #'list tails lists))
-           (macrolet (,@adders)
-             (symbol-macrolet (,@syms)
-               ,@body)))))))
 
 (define-setf-expander values (&rest places)
   (with-collectors (temp-vars temp-vals store-main-vars store-other-vars setters getters)

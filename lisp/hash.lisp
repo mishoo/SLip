@@ -11,6 +11,9 @@
 (define-compiler-macro (setf gethash) (newvalue key hash)
   `(%hash-set ,newvalue ,key ,hash))
 
+(defun (setf compiler-macro-function) (handler name)
+  (setf (gethash name %:*compiler-macros*) handler))
+
 (defun unsupported-test (test)
   (and test (not (or (eq test 'eq)
                      (eq test 'eql)
