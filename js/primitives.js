@@ -551,7 +551,7 @@ defp("%putf", true, function(m, nargs){
         checknargs(nargs, 0, 1);
         var name = "SYM";
         if (nargs == 1) {
-            name = m.pop();
+            name = as_string(m.pop());
             checktype(name, LispString);
             if (name === "_reset") N = -1;
         }
