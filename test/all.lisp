@@ -59,6 +59,7 @@
   (load "test/cons/member.lisp")
   (load "test/cons/adjoin.lisp")
   (load "test/cons/getf.lisp")
+  (load "test/cons/get-properties.lisp")
   (load "test/cons/pop.lisp")
   (load "test/cons/push.lisp")
   (load "test/cons/pushnew.lisp")

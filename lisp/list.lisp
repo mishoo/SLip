@@ -1,6 +1,7 @@
 (in-package :sl)
 
 (export '(acons pairlis
+          get-properties
           assoc assoc-if assoc-if-not
           rassoc rassoc-if rassoc-if-not
           intersection union set-difference
@@ -23,6 +24,13 @@
        (data data (cdr data))
        (result alist (acons (car keys) (car data) result)))
       ((or (null keys) (null data)) result)))
+
+(defun get-properties (plist indicator-list)
+  (loop for tail on plist by #'cddr
+        for (key val) = tail
+        unless (cdr tail) do (error "GET-PROPERTIES: malformed plist")
+        when (member key indicator-list) do (return (values key val tail))
+        finally (return (values nil nil nil))))
 
 (defconstant *default-test* (list #'eql #'eq 'eql 'eq))
 (defconstant *default-key* (list #'identity 'identity))
