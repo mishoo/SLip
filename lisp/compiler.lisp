@@ -536,13 +536,13 @@
                           (#\) ret)
                           (#\; (skip-comment) (rec))
                           (#\. (next)
-                               (rplacd p (read-token))
+                               (%rplacd p (read-token))
                                (skip-ws)
                                ret)
                           ((nil) (croak "Unterminated list"))
                           (otherwise (let ((cell (cons (read-token) nil)))
                                        (setq p (if ret
-                                                   (rplacd p cell)
+                                                   (%rplacd p cell)
                                                    (setq ret cell))))
                                      (rec)))))
                (prog2
@@ -1533,7 +1533,7 @@
                (if (atom (car forms))
                    (let ((cell (list (list (car forms)
                                            :tag tbody (gensym "tag")))))
-                     (rec (cdr forms) (rplacd p cell)))
+                     (rec (cdr forms) (%rplacd p cell)))
                    (rec (cdr forms) p))))
            (%pop tags)
            (cond
@@ -2096,15 +2096,15 @@
          `(flet ((%get-file-contents args
                    (let ((,t-load (get-internal-run-time)))
                      (prog1 (apply #'%get-file-contents args)
-                       (rplaca *load-timing*
-                               (+ (car *load-timing*)
-                                  (- (get-internal-run-time) ,t-load))))))
+                       (%rplaca *load-timing*
+                                (+ (car *load-timing*)
+                                   (- (get-internal-run-time) ,t-load))))))
                  (compile-string args
                    (let ((,t-comp (get-internal-run-time)))
                      (prog1 (apply #'compile-string args)
-                       (rplaca (cdr *load-timing*)
-                               (+ (cadr *load-timing*)
-                                  (- (get-internal-run-time) ,t-comp)))))))
+                       (%rplaca (cdr *load-timing*)
+                                (+ (cadr *load-timing*)
+                                   (- (get-internal-run-time) ,t-comp)))))))
             ,@body)))
      (t ,@body)))
 

@@ -513,8 +513,8 @@
                    `(setf ,var ,set))
                  places temps))))
 
-(defsetf car rplaca)
-(defsetf cdr rplacd)
+(defsetf car %rplaca)
+(defsetf cdr %rplacd)
 
 (defun (setf symbol-function) (func sym)
   (%::maybe-xref-info sym 'defun)

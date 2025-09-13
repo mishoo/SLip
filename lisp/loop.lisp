@@ -459,7 +459,7 @@
                    (setf ,tail
                          (last
                           (if ,tail
-                              (rplacd ,tail $nconc)
+                              (setf (cdr ,tail) $nconc)
                               (setf ,name $nconc))))))))
   args)
 

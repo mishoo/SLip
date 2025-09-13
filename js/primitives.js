@@ -409,18 +409,34 @@ defp("elt", false, function(m, nargs){
     error("Unrecognized sequence in elt");
 });
 
-defp("rplaca", true, function(m, nargs){
+defp("%rplaca", true, function(m, nargs){
     checknargs(nargs, 2, 2);
     var val = m.pop(), cons = m.pop();
     checktype(cons, LispCons);
     return cons.car = val;
 });
 
-defp("rplacd", true, function(m, nargs){
+defp("%rplacd", true, function(m, nargs){
     checknargs(nargs, 2, 2);
     var val = m.pop(), cons = m.pop();
     checktype(cons, LispCons);
     return cons.cdr = val;
+});
+
+defp("rplaca", true, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    var val = m.pop(), cons = m.pop();
+    checktype(cons, LispCons);
+    cons.car = val;
+    return cons;
+});
+
+defp("rplacd", true, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    var val = m.pop(), cons = m.pop();
+    checktype(cons, LispCons);
+    cons.cdr = val;
+    return cons;
 });
 
 defp("nthcdr", false, function(m, nargs){
