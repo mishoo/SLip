@@ -10,74 +10,53 @@
       exported)
   (%use-package boot main)
   (%use-package main user)
-  (setq exported
-        '(atom quasiquote defmacro defun when unless labels flet foreach
-          prog1 prog2 or and cond member case ecase otherwise mapcar mapc aif it push
-          error warn assert without-interrupts
-          eval compile load function functionp unwind-protect
-          apply funcall macrolet symbol-macrolet catch throw
-          quote lambda λ let let* if progn progv setq t nil not
-          tagbody go block return return-from
-          *package* *read-table*
-          elt rplaca rplacd nth nthcdr last reverse nreverse append nconc nreconc revappend
-          char schar char-name char-code name-char code-char upcase downcase string-upcase string-downcase
-          charp char= char< char<= char> char>= char/= letterp digitp
-          stringp string= string< string<= string> string>= string/=
-          char-equal char-not-equal char-lessp char-greaterp char-not-lessp char-not-greaterp
-          string-equal string-not-equal string-lessp string-greaterp string-not-lessp string-not-greaterp
-          make-regexp regexp-test regexp-exec replace-regexp quote-regexp regexpp
-          vectorp vector svref vector-push vector-pop make-vector
-          getf
-          list list* copy-list copy-seq listp cons consp eq eql equal equalp gensym length
-          declare locally type ignore special optimize speed debug space fixnum integer unsigned-byte
-          identity constantly
+  (setq
+   exported
+   '(
 
-          export import
+     &allow-other-keys &aux &body &key &optional &rest &whole * *error-output*
+     *package* *read-table* *standard-output* *trace-output* + - / /= 1+ 1- <
+     <= = > >= abs acos adjoin aif and append apply aref asin assert atan atom
+     block boundp caaaar caaadr caaar caadar caaddr caadr caar cadaar cadadr
+     cadar caddar cadddr caddr cadr car case catch cdaaar cdaadr cdaar cdadar
+     cdaddr cdadr cdar cddaar cddadr cddar cdddar cddddr cdddr cddr cdr
+     ceiling char char-code char-equal char-greaterp char-lessp char-name
+     char-not-equal char-not-greaterp char-not-lessp char/= char< char<= char=
+     char> char>= charp clear-timeout code-char compile
+     compiler-macro-function complement cond cons consp constantly copy-list
+     copy-seq copy-tree cos current-thread debug decf declare defconstant
+     defglobal define-compiler-macro define-modify-macro define-setf-expander
+     defmacro defpackage defparameter defsetf defun defvar destructuring-bind
+     digitp disassemble do do* dolist dotimes downcase ecase elt eq eql equal
+     equalp error eval evenp every exp export expt fboundp fdefinition fifth
+     find-package find-symbol first fixnum flet floor fmakunbound foreach
+     fourth funcall function functionp gensym get get-internal-run-time
+     get-setf-expansion getf gethash go hash-copy hash-iterator hash-keys
+     hash-table-p hash-values identity if ignore import in-package incf
+     integer intern it iterator-next keywordp labels lambda
+     lambda-list-keywords last length let let* letterp list list* listp load
+     locally log macroexpand macroexpand-1 macrolet make-array make-hash
+     make-list make-package make-regexp make-symbol make-thread make-vector
+     makunbound mapc mapcar max member min minusp mod most-negative-fixnum
+     most-positive-fixnum multiple-value-bind multiple-value-call
+     multiple-value-list multiple-value-prog1 multiple-value-setq name-char
+     nconc nil not notany notevery nreconc nreverse nth nthcdr null
+     number-fixed number-string numberp oddp optimize or otherwise
+     package-name packagep parse-integer parse-number plusp pop prog prog*
+     prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
+     quote-regexp random regexp-exec regexp-test regexpp remhash
+     replace-regexp rest return return-from revappend reverse rotatef round
+     rplaca rplacd schar second set-timeout setf setq shadow shiftf sin some
+     space special speed sqrt string-downcase string-equal string-greaterp
+     string-lessp string-not-equal string-not-greaterp string-not-lessp
+     string-upcase string/= string< string<= string= string> string>= stringp
+     svref sxhash symbol-function symbol-macrolet symbol-name symbol-package
+     symbol-plist symbol-value symbolp t tagbody tan third threadp throw type
+     unintern unless unsigned-byte unwind-protect upcase use-package values
+     values-list vector vector-pop vector-push vectorp warn when
+     with-output-to-string without-interrupts zerop λ
 
-          most-positive-fixnum most-negative-fixnum
-
-          numberp zerop plusp minusp evenp oddp parse-number parse-integer number-fixed number-string
-          < <= > >= + - * / = /= null 1+ 1- floor ceiling round mod
-          abs sin asin cos acos tan atan exp log sqrt expt random
-          min max
-
-          make-hash hash-table-p gethash remhash hash-copy hash-keys hash-values
-          hash-iterator iterator-next
-
-          macroexpand-1 disassemble
-
-          make-package find-package make-symbol symbol-name symbol-package symbol-function
-          fdefinition symbol-plist get
-          packagep symbolp keywordp intern unintern shadow find-symbol package-name
-          threadp make-thread current-thread set-timeout clear-timeout
-
-          car cdr caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr
-          cddar cdddr caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
-          cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
-          first second third fourth fifth rest destructuring-bind
-
-          boundp makunbound fboundp fmakunbound
-
-          get-internal-run-time
-          compiler-macro-function
-          symbol-value
-
-          values multiple-value-bind multiple-value-call values-list
-          multiple-value-list multiple-value-setq multiple-value-prog1
-
-          *standard-output* *error-output* *trace-output*
-
-          lambda-list-keywords
-          &key &rest &body &whole &optional &aux &allow-other-keys
-
-          define-modify-macro macroexpand-1 macroexpand defpackage in-package
-          defparameter defvar defconstant defglobal every some notany notevery defsetf
-          define-setf-expander get-setf-expansion setf psetf rotatef shiftf psetq push pop
-          define-compiler-macro incf decf dolist dotimes do do* complement adjoin
-          pushnew nth use-package with-output-to-string prog prog* make-list
-          make-array aref copy-tree
-
-          sxhash))
+     ))
 
   (%export exported boot)
   (%export exported main)
