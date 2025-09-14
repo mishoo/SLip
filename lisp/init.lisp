@@ -47,14 +47,14 @@
      quote-regexp random regexp-exec regexp-test regexpp remhash
      replace-regexp rest return return-from revappend reverse rotatef round
      rplaca rplacd schar second set-timeout setf setq shadow shiftf sin some
-     space special speed sqrt string-downcase string-equal string-greaterp
-     string-lessp string-not-equal string-not-greaterp string-not-lessp
-     string-upcase string/= string< string<= string= string> string>= stringp
-     svref sxhash symbol-function symbol-macrolet symbol-name symbol-package
-     symbol-plist symbol-value symbolp t tagbody tan third threadp throw type
-     unintern unless unsigned-byte unwind-protect upcase use-package values
-     values-list vector vector-pop vector-push vectorp warn when
-     with-output-to-string without-interrupts zerop λ
+     space special speed sqrt string-capitalize string-downcase string-equal
+     string-greaterp string-lessp string-not-equal string-not-greaterp
+     string-not-lessp string-upcase string/= string< string<= string= string>
+     string>= stringp svref sxhash symbol-function symbol-macrolet symbol-name
+     symbol-package symbol-plist symbol-value symbolp t tagbody tan third
+     threadp throw type unintern unless unsigned-byte unwind-protect upcase
+     use-package values values-list vector vector-pop vector-push vectorp warn
+     when with-output-to-string without-interrupts zerop λ
 
      ))
 
@@ -123,9 +123,19 @@
 (defmacro in-package (name)
   (setq *package* (find-package name)) nil)
 
+(defun some1 (test list)
+  (tagbody
+   :loop
+   (when list
+     (aif (funcall test (%pop list))
+          (return-from some1 it))
+     (go :loop))))
+
 (defun finished (tails)
-  (when tails
-    (if (car tails) (finished (cdr tails)) t)))
+  (some1 #'null tails))
+
+(define-compiler-macro finished (tails)
+  `(some1 #'null ,tails))
 
 (defun mapcar (f . lists)
   (let rec (ret (tails lists))
@@ -191,14 +201,6 @@
     (if (finished tails) nil
         (or (apply test (mapcar #'car tails))
             (scan (mapcar #'cdr tails))))))
-
-(defun some1 (test list)
-  (tagbody
-   :loop
-   (when list
-     (aif (funcall test (%pop list))
-          (return-from some1 it))
-     (go :loop))))
 
 (define-compiler-macro some (&whole form func &rest lists)
   (cond
@@ -267,6 +269,8 @@
      `(notevery1 ,func ,@lists))
     (form)))
 
+;;; setf
+
 (defmacro with-collectors ((&rest names) &body body)
   (let (lists tails syms adders)
     (flet ((mk-collector (arg)
@@ -292,8 +296,6 @@
            (macrolet (,@adders)
              (symbol-macrolet (,@syms)
                ,@body)))))))
-
-;;; setf
 
 (defmacro %mvb-internal (names form &body body)
   `(multiple-value-bind ,names ,form ,@body))
@@ -1018,8 +1020,8 @@
            nil)))))
 
 (defmacro shiftf (&rest args)
-  (let* ((args (reverse args))
-         (oldvalue (gensym))
+  (let* ((oldvalue (gensym))
+         (args (reverse args))
          (newvalue (pop args))
          (places (nreverse args)))
     (with-places (places)

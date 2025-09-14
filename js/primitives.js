@@ -881,12 +881,19 @@ defp("upcase", false, function(m, nargs){
 
 defp("string-downcase", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return checktype(m.pop(), LispString).toLowerCase();
+    return checktype(as_string(m.pop()), LispString).toLowerCase();
 });
 
 defp("string-upcase", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return checktype(m.pop(), LispString).toUpperCase();
+    return checktype(as_string(m.pop()), LispString).toUpperCase();
+});
+
+defp("string-capitalize", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(as_string(m.pop()), LispString).replace(/\w+/g, str =>
+        str.charAt(0).toUpperCase() + str.substr(1).toLowerCase()
+    );
 });
 
 defp("char-name", false, function(m, nargs){
