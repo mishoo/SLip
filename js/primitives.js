@@ -842,6 +842,18 @@ defp("strcat", false, function(m, nargs){
     return strcat(m, nargs);
 });
 
+defp("strjoin", false, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let bag = m.pop(), sep = checktype(m.pop(), LispString);
+    if (LispList.is(bag)) {
+        return LispCons.toArray(bag).join(sep);
+    }
+    if (LispVector.is(bag)) {
+        return bag.join(sep);
+    }
+    error("STRJOIN: unsupported sequence");
+});
+
 defp("substr", false, function(m, nargs){
     checknargs(nargs, 2, 3);
     var len = nargs == 3 ? m.pop_number() : false;
