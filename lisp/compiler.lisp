@@ -39,6 +39,12 @@
      (%set-symbol-prop ',name :constant t)
      (setq ,name ,val)))
 
+(defmacro defglobal (name val)
+  (%global! name)
+  (%::maybe-xref-info name 'defglobal)
+  `(progn (%global! ',name)
+          (setq ,name ,val)))
+
 (defvar *read-table* nil)
 (defvar *package* nil)
 (defvar *standard-input* nil)
@@ -353,8 +359,7 @@
 (defmacro push (obj place)
   `(setq ,place (cons ,obj ,place)))
 
-(%global! '+keyword-package+)
-(setq +keyword-package+ (find-package "KEYWORD"))
+(defconstant +keyword-package+ (find-package "KEYWORD"))
 
 ;;;; parser/compiler
 
@@ -2136,21 +2141,20 @@
 (defun values-list (list)
   (apply #'values list))
 
-(%global! '*core-files*)
-(setq *core-files*
-      '("lisp/init.lisp"
-        "lisp/hash.lisp"
-        "lisp/macroexpand.lisp"
-        "lisp/format.lisp"
-        "lisp/struct.lisp"
-        "lisp/loop.lisp"
-        "lisp/list.lisp"
-        "lisp/seq.lisp"
-        "lisp/tiny-clos.lisp"
-        "lisp/printer.lisp"
-        "lisp/ffi.lisp"
-        "lisp/conditions.lisp"
-        "ide/ide.lisp"))
+(defconstant *core-files*
+  '("lisp/init.lisp"
+    "lisp/hash.lisp"
+    "lisp/macroexpand.lisp"
+    "lisp/format.lisp"
+    "lisp/struct.lisp"
+    "lisp/loop.lisp"
+    "lisp/list.lisp"
+    "lisp/seq.lisp"
+    "lisp/tiny-clos.lisp"
+    "lisp/printer.lisp"
+    "lisp/ffi.lisp"
+    "lisp/conditions.lisp"
+    "ide/ide.lisp"))
 
 ;;;
 

@@ -144,12 +144,6 @@
 (defmacro in-package (name)
   (setq *package* (find-package name)) nil)
 
-(defmacro defglobal (name val)
-  (%global! name)
-  (%::maybe-xref-info name 'defglobal)
-  `(progn (%global! ',name)
-          (setq ,name ,val)))
-
 (defun finished (tails)
   (when tails
     (if (car tails) (finished (cdr tails)) t)))
@@ -807,10 +801,10 @@
                                              (mapcar #'list temps value-forms)))
                                          syms)))
           (multiple-value-bind ,(mapcar #'car syms) ,value-form
-            (let (,@(append (mapcar (lambda (exp)
-                                      (let ((store-vars (cadddr exp)))
-                                        `(,(car store-vars) ,(car exp))))
-                                    syms)))
+            (let (,@(mapcar (lambda (exp)
+                              (let ((store-vars (cadddr exp)))
+                                `(,(car store-vars) ,(car exp))))
+                            syms))
               ,@(mapcar (lambda (exp)
                           (elt exp 4))
                         syms)
@@ -1006,17 +1000,17 @@
   (setf (cdr (cdddr list)) val))
 
 (defmacro with-places ((places &key
-                                 (temp-vars 'temp-vars)
-                                 (temp-vals 'temp-vals)
-                                 (store-main-vars 'store-main-vars)
-                                 (store-other-vars 'store-other-vars)
-                                 (setters 'setters)
-                                 (getters 'getters))
+                               (temp-vars 'temp-vars)
+                               (temp-vals 'temp-vals)
+                               (store-main-vars 'store-main-vars)
+                               (store-other-vars 'store-other-vars)
+                               (setters 'setters)
+                               (getters 'getters))
                        &body body)
   `(with-collectors (,temp-vars ,temp-vals ,store-main-vars ,store-other-vars ,setters ,getters)
      (dolist (place ,places)
        (multiple-value-bind (place-temps place-vals place-stores place-set place-get)
-           (get-setf-expansion place)
+                            (get-setf-expansion place)
          (dolist (el place-temps) (,temp-vars el))
          (dolist (el place-vals) (,temp-vals el))
          (dolist (el (cdr place-stores)) (,store-other-vars el))
@@ -1050,13 +1044,14 @@
          (newvalue (pop args))
          (places (nreverse args)))
     (with-places (places)
-      `(let (,@(mapcar #'list temp-vars temp-vals))
-         (let ((,oldvalue ,(pop getters)))
-           (let (,@(mapcar #'list
-                           store-main-vars
-                           (nconc getters (list newvalue))))
-             (let (,@store-other-vars)
-               ,@setters
-               ,oldvalue)))))))
+      (let ((getters getters))
+        `(let (,@(mapcar #'list temp-vars temp-vals))
+           (let ((,oldvalue ,(pop getters)))
+             (let (,@(mapcar #'list
+                             store-main-vars
+                             (nconc getters (list newvalue))))
+               (let (,@store-other-vars)
+                 ,@setters
+                 ,oldvalue))))))))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
