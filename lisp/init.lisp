@@ -47,6 +47,7 @@
           macroexpand-1 disassemble
 
           make-package find-package make-symbol symbol-name symbol-package symbol-function
+          fdefinition symbol-plist get
           packagep symbolp keywordp intern unintern shadow find-symbol package-name
           threadp make-thread current-thread set-timeout clear-timeout
 
@@ -71,7 +72,7 @@
 
           define-modify-macro macroexpand-1 macroexpand defpackage in-package
           defparameter defvar defconstant defglobal every some notany notevery defsetf
-          define-setf-expander get-setf-expansion setf psetf psetq push pop
+          define-setf-expander get-setf-expansion setf psetf rotatef shiftf psetq push pop
           define-compiler-macro incf decf dolist dotimes do do* complement adjoin
           pushnew nth use-package with-output-to-string prog prog* make-list
           make-array aref copy-tree
@@ -524,8 +525,20 @@
   (%::maybe-xref-info sym 'defun)
   (set-symbol-function! sym func))
 
+(defun fdefinition (sym)
+  (symbol-function sym))
+
+(defun (setf fdefinition) (func sym)
+  (setf (symbol-function sym) func))
+
 (defun (setf symbol-value) (value sym)
   (set-symbol-value! sym value))
+
+(defun (setf symbol-plist) (plist sym)
+  (%:%set-symbol-plist plist sym))
+
+(define-compiler-macro (setf symbol-plist) (plist sym)
+  `(%:%set-symbol-plist ,plist ,sym))
 
 (defmacro push (obj place)
   (cond
@@ -567,6 +580,12 @@
                  ,set
                  ,newval)
               `(getf ,get ,vindicator ,vdefault)))))
+
+(defun get (symbol indicator &optional default)
+  (getf (symbol-plist symbol) indicator default))
+
+(defun (setf get) (value symbol indicator &optional default)
+  (setf (getf (symbol-plist symbol) indicator default) value))
 
 (defun constantly (value)
   (lambda args
@@ -902,25 +921,142 @@
       (cons (copy-tree (car tree))
             (copy-tree (cdr tree)))))
 
-(defun (setf cadr) (value list)
-  (setf (car (cdr list)) value))
+(defun (setf caar) (val list)
+  (setf (car (car list)) val))
+
+(defun (setf cadr) (val list)
+  (setf (car (cdr list)) val))
+
+(defun (setf cdar) (val list)
+  (setf (cdr (car list)) val))
+
+(defun (setf cddr) (val list)
+  (setf (cdr (cdr list)) val))
+
+(defun (setf caaar) (val list)
+  (setf (car (caar list)) val))
+
+(defun (setf caadr) (val list)
+  (setf (car (cadr list)) val))
+
+(defun (setf cadar) (val list)
+  (setf (car (cdar list)) val))
+
+(defun (setf caddr) (val list)
+  (setf (car (cddr list)) val))
+
+(defun (setf cdaar) (val list)
+  (setf (cdr (caar list)) val))
+
+(defun (setf cdadr) (val list)
+  (setf (cdr (cadr list)) val))
+
+(defun (setf cddar) (val list)
+  (setf (cdr (cdar list)) val))
+
+(defun (setf cdddr) (val list)
+  (setf (cdr (cddr list)) val))
+
+(defun (setf caaaar) (val list)
+  (setf (car (caaar list)) val))
+
+(defun (setf caaadr) (val list)
+  (setf (car (caadr list)) val))
+
+(defun (setf caadar) (val list)
+  (setf (car (cadar list)) val))
+
+(defun (setf caaddr) (val list)
+  (setf (car (caddr list)) val))
+
+(defun (setf cadaar) (val list)
+  (setf (car (cdaar list)) val))
+
+(defun (setf cadadr) (val list)
+  (setf (car (cdadr list)) val))
+
+(defun (setf caddar) (val list)
+  (setf (car (cddar list)) val))
+
+(defun (setf cadddr) (val list)
+  (setf (car (cdddr list)) val))
+
+(defun (setf cdaaar) (val list)
+  (setf (cdr (caaar list)) val))
+
+(defun (setf cdaadr) (val list)
+  (setf (cdr (caadr list)) val))
+
+(defun (setf cdadar) (val list)
+  (setf (cdr (cadar list)) val))
+
+(defun (setf cdaddr) (val list)
+  (setf (cdr (caddr list)) val))
+
+(defun (setf cddaar) (val list)
+  (setf (cdr (cdaar list)) val))
+
+(defun (setf cddadr) (val list)
+  (setf (cdr (cdadr list)) val))
+
+(defun (setf cdddar) (val list)
+  (setf (cdr (cddar list)) val))
+
+(defun (setf cddddr) (val list)
+  (setf (cdr (cdddr list)) val))
+
+(defmacro with-places ((places &key
+                                 (temp-vars 'temp-vars)
+                                 (temp-vals 'temp-vals)
+                                 (store-main-vars 'store-main-vars)
+                                 (store-other-vars 'store-other-vars)
+                                 (setters 'setters)
+                                 (getters 'getters))
+                       &body body)
+  `(with-collectors (,temp-vars ,temp-vals ,store-main-vars ,store-other-vars ,setters ,getters)
+     (dolist (place ,places)
+       (multiple-value-bind (place-temps place-vals place-stores place-set place-get)
+           (get-setf-expansion place)
+         (dolist (el place-temps) (,temp-vars el))
+         (dolist (el place-vals) (,temp-vals el))
+         (dolist (el (cdr place-stores)) (,store-other-vars el))
+         (,store-main-vars (car place-stores))
+         (,setters place-set)
+         (,getters place-get)))
+     ,@body))
 
 (define-setf-expander values (&rest places)
-  (with-collectors (temp-vars temp-vals store-main-vars store-other-vars setters getters)
-    (dolist (place places)
-      (multiple-value-bind (place-temps place-vals place-stores place-set place-get)
-                           (get-setf-expansion place)
-        (dolist (el place-temps) (temp-vars el))
-        (dolist (el place-vals) (temp-vals el))
-        (dolist (el (cdr place-stores)) (store-other-vars el))
-        (store-main-vars (car place-stores))
-        (setters place-set)
-        (getters place-get)))
+  (with-places (places)
     (values temp-vars
             temp-vals
             store-main-vars
             `(let (,@store-other-vars)
                (values ,@setters))
             `(values ,@getters))))
+
+(defmacro rotatef (&rest places)
+  (with-places (places)
+    `(let (,@(mapcar #'list temp-vars temp-vals))
+       (let (,@(mapcar #'list
+                       store-main-vars
+                       (nconc (cdr getters) (list (car getters)))))
+         (let (,@store-other-vars)
+           ,@setters
+           nil)))))
+
+(defmacro shiftf (&rest args)
+  (let* ((args (reverse args))
+         (oldvalue (gensym))
+         (newvalue (pop args))
+         (places (nreverse args)))
+    (with-places (places)
+      `(let (,@(mapcar #'list temp-vars temp-vals))
+         (let ((,oldvalue ,(pop getters)))
+           (let (,@(mapcar #'list
+                           store-main-vars
+                           (nconc getters (list newvalue))))
+             (let (,@store-other-vars)
+               ,@setters
+               ,oldvalue)))))))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))

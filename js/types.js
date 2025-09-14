@@ -388,6 +388,7 @@ export class LispSymbol {
             this.pak = pak || false;
             this.value = undefined;
             this.vlist = Object.create(null);
+            this.plist = false;
             this.primitive = false;
             this.function = false;
         }

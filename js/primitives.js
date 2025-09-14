@@ -2032,7 +2032,7 @@ defp("makunbound", false, function(m, nargs){
 });
 
 defp("set-symbol-value!", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
+    checknargs(nargs, 2, 2);
     let value = m.pop();
     let sym = m.pop();
     if (sym === S_T)
@@ -2078,6 +2078,16 @@ defp("%get-symbol-prop", false, function(m, nargs){
     checktype(key, LispString);
     checktype(sym, LispSymbol);
     return sym.getv(key);
+});
+
+defp("symbol-plist", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispSymbol).plist;
+});
+
+defp("%set-symbol-plist", true, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    return checktype(m.pop(), LispSymbol).plist = checktype(m.pop(), LispList);
 });
 
 /* -----[ processes ]----- */
