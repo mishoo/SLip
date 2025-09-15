@@ -82,7 +82,8 @@
     ((and (eq 'progn (car form))
           (null (cdr form)))
      nil)
-    ((aif (or (%:find-macrolet-in-compiler-env (car form))
+    (t
+     (aif (or (%:find-macrolet-in-compiler-env (car form))
               (%macro (car form)))
           (let ((%:*whole-form* form))
             (apply it (cdr form)))
