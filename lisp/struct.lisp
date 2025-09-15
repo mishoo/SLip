@@ -228,7 +228,7 @@
                                 ,@(mapcar (lambda (slot)
                                             (let ((name (getf slot :name)))
                                               (cond
-                                                ((%memq name ctor-args)
+                                                ((member name ctor-args)
                                                  name)
                                                 (t
                                                  (getf slot :initform)))))

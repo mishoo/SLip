@@ -237,8 +237,8 @@
       (slot-makunbound-using-class (class-of object) object slot-name)))
 
 (defun std-slot-exists-p (instance slot-name)
-  (not (null (find slot-name (class-slots (class-of instance))
-                   :key #'slot-definition-name))))
+  (not (null (member slot-name (class-slots (class-of instance))
+                     :key #'slot-definition-name))))
 (defun slot-exists-p (object slot-name)
   (if (eq (class-of (class-of object)) the-class-standard-class)
       (std-slot-exists-p object slot-name)
@@ -283,16 +283,17 @@
      (find-class 'vector))
     ((functionp x)
      (find-class 'function))
-    ((find-class 't))))
+    (t
+     (find-class 't))))
 
 ;;; subclassp and sub-specializer-p
 
 (defun subclassp (c1 c2)
-  (not (null (find c2 (class-precedence-list c1)))))
+  (not (null (member c2 (class-precedence-list c1)))))
 
 (defun sub-specializer-p (c1 c2 c-arg)
   (let ((cpl (class-precedence-list c-arg)))
-    (not (null (find c2 (cdr (member c1 cpl)))))))
+    (not (null (member c2 (cdr (member c1 cpl)))))))
 
 ;;;
 ;;; Class metaobjects and standard-class

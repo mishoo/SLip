@@ -49,7 +49,7 @@
      (<< "#'#:anonymous-function"))))
 
 (def-print (hash)
-  (<< "<HASH[" (length hash) "]")
+  (<< "#<HASH[" (length hash) "]")
   (let rec ((keys (%:as-list (hash-keys hash)))
             (vals (%:as-list (hash-values hash))))
     (when keys
@@ -61,7 +61,7 @@
   (<< ">"))
 
 (def-print (class)
-  (<< "<CLASS")
+  (<< "#<CLASS")
   (when (class-name class)
     (<< " " (class-name class)))
   (<< ">"))
@@ -152,7 +152,7 @@
   (<< "#" (%dump regexp)))
 
 (def-print (package)
-  (<< "<PACKAGE " (package-name package) ">"))
+  (<< "#<PACKAGE " (package-name package) ">"))
 
 (def-print (null)
   (<< "NIL"))
