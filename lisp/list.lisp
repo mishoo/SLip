@@ -4,7 +4,7 @@
           get-properties
           assoc assoc-if assoc-if-not
           rassoc rassoc-if rassoc-if-not
-          intersection union set-difference
+          intersection union set-difference set-exclusive-or
           subst-if subst-if-not subst sublis
           sort stable-sort merge
           butlast))
@@ -138,6 +138,16 @@
         (res nil))
     (dolist (item list1 res)
       (when (some (lambda (el) (funcall test item el)) list2)
+        (push item res)))))
+
+(defun set-exclusive-or (list1 list2 &key key test test-not)
+  (let ((test (make-subject-test test test-not key t))
+        (res nil))
+    (dolist (item list1
+                  (dolist (item list2 res)
+                    (unless (some (lambda (el) (funcall test el item)) list1)
+                      (push item res))))
+      (unless (some (lambda (el) (funcall test item el)) list2)
         (push item res)))))
 
 (defun union (list1 list2 &key key test test-not)

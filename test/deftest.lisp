@@ -354,3 +354,38 @@
            (check-scaffold-copy old oldcopy)
            (check-scaffold-copy tree treecopy)
            result))))
+
+(defun set-exclusive-or-with-check (x y &key (key 'no-key)
+                                      test test-not)
+  (setf x (copy-list x))
+  (setf y (copy-list y))
+  (let ((xcopy (make-scaffold-copy x))
+        (ycopy (make-scaffold-copy y)))
+    (let ((result (apply #'set-exclusive-or
+                         x y
+                         `(,@(unless (eqt key 'no-key) `(:key ,key))
+                             ,@(when test `(:test ,test))
+                             ,@(when test-not `(:test-not ,test-not))))))
+      (cond
+       ((and (check-scaffold-copy x xcopy)
+             (check-scaffold-copy y ycopy))
+        result)
+       (t
+        'failed)))))
+
+(defun check-set-exclusive-or (x y z &key (key #'identity)
+                                 (test #'eql))
+  (and
+   ;; (not (eqt 'failed z))
+   (listp x)
+   (listp y)
+   (listp z)
+   (loop for e in z always (or (member e x :key key :test test)
+                               (member e y :key key :test test)))
+   (loop for e in x always (if (member e y :key key :test test)
+                               (not (member e z :key key :test test))
+                             (member e z :key key :test test)))
+   (loop for e in y always (if (member e x :key key :test test)
+                               (not (member e z :key key :test test))
+                             (member e z :key key :test test)))
+   t))

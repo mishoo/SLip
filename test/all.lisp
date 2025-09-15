@@ -79,6 +79,7 @@
   (load "test/cons/intersection.lisp")
   (load "test/cons/union.lisp")
   (load "test/cons/set-difference.lisp")
+  (load "test/cons/set-exclusive-or.lisp")
 
   (load "test/seq/count.lisp")
   (load "test/seq/count-if.lisp")
