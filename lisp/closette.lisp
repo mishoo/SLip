@@ -251,41 +251,6 @@
       (std-instance-class x)
       (built-in-class-of x)))
 
-;;; N.B. This version of built-in-class-of is straightforward but very slow.
-
-(defun built-in-class-of (x)
-  (cond
-    ((null x)
-     (find-class 'null))
-    ((symbolp x)
-     (find-class 'symbol))
-    ((numberp x)
-     (find-class 'number))
-    ((consp x)
-     (find-class 'cons))
-    ((charp x)
-     (find-class 'character))
-    ((hash-table-p x)
-     (find-class 'hash-table))
-    ((packagep x)
-     (find-class 'package))
-    ((%:%input-stream-p x)
-     (find-class 'input-stream))
-    ((%:%output-stream-p x)
-     (find-class 'output-stream))
-    ((stringp x)
-     (find-class 'string))
-    ((sl-struct::structurep x 'sl-struct::structure)
-     (find-class 'structure-class))
-    ((sl-struct::structurep x)
-     (find-class 'structure-object))
-    ((vectorp x)
-     (find-class 'vector))
-    ((functionp x)
-     (find-class 'function))
-    (t
-     (find-class 't))))
-
 ;;; subclassp and sub-specializer-p
 
 (defun subclassp (c1 c2)
@@ -1318,6 +1283,7 @@
 (format t "Beginning to bootstrap Closette...~%")
 (forget-all-classes)
 (forget-all-generic-functions)
+
 ;; How to create the class hierarchy in 10 easy steps:
 ;; 1. Figure out standard-class's slots.
 (setq the-slots-of-standard-class
@@ -1333,18 +1299,22 @@
                    (if a (lambda () (eval a)) nil))
                  :allocation :instance))
               (nth 3 the-defclass-standard-class)))
+
 ;; 2. Create the standard-class metaobject by hand.
 (setq the-class-standard-class
       (allocate-std-instance
        'tba
        (make-array (length the-slots-of-standard-class)
                    :initial-element secret-unbound-value)))
+
 ;; 3. Install standard-class's (circular) class-of link.
 (setf (std-instance-class the-class-standard-class)
       the-class-standard-class)
+
 ;; (It's now okay to use class-... accessor).
 ;; 4. Fill in standard-class's class-slots.
 (setf (class-slots the-class-standard-class) the-slots-of-standard-class)
+
 ;; (Skeleton built; it's now okay to call make-instance-standard-class.)
 ;; 5. Hand build the class t so that it has no direct superclasses.
 (setf (find-class 't)
@@ -1357,11 +1327,14 @@
         (setf (class-precedence-list class) (list class))
         (setf (class-slots class) ())
         class))
+
 ;; (It's now okay to define subclasses of t.)
 ;; 6. Create the other superclass of standard-class (i.e., standard-object).
 (defclass standard-object (t) ())
+
 ;; 7. Define the full-blown version of standard-class.
 (setq the-class-standard-class (eval the-defclass-standard-class))
+
 ;; 8. Replace all (3) existing pointers to the skeleton with real one.
 (setf (std-instance-class (find-class 't))
       the-class-standard-class)
@@ -1369,31 +1342,55 @@
       the-class-standard-class)
 (setf (std-instance-class the-class-standard-class)
       the-class-standard-class)
+
 ;; (Clear sailing from here on in).
 ;; 9. Define the other built-in classes.
-(defclass symbol (t) ())
-(defclass sequence (t) ())
-(defclass array (t) ())
-(defclass number (t) ())
-(defclass character (t) ())
-(defclass function (t) ())
-(defclass hash-table (t) ())
-(defclass package (t) ())
-(defclass input-stream (t) ())
-(defclass output-stream (t) ())
-(defclass stream (input-stream output-stream) ())
-(defclass list (sequence) ())
-(defclass null (symbol list) ())
-(defclass cons (list) ())
-(defclass vector (array sequence) ())
-(defclass string (vector) ())
-(defclass structure-object (t) ())
-(defclass structure-class (standard-class) ())
+(defconstant <top>               (find-class 't))
+(defconstant <symbol>            (defclass symbol (t) ()))
+(defconstant <sequence>          (defclass sequence (t) ()))
+(defconstant <array>             (defclass array (t) ()))
+(defconstant <number>            (defclass number (t) ()))
+(defconstant <character>         (defclass character (t) ()))
+(defconstant <function>          (defclass function (t) ()))
+(defconstant <hash-table>        (defclass hash-table (t) ()))
+(defconstant <package>           (defclass package (t) ()))
+(defconstant <input-stream>      (defclass input-stream (t) ()))
+(defconstant <output-stream>     (defclass output-stream (t) ()))
+(defconstant <stream>            (defclass stream (input-stream output-stream) ()))
+(defconstant <list>              (defclass list (sequence) ()))
+(defconstant <null>              (defclass null (symbol list) ()))
+(defconstant <cons>              (defclass cons (list) ()))
+(defconstant <vector>            (defclass vector (array sequence) ()))
+(defconstant <string>            (defclass string (vector) ()))
+(defconstant <structure-object>  (defclass structure-object (t) ()))
+(defconstant <structure-class>   (defclass structure-class (standard-class) ()))
+
+;; N.B. This version of built-in-class-of is straightforward but very slow.
+(defun built-in-class-of (x)
+  (cond
+    ((null x)                                         <null>)
+    ((symbolp x)                                      <symbol>)
+    ((numberp x)                                      <number>)
+    ((consp x)                                        <cons>)
+    ((charp x)                                        <character>)
+    ((hash-table-p x)                                 <hash-table>)
+    ((packagep x)                                     <package>)
+    ((%:%input-stream-p x)                            <input-stream>)
+    ((%:%output-stream-p x)                           <output-stream>)
+    ((stringp x)                                      <string>)
+    ((sl-struct::structurep x 'sl-struct::structure)  <structure-class>)
+    ((sl-struct::structurep x)                        <structure-object>)
+    ((vectorp x)                                      <vector>)
+    ((functionp x)                                    <function>)
+    (t                                                <top>)))
+
 ;; 10. Define the other standard metaobject classes.
 (setq the-class-standard-gf (eval the-defclass-standard-generic-function))
 (setq the-class-standard-method (eval the-defclass-standard-method))
+
 ;; Voila! The class hierarchy is in place.
 (format t "Class hierarchy created.~%")
+
 ;; (It's now okay to define generic functions and methods.)
 
 ;;; -------------------- closette-final.lisp
