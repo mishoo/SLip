@@ -1335,7 +1335,7 @@
                (when val?
                  (cond
                    ((when (and (consp sym)
-                               (eq 'lambda (car sym)))
+                               (%memq (car sym) '(lambda λ)))
                       (comp sym env t more?)))
                    (t
                     (assert (symbolp sym) "FUNCTION requires a symbol")

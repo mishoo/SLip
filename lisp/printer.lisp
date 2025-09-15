@@ -5,7 +5,9 @@
 
 (import '(sl-struct::find-structure
           sl-struct::structure-name
-          sl-struct::structure-slots))
+          sl-struct::structure-slots
+          sl-struct::structure-print-object
+          sl-struct::structure-print-function))
 
 (defgeneric print-object)
 
@@ -101,18 +103,31 @@
            (print-object list out)))))
     (<< ")")))
 
+(defun default-print-structure (obj def out)
+  (macrolet ((<< args
+               `(%stream-put out ,@args)))
+    (let* ((name (structure-name def))
+           (slots (structure-slots def)))
+      (<< "#S(")
+      (print-object name out)
+      (foreach-index slots (lambda (slot index)
+                             (<< " ")
+                             (print-object (intern (strcat (getf slot :name)) "KEYWORD") out)
+                             (<< " ")
+                             (print-object (svref obj (+ index 2)) out)))
+      (<< ")"))))
+
 (def-print (structure)
   (let* ((def (find-structure (svref structure 1)))
-         (name (structure-name def))
-         (slots (structure-slots def)))
-    (<< "#S(")
-    (print-object name out)
-    (foreach-index slots (lambda (slot index)
-                           (<< " ")
-                           (print-object (intern (strcat (getf slot :name)) "KEYWORD") out)
-                           (<< " ")
-                           (print-object (svref structure (+ index 2)) out)))
-    (<< ")")))
+         (print-object (structure-print-object def))
+         (print-function (structure-print-function def)))
+    (cond
+      (print-object
+       (funcall print-object structure out))
+      (print-function
+       (funcall print-function structure out *indentation*))
+      (t
+       (default-print-structure structure def out)))))
 
 (def-print (vector)
   (when *print-pretty*

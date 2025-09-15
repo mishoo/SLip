@@ -44,18 +44,21 @@
   (assert-struct structure)
   (copy-seq structure))
 
-(defun make-structure (name &key slots include)
+(defun make-structure (name &key slots include print-object print-function)
   (when (find-structure name nil)
     (warn "Redefining structure ~S." name))
   (when include
     (setf include (find-structure include)))
   (setf (find-structure name)
-        (vector *stag* 'structure name slots include)))
+        (vector *stag* 'structure name slots include print-object print-function)))
 
-(make-structure 'structure
-                :slots '((:name name :read-only t :type symbol)
-                         (:name slots :read-only t :type list)
-                         (:name include :read-only t :type symbol)))
+(make-structure
+ 'structure
+ :slots '((:name name :read-only t :type symbol)
+          (:name slots :read-only t :type list)
+          (:name include :read-only t :type symbol)
+          (:name print-object :read-only t :type function)
+          (:name print-function :read-only t :type function)))
 
 (defun structure-name (struct)
   (assert-struct struct 'structure)
@@ -68,6 +71,14 @@
 (defun structure-include (struct)
   (assert-struct struct 'structure)
   (svref struct 4))
+
+(defun structure-print-object (struct)
+  (assert-struct struct 'structure)
+  (svref struct 5))
+
+(defun structure-print-function (struct)
+  (assert-struct struct 'structure)
+  (svref struct 6))
 
 (defun parse-slot (args)
   (when (atom args)
@@ -85,8 +96,8 @@
          (constructor-arglist nil)
          (conc-name (strcat name "-"))
          (copier (intern (strcat "COPY-" name)))
-         (print-function nil)
          (print-object nil)
+         (print-function nil)
          (predicate (intern (strcat name "-P")))
          (include nil))
     (dolist (opt (cdr args)
@@ -95,8 +106,8 @@
                          constructor-arglist
                          conc-name
                          copier
-                         print-function
                          print-object
+                         print-function
                          predicate
                          include))
       (when (symbolp opt)
@@ -111,10 +122,10 @@
          (setf copier (cadr opt)))
         ((:predicate)
          (setf predicate (cadr opt)))
-        ((:print-function)
-         (setf print-function (cadr opt)))
         ((:print-object)
          (setf print-object (cadr opt)))
+        ((:print-function)
+         (setf print-function (cadr opt)))
         ((:include)
          (setf include (cadr opt)))
         (otherwise
@@ -156,13 +167,19 @@
                         constructor-arglist
                         conc-name
                         copier
-                        print-function
                         print-object
+                        print-function
                         predicate
                         include)
                        (parse-name-and-options name-and-options)
     (when include
-      (setf include (find-structure include)))
+      (setf include (find-structure include))
+      (unless (or print-object print-function)
+        (setf print-object (structure-print-object include)
+              print-function (structure-print-function include))))
+    (when (and print-object print-function)
+      (error "DEFSTRUCT ~S: both PRINT-OBJECT and PRINT-FUNCTION are specified"
+             struct-name))
     (let* ((documentation (when (stringp (car slot-description))
                             (pop slot-description)))
            (slots (append (when include
@@ -186,7 +203,12 @@
         `(progn
            (make-structure ',struct-name
                            :slots ',slots
-                           ,@(when include `(:include ',(structure-name include))))
+                           ,@(when include
+                               `(:include ',(structure-name include)))
+                           ,@(when print-object
+                               `(:print-object ',print-object))
+                           ,@(when print-function
+                               `(:print-function ',print-function)))
            ,@(mapcar #'make-slot slots)
            ,@(when predicate
                `((defun ,predicate (obj)

@@ -47,6 +47,7 @@
     #:standard-object
     #:standard-class #:standard-generic-function #:standard-method
     #:class-name
+    #:structure-class #:structure-object
 
     #:class-direct-superclasses #:class-direct-slots
     #:class-precedence-list #:class-slots #:class-direct-subclasses
@@ -132,9 +133,13 @@
 ;;; kind of Lisp object that can be easily made to print whatever way we want.
 
 (defstruct (std-instance (:constructor allocate-std-instance (class slots))
-                         (:predicate std-instance-p))
+                         (:predicate std-instance-p)
+                         (:print-object print-std-instance))
   class
   slots)
+
+(defun print-std-instance (instance stream)
+  (format stream "#<CLOSETTE: ~A>" (class-name (std-instance-class instance))))
 
 ;;; Standard instance allocation
 
@@ -270,8 +275,10 @@
      (find-class 'output-stream))
     ((stringp x)
      (find-class 'string))
+    ((sl-struct::structurep x 'sl-struct::structure)
+     (find-class 'structure-class))
     ((sl-struct::structurep x)
-     (find-class 'structure))
+     (find-class 'structure-object))
     ((vectorp x)
      (find-class 'vector))
     ((functionp x)
@@ -1379,6 +1386,8 @@
 (defclass cons (list) ())
 (defclass vector (array sequence) ())
 (defclass string (vector) ())
+(defclass structure-object (t) ())
+(defclass structure-class (standard-class) ())
 ;; 10. Define the other standard metaobject classes.
 (setq the-class-standard-gf (eval the-defclass-standard-generic-function))
 (setq the-class-standard-method (eval the-defclass-standard-method))
