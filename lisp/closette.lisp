@@ -322,6 +322,7 @@
 
 (defmacro defclass (name direct-superclasses direct-slots
                          &rest options)
+  (%:maybe-xref-info name :defclass)
   `(ensure-class ',name
                  :direct-superclasses
                  ,(canonicalize-direct-superclasses direct-superclasses)
@@ -821,8 +822,10 @@
         &key (generic-function-class the-class-standard-gf)
         (method-class the-class-standard-method)
         &allow-other-keys)
-  (multiple-value-bind (setter) (%:maybe-setter function-name)
-    (when setter (setf function-name setter)))
+  (multiple-value-bind (setter sym) (%:maybe-setter function-name)
+    (%:maybe-xref-info sym (if setter :generic-setf :generic))
+    (when setter
+      (setf function-name setter)))
   (if (find-generic-function function-name nil)
       (find-generic-function function-name)
       (let ((gf (apply (if (eq generic-function-class the-class-standard-gf)
@@ -876,6 +879,7 @@
                        (parse-defmethod args)
     (multiple-value-bind (setter) (%:maybe-setter function-name)
       (when setter (setf function-name setter)))
+    (%:maybe-xref-info function-name :method)
     `(ensure-method (find-generic-function ',function-name)
                     :lambda-list ',lambda-list
                     :qualifiers ',qualifiers
