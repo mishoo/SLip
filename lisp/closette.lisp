@@ -56,7 +56,7 @@
     #:generic-function-methods #:generic-function-discriminating-function
     #:generic-function-method-class
     #:method-lambda-list #:method-qualifiers #:method-specializers #:method-body
-    #:method-environment #:method-generic-function #:method-function
+    #:method-generic-function #:method-function
     #:slot-definition-name #:slot-definition-initfunction
     #:slot-definition-initform #:slot-definition-initargs
     #:slot-definition-readers #:slot-definition-writers
@@ -741,7 +741,6 @@
      (qualifiers :initarg :qualifiers)       ; :accessor method-qualifiers
      (specializers :initarg :specializers)   ; :accessor method-specializers
      (body :initarg :body)                   ; :accessor method-body
-     (environment :initarg :environment)     ; :accessor method-environment
      (generic-function :initform nil)        ; :accessor method-generic-function
      (function))))                           ; :accessor method-function
 
@@ -763,10 +762,6 @@
 (defun (setf method-body) (new-value method)
   (setf (slot-value method 'body) new-value))
 
-(defun method-environment (method) (slot-value method 'environment))
-(defun (setf method-environment) (new-value method)
-  (setf (slot-value method 'environment) new-value))
-
 (defun method-generic-function (method)
   (slot-value method 'generic-function))
 (defun (setf method-generic-function) (new-value method)
@@ -779,8 +774,6 @@
 ;;; defgeneric
 
 (defmacro defgeneric (function-name lambda-list &rest options)
-  (multiple-value-bind (setter) (%:maybe-setter function-name)
-    (when setter (setf function-name setter)))
   `(ensure-generic-function
     ',function-name
     :lambda-list ',lambda-list
@@ -828,6 +821,8 @@
         &key (generic-function-class the-class-standard-gf)
         (method-class the-class-standard-method)
         &allow-other-keys)
+  (multiple-value-bind (setter) (%:maybe-setter function-name)
+    (when setter (setf function-name setter)))
   (if (find-generic-function function-name nil)
       (find-generic-function function-name)
       (let ((gf (apply (if (eq generic-function-class the-class-standard-gf)
@@ -885,8 +880,7 @@
                     :lambda-list ',lambda-list
                     :qualifiers ',qualifiers
                     :specializers ,(canonicalize-specializers specializers)
-                    :body ',body
-                    :environment (top-level-environment))))
+                    :body ',body)))
 
 (defun canonicalize-specializers (specializers)
   `(list ,@(mapcar #'canonicalize-specializer specializers)))
@@ -1028,14 +1022,13 @@
 
 (defun make-instance-standard-method (method-class
                                       &key lambda-list qualifiers
-                                      specializers body environment)
+                                      specializers body)
   (declare (ignore method-class))
   (let ((method (std-allocate-instance the-class-standard-method)))
     (setf (method-lambda-list method) lambda-list)
     (setf (method-qualifiers method) qualifiers)
     (setf (method-specializers method) specializers)
     (setf (method-body method) body)
-    (setf (method-environment method) environment)
     (setf (method-generic-function method) nil)
     (setf (method-function method)
           (std-compute-method-function method))
@@ -1090,8 +1083,7 @@
    :lambda-list '(object)
    :qualifiers ()
    :specializers (list class)
-   :body `(slot-value object ',slot-name)
-   :environment (top-level-environment))
+   :body `(slot-value object ',slot-name))
   (values))
 
 (defun add-writer-method (class fn-name slot-name)
@@ -1102,8 +1094,7 @@
    :qualifiers ()
    :specializers (list (find-class 't) class)
    :body `(setf (slot-value object ',slot-name)
-                new-value)
-   :environment (top-level-environment))
+                new-value))
   (values))
 
 ;;;
@@ -1233,8 +1224,7 @@
 (defun std-compute-method-function (method)
   (let ((form (method-body method))
         (lambda-list (method-lambda-list method)))
-    (compile-in-lexical-environment
-     (method-environment method)
+    (compile
      `(lambda (args next-emfun)
         (flet ((call-next-method (&rest cnm-args)
                  (if (null next-emfun)
@@ -1260,19 +1250,6 @@
                (not (member '&key lambda-list)))
           (append lambda-list '(&key &allow-other-keys))
           lambda-list)))
-
-;;; Run-time environment hacking (Common Lisp ain't got 'em).
-
-(defun top-level-environment ()
-  nil) ; Bogus top level lexical environment
-
-(defvar compile-methods t)
-
-(defun compile-in-lexical-environment (env lambda-expr)
-  (declare (ignore env))
-  (if compile-methods
-      (compile lambda-expr)
-      (eval `(function ,lambda-expr))))
 
 ;;; -------------------- bootstrap.lisp
 
