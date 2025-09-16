@@ -69,10 +69,6 @@ export class LispChar {
         return this.value;
     }
 
-    toString() {
-        return this.value;
-    }
-
     name() {
         return LispChar.#NAMES_TO[this.value] || this.value;
     }
@@ -104,7 +100,7 @@ export class LispClosure {
         return new LispClosure(this.code, this.name, this.env);
     }
     toString() {
-        return "<function" + (this.name ? " " + this.name : "") + ">";
+        return "#<FUNCTION" + (this.name ? " " + this.name : "") + ">";
     }
 }
 
@@ -229,13 +225,16 @@ export class LispHash {
     [Symbol.iterator]() {
         return this.data.entries();
     }
+    toString() {
+        return `#<HASH[${this.size()}]>`;
+    }
 }
 
 export class LispObject {
     static type = "object";
     static is(x) { return x instanceof LispObject }
     toString() {
-        return "<object " + this.vector[0].vector[2] + ">";
+        return "#<OBJECT " + this.vector[0].vector[2] + ">";
     }
     constructor(size) {
         this.vector = new Array(size).fill(false);
@@ -264,7 +263,7 @@ export class LispPackage {
         this.exports = [];
         this.uses = [];
     }
-    toString() { return "<package " + this.name + ">" }
+    toString() { return "#<PACKAGE " + this.name + ">" }
     serialize(cache) {
         if (cache) {
             let id = cache.get(this);
@@ -574,7 +573,7 @@ export class LispProcess {
     }
 
     toString() {
-        return "<process " + this.pid + ">";
+        return "#<PROCESS " + this.pid + ">";
     }
 
     resume() {

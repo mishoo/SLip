@@ -738,27 +738,60 @@ function indent(level) {
 }
 
 function dump(thing) {
-    if (thing === false) return "NIL";
-    if (thing === true) return "T";
-    if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
-    if (thing instanceof LispCons) {
-        if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
-            return "'" + dump(LispCons.cadr(thing));
-        var ret = "(", first = true;
-        while (thing !== false) {
-            if (!first) ret += " ";
-            else first = false;
-            ret += dump(LispCons.car(thing));
-            thing = LispCons.cdr(thing);
-            if (!LispCons.isList(thing)) {
-                ret += " . " + dump(thing);
-                break;
+    let cache = new Map();
+    (function walk(thing){
+        if (thing instanceof LispCons) {
+            if (cache.has(thing)) {
+                cache.set(thing, cache.get(thing) + 1);
+            } else {
+                cache.set(thing, 1);
+                LispCons.forEach(thing, walk);
             }
         }
-        return ret + ")";
-    }
-    if (Array.isArray(thing)) return `#(${thing.map(dump).join(" ")})`;
-    return String(thing);
+        else if (Array.isArray(thing)) {
+            if (cache.has(thing)) {
+                cache.set(thing, cache.get(thing) + 1);
+            } else {
+                cache.set(thing, 1);
+                thing.forEach(walk);
+            }
+        }
+    })(thing);
+    let dumped = new Map(), ref = 0;
+    return function idump(thing) {
+        if (thing === false) return "NIL";
+        if (thing === true) return "T";
+        if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
+        if (dumped.has(thing)) {
+            return "#" + dumped.get(thing);
+        }
+        let ret = "";
+        if (cache.get(thing) > 1) {
+            dumped.set(thing, ++ref);
+            ret += "#" + ref + "=";
+        }
+        if (thing instanceof LispCons) {
+            if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
+                return ret + "'" + idump(LispCons.cadr(thing));
+            ret += "(";
+            let first = true;
+            while (thing !== false) {
+                if (!first) ret += " ";
+                else first = false;
+                ret += idump(LispCons.car(thing));
+                thing = LispCons.cdr(thing);
+                if (!LispCons.isList(thing)) {
+                    ret += " . " + idump(thing);
+                    break;
+                }
+            }
+            return ret + ")";
+        }
+        if (Array.isArray(thing)) {
+            return ret + `#(${thing.map(idump).join(" ")})`;
+        }
+        return String(thing);
+    }(thing);
 }
 
 const OP_REV = Object.keys(OP);

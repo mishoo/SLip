@@ -1582,21 +1582,22 @@
 ;;; describe-object is a handy tool for enquiring minds:
 
 (defgeneric describe-object (object stream))
-;; (defmethod describe-object ((object standard-object) stream)
-;;   (format t "A Closette object~
-;;              ~%Printed representation: ~S~
-;;              ~%Class: ~S~
-;;              ~%Structure "
-;;           object
-;;           (class-of object))
-;;   (dolist (sn (mapcar #'slot-definition-name
-;;                       (class-slots (class-of object))))
-;;     (format t "~%    ~S <- ~:[not bound~;~S~]"
-;;             sn
-;;             (slot-boundp object sn)
-;;             (and (slot-boundp object sn)
-;;                  (slot-value object sn))))
-;;   (values))
+(defmethod describe-object ((object standard-object) stream)
+  (format stream "A Closette object~
+             ~%Printed representation: ~S~
+             ~%Class: ~S~
+             ~%Structure "
+          object
+          (class-of object))
+  (dolist (sn (mapcar #'slot-definition-name
+                      (class-slots (class-of object))))
+    (format stream "~%    ~S <- ~:[not bound~;~S~]"
+            sn
+            (slot-boundp object sn)
+            (and (slot-boundp object sn)
+                 (slot-value object sn))))
+  (format stream "~%")
+  (values))
 ;; (defmethod describe-object ((object t) stream)
 ;;   (common-lisp:describe object)
 ;;   (values))
