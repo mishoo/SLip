@@ -505,7 +505,7 @@
   (symbol-function sym))
 
 (defun (setf fdefinition) (func sym)
-  (setf (symbol-function sym) func))
+  (set-symbol-function! sym func))
 
 (defun (setf symbol-value) (value sym)
   (set-symbol-value! sym value))

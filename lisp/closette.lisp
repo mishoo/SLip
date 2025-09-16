@@ -847,7 +847,7 @@
                      #'std-compute-discriminating-function
                      #'compute-discriminating-function)
                  gf))
-  (setf (symbol-function (generic-function-name gf))
+  (setf (fdefinition (generic-function-name gf))
         (generic-function-discriminating-function gf))
   (clrhash (classes-to-emf-table gf))
   (values))

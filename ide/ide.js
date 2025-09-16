@@ -371,7 +371,9 @@ Ymacs_Buffer.newCommands({
                 goto(0);
             } else {
                 this.cmd("popup_menu", {
-                    items: debug.map(stuff => stuff[0].name ?? stuff[0]),
+                    items: debug.map(([sym, file, line]) => ({
+                        label: Ymacs.raw(`<b>${sym.name ?? sym}</b> (${file}:${line})`)
+                    })),
                     onSelect: goto,
                 });
             }
