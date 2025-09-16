@@ -125,6 +125,8 @@
                (case directive
                  (#\{
                   (slurp #\} nil))
+                 (#\(
+                  (slurp #\) nil))
                  (#\[
                   (slurp #\] (lambda (sublist)
                                (let ((ret (list)))
@@ -282,13 +284,31 @@
     (%stream-put output (%pad-string x mincol padchar))
     (cdr args)))
 
+(def-format #\( (#:ignored #:ignored sublist)
+  (let* ((args args)
+         (str (with-output-to-string (out)
+                (setf args (%exec-format sublist args out)))))
+    (%stream-put output
+                 (cond
+                   ((and colmod? atmod?)
+                    (string-upcase str))
+                   (colmod?
+                    (string-capitalize str))
+                   (atmod?
+                    (%:string-capitalize-1 str))
+                   (t
+                    (string-downcase str))))
+    args))
+
+(def-format #\) ()
+  (error "Unmatched ~~)"))
+
 ;;; iteration
 
 (def-format #\{ (ensure-once? #:end-at? sublist maxn)
   ;; "If str is empty, then an argument is used as str."
   (unless sublist
-    (setf sublist (%parse-format (car args))
-          args (cdr args)))
+    (setf sublist (%parse-format (pop args))))
   ;; "if atmod, use the rest of the arguments as list"
   (let ((*format-current-args* (if atmod? args (car args))))
     (catch 'abort-format-iteration
@@ -310,8 +330,8 @@
         (if colmod?
             ;; iterate once for each argument sublist
             (foreach *format-current-args*
-              (lambda (*format-current-args*)
-                (iterate sublist 0)))
+                     (lambda (*format-current-args*)
+                       (iterate sublist 0)))
             ;; normal case (no colmod)
             (iterate sublist 0)))))
   (if atmod? nil (cdr args)))
