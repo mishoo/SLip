@@ -2309,12 +2309,13 @@ function grok_xref_info(xref, filename) {
         if (sym instanceof LispSymbol) {
             let a = sym.getv("XREF");
             if (a === false) a = sym.setv("XREF", []);
-            let idx = a.findIndex(def => def[0] === type);
-            if (idx >= 0) {
-                a[idx] = [type, filename, pos];
-            } else {
-                a.push([ type, filename, pos ]);
-            }
+            // let idx = a.findIndex(def => def[0] === type);
+            // if (idx >= 0) {
+            //     a[idx] = [type, filename, pos];
+            // } else {
+            //     a.push([ type, filename, pos ]);
+            // }
+            a.push([ type, filename, pos ]);
         }
     });
     LispMachine.XREF[filename] = xref;
