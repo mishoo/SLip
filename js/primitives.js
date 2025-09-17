@@ -1085,6 +1085,11 @@ defp("numberp", false, function(m, nargs){
     return LispNumber.is(m.pop());
 });
 
+defp("integerp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return Number.isInteger(m.pop());
+});
+
 defp("hash-table-p", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return LispHash.is(m.pop());
@@ -1163,6 +1168,30 @@ defp("oddp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var x = m.pop_number();
     return x % 2 === 1;
+});
+
+defp("%type-of", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let x = m.pop();
+    if (x === false) return LispSymbol.get("NULL");
+    if (x === true) return LispSymbol.get("BOOLEAN");
+    if (LispSymbol.is(x)) return LispSymbol.get("SYMBOL");
+    if (LispCons.is(x)) return LispSymbol.get("CONS");
+    if (Number.isInteger(x)) return LispSymbol.get("INTEGER");
+    if (typeof x === "number") return LispSymbol.get("NUMBER");
+    if (typeof x === "string") return LispSymbol.get("STRING");
+    if (LispChar.is(x)) return LispSymbol.get("CHAR");
+    if (LispHash.is(x)) return LispSymbol.get("HASH-TABLE");
+    if (LispRegexp.is(x)) return LispSymbol.get("REGEXP");
+    if (LispClosure.is(x)) return LispSymbol.get("FUNCTION");
+    // XXX: define built-in type LispStruct.
+    if (LispVector.is(x)) return x[0] === LispSymbol.get("%STRUCT", LispPackage.get("SL-STRUCT"))
+        ? LispSymbol.get("STRUCTURE")
+        : LispSymbol.get("VECTOR");
+    if (LispPackage.is(x)) return LispSymbol.get("PACKAGE");
+    if (LispProcess.is(x)) return LispSymbol.get("THREAD");
+    if (LispObject.is(x)) return LispSymbol.get("STANDARD-OBJECT");
+    return LispSymbol.get("T");
 });
 
 defp("parse-number", false, function(m, nargs){

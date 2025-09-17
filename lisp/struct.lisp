@@ -209,6 +209,8 @@
                                `(:print-object ',print-object))
                            ,@(when print-function
                                `(:print-function ',print-function)))
+           (sl-type::defop ,struct-name (obj)
+                           (structurep obj ',struct-name))
            ,@(mapcar #'make-slot slots)
            ,@(when predicate
                `((defun ,predicate (obj)
@@ -246,3 +248,7 @@
                       (vector *stag* ',struct-name
                               ,@(mapcar (lambda (slot) (getf slot :name)) slots)))))))
            ',struct-name)))))
+
+(defun sl-type::type-of-structure (x)
+  ;; we already know it's a struct at this point.
+  (svref x 1))

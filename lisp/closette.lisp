@@ -952,7 +952,7 @@
 (defun analyze-lambda-list (lambda-list)
   (labels ((make-keyword (symbol)
              (intern (symbol-name symbol)
-                     (find-package 'keyword)))
+                     #.(find-package 'keyword)))
            (get-keyword-from-arg (arg)
              (if (listp arg)
                  (if (listp (car arg))

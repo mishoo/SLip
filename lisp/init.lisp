@@ -17,9 +17,9 @@
      &allow-other-keys &aux &body &key &optional &rest &whole * *error-output*
      *package* *read-table* *standard-output* *trace-output* + - / /= 1+ 1- <
      <= = > >= abs acos adjoin aif and append apply aref asin assert atan atom
-     block boundp caaaar caaadr caaar caadar caaddr caadr caar cadaar cadadr
-     cadar caddar cadddr caddr cadr car case catch cdaaar cdaadr cdaar cdadar
-     cdaddr cdadr cdar cddaar cddadr cddar cdddar cddddr cdddr cddr cdr
+     block boolean boundp caaaar caaadr caaar caadar caaddr caadr caar cadaar
+     cadadr cadar caddar cadddr caddr cadr car case catch cdaaar cdaadr cdaar
+     cdadar cdaddr cdadr cdar cddaar cddadr cddar cdddar cddddr cdddr cddr cdr
      ceiling char char-code char-equal char-greaterp char-lessp char-name
      char-not-equal char-not-greaterp char-not-lessp char/= char< char<= char=
      char> char>= charp clear-timeout code-char compile
@@ -32,8 +32,8 @@
      find-package find-symbol first fixnum flet floor fmakunbound foreach
      fourth funcall function functionp gensym get get-internal-run-time
      get-setf-expansion getf gethash go hash-copy hash-iterator hash-keys
-     hash-table-p hash-values identity if ignore import in-package incf
-     integer intern it iterator-next keywordp labels lambda
+     hash-table hash-table-p hash-values identity if ignore import in-package
+     incf integer integerp intern it iterator-next keywordp labels lambda
      lambda-list-keywords last length let let* letterp list list* listp load
      locally log macroexpand macroexpand-1 macrolet make-array make-hash
      make-list make-package make-regexp make-symbol make-thread make-vector
@@ -41,20 +41,21 @@
      most-positive-fixnum multiple-value-bind multiple-value-call
      multiple-value-list multiple-value-prog1 multiple-value-setq name-char
      nconc nil not notany notevery nreconc nreverse nth nthcdr null
-     number-fixed number-string numberp oddp optimize or otherwise
-     package-name packagep parse-integer parse-number plusp pop prog prog*
-     prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
-     quote-regexp random regexp-exec regexp-test regexpp remhash
+     number-fixed number-string number numberp oddp optimize or otherwise
+     package package-name packagep parse-integer parse-number plusp pop prog
+     prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
+     quote-regexp random regexp regexp-exec regexp-test regexpp remhash
      replace-regexp rest return return-from revappend reverse rotatef round
      rplaca rplacd schar second set-timeout setf setq shadow shiftf sin some
-     space special speed sqrt string-capitalize string-downcase string-equal
-     string-greaterp string-lessp string-not-equal string-not-greaterp
-     string-not-lessp string-upcase string/= string< string<= string= string>
-     string>= stringp svref sxhash symbol-function symbol-macrolet symbol-name
+     space special speed sqrt standard-object string-capitalize
+     string-downcase string-equal string-greaterp string-lessp
+     string-not-equal string-not-greaterp string-not-lessp string-upcase
+     string/= string< string<= string= string> string>= stringp structure
+     svref sxhash symbol symbol-function symbol-macrolet symbol-name
      symbol-package symbol-plist symbol-value symbolp t tagbody tan third
-     threadp throw type unintern unless unsigned-byte unwind-protect upcase
-     use-package values values-list vector vector-pop vector-push vectorp warn
-     when with-output-to-string without-interrupts zerop λ
+     thread threadp throw type unintern unless unsigned-byte unwind-protect
+     upcase use-package values values-list vector vector-pop vector-push
+     vectorp warn when with-output-to-string without-interrupts zerop λ
 
      ))
 
@@ -110,7 +111,7 @@
        ,@(map1 (lambda (opt)
                  (case (car opt)
                    (:export
-                    `(%export (list ,@(cdr opt)) ,pak))
+                    `(%export ',(cdr opt) ,pak))
                    (:import-from
                     (destructuring-bind (source &rest names) (cdr opt)
                       (setq source (find-package source))

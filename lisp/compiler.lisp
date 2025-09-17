@@ -296,7 +296,7 @@
 
 (defmacro and exps
   (cond
-    ((cdr exps) `(when ,(car exps) (and ,@(cdr exps))))
+    ((cdr exps) `(if ,(car exps) (and ,@(cdr exps))))
     (exps (car exps))
     (t t)))
 
@@ -809,7 +809,7 @@
 (defun %dbind-error-missing-sublist ()
   (error/wp "DESTRUCTURING-BIND: Missing sublist"))
 
-(defun %fn-destruct (macro? args values body)
+(defun %fn-destruct (macro? args values body &key default-value)
   (let (names decls)
     (let ((topv (gensym)) rec)
       (labels
@@ -873,12 +873,18 @@
                           (push thisarg names)
                           (cond
                             (optional?
-                             (add thisarg `(%pop ,values)))
+                             (add thisarg (if default-value
+                                              `(or (%pop ,values) ,default-value)
+                                              `(%pop ,values))))
                             (aux?
                              (add thisarg nil))
                             (key?
-                             (add thisarg `(getf ,values ,(intern (symbol-name thisarg)
-                                                                  (find-package "KEYWORD")))))
+                             (add thisarg (if default-value
+                                              `(getf ,values ,(intern (symbol-name thisarg)
+                                                                      #.+keyword-package+)
+                                                     ,default-value)
+                                              `(getf ,values ,(intern (symbol-name thisarg)
+                                                                      #.+keyword-package+)))))
                             (t
                              (add thisarg `(if ,values
                                                (%pop ,values)
@@ -889,14 +895,18 @@
                        (cond
                          (optional?
                           (let ((thisarg (car thisarg))
-                                (default (cadr thisarg))
+                                (default (if (cdr thisarg)
+                                             (cadr thisarg)
+                                             default-value))
                                 (thisarg-p (caddr thisarg)))
                             (when thisarg-p
                               (add thisarg-p `(if ,values t nil)))
                             (add thisarg `(if ,values (%pop ,values) ,default))))
                          (key?
                           (let ((thisarg (car thisarg))
-                                (default (cadr thisarg))
+                                (default (if (cdr thisarg)
+                                             (cadr thisarg)
+                                             default-value))
                                 (thisarg-p (caddr thisarg)))
                             (when thisarg-p
                               (add thisarg-p nil))
@@ -915,7 +925,7 @@
                                          ,setdef)))
                                 ((add thisarg
                                       `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
-                                                                          (find-package "KEYWORD"))
+                                                                          #.+keyword-package+)
                                                          '%not-found)))
                                          ,setdef)))))))
                          (aux? (let ((thisarg (car thisarg))
@@ -935,15 +945,19 @@
 (defmacro destructuring-bind (args values . body)
   (%fn-destruct nil args values body))
 
+(defun macro-lambda (name lambda-list body &key default-value)
+  (if (and (not default-value)
+           (ordinary-lambda-list-p lambda-list))
+      `(%::%fn ,name ,lambda-list ,@body)
+      (let ((args (gensym "ARGS")))
+        `(%::%fn ,name ,args
+                 ,(%fn-destruct t lambda-list args body :default-value default-value)))))
+
 (defmacro defmacro (name lambda-list . body)
   (when (%primitivep name)
     (error/wp (strcat "We shall not DEFMACRO on " name " (primitive function)")))
   (%::maybe-xref-info name 'defmacro)
-  (if (ordinary-lambda-list-p lambda-list)
-      `(%macro! ',name (%::%fn ,name ,lambda-list ,@body))
-      (let ((args (gensym "ARGS")))
-        `(%macro! ',name (%::%fn ,name ,args
-                                 ,(%fn-destruct t lambda-list args body))))))
+  `(%macro! ',name ,(macro-lambda name lambda-list body)))
 
 ;; let's define early some compiler macros, so that the compiler itself can
 ;; benefit from them.
@@ -1713,6 +1727,10 @@
                &aux
                (index 0)
                (envcell (vector)))
+       ;; (unless (or optional key has-key aux aok)
+       ;;   (return-from comp-extended-lambda
+       ;;     ;; this should still be somewhat more efficient
+       ;;     (comp-lambda name `(,@required . ,rest) body env)))
        (with-declarations body
          (with-seq-output <<
            (setq env (extenv env :lex envcell))
@@ -2144,6 +2162,7 @@
 (defconstant *core-files*
   '("lisp/init.lisp"
     "lisp/hash.lisp"
+    "lisp/type.lisp"
     "lisp/macroexpand.lisp"
     "lisp/format.lisp"
     "lisp/struct.lisp"

@@ -1,6 +1,7 @@
 (in-package :sl)
 
 (export '(print-object
+          print-unreadable-object
           print-object-to-string
           *print-readably*
           *print-escape*
@@ -29,6 +30,15 @@
 (defun print-object-to-string (obj)
   (with-output-to-string (out)
     (print-object obj out)))
+
+(defmacro print-unreadable-object ((object stream &key type identity) &body body)
+  (let ((_stream (gensym))
+        (_object (gensym)))
+    `(let ((,_stream ,stream)
+           (,_object ,object))
+       (%stream-put ,_stream "#<")
+  
+       (%stream-put ,_stream ">"))))
 
 (defun print-object (obj stream)
   (%stream-put stream (%dump obj)))
