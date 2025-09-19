@@ -304,7 +304,7 @@
       (setf class (find-class class)))
     (%memq class (class-cpl (class-of obj)))))
 
-(defun sl-type::type-of-object (obj)
+(defun sl-type:type-of-object (obj)
   (class-name (class-of obj)))
 
 (defmacro defclass (name direct-supers direct-slots)
@@ -313,7 +313,7 @@
     (setf direct-supers '(object)))
   `(progn
      (sl-type:defop ,name (obj)
-                    (if (is-a obj ',name) t))
+       (if (is-a obj ',name) t))
      (setf (find-class ',name)
            (make-class ',name (list ,@(mapcar (lambda (name)
                                                 `(find-class ',name))
