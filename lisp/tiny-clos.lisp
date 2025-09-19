@@ -312,7 +312,7 @@
   (unless direct-supers
     (setf direct-supers '(object)))
   `(progn
-     (sl-type:defop ,name (obj)
+     (sl-type:defpredicate ,name (obj)
        (if (is-a obj ',name) t))
      (setf (find-class ',name)
            (make-class ',name (list ,@(mapcar (lambda (name)

@@ -6,7 +6,7 @@
 
 (defpackage :sl-type
   (:use :sl :%)
-  (:export "DEFOP" "TYPE-OF-STRUCTURE" "TYPE-OF-OBJECT"))
+  (:export "DEFPREDICATE" "TYPE-OF-STRUCTURE" "TYPE-OF-OBJECT"))
 
 (in-package :sl-type)
 
@@ -17,7 +17,7 @@
 ;;
 ;; Predicates are called with the object to test followed by the type
 ;; arguments. For example (typep x '(integer 0 9)) will call (integer x 0 9),
-;; where `integer' is the predicate for integer (defined with defop below).
+;; where `integer' is the predicate for integer (defined with defpredicate below).
 (defglobal *built-in-types*
   (%:make-hash
    'null           'null
@@ -37,7 +37,7 @@
 
 (defglobal *ext-types* *built-in-types*)
 
-(defmacro defop (name args &body body)
+(defmacro defpredicate (name args &body body)
   (let ((intname (intern (strcat (symbol-name name) "-SL-TYPE-INTERNAL"))))
     `(progn
        (setf (fdefinition ',intname) (%:%fn ,name ,args ,@body))
@@ -47,42 +47,42 @@
 ;; built-in complex definitions
 
 ;; Everything is of type T, and nothing is of type NIL.
-(defop t (obj) (declare (ignore obj)) t)
-(defop nil (obj) (declare (ignore obj)) nil)
+(defpredicate t (obj) (declare (ignore obj)) t)
+(defpredicate nil (obj) (declare (ignore obj)) nil)
 
-(defop boolean (obj)
+(defpredicate boolean (obj)
   (or (null obj) (eq obj t)))
 
-(defop integer (obj &optional (min '*) (max '*))
+(defpredicate integer (obj &optional (min '*) (max '*))
   (and (integerp obj)
        (or (eq min '*) (>= obj min))
        (or (eq max '*) (<= obj max))))
 
-(defop or (obj &rest typespecs)
+(defpredicate or (obj &rest typespecs)
   (do ((ts typespecs (cdr ts)))
       ((null ts) nil)
     (when (typep obj (car ts))
       (return t))))
 
-(defop and (obj &rest typespecs)
+(defpredicate and (obj &rest typespecs)
   (do ((ts typespecs (cdr ts)))
       ((null ts) t)
     (unless (typep obj (car ts))
       (return nil))))
 
-(defop not (obj typespec)
+(defpredicate not (obj typespec)
   (not (typep obj typespec)))
 
-(defop satisfies (obj predicate)
+(defpredicate satisfies (obj predicate)
   (funcall predicate obj))
 
-(defop member (obj &rest options)
+(defpredicate member (obj &rest options)
   (if (member obj options) t))
 
-(defop eql (obj value)
+(defpredicate eql (obj value)
   (eql obj value))
 
-(defop mod (obj n)
+(defpredicate mod (obj n)
   (and (integerp obj)
        (plusp obj)
        (< obj n)))
@@ -102,8 +102,6 @@
           (error "TYPEP: unknown type ~S" typespec)))))
 
 (setf (symbol-function 'typep) #'%typep)
-
-(defun qt (arg) `',arg)
 
 (defun expand (tspec object)
   (symbol-macrolet (($thing (progn
@@ -167,7 +165,7 @@
            ;; this is constant and we can evaluate it right away
            (let ((typespec (eval typespec))
                  (obj (make-symbol "OBJ")))
-             `(defop ,name (,obj)
+             `(defpredicate ,name (,obj)
                 ,(expand typespec obj))))
           (t
            ;; Parametrized type: this case is completely unoptimized and will
@@ -179,7 +177,7 @@
            ;; that would require a hash table with :test EQUAL, which we lack
            ;; at the moment.
            ;;
-           ;; TODO: at least use DEFOP to intern a symbol, rather than
+           ;; TODO: at least use DEFPREDICATE to intern a symbol, rather than
            ;; function object.
            `(setf (gethash ',name *ext-types*)
                   ,(%:macro-lambda name (cons '$obj lambda-list)
