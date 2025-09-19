@@ -38,11 +38,16 @@
 (defglobal *ext-types* *built-in-types*)
 
 (defmacro defpredicate (name args &body body)
-  (let ((intname (intern (strcat (symbol-name name) "-SL-TYPE-INTERNAL"))))
-    `(progn
-       (setf (fdefinition ',intname) (%:%fn ,name ,args ,@body))
-       (setf (gethash ',name *ext-types*) ',intname)
-       ',name)))
+  ;; This will make life a little harder during development, but we really
+  ;; don't want to change built-in type defs. We also don't want to throw an
+  ;; error, because calls to DEFPREDICATE will happen while bootstrapping the
+  ;; class hierarchy. So if built-in type is already defined, just do nothing.
+  (unless (gethash name *built-in-types*)
+    (let ((intname (intern (strcat (symbol-name name) "-SL-TYPE-INTERNAL"))))
+      `(progn
+         (setf (fdefinition ',intname) (%:%fn ,name ,args ,@body))
+         (setf (gethash ',name *ext-types*) ',intname)
+         ',name))))
 
 ;; built-in complex definitions
 
@@ -122,7 +127,8 @@
                        `(%typep ,$thing ',tspec))))
                 ((atom tspec)
                  (error "Unexpected atom in type spec: ~S" tspec))
-                ((case (car tspec)
+                (t
+                 (case (car tspec)
                    ((and)
                     `(and ,@(mapcar #'expand (cdr tspec))))
                    ((or)

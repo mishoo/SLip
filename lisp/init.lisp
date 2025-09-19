@@ -393,6 +393,8 @@
   (let ((setter (maybe-setter `(setf ,(car form)))))
     (cond
       ((or (safe-atom-p value)
+           (and (consp value)
+                (eq 'quote (car value)))
            (every #'safe-atom-p (cdr form)))
        ;; it's safe to compute the value first.
        `(,setter ,value ,@(cdr form)))
