@@ -28,7 +28,7 @@
           vector structure string char regexp package null symbol
           stream thread input-stream output-stream unknown-class
           find-class defclass defgeneric make-instance defmethod
-          slot-value class-name typep class-of))
+          slot-value class-name class-of))
 
 (defpackage :sl-tiny-clos
   (:use :sl :%))
@@ -48,24 +48,6 @@
 
 (defsetf find-generic (sym) (generic)
   `(%set-symbol-prop ,sym :generic ,generic))
-
-(defmacro defclass (name direct-supers direct-slots)
-  (%:maybe-xref-info name 'defclass)
-  (unless direct-supers
-    (setf direct-supers '(object)))
-  `(setf (find-class ',name)
-         (make-class ',name (list ,@(mapcar (lambda (name)
-                                              `(find-class ',name))
-                                            direct-supers))
-                     ',direct-slots)))
-
-(defmacro defgeneric (name)
-  (let ((generic (gensym "GENERIC")))
-    `(unless (find-generic ',name)
-       (let ((,generic (make-generic)))
-         (setf (find-generic ',name) ,generic)
-         (defun ,name args
-           (apply (%get-entity-proc ,generic) args))))))
 
 (defun make-instance (class . initargs)
   (apply #'make (if (symbolp class)
@@ -322,8 +304,29 @@
       (setf class (find-class class)))
     (%memq class (class-cpl (class-of obj)))))
 
-(defun typep (obj type)
-  (if (is-a obj type) t nil))
+(defun sl-type::type-of-object (obj)
+  (class-name (class-of obj)))
+
+(defmacro defclass (name direct-supers direct-slots)
+  (%:maybe-xref-info name 'defclass)
+  (unless direct-supers
+    (setf direct-supers '(object)))
+  `(progn
+     (sl-type:defop ,name (obj)
+                    (if (is-a obj ',name) t))
+     (setf (find-class ',name)
+           (make-class ',name (list ,@(mapcar (lambda (name)
+                                                `(find-class ',name))
+                                              direct-supers))
+                       ',direct-slots))))
+
+(defmacro defgeneric (name)
+  (let ((generic (gensym "GENERIC")))
+    `(unless (find-generic ',name)
+       (let ((,generic (make-generic)))
+         (setf (find-generic ',name) ,generic)
+         (defun ,name args
+           (apply (%get-entity-proc ,generic) args))))))
 
 ;;
 ;; Initialization protocol
@@ -619,4 +622,3 @@
 
 (setf (find-class 'nil) <null>)
 (setf (find-class 't) <top>)
-

@@ -1,14 +1,12 @@
 (in-package :sl)
 
-(export '(type-of deftype null symbol number integer cons function char
+(export '(type-of typep deftype null symbol number integer cons function char
           hash-table package structure input-stream output-stream string vector
           satisfies mod))
 
 (defpackage :sl-type
   (:use :sl :%)
-  (:export defop type-of-structure type-of-object))
-
-(shadow 'typep) ;; XXX: for now.
+  (:export "DEFOP" "TYPE-OF-STRUCTURE" "TYPE-OF-OBJECT"))
 
 (in-package :sl-type)
 
@@ -47,6 +45,11 @@
        ',name)))
 
 ;; built-in complex definitions
+
+;; Everything is of type T, and nothing is of type NIL.
+(defop t (obj) (declare (ignore obj)) t)
+(defop nil (obj) (declare (ignore obj)) nil)
+
 (defop boolean (obj)
   (or (null obj) (eq obj t)))
 
