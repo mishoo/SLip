@@ -1727,10 +1727,18 @@
                &aux
                (index 0)
                (envcell (vector)))
-       ;; (unless (or optional key has-key aux aok)
-       ;;   (return-from comp-extended-lambda
-       ;;     ;; this should still be somewhat more efficient
-       ;;     (comp-lambda name `(,@required . ,rest) body env)))
+       (unless (or optional key has-key aux aok)
+         ;; this should still be somewhat more efficient
+         (return-from comp-extended-lambda
+           (cond
+             ((and required rest)
+              (comp-lambda-args-and-body name `(,@required . ,rest) body env))
+             (required
+              (comp-lambda-args-and-body name required body env))
+             (rest
+              (comp-lambda-args-and-body name rest body env))
+             (t
+              (comp-lambda-args-and-body name () body env)))))
        (with-declarations body
          (with-seq-output <<
            (setq env (extenv env :lex envcell))
@@ -1781,29 +1789,31 @@
 
      (comp-lambda (name args body env)
        (gen "FN"
-            (let ((code
-                   (catch '$xargs
-                     (with-seq-output <<
-                       (with-declarations body
-                         (<< (gen-simple-args args 0 nil))
-                         (let ((args (make-true-list args)))
-                           (foreach-index args
-                                          (lambda (name index)
-                                            (when (or (%specialp name)
-                                                      (%memq name locally-special))
-                                              (<< (gen "BIND" name index)))))
-                           (cond
-                             (args
-                              (setq env (extenv env :lex (map1-vector #'maybe-special args)))
-                              (declare-locally-special :except args)
-                              (<< (with-env (comp-lambda-body name body env))))
-                             (t
-                              (declare-locally-special)
-                              (<< (with-env (comp-lambda-body name body env)))))))))))
+            (let ((code (catch '$xargs
+                          (comp-lambda-args-and-body name args body env))))
               (if (eq code '$xargs)
                   (apply #'comp-extended-lambda name body env (parse-lambda-list args))
                   code))
             name))
+
+     (comp-lambda-args-and-body (name args body env)
+       (with-seq-output <<
+         (with-declarations body
+           (<< (gen-simple-args args 0 nil))
+           (let ((args (make-true-list args)))
+             (foreach-index args
+                            (lambda (name index)
+                              (when (or (%specialp name)
+                                        (%memq name locally-special))
+                                (<< (gen "BIND" name index)))))
+             (cond
+               (args
+                (setq env (extenv env :lex (map1-vector #'maybe-special args)))
+                (declare-locally-special :except args)
+                (<< (with-env (comp-lambda-body name body env))))
+               (t
+                (declare-locally-special)
+                (<< (with-env (comp-lambda-body name body env)))))))))
 
      (comp-lambda-body (name body env)
        (if name
