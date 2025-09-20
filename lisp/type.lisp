@@ -1,9 +1,7 @@
 (in-package :sl)
 
 (export '(type-of typep deftype typecase etypecase
-          null symbol number integer cons function char
-          hash-table package structure input-stream output-stream string vector
-          satisfies mod))
+          input-stream output-stream satisfies mod))
 
 (defpackage :sl-type
   (:use :sl :%)
@@ -57,7 +55,7 @@
 (defpredicate nil (obj) (declare (ignore obj)) nil)
 
 (defpredicate boolean (obj)
-  (or (null obj) (eq obj t)))
+  (if (null obj) t (eq obj t)))
 
 (defpredicate integer (obj &optional (min '*) (max '*))
   (and (integerp obj)

@@ -42,7 +42,7 @@
      multiple-value-list multiple-value-prog1 multiple-value-setq name-char
      nconc nil not notany notevery nreconc nreverse nth nthcdr null
      number-fixed number-string number numberp oddp optimize or otherwise
-     package package-name packagep parse-integer parse-number plusp pop prog
+     package-name package packagep parse-integer parse-number plusp pop prog
      prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
      quote-regexp random regexp regexp-exec regexp-test regexpp remhash
      replace-regexp rest return return-from revappend reverse rotatef round
@@ -53,9 +53,10 @@
      string/= string< string<= string= string> string>= stringp structure
      svref sxhash symbol symbol-function symbol-macrolet symbol-name
      symbol-package symbol-plist symbol-value symbolp t tagbody tan third
-     thread threadp throw type unintern unless unsigned-byte unwind-protect
-     upcase use-package values values-list vector vector-pop vector-push
-     vectorp warn when with-output-to-string without-interrupts zerop λ
+     thread threadp throw type type-of typep unintern unless unsigned-byte
+     unwind-protect upcase use-package values values-list vector vector-pop
+     vector-push vectorp warn when with-output-to-string without-interrupts
+     zerop λ
 
      ))
 
@@ -930,6 +931,15 @@
       (cons (copy-tree (car tree))
             (copy-tree (cdr tree)))))
 
+;; We do this for completion, to have (SETF CAR) and (SETF CDR) defined. It
+;; will not endless-loop, because we have a DEFSETF for CAR and CDR somewhere
+;; above (the macro instilled by DEFSETF takes precedence over the function).
+(defun (setf car) (val list)
+  (setf (car list) val))
+
+(defun (setf cdr) (val list)
+  (setf (cdr list) val))
+
 (defun (setf caar) (val list)
   (setf (car (car list)) val))
 
@@ -1056,9 +1066,8 @@
 (defmacro shiftf (&rest args)
   (let* ((oldvalue (gensym))
          (args (reverse args))
-         (newvalue (pop args))
-         (places (nreverse args)))
-    (with-places (places)
+         (newvalue (pop args)))
+    (with-places ((nreverse args))
       (let ((getters getters))
         `(let (,@(mapcar #'list temp-vars temp-vals))
            (let ((,oldvalue ,(pop getters)))
