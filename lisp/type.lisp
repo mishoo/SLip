@@ -1,6 +1,7 @@
 (in-package :sl)
 
-(export '(type-of typep deftype null symbol number integer cons function char
+(export '(type-of typep deftype typecase etypecase
+          null symbol number integer cons function char
           hash-table package structure input-stream output-stream string vector
           satisfies mod))
 
@@ -9,6 +10,8 @@
   (:export "DEFPREDICATE" "TYPE-OF-STRUCTURE" "TYPE-OF-OBJECT"))
 
 (in-package :sl-type)
+
+(import '(sl::mapcar-filter))
 
 ;; Map type name -> predicate, which must be funcallable and return T if and
 ;; only if the type matches. Symbols are preferred because a compiler macro
@@ -205,3 +208,37 @@
 
 (defun type-of-object (x)
   (error "TYPE-OF-OBJECT: CLOS not initialized"))
+
+(defun %typecase-error (expr cases)
+  (error "~S fell through ETYPECASE expression. Wanted one of ~S."
+         expr cases))
+
+(defun %typecase (expr cases errorp)
+  (let* ((safe (%:safe-atom-p expr))
+         (vexpr (if safe expr (gensym "TYPECASE")))
+         (exps nil)
+         (code (let recur ((cases cases))
+                 (cond
+                   ((null cases)
+                    (when errorp
+                      `(%typecase-error ,vexpr ',(nreverse exps))))
+                   ((and (not (cdr cases))
+                         (%memq (caar cases) '(otherwise t)))
+                    `(progn ,@(cdar cases)))
+                   ((not (caar cases))
+                    (recur (cdr cases)))
+                   (t
+                    (when errorp
+                      (push (caar cases) exps))
+                    `(if (typep ,vexpr ',(caar cases))
+                         (progn ,@(cdar cases))
+                         ,(recur (cdr cases))))))))
+    (if safe
+        code
+        `(let ((,vexpr ,expr)) ,code))))
+
+(defmacro typecase (expr &rest clauses)
+  (%typecase expr clauses nil))
+
+(defmacro etypecase (expr &rest clauses)
+  (%typecase expr clauses t))
