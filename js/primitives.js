@@ -4,54 +4,72 @@ import { LispPrimitiveError } from "./error.js";
 import { LispMachine, OP } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
 
-let BASE_PACK = LispPackage.BASE_PACK;
-let KEYWORD_PACK = LispPackage.get("KEYWORD");
+let ALL_PRIMITIVES = false;
 
-var S_NIL = LispSymbol.get("NIL");
-var S_T = LispSymbol.get("T");
-var ALL_PRIMITIVES = false;
+const BASE_PACK = LispPackage.BASE_PACK;
+const KEYWORD_PACK = LispPackage.get("KEYWORD");
 
-var LispList = {
+const S_T                   = LispSymbol.get("T");
+const S_NIL                 = LispSymbol.get("NIL");
+const S_NULL                = LispSymbol.get("NULL");
+const S_BOOLEAN             = LispSymbol.get("BOOLEAN");
+const S_SYMBOL              = LispSymbol.get("SYMBOL");
+const S_CONS                = LispSymbol.get("CONS");
+const S_INTEGER             = LispSymbol.get("INTEGER");
+const S_NUMBER              = LispSymbol.get("NUMBER");
+const S_STRING              = LispSymbol.get("STRING");
+const S_CHAR                = LispSymbol.get("CHAR");
+const S_HASH_TABLE          = LispSymbol.get("HASH-TABLE");
+const S_REGEXP              = LispSymbol.get("REGEXP");
+const S_FUNCTION            = LispSymbol.get("FUNCTION");
+const S_STRUCT_TAG          = LispSymbol.get("%STRUCT", LispPackage.get("SL-STRUCT"));
+const S_STRUCTURE           = LispSymbol.get("STRUCTURE");
+const S_VECTOR              = LispSymbol.get("VECTOR");
+const S_PACKAGE             = LispSymbol.get("PACKAGE");
+const S_THREAD              = LispSymbol.get("THREAD");
+const S_STANDARD_OBJECT     = LispSymbol.get("STANDARD-OBJECT");
+
+const LispList = {
     is: LispCons.isList,
     type: "list"
 };
 
-var LispVector = {
+const LispVector = {
     is: Array.isArray,
     type: "array"
 };
 
-var LispString = {
+const LispString = {
     is: function(x) { return typeof x == "string" },
     type: "string"
 };
 
-var LispNumber = {
+const LispNumber = {
     is: function(x) { return typeof x == "number" },
     type: "number"
 };
 
-var LispInteger = {
+const LispInteger = {
     is: function(x) { return typeof x == "number" && Math.floor(x) == x },
     type: "integer"
 };
 
-var LispRegexp = {
+const LispRegexp = {
     is: function(x) { return x instanceof RegExp },
     type: "regexp"
 };
 
-var LispDomElement = {
+const LispDomElement = {
     is: function(x) { return x instanceof Element },
     type: "dom-element"
 };
 
-var LispNativeFunction = {
+const LispNativeFunction = {
     is: function(x) { return x instanceof Function },
     type: "native-function"
 };
 
-var LispIterator = {
+const LispIterator = {
     // XXX: is there some good way to check if it's actually a
     // "good boy" iterator? Seems instanceof Iterator is not
     // widely supported..
@@ -1173,24 +1191,22 @@ defp("oddp", false, function(m, nargs){
 defp("%type-of", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     let x = m.pop();
-    if (x === false) return LispSymbol.get("NULL");
-    if (x === true) return LispSymbol.get("BOOLEAN");
-    if (LispSymbol.is(x)) return LispSymbol.get("SYMBOL");
-    if (LispCons.is(x)) return LispSymbol.get("CONS");
-    if (Number.isInteger(x)) return LispSymbol.get("INTEGER");
-    if (typeof x === "number") return LispSymbol.get("NUMBER");
-    if (typeof x === "string") return LispSymbol.get("STRING");
-    if (LispChar.is(x)) return LispSymbol.get("CHAR");
-    if (LispHash.is(x)) return LispSymbol.get("HASH-TABLE");
-    if (LispRegexp.is(x)) return LispSymbol.get("REGEXP");
-    if (LispClosure.is(x)) return LispSymbol.get("FUNCTION");
+    if (x === false) return S_NULL;
+    if (x === true) return S_BOOLEAN;
+    if (LispSymbol.is(x)) return S_SYMBOL;
+    if (LispCons.is(x)) return S_CONS;
+    if (LispObject.is(x)) return S_STANDARD_OBJECT;
+    if (Number.isInteger(x)) return S_INTEGER;
+    if (typeof x === "number") return S_NUMBER;
+    if (typeof x === "string") return S_STRING;
+    if (LispChar.is(x)) return S_CHAR;
+    if (LispHash.is(x)) return S_HASH_TABLE;
+    if (LispRegexp.is(x)) return S_REGEXP;
+    if (LispClosure.is(x)) return S_FUNCTION;
     // XXX: define built-in type LispStruct.
-    if (LispVector.is(x)) return x[0] === LispSymbol.get("%STRUCT", LispPackage.get("SL-STRUCT"))
-        ? LispSymbol.get("STRUCTURE")
-        : LispSymbol.get("VECTOR");
-    if (LispPackage.is(x)) return LispSymbol.get("PACKAGE");
-    if (LispProcess.is(x)) return LispSymbol.get("THREAD");
-    if (LispObject.is(x)) return LispSymbol.get("STANDARD-OBJECT");
+    if (LispVector.is(x)) return x[0] === S_STRUCT_TAG ? S_STRUCTURE : S_VECTOR;
+    if (LispPackage.is(x)) return S_PACKAGE;
+    if (LispProcess.is(x)) return S_THREAD;
     return LispSymbol.get("T");
 });
 
@@ -2230,7 +2246,7 @@ defp("dom.get-element-by-id", false, function(m, nargs){
     return document.getElementById(id);
 });
 
-var DOM_EVENTS = {
+const DOM_EVENTS = {
     "CLICK"      : "click",
     "MOUSE-MOVE" : "mousemove",
     "MOUSE-DOWN" : "mousedown",
@@ -2310,7 +2326,7 @@ defp("%warn", true, function(m, nargs){
 
 /* -----[ other ]----- */
 
-var S_SKIP_COUNT = LispSymbol.get("%SKIP-COUNT");
+const S_SKIP_COUNT = LispSymbol.get("%SKIP-COUNT");
 defp("%find-in-env", false, function(m, nargs){
     checknargs(nargs, 3, 3);
     let env = checktype(m.pop(), LispList);
