@@ -11,8 +11,6 @@
 
 (in-package :sl-type)
 
-(import '(sl::mapcar-filter))
-
 ;; Map type name -> predicate, which must be funcallable and return T if and
 ;; only if the type matches. Symbols are preferred because a compiler macro
 ;; will optimize TYPEP calls into direct calls to the predicate whenever

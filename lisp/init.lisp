@@ -126,12 +126,13 @@
   (setq *package* (find-package name)) nil)
 
 (defun some1 (test list)
-  (tagbody
-   :loop
-   (when list
-     (aif (funcall test (%pop list))
-          (return-from some1 it))
-     (go :loop))))
+  (let (val)
+    (tagbody
+     :loop
+     (when list
+       (when (setq val (funcall test (%pop list)))
+         (return-from some1 val))
+       (go :loop)))))
 
 (defun finished (tails)
   (some1 #'null tails))
@@ -155,16 +156,6 @@
     ((null (cddr lists))
      `(map2 ,func ,@lists))
     (form)))
-
-(defun mapc (f . lists)
-  (let ((first (car lists)))
-    (tagbody
-     :loop
-     (unless (finished lists)
-       (apply f (mapcar #'car lists))
-       (setq lists (mapcar #'cdr lists))
-       (go :loop)))
-    first))
 
 ;; every returns false as soon as any invocation of predicate
 ;; returns false. If the end of a sequence is reached, every returns
@@ -599,6 +590,45 @@
 
 (defmacro rest (list)
   `(cdr ,list))
+
+(defun mapc1 (f list)
+  (let ((p list))
+    (tagbody
+     :loop
+     (when p
+       (funcall f (pop p))
+       (go :loop))))
+  list)
+
+(defun mapc2 (f list1 list2)
+  (let ((p list1)
+        (q list2))
+    (tagbody
+     :loop
+     (when (and p q)
+       (funcall f (pop p) (pop q))
+       (go :loop))))
+  list1)
+
+(defun mapc (f . lists)
+  (let ((first (car lists)))
+    (tagbody
+     :loop
+     (unless (finished lists)
+       (apply f (mapcar #'car lists))
+       (setf lists (mapcar #'cdr lists))
+       (go :loop)))
+    first))
+
+(define-compiler-macro mapc (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPC"))
+    ((null (cdr lists))
+     `(mapc1 ,func ,@lists))
+    ((null (cddr lists))
+     `(mapc2 ,func ,@lists))
+    (form)))
 
 ;;; basic looping
 
