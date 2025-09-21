@@ -460,7 +460,7 @@
                            ((zerop (length pak))
                             ;; KEYWORD
                             (setq sym (intern sym +keyword-package+))
-                            (%export sym +keyword-package+)
+                            (export sym +keyword-package+)
                             sym)
                            (t
                             (setq pak (find-package pak))

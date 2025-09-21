@@ -60,19 +60,13 @@
 
      ))
 
-  (%export exported boot)
-  (%export exported main)
+  (export exported boot)
+  (export exported main)
   (setq *package* main))
 
 "
 (in-package :sl)
 "
-
-(defmacro import (symbols &optional (package *package*))
-  `(%import ,symbols ,package))
-
-(defmacro export (symbols &optional (package *package*))
-  `(%export ,symbols ,package))
 
 (defun assert (cond . arguments)
   (unless cond (apply #'error arguments)))
@@ -112,14 +106,14 @@
        ,@(map1 (lambda (opt)
                  (case (car opt)
                    (:export
-                    `(%export ',(cdr opt) ,pak))
+                    `(export ',(cdr opt) ,pak))
                    (:import-from
                     (destructuring-bind (source &rest names) (cdr opt)
                       (setq source (find-package source))
-                      `(%import ',(map1 (lambda (name)
-                                          (find-symbol name source))
-                                        names)
-                                ,pak)))))
+                      `(import ',(map1 (lambda (name)
+                                         (find-symbol name source))
+                                       names)
+                               ,pak)))))
                options)
        ,pak)))
 

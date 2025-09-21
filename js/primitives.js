@@ -2035,9 +2035,10 @@ defp("package-name", false, function(m, nargs){
     return pak.name;
 });
 
-defp("%export", true, function(m, nargs){
-    checknargs(nargs, 2, 2);
-    var pak = m.pop(), syms = as_list(m.pop());
+defp("export", true, function(m, nargs){
+    checknargs(nargs, 1, 2);
+    let pak = nargs > 1 ? m.pop() : m.gvar(BASE_PACK.PACKAGE_VAR);
+    let syms = as_list(m.pop());
     if (!LispPackage.is(pak)) {
         pak = LispPackage.get_existing(as_string(pak));
     }
@@ -2052,9 +2053,10 @@ defp("%export", true, function(m, nargs){
     return pak;
 });
 
-defp("%import", true, function(m, nargs){
-    checknargs(nargs, 2, 2);
-    var pak = m.pop(), syms = as_list(m.pop());
+defp("import", true, function(m, nargs){
+    checknargs(nargs, 1, 2);
+    let pak = nargs > 1 ? m.pop() : m.gvar(BASE_PACK.PACKAGE_VAR);
+    let syms = as_list(m.pop());
     if (!LispPackage.is(pak)) {
         pak = LispPackage.get_existing(as_string(pak));
     }
@@ -2063,6 +2065,32 @@ defp("%import", true, function(m, nargs){
         pak.import(sym);
     });
     return pak;
+});
+
+defp("%import-from", true, function(m, nargs){
+    checknargs(nargs, 2, 3);
+    let target = nargs > 2 ? m.pop() : m.gvar(BASE_PACK.PACKAGE_VAR);
+    let syms = as_list(m.pop());
+    let source = m.pop();
+    if (!LispPackage.is(target)) {
+        target = LispPackage.get_existing(as_string(target));
+    }
+    if (!LispPackage.is(source)) {
+        source = LispPackage.get_existing(as_string(source));
+    }
+    checktype(source, LispPackage);
+    checktype(target, LispPackage);
+    LispCons.forEach(syms, function(name){
+        if (LispSymbol.is(name))
+            name = LispSymbol.symname(name);
+        checktype(name, LispString);
+        let sym = source.find(name);
+        if (!sym) {
+            error(`Symbol ${LispMachine.dump(name)} not found in package ${LispMachine.dump(source)}`);
+        }
+        target.import(sym);
+    });
+    return target;
 });
 
 defp("symbol-name", false, function(m, nargs){

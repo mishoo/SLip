@@ -1,4 +1,4 @@
-9,l(s("MAKE-HASH-TABLE",p("SL")),s("MAPHASH",p(0)),s("CLRHASH",p("%")),s("HASH-TABLE-COUNT",p(3)),s("WITH-HASH-TABLE-ITERATOR",p(0))),9,p(0),34,s("%EXPORT",p(3)),2,8
+9,l(s("MAKE-HASH-TABLE",p("SL")),s("MAPHASH",p(0)),s("CLRHASH",p("%")),s("HASH-TABLE-COUNT",p(3)),s("WITH-HASH-TABLE-ITERATOR",p(0))),34,s("EXPORT",p(3)),1,8
 ,9,s("SL-HASH",p("KEYWORD")),9,l(s("SL",p(8)),s("%",p(8))),35,34,s("MAKE-PACKAGE",p(3)),3,26,1,32,1,0
 ,9,s("(SETF GETHASH)",p(3)),33,[27,3,1,0,0,1,0,1,1,0,2,34,s("%HASH-SET",p(3)),3,19],s("GETHASH",p(3)),34,s("SET-SYMBOL-FUNCTION!",p(3)),2,8
 ,33,[27,1,29,9,s("FUNCALL",p(3)),1,1,0,41,76,12,18,1,1,0,46,10,22,1,1,0,42,30,1,0,0,12,33,75,0,0,10,41,18,41,9,s("NEWVALUE",p(0)),6,s("%DBIND-ERROR-MISSING-ARG",p(3)),20,1,30,1,0,0,12,52,75,0,0,10,60,18,60,9,s("KEY",p(3)),6,s(19),20,1,30,1,0,0,12,71,75,0,0,10,79,18,79,9,s("HASH",p(0)),6,s(19),20,1,30,9,s(14),1,0,1,1,0,2,1,0,3,38,4,19],s(15),9,s(13),3,s("*COMPILER-MACROS*",p(3)),34,s(14),3,8

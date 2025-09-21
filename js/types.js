@@ -311,17 +311,6 @@ export class LispPackage {
     find_internal(name) {
         return this.symbols.get(name) || false;
     }
-    find_accessible(name) {
-        var sym = this.find_exported(name);
-        if (!sym) {
-            var a = this.uses;
-            for (var i = a.length; --i >= 0;) {
-                sym = a[i].find_accessible(name);
-                if (sym) break;
-            }
-        }
-        return sym;
-    }
     all_accessible() {
         var ret = [ ...this.symbols.values() ];
         var a = this.uses;
