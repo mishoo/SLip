@@ -1950,6 +1950,9 @@ defp("%accessible-symbols", false, function(m, nargs){
     checknargs(nargs, 1, 2);
     var ext = nargs == 2 ? m.pop() : false;
     var pak = m.pop();
+    if (!LispPackage.is(pak)) {
+        pak = LispPackage.get_existing(as_string(pak));
+    }
     checktype(pak, LispPackage);
     return ext ? pak.all_exported() : pak.all_accessible();
 });
@@ -1957,6 +1960,9 @@ defp("%accessible-symbols", false, function(m, nargs){
 defp("%external-symbols", false, function(m, nargs){
     checknargs(nargs, 1);
     var pak = m.pop();
+    if (!LispPackage.is(pak)) {
+        pak = LispPackage.get_existing(as_string(pak));
+    }
     checktype(pak, LispPackage);
     return pak.all_exported();
 });
@@ -1964,6 +1970,9 @@ defp("%external-symbols", false, function(m, nargs){
 defp("%symbol-accessible", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var pak = m.pop(), sym = m.pop();
+    if (!LispPackage.is(pak)) {
+        pak = LispPackage.get_existing(as_string(pak));
+    }
     checktype(sym, LispSymbol);
     checktype(pak, LispPackage);
     return pak.all_accessible().indexOf(sym) >= 0; // XXX: optimize this
@@ -1972,6 +1981,9 @@ defp("%symbol-accessible", false, function(m, nargs){
 defp("%interned-symbols", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var pak = m.pop();
+    if (!LispPackage.is(pak)) {
+        pak = LispPackage.get_existing(as_string(pak));
+    }
     checktype(pak, LispPackage);
     return pak.all_interned();
 });
@@ -1979,6 +1991,9 @@ defp("%interned-symbols", false, function(m, nargs){
 defp("%find-exported-symbol", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var pak = m.pop(), name = as_string(m.pop());
+    if (!LispPackage.is(pak)) {
+        pak = LispPackage.get_existing(as_string(pak));
+    }
     checktype(name, LispString);
     checktype(pak, LispPackage);
     return pak.find_exported(name);
@@ -1987,6 +2002,9 @@ defp("%find-exported-symbol", false, function(m, nargs){
 defp("%find-internal-symbol", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var pak = m.pop(), name = as_string(m.pop());
+    if (!LispPackage.is(pak)) {
+        pak = LispPackage.get_existing(as_string(pak));
+    }
     checktype(name, LispString);
     checktype(pak, LispPackage);
     return pak.find_internal(name);
@@ -2025,7 +2043,9 @@ defp("%export", true, function(m, nargs){
     }
     checktype(pak, LispPackage);
     LispCons.forEach(syms, function(sym){
-        if (LispString.is(sym))
+        if (sym instanceof LispSymbol && !sym.pak)
+            sym = pak.intern(sym.name);
+        else if (LispString.is(sym))
             sym = pak.intern(sym);
         pak.export(sym);
     });

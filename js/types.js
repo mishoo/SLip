@@ -260,7 +260,7 @@ export class LispPackage {
     constructor(name) {
         this.name = name + "";
         this.symbols = new LispHash();
-        this.exports = [];
+        this.exports = new Map();
         this.uses = [];
     }
     toString() { return "#<PACKAGE " + this.name + ">" }
@@ -277,18 +277,20 @@ export class LispPackage {
         if (!sym) {
             sym = this.symbols.set(name, new LispSymbol(name, this));
             if (this === LispPackage.BASE_PACK) {
-                this.exports.push(sym);
+                this.exports.set(name, sym);
             }
         }
         return sym;
     }
     unintern(name) {
         this.symbols.delete(name);
+        this.exports.delete(name);
     }
     export(sym) {
-        sym = this.find(LispSymbol.symname(sym));
-        if (sym && this.exports.indexOf(sym) < 0) {
-            this.exports.push(sym);
+        let name = LispSymbol.symname(sym);
+        sym = this.find(name);
+        if (sym && !this.exports.has(name)) {
+            this.exports.set(name, sym);
             return true;
         }
         return false;
@@ -304,16 +306,10 @@ export class LispPackage {
         return sym;
     }
     find_exported(name) {
-        var a = this.exports;
-        for (var i = a.length; --i >= 0;) {
-            var sym = a[i];
-            if (LispSymbol.symname(sym) == name)
-                return sym;
-        }
-        return false;
+        return this.exports.get(name) || false;
     }
     find_internal(name) {
-        return this.symbols.get(name);
+        return this.symbols.get(name) || false;
     }
     find_accessible(name) {
         var sym = this.find_exported(name);
@@ -327,15 +323,15 @@ export class LispPackage {
         return sym;
     }
     all_accessible() {
-        var ret = this.symbols.values();
+        var ret = [ ...this.symbols.values() ];
         var a = this.uses;
         for (var i = a.length; --i >= 0;) {
-            ret.push.apply(ret, a[i].exports);
+            ret.push(...a[i].exports.values());
         }
-        return ret;
+        return [ ...new Set(ret) ];
     }
     all_exported() {
-        return [ ...this.exports ];
+        return [ ...this.exports.values() ];
     }
     all_interned() {
         return this.symbols.values();
@@ -351,9 +347,6 @@ export class LispPackage {
     }
     find_or_intern(name) {
         return this.find(name) || this.intern(name);
-    }
-    external(sym) {
-        return this.exports.indexOf(sym) >= 0;
     }
     alias(nickname) {
         LispPackage.#PACKAGES[nickname] = this;

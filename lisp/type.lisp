@@ -5,7 +5,7 @@
 
 (defpackage :sl-type
   (:use :sl :%)
-  (:export "DEFPREDICATE" "TYPE-OF-STRUCTURE" "TYPE-OF-OBJECT"))
+  (:export #:defpredicate #:type-of-structure #:type-of-object))
 
 (in-package :sl-type)
 
