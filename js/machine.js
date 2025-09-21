@@ -872,11 +872,11 @@ function serialize(code, strip, cache) {
 export function unserialize(code) {
     var names = [], values = [], cache = [];
     names.push("s"); values.push(function(name, pak){
-        if (arguments.length == 1 && typeof name == "number") {
+        let sym;
+        if (arguments.length === 1 && typeof name == "number") {
             return cache[name];
         }
-        let sym;
-        if (pak !== false) {
+        if (pak) {
             pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
             sym = LispSymbol.get(name, pak);
         } else {
@@ -886,7 +886,7 @@ export function unserialize(code) {
         return sym;
     });
     names.push("p"); values.push(function(name){
-        if (arguments.length == 1 && typeof name == "number") {
+        if (typeof name === "number") {
             return cache[name];
         }
         let pak = LispPackage.get(name);
