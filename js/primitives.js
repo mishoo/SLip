@@ -28,6 +28,7 @@ const S_VECTOR              = LispSymbol.get("VECTOR");
 const S_PACKAGE             = LispSymbol.get("PACKAGE");
 const S_THREAD              = LispSymbol.get("THREAD");
 const S_STANDARD_OBJECT     = LispSymbol.get("STANDARD-OBJECT");
+const S_CLOSETTE_STRUCT     = LispSymbol.get("STD-INSTANCE", LispPackage.get("CLOSETTE")); // XXX: temporary.
 
 const LispList = {
     is: LispCons.isList,
@@ -1203,8 +1204,18 @@ defp("%type-of", false, function(m, nargs){
     if (LispHash.is(x)) return S_HASH_TABLE;
     if (LispRegexp.is(x)) return S_REGEXP;
     if (LispClosure.is(x)) return S_FUNCTION;
-    // XXX: define built-in type LispStruct.
-    if (LispVector.is(x)) return x[0] === S_STRUCT_TAG ? S_STRUCTURE : S_VECTOR;
+    if (LispVector.is(x)) {
+        // XXX: define built-in type LispStruct for structures
+        // XXX: update Closette to use LispObject for objects.
+        switch (x[0]) {
+          case S_STRUCT_TAG:
+            if (x[1] === S_CLOSETTE_STRUCT)
+                return S_STANDARD_OBJECT;
+            return S_STRUCTURE;
+          default:
+            return S_VECTOR;
+        }
+    }
     if (LispPackage.is(x)) return S_PACKAGE;
     if (LispProcess.is(x)) return S_THREAD;
     return LispSymbol.get("T");

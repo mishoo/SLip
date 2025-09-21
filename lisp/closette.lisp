@@ -320,15 +320,21 @@
 
 ;;; defclass
 
+(defun sl-type:type-of-object (obj)
+  (class-name (class-of obj)))
+
 (defmacro defclass (name direct-superclasses direct-slots
                          &rest options)
   (%:maybe-xref-info name :defclass)
-  `(ensure-class ',name
-                 :direct-superclasses
-                 ,(canonicalize-direct-superclasses direct-superclasses)
-                 :direct-slots
-                 ,(canonicalize-direct-slots direct-slots)
-                 ,@(canonicalize-defclass-options options)))
+  `(progn
+     (sl-type:defpredicate ,name (obj)
+       (subclassp (class-of obj) (find-class ',name)))
+     (ensure-class ',name
+                   :direct-superclasses
+                   ,(canonicalize-direct-superclasses direct-superclasses)
+                   :direct-slots
+                   ,(canonicalize-direct-slots direct-slots)
+                   ,@(canonicalize-defclass-options options))))
 
 (defun canonicalize-direct-superclasses (direct-superclasses)
   `(list ,@(mapcar #'canonicalize-direct-superclass direct-superclasses)))
