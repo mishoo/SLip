@@ -320,7 +320,8 @@
                                               direct-supers))
                        ',direct-slots))))
 
-(defmacro defgeneric (name)
+(defmacro defgeneric (name &rest args)
+  (declare (ignore args))
   (let ((generic (gensym "GENERIC")))
     `(unless (find-generic ',name)
        (let ((,generic (make-generic)))

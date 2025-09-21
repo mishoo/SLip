@@ -798,6 +798,9 @@
     (find-in-compiler-env name :var (gethash :lex env))))
 
 (defun safe-atom-p (thing &optional (env *compiler-env*))
+  "Tells us if we can safely evaluate THING multiple times during macro
+   expansion. That is, if THING is a constant, or a symbol which is not bound
+   via SYMBOL-MACROLET in the current compiler environment."
   (and (atom thing)
        (not (and (symbolp thing)
                  (aif (find-var-in-compiler-env thing)

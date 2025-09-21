@@ -122,7 +122,8 @@
          (make-instance default-class
                         :format-control datum
                         :format-arguments arguments))
-        ((apply #'make-instance datum arguments))))
+        (t
+         (apply #'make-instance datum arguments))))
 
 (defun signal (datum . arguments)
   (let ((condition (%condition datum arguments 'simple-condition))

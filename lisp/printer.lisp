@@ -9,7 +9,7 @@
           sl-struct::structure-print-object
           sl-struct::structure-print-function))
 
-(defgeneric print-object)
+(defgeneric print-object (object stream))
 
 (defmacro def-print ((type) &body body)
   `(defmethod print-object ((,type ,type) (out output-stream))
@@ -486,7 +486,7 @@
               (%pp-object (cadr exps)))
             (rec (cddr exps) nil)))))))
 
-(defgeneric pprint-object)
+(defgeneric pprint-object (object stream))
 
 (defmethod pprint-object (object (output output-stream))
   (let ((*print-pretty* nil))

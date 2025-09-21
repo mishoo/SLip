@@ -88,7 +88,7 @@
 
 (defpredicate mod (obj n)
   (and (integerp obj)
-       (plusp obj)
+       (>= obj 0)
        (< obj n)))
 
 ;; we no longer touch *built-in-types* from this point on
@@ -140,7 +140,7 @@
                     `(,(cadr tspec) ,$thing))
                    ((member)
                     `(member ,$thing ',(cdr tspec)))
-                   (otherwise
+                   (t
                     (let ((pred (gethash (car tspec) *ext-types*)))
                       (if (and pred (symbolp pred))
                           `(,pred ,$thing ,@(cdr tspec))
@@ -192,7 +192,7 @@
      ',name))
 
 (deftype fixnum ()
-  `(integer most-negative-fixnum most-positive-fixnum))
+  `(integer ,most-negative-fixnum ,most-positive-fixnum))
 
 (defun type-of (x)
   (let ((type (%:%type-of x)))
