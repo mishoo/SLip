@@ -424,12 +424,19 @@ export class LispSymbol {
 
 (function(BASE_PACK){
     BASE_PACK.PACKAGE_VAR = special("*PACKAGE*", BASE_PACK);
-    special("MOST-POSITIVE-FIXNUM", Number.MAX_SAFE_INTEGER);
-    special("MOST-NEGATIVE-FIXNUM", Number.MIN_SAFE_INTEGER);
+    global("MOST-POSITIVE-FIXNUM", Number.MAX_SAFE_INTEGER);
+    global("MOST-NEGATIVE-FIXNUM", Number.MIN_SAFE_INTEGER);
 
     function special(name, value = false) {
         let sym = BASE_PACK.intern(name);
         sym.setv("special", true);
+        sym.setv("global", true);
+        sym.value = value;
+        return sym;
+    }
+    function global(name, value = false) {
+        let sym = BASE_PACK.intern(name);
+        sym.setv("global", true);
         sym.value = value;
         return sym;
     }

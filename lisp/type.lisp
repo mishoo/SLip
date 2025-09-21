@@ -1,7 +1,7 @@
 (in-package :sl)
 
 (export '(type-of typep deftype typecase etypecase
-          input-stream output-stream satisfies mod))
+          fixnum input-stream output-stream satisfies mod))
 
 (defpackage :sl-type
   (:use :sl :%)
@@ -163,6 +163,7 @@
           "DEFTYPE: type name must be a symbol, but it's ~S" name)
   (when (gethash name *built-in-types*)
     (error "DEFTYPE: we won't change built-in type ~S" name))
+  (%:maybe-xref-info name :deftype)
   `(progn
      ,(let ((typespec `(block ,name ,@forms)))
         (cond
@@ -189,6 +190,9 @@
                                    `((typep $obj ,typespec))
                                    :default-value '*)))))
      ',name))
+
+(deftype fixnum ()
+  `(integer most-negative-fixnum most-positive-fixnum))
 
 (defun type-of (x)
   (let ((type (%:%type-of x)))
