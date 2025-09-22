@@ -5,6 +5,8 @@
 
 (export '(condition
           simple-condition
+          simple-condition-format-control
+          simple-condition-format-arguments
           simple-warning
           simple-error
           primitive-error
@@ -22,7 +24,12 @@
 (in-package :sl-cond)
 
 (defclass condition () (datum))
-(defclass simple-condition (condition) (:format-control :format-arguments))
+(defclass simple-condition (condition)
+  ((format-control :initarg :format-control
+                   :accessor simple-condition-format-control)
+   (format-arguments :initarg :format-arguments
+                     :initform nil
+                     :accessor simple-condition-format-arguments)))
 (defclass serious-condition (condition) ())
 (defclass error (serious-condition) ())
 (defclass simple-error (simple-condition error) ())
@@ -33,8 +40,8 @@
 (defglobal <condition> (find-class 'condition))
 
 (defmethod print-object ((c simple-condition) (out output-stream))
-  (let ((format-control (slot-value c :format-control))
-        (format-arguments (slot-value c :format-arguments)))
+  (let ((format-control (slot-value c 'format-control))
+        (format-arguments (slot-value c 'format-arguments)))
     (strcat
      "<" (class-name (class-of c)) ": "
      (apply #'format out format-control format-arguments)

@@ -241,6 +241,18 @@ export class LispObject {
     }
 }
 
+export class LispStdInstance {
+    static type = "std-instance";
+    static is(x) { return x instanceof LispStdInstance }
+    toString() {
+        return "#<STD-INSTANCE>";
+    }
+    constructor(klass, slots) {
+        this.klass = klass;
+        this.slots = slots;
+    }
+}
+
 export class LispPackage {
     static type = "package";
     static is(x) { return x instanceof LispPackage }

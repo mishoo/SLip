@@ -146,8 +146,8 @@
    but make no assumptions about what they print as, only that they
    do print."
   (and (typep c 'simple-condition)
-       (let ((fc (slot-value c :format-control))
-             (args (slot-value c :format-arguments)))
+       (let ((fc (simple-condition-format-control c))
+             (args (simple-condition-format-arguments c)))
          (and
           (stringp (apply #'format nil fc args))
           t))))

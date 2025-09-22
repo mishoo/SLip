@@ -761,7 +761,12 @@ function dump(thing) {
     return function idump(thing) {
         if (thing === false) return "NIL";
         if (thing === true) return "T";
-        if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
+        if (typeof thing === "string") return JSON.stringify(LispChar.sanitize(thing));
+        if (LispSymbol.is(thing)) {
+            if (thing.pak === KEYWORD_PACK) return ":" + thing.name;
+            if (thing.pak) return thing.pak.name + "::" + thing.name;
+            return thing.name;
+        }
         if (dumped.has(thing)) {
             return "#" + dumped.get(thing);
         }
@@ -1024,6 +1029,10 @@ export class LispMachine {
         //if (this.trace) this.trace = [ closure, args ];
         try {
             return this.loop();
+        } catch(ex) {
+            console.log(this.backtrace());
+            //console.log(LispMachine.disassemble(machine.code));
+            debugger;
         } finally {
             //this.trace = save_trace;
             this.f = save_f;

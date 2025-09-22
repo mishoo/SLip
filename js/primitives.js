@@ -1,5 +1,5 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject } from "./types.js";
+import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject, LispStdInstance } from "./types.js";
 import { LispPrimitiveError } from "./error.js";
 import { LispMachine, OP } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
@@ -18,7 +18,7 @@ const S_CONS                = LispSymbol.get("CONS");
 const S_INTEGER             = LispSymbol.get("INTEGER");
 const S_NUMBER              = LispSymbol.get("NUMBER");
 const S_STRING              = LispSymbol.get("STRING");
-const S_CHAR                = LispSymbol.get("CHAR");
+const S_CHARACTER           = LispSymbol.get("CHARACTER");
 const S_HASH_TABLE          = LispSymbol.get("HASH-TABLE");
 const S_REGEXP              = LispSymbol.get("REGEXP");
 const S_FUNCTION            = LispSymbol.get("FUNCTION");
@@ -865,10 +865,10 @@ defp("strjoin", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     let bag = m.pop(), sep = checktype(m.pop(), LispString);
     if (LispList.is(bag)) {
-        return LispCons.toArray(bag).join(sep);
+        return LispCons.toArray(bag).map(LispMachine.dump).join(sep);
     }
     if (LispVector.is(bag)) {
-        return bag.join(sep);
+        return bag.map(LispMachine.dump).join(sep);
     }
     error("STRJOIN: unsupported sequence");
 });
@@ -1197,20 +1197,18 @@ defp("%type-of", false, function(m, nargs){
     if (LispSymbol.is(x)) return S_SYMBOL;
     if (LispCons.is(x)) return S_CONS;
     if (LispObject.is(x)) return S_STANDARD_OBJECT;
+    if (LispStdInstance.is(x)) return S_STANDARD_OBJECT;
     if (Number.isInteger(x)) return S_INTEGER;
     if (typeof x === "number") return S_NUMBER;
     if (typeof x === "string") return S_STRING;
-    if (LispChar.is(x)) return S_CHAR;
+    if (LispChar.is(x)) return S_CHARACTER;
     if (LispHash.is(x)) return S_HASH_TABLE;
     if (LispRegexp.is(x)) return S_REGEXP;
     if (LispClosure.is(x)) return S_FUNCTION;
     if (LispVector.is(x)) {
         // XXX: define built-in type LispStruct for structures
-        // XXX: update Closette to use LispObject for objects.
         switch (x[0]) {
           case S_STRUCT_TAG:
-            if (x[1] === S_CLOSETTE_STRUCT)
-                return S_STANDARD_OBJECT;
             return S_STRUCTURE;
           default:
             return S_VECTOR;
@@ -1231,8 +1229,7 @@ defp("parse-number", false, function(m, nargs){
 
 defp("parse-integer", false, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var radix = nargs == 2 ? m.pop() : 10;
-    checktype(radix, LispNumber);
+    var radix = nargs == 2 ? checktype(m.pop(), LispNumber) : 10;
     var x = m.pop();
     checktype(x, LispString);
     var ret = parseInt(x, radix);
@@ -1741,6 +1738,37 @@ defp("%make-object", false, function(m, nargs){
     var size = m.pop();
     checktype(size, LispNumber);
     return new LispObject(size);
+});
+
+defp("%std-instance-p", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return LispStdInstance.is(m.pop());
+});
+
+defp("%make-std-instance", false, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let slots = m.pop(), klass = m.pop();
+    return new LispStdInstance(klass, slots);
+});
+
+defp("%std-instance-class", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispStdInstance).klass;
+});
+
+defp("%set-std-instance-class", false, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    return checktype(m.pop(), LispStdInstance).klass = m.pop();
+});
+
+defp("%std-instance-slots", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispStdInstance).slots;
+});
+
+defp("%set-std-instance-slots", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispStdInstance).slots = m.pop();
 });
 
 /* -----[ macros/primitives ]----- */

@@ -29,62 +29,59 @@
 ;;; This program is available by anonymous FTP, from the /pub/pcl/mop
 ;;; directory on parcftp.xerox.com.
 
+(in-package :sl)
+
+(export '(defclass defgeneric defmethod
+          find-class class-of
+          call-next-method next-method-p
+          slot-value slot-boundp slot-exists-p slot-makunbound
+          make-instance change-class
+          initialize-instance reinitialize-instance shared-initialize
+          update-instance-for-different-class
+          describe-object
+          standard-object
+          standard-class standard-generic-function standard-method
+          class-name
+          structure-class structure-object
+
+          class-direct-superclasses class-direct-slots
+          class-precedence-list class-slots class-direct-subclasses
+          class-direct-methods
+          generic-function-name generic-function-lambda-list
+          generic-function-methods generic-function-discriminating-function
+          generic-function-method-class
+          method-lambda-list method-qualifiers method-specializers method-body
+          method-generic-function method-function
+          slot-definition-name slot-definition-initfunction
+          slot-definition-initform slot-definition-initargs
+          slot-definition-readers slot-definition-writers
+          slot-definition-allocation
+          ;;
+          ;; Class-related metaobject protocol
+          ;;
+
+          compute-class-precedence-list compute-slots
+          compute-effective-slot-definition
+          finalize-inheritance allocate-instance
+          slot-value-using-class slot-boundp-using-class
+          slot-exists-p-using-class slot-makunbound-using-class
+          ;;
+          ;; Generic function related metaobject protocol
+          ;;
+
+          compute-discriminating-function
+          compute-applicable-methods-using-classes method-more-specific-p
+          ensure-generic-function
+          add-method remove-method find-method
+          compute-effective-method-function compute-method-function
+          apply-methods apply-method
+          find-generic-function ; Necessary artifact of this implementation
+          ))
+
 (defpackage :closette
   (:use :sl :%))
 
 (in-package :closette)
-
-(defparameter +closette-symbols+
-  '(#:defclass #:defgeneric #:defmethod
-    #:find-class #:class-of
-    #:call-next-method #:next-method-p
-    #:slot-value #:slot-boundp #:slot-exists-p #:slot-makunbound
-    #:make-instance #:change-class
-    #:initialize-instance #:reinitialize-instance #:shared-initialize
-    #:update-instance-for-different-class
-    #:print-object
-    #:describe-object
-    #:standard-object
-    #:standard-class #:standard-generic-function #:standard-method
-    #:class-name
-    #:structure-class #:structure-object
-
-    #:class-direct-superclasses #:class-direct-slots
-    #:class-precedence-list #:class-slots #:class-direct-subclasses
-    #:class-direct-methods
-    #:generic-function-name #:generic-function-lambda-list
-    #:generic-function-methods #:generic-function-discriminating-function
-    #:generic-function-method-class
-    #:method-lambda-list #:method-qualifiers #:method-specializers #:method-body
-    #:method-generic-function #:method-function
-    #:slot-definition-name #:slot-definition-initfunction
-    #:slot-definition-initform #:slot-definition-initargs
-    #:slot-definition-readers #:slot-definition-writers
-    #:slot-definition-allocation
-    ;;
-    ;; Class-related metaobject protocol
-    ;;
-
-    #:compute-class-precedence-list #:compute-slots
-    #:compute-effective-slot-definition
-    #:finalize-inheritance #:allocate-instance
-    #:slot-value-using-class #:slot-boundp-using-class
-    #:slot-exists-p-using-class #:slot-makunbound-using-class
-    ;;
-    ;; Generic function related metaobject protocol
-    ;;
-
-    #:compute-discriminating-function
-    #:compute-applicable-methods-using-classes #:method-more-specific-p
-    #:ensure-generic-function
-    #:add-method #:remove-method #:find-method
-    #:compute-effective-method-function #:compute-method-function
-    #:apply-methods #:apply-method
-    #:find-generic-function  ; Necessary artifact of this implementation
-    ))
-
-(shadow +closette-symbols+)
-(export +closette-symbols+)
 
 ;;; -------------------- utils.lisp
 
@@ -129,17 +126,23 @@
 ;;; Standard instances
 ;;;
 
-;;; This implementation uses structures for instances, because they're the only
-;;; kind of Lisp object that can be easily made to print whatever way we want.
+(defun allocate-std-instance (class slots)
+  (%:%make-std-instance class slots))
 
-(defstruct (std-instance (:constructor allocate-std-instance (class slots))
-                         (:predicate std-instance-p)
-                         (:print-object print-std-instance))
-  class
-  slots)
+(defun std-instance-p (x)
+  (%:%std-instance-p x))
 
-(defun print-std-instance (instance stream)
-  (format stream "#<CLOSETTE: ~A>" (class-name (std-instance-class instance))))
+(defun std-instance-class (x)
+  (%:%std-instance-class x))
+
+(defun (setf std-instance-class) (class x)
+  (%:%set-std-instance-class class x))
+
+(defun std-instance-slots (x)
+  (%:%std-instance-slots x))
+
+(defun (setf std-instance-slots) (slots x)
+  (%:%set-std-instance-slots slots x))
 
 ;;; Standard instance allocation
 
@@ -1338,6 +1341,7 @@
 (defconstant <array>             (defclass array (t) ()))
 (defconstant <number>            (defclass number (t) ()))
 (defconstant <character>         (defclass character (t) ()))
+(defconstant <regexp>            (defclass regexp (t) ()))
 (defconstant <function>          (defclass function (t) ()))
 (defconstant <hash-table>        (defclass hash-table (t) ()))
 (defconstant <package>           (defclass package (t) ()))
@@ -1360,6 +1364,7 @@
     ((numberp x)                                      <number>)
     ((consp x)                                        <cons>)
     ((charp x)                                        <character>)
+    ((regexpp x)                                      <regexp>)
     ((hash-table-p x)                                 <hash-table>)
     ((packagep x)                                     <package>)
     ((%:%input-stream-p x)                            <input-stream>)
@@ -1382,7 +1387,7 @@
 
 ;;; -------------------- closette-final.lisp
 
-(defgeneric print-object (instance stream))
+;; (defgeneric print-object (instance stream))
 ;; (defmethod print-object ((instance standard-object) stream)
 ;;   (print-unreadable-object (instance stream :identity t)
 ;;      (format stream "~:(~S~)"

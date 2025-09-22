@@ -2187,7 +2187,7 @@
     "lisp/loop.lisp"
     "lisp/list.lisp"
     "lisp/seq.lisp"
-    "lisp/tiny-clos.lisp"
+    "lisp/closette.lisp"
     "lisp/printer.lisp"
     "lisp/ffi.lisp"
     "lisp/conditions.lisp"
