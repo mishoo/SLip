@@ -15,17 +15,10 @@
                   `(%stream-put out ,@args)))
        ,@body)))
 
-;; (let ((%to-string (%js-eval "function to_string(obj) { return obj + '' }")))
-;;   (def-print (unknown-class)
-;;     (<< "<UNKNOWN-CLASS " (%js-apply %to-string nil (vector unknown-class)) ">")))
+(defconstant %to-string (%js-eval "function to_string(obj) { return obj + '' }"))
 
-;; (def-print (primitive)
-;;   (<< "<PRIMITIVE")
-;;   (let* ((class (class-of primitive))
-;;          (name (class-name class)))
-;;     (when name
-;;       (<< " " name)))
-;;   (<< ">"))
+(def-print (t obj)
+  (<< (%js-apply %to-string nil (vector obj))))
 
 (def-print (number)
   (<< (number-string number *print-base*)))

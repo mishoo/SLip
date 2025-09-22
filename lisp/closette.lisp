@@ -82,7 +82,8 @@
 
 (in-package :closette)
 
-(import '(sl::defun-memoize2))
+(import '(sl::defun-memoize2
+          sl::clear-memoize-cache))
 
 ;;; -------------------- utils.lisp
 
@@ -433,6 +434,7 @@
 
   (defun forget-all-classes ()
     (clrhash class-table)
+    (clear-memoize-cache 'slot-location)
     (values))
   ) ;end let class-table
 
@@ -1350,6 +1352,7 @@
 (defconstant <function>          (defclass function (t) ()))
 (defconstant <hash-table>        (defclass hash-table (t) ()))
 (defconstant <package>           (defclass package (t) ()))
+(defconstant <thread>            (defclass thread (t) ()))
 (defconstant <input-stream>      (defclass input-stream (t) ()))
 (defconstant <output-stream>     (defclass output-stream (t) ()))
 (defconstant <stream>            (defclass stream (input-stream output-stream) ()))
@@ -1372,6 +1375,7 @@
     ((regexpp x)                                      <regexp>)
     ((hash-table-p x)                                 <hash-table>)
     ((packagep x)                                     <package>)
+    ((threadp x)                                      <thread>)
     ((%:%input-stream-p x)                            <input-stream>)
     ((%:%output-stream-p x)                           <output-stream>)
     ((stringp x)                                      <string>)
