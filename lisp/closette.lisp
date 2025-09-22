@@ -38,7 +38,7 @@
           make-instance change-class
           initialize-instance reinitialize-instance shared-initialize
           update-instance-for-different-class
-          describe-object
+          print-object describe-object
           standard-object
           standard-class standard-generic-function standard-method
           class-name
@@ -55,7 +55,6 @@
           slot-definition-name slot-definition-initfunction
           slot-definition-initform slot-definition-initargs
           slot-definition-readers slot-definition-writers
-          slot-definition-allocation
           ;;
           ;; Class-related metaobject protocol
           ;;
@@ -129,17 +128,29 @@
 (defun allocate-std-instance (class slots)
   (%:%make-std-instance class slots))
 
+(define-compiler-macro allocate-std-instance (class slots)
+  `(%:%make-std-instance ,class ,slots))
+
 (defun std-instance-p (x)
   (%:%std-instance-p x))
 
+(define-compiler-macro std-instance-p (x)
+  `(%:%std-instance-p ,x))
+
 (defun std-instance-class (x)
   (%:%std-instance-class x))
+
+(define-compiler-macro std-instance-class (x)
+  `(%:%std-instance-class ,x))
 
 (defun (setf std-instance-class) (class x)
   (%:%set-std-instance-class class x))
 
 (defun std-instance-slots (x)
   (%:%std-instance-slots x))
+
+(define-compiler-macro std-instance-slots (x)
+  `(%:%std-instance-slots ,x))
 
 (defun (setf std-instance-slots) (slots x)
   (%:%set-std-instance-slots slots x))
@@ -148,13 +159,10 @@
 
 (defparameter secret-unbound-value (list "slot unbound"))
 
-(defun instance-slot-p (slot)
-  (eq (slot-definition-allocation slot) :instance))
-
 (defun std-allocate-instance (class)
   (allocate-std-instance
    class
-   (allocate-slot-storage (count-if #'instance-slot-p (class-slots class))
+   (allocate-slot-storage (length (class-slots class))
                           secret-unbound-value)))
 
 ;;; Simple vectors are used for slot storage.
@@ -182,9 +190,7 @@
         (if (null slot)
             (error "The slot ~S is missing from the class ~S."
                    slot-name class)
-            (let ((pos (position slot
-                                 (remove-if-not #'instance-slot-p
-                                                (class-slots class)))))
+            (let ((pos (position slot (class-slots class))))
               (if (null pos)
                   (error "The slot ~S is not an instance~@
                            slot in the class ~S."
@@ -491,7 +497,7 @@
 (defun make-direct-slot-definition
        (&rest properties
               &key name (initargs ()) (initform nil) (initfunction nil)
-              (readers ()) (writers ()) (allocation :instance)
+              (readers ()) (writers ())
               &allow-other-keys)
   (let ((slot (copy-list properties))) ; Don't want to side effect &rest list
     (setf (getf* slot :name) name)
@@ -500,20 +506,17 @@
     (setf (getf* slot :initfunction) initfunction)
     (setf (getf* slot :readers) readers)
     (setf (getf* slot :writers) writers)
-    (setf (getf* slot :allocation) allocation)
     slot))
 
 (defun make-effective-slot-definition
        (&rest properties
               &key name (initargs ()) (initform nil) (initfunction nil)
-              (allocation :instance)
               &allow-other-keys)
   (let ((slot (copy-list properties)))  ; Don't want to side effect &rest list
     (setf (getf* slot :name) name)
     (setf (getf* slot :initargs) initargs)
     (setf (getf* slot :initform) initform)
     (setf (getf* slot :initfunction) initfunction)
-    (setf (getf* slot :allocation) allocation)
     slot))
 
 (defun slot-definition-name (slot)
@@ -545,11 +548,6 @@
   (getf slot :writers))
 (defun (setf slot-definition-writers) (new-value slot)
   (setf (getf* slot :writers) new-value))
-
-(defun slot-definition-allocation (slot)
-  (getf slot :allocation))
-(defun (setf slot-definition-allocation) (new-value slot)
-  (setf (getf* slot :allocation) new-value))
 
 ;;; finalize-inheritance
 
@@ -685,8 +683,7 @@
                        nil)
      :initargs (remove-duplicates
                 (mapappend #'slot-definition-initargs
-                           direct-slots))
-     :allocation (slot-definition-allocation (car direct-slots)))))
+                           direct-slots)))))
 
 ;;;
 ;;; Generic function metaobjects and standard-generic-function
@@ -1005,15 +1002,15 @@
                (push-on-end (get-keyword-from-arg arg) keys)
                (push-on-end arg key-args))
               (:parsing-aux (push-on-end arg auxs)))))
-      (list  :required-names required-names
-             :required-args required-args
-             :specializers specializers
-             :rest-var rest-var
-             :keywords keys
-             :key-args key-args
-             :auxiliary-args auxs
-             :optional-args optionals
-             :allow-other-keys allow-other-keys))))
+      (list :required-names required-names
+            :required-args required-args
+            :specializers specializers
+            :rest-var rest-var
+            :keywords keys
+            :key-args key-args
+            :auxiliary-args auxs
+            :optional-args optionals
+            :allow-other-keys allow-other-keys))))
 
 ;;; ensure method
 
@@ -1286,8 +1283,7 @@
                  :initform (getf (cdr slotd) :initform)
                  :initfunction
                  (let ((a (getf (cdr slotd) :initform)))
-                   (if a (lambda () (eval a)) nil))
-                 :allocation :instance))
+                   (if a (lambda () (eval a)) nil))))
               (nth 3 the-defclass-standard-class)))
 
 ;; 2. Create the standard-class metaobject by hand.
@@ -1387,12 +1383,12 @@
 
 ;;; -------------------- closette-final.lisp
 
-;; (defgeneric print-object (instance stream))
-;; (defmethod print-object ((instance standard-object) stream)
-;;   (print-unreadable-object (instance stream :identity t)
-;;      (format stream "~:(~S~)"
-;;                     (class-name (class-of instance))))
-;;   instance)
+(defgeneric print-object (instance stream))
+(defmethod print-object ((instance standard-object) stream)
+  (print-unreadable-object (instance stream)
+     (format stream "~:(~S~)"
+                    (class-name (class-of instance))))
+  instance)
 
 ;;; Slot access
 
@@ -1506,12 +1502,12 @@
 ;;;  Methods having to do with class metaobjects.
 ;;;
 
-;; (defmethod print-object ((class standard-class) stream)
-;;   (print-unreadable-object (class stream :identity t)
-;;     (format stream "~:(~S~) ~S"
-;;             (class-name (class-of class))
-;;             (class-name class)))
-;;   class)
+(defmethod print-object ((class standard-class) stream)
+  (print-unreadable-object (class stream)
+    (format stream "~:(~S~) ~S"
+            (class-name (class-of class))
+            (class-name class)))
+  class)
 
 (defmethod initialize-instance :after ((class standard-class) &rest args)
   (apply #'std-after-initialization-for-classes class args))
@@ -1544,12 +1540,12 @@
 ;;; Methods having to do with generic function metaobjects.
 ;;;
 
-;; (defmethod print-object ((gf standard-generic-function) stream)
-;;   (print-unreadable-object (gf stream :identity t)
-;;      (format stream "~:(~S~) ~S"
-;;              (class-name (class-of gf))
-;;              (generic-function-name gf)))
-;;   gf)
+(defmethod print-object ((gf standard-generic-function) stream)
+  (print-unreadable-object (gf stream)
+     (format stream "~:(~S~) ~S"
+             (class-name (class-of gf))
+             (generic-function-name gf)))
+  gf)
 
 (defmethod initialize-instance :after ((gf standard-generic-function) &key)
   (finalize-generic-function gf))
@@ -1558,16 +1554,16 @@
 ;;; Methods having to do with method metaobjects.
 ;;;
 
-;; (defmethod print-object ((method standard-method) stream)
-;;   (print-unreadable-object (method stream :identity t)
-;;      (format stream "~:(~S~) ~S~{ ~S~} ~S"
-;;                     (class-name (class-of method))
-;;                     (generic-function-name
-;;                       (method-generic-function method))
-;;                     (method-qualifiers method)
-;;                     (mapcar #'class-name
-;;                             (method-specializers method))))
-;;   method)
+(defmethod print-object ((method standard-method) stream)
+  (print-unreadable-object (method stream)
+     (format stream "~:(~S~) ~S~{ ~S~} ~S"
+                    (class-name (class-of method))
+                    (generic-function-name
+                      (method-generic-function method))
+                    (method-qualifiers method)
+                    (mapcar #'class-name
+                            (method-specializers method))))
+  method)
 
 (defmethod initialize-instance :after ((method standard-method) &key)
   (setf (method-function method) (compute-method-function method)))

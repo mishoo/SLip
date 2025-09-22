@@ -39,10 +39,13 @@
        (%stream-put ,_stream "#<")
        ,@(when type
            `((%stream-put ,_stream (%:%dump (type-of ,object)))
-             (%stream-put ,_stream " ")))
+             ,@(when (or body identity)
+                 `((%stream-put ,_stream " ")))))
        ,@body
        ,@(when identity
-           `((%stream-put ,_stream (%:%dump ,object))))
+           `(,@(when (or type body)
+                 `((%stream-put ,_stream " ")))
+             (%stream-put ,_stream (%:%dump ,object))))
        (%stream-put ,_stream ">"))))
 
 (defun print-object (obj stream)

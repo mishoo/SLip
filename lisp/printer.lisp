@@ -9,8 +9,6 @@
           sl-struct::structure-print-object
           sl-struct::structure-print-function))
 
-(defgeneric print-object (object stream))
-
 (defmacro def-print ((type &optional (name type)) &body body)
   `(defmethod print-object ((,name ,type) (out output-stream))
      (macrolet ((<< args
@@ -20,14 +18,6 @@
 ;; (let ((%to-string (%js-eval "function to_string(obj) { return obj + '' }")))
 ;;   (def-print (unknown-class)
 ;;     (<< "<UNKNOWN-CLASS " (%js-apply %to-string nil (vector unknown-class)) ">")))
-
-(def-print (standard-object object)
-  (<< "<OBJECT")
-  (let* ((class (class-of object))
-         (name (class-name class)))
-    (when name
-      (<< " " name)))
-  (<< ">"))
 
 ;; (def-print (primitive)
 ;;   (<< "<PRIMITIVE")
@@ -58,12 +48,6 @@
       (<< " ")
       (print-object (car vals) out)
       (rec (cdr keys) (cdr vals))))
-  (<< ">"))
-
-(def-print (standard-class class)
-  (<< "#<CLASS")
-  (when (class-name class)
-    (<< " " (class-name class)))
   (<< ">"))
 
 (def-print (cons)
