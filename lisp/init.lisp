@@ -851,6 +851,9 @@
                   (%hash-set (make-hash ,(cadr args) val) ,(car args) ,memo)
                   val)))))))
 
+(defun clear-memoize-cache (symbol)
+  (clrhash (%get-symbol-prop symbol "MEMOIZE")))
+
 (defmacro prog (bindings &body body)
   (multiple-value-bind (body declarations) (%:dig-declarations body)
     `(block nil

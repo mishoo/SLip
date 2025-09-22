@@ -82,6 +82,8 @@
 
 (in-package :closette)
 
+(import '(sl::defun-memoize2))
+
 ;;; -------------------- utils.lisp
 
 ;;; push-on-end is like push except it uses the other end:
@@ -179,7 +181,10 @@
 (defvar the-slots-of-standard-class) ;standard-class's class-slots
 (defvar the-class-standard-class)    ;standard-class's class metaobject
 
-(defun slot-location (class slot-name)
+;; XXX: memoizing SLOT-LOCATION improves speed dramatically, so let's leave
+;; this on for the moment. In the event we'll ever support class redefinition
+;; (which Closette doesn't) we'll have to invalidate the cache.
+(defun-memoize2 slot-location (class slot-name)
   (if (and (eq slot-name 'effective-slots)
            (eq class the-class-standard-class))
       (position 'effective-slots the-slots-of-standard-class
@@ -695,6 +700,10 @@
      (name :initarg :name)
      ; :accessor generic-function-lambda-list
      (lambda-list :initarg :lambda-list)
+     ; :accessor generic-function-parsed-lambda-list
+     (parsed-lambda-list :initarg :parsed-lambda-list)
+     ; :accessor generic-function-required-args
+     (required-args :initarg :required-args)
      ; :accessor generic-function-methods
      (methods :initform ())
      ; :accessor generic-function-method-class
@@ -715,6 +724,16 @@
   (slot-value gf 'lambda-list))
 (defun (setf generic-function-lambda-list) (new-value gf)
   (setf (slot-value gf 'lambda-list) new-value))
+
+(defun generic-function-parsed-lambda-list (gf)
+  (slot-value gf 'parsed-lambda-list))
+(defun (setf generic-function-parsed-lambda-list) (new-value gf)
+  (setf (slot-value gf 'parsed-lambda-list) new-value))
+
+(defun generic-function-required-args (gf)
+  (slot-value gf 'required-args))
+(defun (setf generic-function-required-args) (new-value gf)
+  (setf (slot-value gf 'required-args) new-value))
 
 (defun generic-function-methods (gf)
   (slot-value gf 'methods))
@@ -868,9 +887,12 @@
 (defun make-instance-standard-generic-function
        (generic-function-class &key name lambda-list method-class)
   (declare (ignore generic-function-class))
-  (let ((gf (std-allocate-instance the-class-standard-gf)))
+  (let ((gf (std-allocate-instance the-class-standard-gf))
+        (parsed-lambda-list (analyze-lambda-list lambda-list)))
     (setf (generic-function-name gf) name)
     (setf (generic-function-lambda-list gf) lambda-list)
+    (setf (generic-function-parsed-lambda-list gf) parsed-lambda-list)
+    (setf (generic-function-required-args gf) (length (getf parsed-lambda-list :required-args)))
     (setf (generic-function-methods gf) ())
     (setf (generic-function-method-class gf) method-class)
     (setf (classes-to-emf-table gf) (make-hash-table))
@@ -880,8 +902,7 @@
 ;;; defmethod
 
 (defmacro defmethod (&rest args)
-  (multiple-value-bind (function-name qualifiers
-                                      lambda-list specializers body)
+  (multiple-value-bind (function-name qualifiers lambda-list specializers body)
                        (parse-defmethod args)
     (multiple-value-bind (setter) (%:maybe-setter function-name)
       (when setter (setf function-name setter)))
@@ -925,16 +946,10 @@
 ;;; Several tedious functions for analyzing lambda lists
 
 (defun required-portion (gf args)
-  (let ((number-required (length (gf-required-arglist gf))))
+  (let ((number-required (generic-function-required-args gf)))
     (when (< (length args) number-required)
       (error "Too few arguments to generic function ~S." gf))
     (subseq args 0 number-required)))
-
-(defun gf-required-arglist (gf)
-  (let ((plist
-         (analyze-lambda-list
-          (generic-function-lambda-list gf))))
-    (getf plist :required-args)))
 
 (defun extract-lambda-list (specialized-lambda-list)
   (let* ((plist (analyze-lambda-list specialized-lambda-list))
@@ -1098,8 +1113,7 @@
 
 (defun add-writer-method (class fn-name slot-name)
   (ensure-method
-   (ensure-generic-function
-    fn-name :lambda-list '(new-value object))
+   (ensure-generic-function fn-name :lambda-list '(new-value object))
    :lambda-list '(new-value object)
    :qualifiers ()
    :specializers (list (find-class 't) class)
@@ -1110,11 +1124,6 @@
 ;;;
 ;;; Generic function invocation
 ;;;
-
-;;; apply-generic-function
-
-(defun apply-generic-function (gf args)
-  (apply (generic-function-discriminating-function gf) args))
 
 ;;; compute-discriminating-function
 
