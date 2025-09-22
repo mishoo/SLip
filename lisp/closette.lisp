@@ -198,7 +198,7 @@
                    slot-name class)
             (let ((pos (position slot (class-slots class))))
               (if (null pos)
-                  (error "The slot ~S is not an instance~@
+                  (error "The slot ~S is not an instance ~
                            slot in the class ~S."
                          slot-name class)
                   pos))))))
@@ -1200,7 +1200,7 @@
   (let ((primaries (remove-if-not #'primary-method-p methods))
         (around (find-if #'around-method-p methods)))
     (when (null primaries)
-      (error "No primary methods for the~@
+      (error "No primary methods for the ~
              generic function ~S." gf))
     (if around
         (let ((next-emfun
@@ -1249,7 +1249,7 @@
      `(lambda (args next-emfun)
         (flet ((call-next-method (&rest cnm-args)
                  (if (null next-emfun)
-                     (error "No next method for the~@
+                     (error "No next method for the ~
                               generic function ~S."
                             (method-generic-function ',method))
                      (funcall next-emfun (or cnm-args args))))
@@ -1360,7 +1360,7 @@
 (defconstant <null>              (defclass null (symbol list) ()))
 (defconstant <cons>              (defclass cons (list) ()))
 (defconstant <vector>            (defclass vector (array sequence) ()))
-(defconstant <string>            (defclass string (vector) ()))
+(defconstant <string>            (defclass string (t) ()))
 (defconstant <structure-object>  (defclass structure-object (t) ()))
 (defconstant <structure-class>   (defclass structure-class (standard-class) ()))
 

@@ -1122,7 +1122,7 @@ defp("functionp", false, function(m, nargs){
 defp("vectorp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     let arg = m.pop();
-    return LispVector.is(arg) || LispString.is(arg);
+    return LispVector.is(arg);
 });
 
 defp("listp", false, function(m, nargs){
