@@ -118,7 +118,7 @@
        ,pak)))
 
 (defmacro in-package (name)
-  (setq *package* (find-package name)) nil)
+  `(setq *package* (find-package ',name)))
 
 (defun some1 (test list)
   (let (val)
