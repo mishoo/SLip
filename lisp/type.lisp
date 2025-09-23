@@ -42,6 +42,7 @@
   ;; error, because calls to DEFPREDICATE will happen while bootstrapping the
   ;; class hierarchy. So if built-in type is already defined, just do nothing.
   (unless (gethash name *built-in-types*)
+    (%:maybe-xref-info name :type)
     (let ((intname (intern (strcat (symbol-name name) "-SL-TYPE-INTERNAL"))))
       `(progn
          (setf (fdefinition ',intname) (%:%fn ,name ,args ,@body))
@@ -163,7 +164,6 @@
           "DEFTYPE: type name must be a symbol, but it's ~S" name)
   (when (gethash name *built-in-types*)
     (error "DEFTYPE: we won't change built-in type ~S" name))
-  (%:maybe-xref-info name :deftype)
   `(progn
      ,(let ((typespec `(block ,name ,@forms)))
         (cond

@@ -20,9 +20,9 @@
      block boolean boundp caaaar caaadr caaar caadar caaddr caadr caar cadaar
      cadadr cadar caddar cadddr caddr cadr car case catch cdaaar cdaadr cdaar
      cdadar cdaddr cdadr cdar cddaar cddadr cddar cdddar cddddr cdddr cddr cdr
-     ceiling char character char-code char-equal char-greaterp char-lessp char-name
-     char-not-equal char-not-greaterp char-not-lessp char/= char< char<= char=
-     char> char>= charp clear-timeout code-char compile
+     ceiling char character char-code char-equal char-greaterp char-lessp
+     char-name char-not-equal char-not-greaterp char-not-lessp char/= char<
+     char<= char= char> char>= charp clear-timeout code-char compile
      compiler-macro-function complement cond cons consp constantly copy-list
      copy-seq copy-tree cos current-thread debug decf declare defconstant
      defglobal define-compiler-macro define-modify-macro define-setf-expander
