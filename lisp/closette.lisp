@@ -160,7 +160,7 @@
 
 ;;; Standard instance allocation
 
-(defparameter secret-unbound-value (list "slot unbound"))
+(defconstant secret-unbound-value (list "slot unbound"))
 
 (defun std-allocate-instance (class)
   (allocate-std-instance
@@ -279,7 +279,7 @@
 ;;; Class metaobjects and standard-class
 ;;;
 
-(defparameter the-defclass-standard-class  ;standard-class's defclass form
+(defconstant the-defclass-standard-class  ;standard-class's defclass form
   '(defclass standard-class ()
     (; :accessor class-name
      (name :initarg :name)
@@ -696,7 +696,7 @@
 ;;; Generic function metaobjects and standard-generic-function
 ;;;
 
-(defparameter the-defclass-standard-generic-function
+(defconstant the-defclass-standard-generic-function
   '(defclass standard-generic-function ()
     (; :accessor generic-function-name
      (name :initarg :name)
@@ -763,7 +763,7 @@
 ;;; Method metaobjects and standard-method
 ;;;
 
-(defparameter the-defclass-standard-method
+(defconstant the-defclass-standard-method
   '(defclass standard-method ()
     ((lambda-list :initarg :lambda-list)     ; :accessor method-lambda-list
      (qualifiers :initarg :qualifiers)       ; :accessor method-qualifiers
@@ -1331,6 +1331,9 @@
 
 ;; 7. Define the full-blown version of standard-class.
 (setq the-class-standard-class (eval the-defclass-standard-class))
+
+;; 7.1 forget slot-location cache.
+(clear-memoize-cache 'slot-location)
 
 ;; 8. Replace all (3) existing pointers to the skeleton with real one.
 (setf (std-instance-class (find-class 't))
