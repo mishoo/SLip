@@ -99,6 +99,8 @@
   (load "test/seq/subseq.lisp")
   (load "test/seq/remove.lisp")
 
+  (load "test/struct/structures-01.lisp")
+
   (format t "Network time: ~,2Fms~%~
              Compile time: ~,2Fms~%"
           (car timing)

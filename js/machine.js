@@ -1030,9 +1030,9 @@ export class LispMachine {
         try {
             return this.loop();
         } catch(ex) {
+            console.log(ex);
             console.log(this.backtrace());
             //console.log(LispMachine.disassemble(machine.code));
-            debugger;
         } finally {
             //this.trace = save_trace;
             this.f = save_f;
