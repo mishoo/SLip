@@ -838,18 +838,21 @@
                (%hash-set (progn ,@body) ,(car args) ,memo)))))))
 
 (defmacro defun-memoize2 (name args &body body)
-  (let ((memo (gensym "memo")))
+  (let ((memo (gensym "memo"))
+        (val (gensym "val"))
+        (h1 (gensym)))
     (multiple-value-bind (body declarations) (%:dig-declarations body)
       `(let ((,memo (make-hash)))
          (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
          (defun ,name ,args
            (declare ,@declarations)
-           (aif (gethash ,(car args) ,memo)
-                (or (gethash ,(cadr args) it)
-                    (%hash-set (progn ,@body) ,(cadr args) it))
-                (let ((val (progn ,@body)))
-                  (%hash-set (make-hash ,(cadr args) val) ,(car args) ,memo)
-                  val)))))))
+           (let ((,h1 (gethash ,(car args) ,memo)))
+             (if ,h1
+                 (or (gethash ,(cadr args) ,h1)
+                     (%hash-set (progn ,@body) ,(cadr args) ,h1))
+                 (let ((,val (progn ,@body)))
+                   (%hash-set (make-hash ,(cadr args) ,val) ,(car args) ,memo)
+                   ,val))))))))
 
 (defun clear-memoize-cache (symbol)
   (clrhash (%get-symbol-prop symbol "MEMOIZE")))
