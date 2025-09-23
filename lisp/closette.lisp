@@ -185,7 +185,7 @@
 ;; XXX: memoizing SLOT-LOCATION improves speed dramatically, so let's leave
 ;; this on for the moment. In the event we'll ever support class redefinition
 ;; (which Closette doesn't) we'll have to invalidate the cache.
-(defun-memoize2 slot-location (class slot-name)
+(defun-memoize2 (slot-location :weak1) (class slot-name)
   (if (and (eq slot-name 'effective-slots)
            (eq class the-class-standard-class))
       (position 'effective-slots the-slots-of-standard-class

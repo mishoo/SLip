@@ -180,10 +180,12 @@ export class LispHash {
     static fromObject(obj) {
         return new LispHash(Object.entries(obj));
     }
-    constructor(init = null) {
-        this.data = new Map(init);
+    constructor(init = null, weak = false) {
+        this.weak = weak;
+        this.data = weak ? new WeakMap(init) : new Map(init);
     }
     toObject() {
+        if (this.weak) throw new LispPrimitiveError("Cannot serialize weak map");
         let obj = Object.create(null);
         this.data.entries().forEach(([ key, val ]) => obj[key] = val);
         return obj;
@@ -202,31 +204,31 @@ export class LispHash {
         return this.data.has(key);
     }
     size() {
-        return this.data.size;
+        return this.weak ? 0 : this.data.size;
     }
     clear() {
-        this.data.clear();
+        if (!this.weak) this.data.clear();
     }
     serialize() {
         return "h(" + LispChar.sanitize(JSON.stringify(this.toObject())) + ")";
     }
     copy() {
-        return new LispHash(this.data);
+        return this.weak ? false : new LispHash(this.data);
     }
     keys() {
-        return [ ...this.data.keys() ];
+        return this.weak ? false : [ ...this.data.keys() ];
     }
     values() {
-        return [ ...this.data.values() ];
+        return this.weak ? false : [ ...this.data.values() ];
     }
     iterator() {
-        return this.data.entries();
+        return this.weak ? false : this.data.entries();
     }
     [Symbol.iterator]() {
-        return this.data.entries();
+        return this.weak ? false : this.data.entries();
     }
     toString() {
-        return `#<HASH[${this.size()}]>`;
+        return this.weak ? `#<WEAK-HASH[${this.size()}]>` : `#<HASH[${this.size()}]>`;
     }
 }
 

@@ -1306,7 +1306,7 @@ defp("%add-commas", false, function(m, nargs){
 
 /* -----[ simple hashes ]----- */
 
-defp("make-hash", false, function(m, nargs){
+function make_hash(weak, m, nargs) {
     if (nargs & 1) error("Odd number of arguments");
     var keys = [], values = [];
     while (nargs > 0) {
@@ -1314,11 +1314,19 @@ defp("make-hash", false, function(m, nargs){
         keys.push(m.pop());
         nargs -= 2;
     }
-    var hash = new LispHash();
+    var hash = new LispHash(null, weak);
     keys.forEach(function(key, i){
         hash.set(key, values[i]);
     });
     return hash;
+}
+
+defp("make-hash", false, function(m, nargs){
+    return make_hash(false, m, nargs);
+});
+
+defp("make-weak-hash", false, function(m, nargs){
+    return make_hash(true, m, nargs);
 });
 
 defp("gethash", false, function(m, nargs){
