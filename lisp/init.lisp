@@ -121,13 +121,11 @@
   `(setq *package* (find-package ',name)))
 
 (defun some1 (test list)
-  (let (val)
-    (tagbody
-     :loop
-     (when list
-       (when (setq val (funcall test (%pop list)))
-         (return-from some1 val))
-       (go :loop)))))
+  (let rec ((list list))
+    (when list
+      (aif (funcall test (%pop list))
+           it
+           (rec list)))))
 
 (defun finished (tails)
   (some1 #'null tails))
@@ -163,13 +161,10 @@
              (scan (mapcar #'cdr tails))))))
 
 (defun every1 (test list)
-  (tagbody
-   :loop
-   (cond
-     ((null list)
-      (return-from every1 t))
-     ((funcall test (%pop list))
-      (go :loop)))))
+  (let rec ((list list))
+    (if (not list) t
+        (when (funcall test (%pop list))
+          (rec list)))))
 
 (define-compiler-macro every (&whole form func &rest lists)
   (cond
@@ -210,14 +205,11 @@
             (scan (mapcar #'cdr tails))))))
 
 (defun notany1 (test list)
-  (tagbody
-   :loop
-   (cond
-     ((null list)
-      (return-from notany1 t))
-     ((funcall test (%pop list))
-      (return-from notany1 nil)))
-   (go :loop)))
+  (let rec ((list list))
+    (if (not list) t
+        (if (funcall test (%pop list))
+            nil
+            (rec list)))))
 
 (define-compiler-macro notany (&whole form func &rest lists)
   (cond
@@ -239,15 +231,11 @@
             t))))
 
 (defun notevery1 (test list)
-  (tagbody
-   :loop
-   (cond
-     ((null list)
-      (return-from notevery1 nil))
-     ((funcall test (%pop list))
-      (go :loop))
-     (t
-      (return-from notevery1 t)))))
+  (let rec ((list list))
+    (when list
+      (if (funcall test (%pop list))
+          (rec list)
+          t))))
 
 (define-compiler-macro notevery (&whole form func &rest lists)
   (cond
@@ -587,33 +575,27 @@
   `(cdr ,list))
 
 (defun mapc1 (f list)
-  (let ((p list))
-    (tagbody
-     :loop
-     (when p
-       (funcall f (pop p))
-       (go :loop))))
-  list)
+  (let rec ((p list))
+    (if (not p) list
+        (progn
+          (funcall f (pop p))
+          (rec p)))))
 
 (defun mapc2 (f list1 list2)
-  (let ((p list1)
-        (q list2))
-    (tagbody
-     :loop
-     (when (and p q)
-       (funcall f (pop p) (pop q))
-       (go :loop))))
-  list1)
+  (let rec ((p list1)
+            (q list2))
+    (if (not (and p q)) list1
+        (progn
+          (funcall f (pop p) (pop q))
+          (rec p q)))))
 
 (defun mapc (f . lists)
   (let ((first (car lists)))
-    (tagbody
-     :loop
-     (unless (finished lists)
-       (apply f (mapcar #'car lists))
-       (setf lists (mapcar #'cdr lists))
-       (go :loop)))
-    first))
+    (let rec ((lists lists))
+      (if (finished lists) first
+          (progn
+            (apply f (mapcar #'car lists))
+            (rec (mapcar #'cdr lists)))))))
 
 (define-compiler-macro mapc (&whole form func &rest lists)
   (cond

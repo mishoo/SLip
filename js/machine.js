@@ -90,7 +90,7 @@ export const OP = {
     CDDDAR: 69,
     CDDDDR: 70,
     PROGV: 71,
-    LRET2: 72,
+    NULLS: 72,
     LJUMP2: 73,
     XARGS: 74,
     LPOP: 75,
@@ -188,7 +188,7 @@ const OP_LEN = [
     0 /* CDDDAR */,
     0 /* CDDDDR */,
     0 /* PROGV */,
-    2 /* LRET2 */,
+    1 /* NULLS */,
     2 /* LJUMP2 */,
     5 /* XARGS */,
     2 /* LPOP */,
@@ -648,6 +648,30 @@ var optimize = (function(){
                 }
             }
             break;
+        }
+        if (i+3 < code.length && (code[i+0][0] === "NIL" &&
+                                  code[i+1][0] === "VAR" &&
+                                  code[i+2][0] === "NIL" &&
+                                  code[i+3][0] === "VAR")) {
+            code.splice(i, 4, [ "NULLS", 2 ]);
+            return true;
+        }
+        if (i+2 < code.length && (code[i+0][0] === "NIL" &&
+                                  code[i+1][0] === "VAR" &&
+                                  code[i+2][0] === "NULLS")) {
+            code.splice(i, 3, [ "NULLS", 1 + code[i+2][1] ]);
+            return true;
+        }
+        if (i+2 < code.length && (code[i+0][0] === "NULLS" &&
+                                  code[i+1][0] === "NIL" &&
+                                  code[i+2][0] === "VAR")) {
+            code.splice(i, 3, [ "NULLS", 1 + code[i+0][1] ]);
+            return true;
+        }
+        if (i+1 < code.length && (code[i+0][0] === "NULLS" &&
+                                  code[i+1][0] === "NULLS")) {
+            code.splice(i, 2, [ "NULLS", code[i+0][1] + code[i+1][1] ]);
+            return true;
         }
     };
     return function optimize(code) {
@@ -1492,8 +1516,9 @@ let OP_RUN = [
         }
         m.dynpush(frame);
     },
-    /*OP.LRET2*/ (m) => {
-        error("Unused instruction slot");
+    /*OP.NULLS*/ (m) => {
+        let n = m.code[m.pc++];
+        while (n > 0) m.env.car.push(false), --n;
     },
     /*OP.LJUMP2*/ (m) => {
         error("Unused instruction slot");

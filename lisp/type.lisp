@@ -64,14 +64,14 @@
        (or (eq max '*) (<= obj max))))
 
 (defpredicate or (obj &rest typespecs)
-  (do ((ts typespecs (cdr ts)))
-      ((null ts) nil)
+  (do* ((ts typespecs (cdr ts)))
+       ((null ts) nil)
     (when (typep obj (car ts))
       (return t))))
 
 (defpredicate and (obj &rest typespecs)
-  (do ((ts typespecs (cdr ts)))
-      ((null ts) t)
+  (do* ((ts typespecs (cdr ts)))
+       ((null ts) t)
     (unless (typep obj (car ts))
       (return nil))))
 

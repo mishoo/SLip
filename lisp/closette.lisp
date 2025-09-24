@@ -97,8 +97,8 @@
 
 (defun (setf getf*) (new-value plist key)
   (block body
-    (do ((x plist (cddr x)))
-        ((null x))
+    (do* ((x plist (cddr x)))
+         ((null x))
       (when (eq (car x) key)
         (setf (car (cdr x)) new-value)
         (return-from body new-value)))
@@ -373,8 +373,8 @@
             (readers ())
             (writers ())
             (other-options ()))
-        (do ((olist (cdr spec) (cddr olist)))
-            ((null olist))
+        (do* ((olist (cdr spec) (cddr olist)))
+             ((null olist))
           (case (car olist)
             (:initform
              (setq initfunction

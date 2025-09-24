@@ -201,52 +201,44 @@
   `(if ,pred nil (progn ,@body)))
 
 (defun map1 (func lst)
-  (let ((ret nil))
-    (tagbody
-     next
-     (when lst
-       (setq ret (cons (funcall func (%pop lst)) ret))
-       (go next)))
-    (nreverse ret)))
+  (let rec ((ret nil) (lst lst))
+    (if lst
+        (rec (cons (funcall func (%pop lst)) ret)
+             lst)
+        (nreverse ret))))
 
 (defun map1-vector (func lst)
   (let ((ret (vector)))
-    (tagbody
-     next
-     (when lst
-       (vector-push ret (funcall func (%pop lst)))
-       (go next)))
-    ret))
+    (let rec ((lst lst))
+      (if lst (progn
+                (vector-push ret (funcall func (%pop lst)))
+                (rec lst))
+          ret))))
 
 (defun map2 (func lst1 lst2)
-  (let ((ret nil))
-    (tagbody
-     next
-     (when (and lst1 lst2)
-       (setq ret (cons (funcall func (%pop lst1) (%pop lst2)) ret))
-       (go next)))
-    (nreverse ret)))
+  (let rec ((ret nil) (lst1 lst1) (lst2 lst2))
+    (if (and lst1 lst2)
+        (rec (cons (funcall func (%pop lst1) (%pop lst2)) ret)
+             lst1 lst2)
+        (nreverse ret))))
 
 (defun foreach (lst func)
-  (tagbody
-   next
-   (when lst
-     (funcall func (%pop lst))
-     (go next))))
+  (let rec ((lst lst))
+    (when lst
+      (funcall func (%pop lst))
+      (rec lst))))
+
+(defun foreach-index (lst func)
+  (let rec ((lst lst) (index 0))
+    (when lst
+      (funcall func (%pop lst) index)
+      (rec lst (1+ index)))))
 
 (defmacro incf (var)
   `(setq ,var (1+ ,var)))
 
 (defmacro decf (var)
   `(setq ,var (1- ,var)))
-
-(defun foreach-index (lst func)
-  (let ((index -1))
-    (tagbody
-     next
-     (when lst
-       (funcall func (%pop lst) (incf index))
-       (go next)))))
 
 (defun identity (x) x)
 
@@ -1585,7 +1577,7 @@
          ((always-true-p pred)
           (comp then env val? more?))
          ((and (consp pred)
-               (eq (car pred) 'not))
+               (%memq (car pred) '(not null)))
           (comp-if (cadr pred) else then env val? more?))
          (t
           (let ((pcode (comp pred env t t))
