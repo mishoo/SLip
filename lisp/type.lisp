@@ -92,9 +92,6 @@
        (>= obj 0)
        (< obj n)))
 
-;; we no longer touch *built-in-types* from this point on
-(setq *ext-types* (%:hash-copy *ext-types*))
-
 (defun %typep (object typespec)
   (cond
     ((atom typespec)
@@ -242,3 +239,6 @@
 
 (defmacro etypecase (expr &rest clauses)
   (%typecase expr clauses t))
+
+;; we no longer touch *built-in-types* from this point on
+(setq *ext-types* (%:hash-copy *ext-types*))

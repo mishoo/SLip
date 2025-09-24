@@ -31,7 +31,7 @@
 
 (in-package :sl)
 
-(export '(defclass defgeneric defmethod
+(export '(array sequence defclass defgeneric defmethod
           find-class class-of
           call-next-method next-method-p
           slot-value slot-boundp slot-exists-p slot-makunbound
@@ -97,8 +97,8 @@
 
 (defun (setf getf*) (new-value plist key)
   (block body
-    (do* ((x plist (cddr x)))
-         ((null x))
+    (do ((x plist (cddr x)))
+        ((null x))
       (when (eq (car x) key)
         (setf (car (cdr x)) new-value)
         (return-from body new-value)))
@@ -373,8 +373,8 @@
             (readers ())
             (writers ())
             (other-options ()))
-        (do* ((olist (cdr spec) (cddr olist)))
-             ((null olist))
+        (do ((olist (cdr spec) (cddr olist)))
+            ((null olist))
           (case (car olist)
             (:initform
              (setq initfunction
@@ -424,7 +424,7 @@
 (let ((class-table (make-hash-table)))
 
   (defun find-class (symbol &optional (errorp t))
-    (let ((class (gethash symbol class-table nil)))
+    (let ((class (gethash symbol class-table)))
       (if (and (null class) errorp)
           (error "No class named ~S." symbol)
           class)))
@@ -828,7 +828,7 @@
 (let ((generic-function-table (make-hash-table)))
 
   (defun find-generic-function (symbol &optional (errorp t))
-    (let ((gf (gethash symbol generic-function-table nil)))
+    (let ((gf (gethash symbol generic-function-table)))
       (if (and (null gf) errorp)
           (error "No generic function named ~S." symbol)
           gf)))
@@ -1133,7 +1133,7 @@
   (lambda (&rest args)
     (let* ((classes (mapcar #'class-of (required-portion gf args)))
            (key (%:strjoin ";" (%:map1-vector #'class-name classes)))
-           (emfun (gethash key (classes-to-emf-table gf) nil)))
+           (emfun (gethash key (classes-to-emf-table gf))))
       (if emfun
           (funcall emfun args)
           (slow-method-lookup gf args classes key)))))
@@ -1278,7 +1278,7 @@
 ;;; Bootstrap
 ;;;
 
-(format t "Beginning to bootstrap Closette...~%")
+;; (format t "Beginning to bootstrap Closette...~%")
 (forget-all-classes)
 (forget-all-generic-functions)
 
@@ -1392,7 +1392,7 @@
 (setq the-class-standard-method (eval the-defclass-standard-method))
 
 ;; Voila! The class hierarchy is in place.
-(format t "Class hierarchy created.~%")
+;; (format t "Class hierarchy created.~%")
 
 ;; (It's now okay to define generic functions and methods.)
 
@@ -1628,4 +1628,4 @@
 ;;   (common-lisp:describe object)
 ;;   (values))
 
-(format t "~%Closette is a Knights of the Lambda Calculus production.~%")
+;; (format t "~%Closette is a Knights of the Lambda Calculus production.~%")

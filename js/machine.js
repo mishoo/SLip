@@ -91,7 +91,7 @@ export const OP = {
     CDDDDR: 70,
     PROGV: 71,
     NULLS: 72,
-    LJUMP2: 73,
+    LSETPS: 73,
     XARGS: 74,
     LPOP: 75,
     EQ: 76,
@@ -189,7 +189,7 @@ const OP_LEN = [
     0 /* CDDDDR */,
     0 /* PROGV */,
     1 /* NULLS */,
-    2 /* LJUMP2 */,
+    2 /* LSETPS */,
     5 /* XARGS */,
     2 /* LPOP */,
     0 /* EQ */,
@@ -671,6 +671,12 @@ var optimize = (function(){
         if (i+1 < code.length && (code[i+0][0] === "NULLS" &&
                                   code[i+1][0] === "NULLS")) {
             code.splice(i, 2, [ "NULLS", code[i+0][1] + code[i+1][1] ]);
+            return true;
+        }
+        if (i+1 < code.length && (code[i+0][0] === "LSET" &&
+                                  code[i+1][0] === "POP")) {
+            code[i+0][0] = "LSETPS";
+            code.splice(i+1, 1);
             return true;
         }
     };
@@ -1520,8 +1526,10 @@ let OP_RUN = [
         let n = m.code[m.pc++];
         while (n > 0) m.env.car.push(false), --n;
     },
-    /*OP.LJUMP2*/ (m) => {
-        error("Unused instruction slot");
+    /*OP.LSETPS*/ (m) => {
+        let i = m.code[m.pc++];
+        let j = m.code[m.pc++];
+        frame(m.env, i)[j] = m.pop();
     },
     /*OP.XARGS*/ (m) => {
         let required = m.code[m.pc++];
