@@ -673,6 +673,13 @@
            ,@result-form)))))
 
 (defmacro psetf args
+  ;; if the places to set are plain symbols (not bound by symbol-macrolet)
+  ;; turn it into a %psetq, which is handled more efficiently by the compiler.
+  (let rec ((p args))
+    (if (not p)
+        (return-from psetf `(%:%psetq ,@args))
+        (if (%:safe-atom-p (car p))
+            (rec (cddr p)))))
   (with-collectors (temps places vals)
     (do* ((args args (cddr args)))
          ((null args) `(let ,(mapcar #'list temps vals)

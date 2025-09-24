@@ -41,12 +41,17 @@
         (setf finished 'done)))))
 
 (defparameter x
-  (loop repeat 1000 collect (random 10000)))
+  (loop repeat 3000 collect (random 10000)))
 
 (defun test-fn (fn &rest args)
-  (loop repeat 1000 do (apply fn args)))
+  (loop repeat 500 do (apply fn args)))
 
 (defun len2 (list)
+  (do ((p list (cdr p))
+       (count 0 (1+ count)))
+      ((null p) count)))
+
+(defun len2* (list)
   (do* ((p list (cdr p))
         (count 0 (1+ count)))
        ((null p) count)))

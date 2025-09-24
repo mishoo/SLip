@@ -243,9 +243,9 @@
 
 ;; like NTHCDR but doesn't fail on dotted lists
 (defun dotted-nthcdr (n list)
-  (do* ((i n (1- i))
-        (result list (cdr result)))
-       ((not (plusp i)) result)
+  (do ((i n (1- i))
+       (result list (cdr result)))
+      ((not (plusp i)) result)
     (when (atom result)
       (return nil))))
 
@@ -257,11 +257,11 @@
      (let ((head (dotted-nthcdr n list)))
        (and (consp head)                      ; there are at least n
             (with-collectors (copy)           ; conses; copy!
-              (do* ((trail list (cdr trail))
-                    (head head (cdr head)))
-                   ;; HEAD is n conses ahead of TRAIL;
-                   ;; when HEAD is NIL (or not a cons), return
-                   ;; the data copied so far.
-                   ((atom head)
-                    copy)
+              (do ((trail list (cdr trail))
+                   (head head (cdr head)))
+                  ;; HEAD is n conses ahead of TRAIL;
+                  ;; when HEAD is NIL (or not a cons), return
+                  ;; the data copied so far.
+                  ((atom head)
+                   copy)
                 (copy (car trail)))))))))

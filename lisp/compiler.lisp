@@ -1222,8 +1222,7 @@
              (when v (getf v :special)))))
 
      (gen-var (name env)
-       (if (or (%globalp name)
-               (find-special name env))
+       (if (find-special name env)
            (gen "GVAR" name)
            (aif (find-var name env)
                 (if (eq :smac (caddr it))
@@ -1231,9 +1230,8 @@
                     (gen "LVAR" (car it) (cadr it)))
                 (gen "GVAR" (unknown-variable name env)))))
 
-     (gen-set (name env local)
-       (if (or (%globalp name)
-               (find-special name env))
+     (gen-set (name env &optional (local (find-var name env)))
+       (if (find-special name env)
            (gen "GSET" name)
            (if local
                (gen "LSET" (car local) (cadr local))
@@ -1298,6 +1296,8 @@
              (comp-pop (cadr x) env val? more?))
             ((setq)
              (comp-setq (cdr x) env val? more?))
+            ((%psetq)
+             (comp-psetq (cdr x) env val? more?))
             ((if)
              (arg-count x 2 3)
              (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
@@ -1404,8 +1404,7 @@
 
      (comp-one-setq (name value env val? more?)
        (assert (symbolp name) "Only symbols can be SETQ")
-       (let* ((local (when (not (%globalp name))
-                       (find-var name env))))
+       (let ((local (find-var name env)))
          (cond
            ((and local (eq :smac (caddr local)))
             ;; setq on symbol macro should be treated as setf on expansion
@@ -1424,6 +1423,20 @@
           (comp-one-setq (car exps) (cadr exps) env val? more?))
          (t (%seq (comp-one-setq (car exps) (cadr exps) env nil t)
                   (comp-setq (cddr exps) env val? more?)))))
+
+     (comp-psetq (exps env val? more?)
+       (with-seq-output <<
+         (let ((names (let rec ((exps exps)
+                                (ret nil))
+                        (if (not exps) ret
+                            (let ((name (car exps))
+                                  (value (cadr exps)))
+                              (<< (comp value env t t))
+                              (rec (cddr exps) (cons name ret)))))))
+           (foreach names (lambda (name)
+                            (<< (gen-set name env)
+                                (gen "POP")))))
+         (<< (comp-const nil val? more?))))
 
      (comp-const (x val? more?)
        (when val?
@@ -1485,7 +1498,7 @@
 
      (comp-pop (name env val? more?)
        (assert (symbolp name) (strcat "%POP expects a symbol, got: " name))
-       (%seq (if (%globalp name)
+       (%seq (if (find-special name env)
                  (gen "GLPOP" name)
                  (aif (find-var name env)
                       (if (eq :smac (caddr it))
