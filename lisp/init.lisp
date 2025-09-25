@@ -667,7 +667,7 @@
             (when ,end-test-form
               (go ,end))
             ,@body
-            (setf ,@step)
+            (setq ,@step)
             (go ,next)
             ,end)
            ,@result-form)))))
@@ -676,22 +676,30 @@
   ;; if the places to set are plain symbols (not bound by symbol-macrolet)
   ;; turn it into a %psetq, which is handled more efficiently by the compiler.
   (let rec ((p args))
-    (if (not p)
-        (return-from psetf `(%:%psetq ,@args))
+    (if (not p) (return-from psetf `(%:%psetq ,@args))
         (if (%:safe-atom-p (car p))
-            (rec (cddr p)))))
-  (with-collectors (temps places vals)
-    (do* ((args args (cddr args)))
-         ((null args) `(let ,(mapcar #'list temps vals)
-                         ,@(mapcar (lambda (var set)
-                                     `(setf ,var ,set))
-                                   places temps)
-                         nil))
-      (unless (cdr args)
-        (error "PSETF: Odd number of forms"))
-      (temps (gensym "psetf"))
-      (places (car args))
-      (vals (cadr args)))))
+            (if (cdr p) (rec (cddr p))
+                (error "PSETF: missing last value")))))
+  (with-collectors (setters)
+    (let* ((code (list nil))
+           (cell code))
+      (do* ((args args (cddr args)))
+           ((null args) (progn
+                          (setters nil)
+                          (setf (car cell) (car setters)
+                                (cdr cell) (cdr setters))
+                          (car code)))
+        (let ((place (car args))
+              (value (cadr args)))
+          (multiple-value-bind (temps vals stores set get)
+                               (get-setf-expansion place)
+            (setters set)
+            (let ((next-cell (list nil)))
+              (setf (car cell)
+                    `(let (,@(mapcar #'list temps vals))
+                       (multiple-value-bind ,stores ,value
+                         . ,next-cell)))
+              (setf cell next-cell))))))))
 
 (defmacro psetq args
   `(psetf ,@args))
@@ -714,7 +722,7 @@
             (when ,end-test-form
               (go ,end))
             ,@body
-            (psetf ,@step)
+            (psetq ,@step)
             (go ,next)
             ,end)
            ,@result-form)))))

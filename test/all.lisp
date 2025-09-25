@@ -22,6 +22,7 @@
   (load "test/places.lisp")
   (load "test/rotatef.lisp")
   (load "test/shiftf.lisp")
+  (load "test/psetf.lisp")
 
   (load "test/values.lisp")
   (load "test/values-list.lisp")
