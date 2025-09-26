@@ -46,8 +46,8 @@
      prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
      quote-regexp random regexp regexp-exec regexp-test regexpp remhash
      replace-regexp rest return return-from revappend reverse rotatef round
-     rplaca rplacd schar second set-timeout setf setq shadow shiftf sin some
-     space special speed sqrt standard-object string-capitalize
+     rplaca rplacd schar second set-timeout setf setq shadow shiftf sin sleep
+     some space special speed sqrt standard-object string-capitalize
      string-downcase string-equal string-greaterp string-lessp
      string-not-equal string-not-greaterp string-not-lessp string-upcase
      string/= string< string<= string= string> string>= stringp structure

@@ -2170,7 +2170,8 @@
 (defun load (url)
   (let ((*package* *package*)
         (*read-table* *read-table*))
-    (%load url)))
+    (%load url)
+    nil))
 
 ;;; multiple values
 

@@ -585,6 +585,10 @@ export class LispProcess {
         start();
     }
 
+    pause() {
+        this.m.status = STATUS_WAITING;
+    }
+
     run(quota) {
         do {
             this.m.run(quota);

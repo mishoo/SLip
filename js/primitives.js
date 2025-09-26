@@ -1,7 +1,7 @@
 import { LispCons } from "./list.js";
 import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject, LispStdInstance } from "./types.js";
 import { LispPrimitiveError } from "./error.js";
-import { LispMachine, OP } from "./machine.js";
+import { LispMachine, OP, STATUS_WAITING } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
 
 let ALL_PRIMITIVES = false;
@@ -2687,6 +2687,17 @@ defp("sxhash", false, function(m, nargs){
     else if (LispRegexp.is(x)) x = "RGX" + x.toString();
     else error("I don't know how to generate hash for this object type");
     return murmurhash3_32_gc(x);
+});
+
+defp("sleep", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let seconds = m.pop_number();
+    if (!m.process) error("SLEEP can only be used when running in a thread");
+    setTimeout(() => {
+        m.push(false);          // push return value
+        m.process.resume();
+    }, seconds * 1000);
+    m.process.pause();
 });
 
 grok_xref_info(PRIMITIVES_XREF, "js/primitives.js");
