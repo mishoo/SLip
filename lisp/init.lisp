@@ -675,6 +675,8 @@
 (defmacro psetf args
   ;; if the places to set are plain symbols (not bound by symbol-macrolet)
   ;; turn it into a %psetq, which is handled more efficiently by the compiler.
+  (when (= 2 (length args))
+    (return-from psetf `(progn (setf ,@args) nil)))
   (let rec ((p args))
     (if (not p) (return-from psetf `(%:%psetq ,@args))
         (if (%:safe-atom-p (car p))
