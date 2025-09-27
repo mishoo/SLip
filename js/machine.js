@@ -1,5 +1,5 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject } from "./types.js";
+import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure } from "./types.js";
 import { LispPrimitiveError } from "./error.js";
 import { repeat_string, pad_string } from "./utils.js";
 import { LispStack } from "./stack.js";
@@ -245,8 +245,8 @@ export class LispRet {
 }
 
 class LispCleanup {
-    constructor(ret, addr) {
-        this.ret = ret;
+    constructor(m, addr) {
+        this.ret = new LispLongRet(m);
         this.addr = addr;
     }
     run(m) {
@@ -279,18 +279,17 @@ class LispLongRet {
         // figure out if we need to execute cleanup hooks
         let doit;
         (doit = (m) => {
-            var p = m.denv;
-            while (p && p !== this.denv) {
-                var c = p.car;
+            while (m.denv && m.denv !== this.denv) {
+                let c = m.denv.car;
+                m.denv = m.denv.cdr;
                 if (c instanceof LispCleanup) {
                     c.run(m);
                     m.push(doit);
                     return;
                 }
-                p = p.cdr;
             }
             this.unwind(m, addr);
-            if (arguments.length === 3) m.push(retval);
+            if (retval !== undefined) m.push(retval);
         })(m);
     }
 }
@@ -1301,7 +1300,7 @@ let OP_RUN = [
     },
     /*OP.UPOPEN*/ (m) => {
         let addr = m.code[m.pc++];
-        let c = new LispCleanup(new LispLongRet(m), addr);
+        let c = new LispCleanup(m, addr);
         m.dynpush(c);
     },
     /*OP.UPEXIT*/ (m) => {

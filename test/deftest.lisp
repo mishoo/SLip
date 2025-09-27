@@ -95,7 +95,7 @@
               and sum *compile-time* into compile-time
               and sum *run-time* into run-time
               else count test into skipped
-              finally (format t "~A tests, ~A skipped, ~A OK, ~A FAILED~%~
+              finally (format t "~A tests, ~A skipped, ~A OK, ~A failed~%~
                                  Compile time: ~,2Fms~%~
                                  Run time: ~,2Fms~%"
                               index skipped success failed

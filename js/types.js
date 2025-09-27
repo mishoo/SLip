@@ -257,17 +257,6 @@ export class LispHash {
     }
 }
 
-export class LispObject {
-    static type = "object";
-    static is(x) { return x instanceof LispObject }
-    toString() {
-        return "#<OBJECT " + this.vector[0].vector[2] + ">";
-    }
-    constructor(size) {
-        this.vector = new Array(size).fill(false);
-    }
-}
-
 export class LispStdInstance {
     static type = "std-instance";
     static is(x) { return x instanceof LispStdInstance }

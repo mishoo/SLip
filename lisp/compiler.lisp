@@ -2101,7 +2101,8 @@
 
 (defun read1-from-string (str)
   (let ((reader (lisp-reader str 'EOF)))
-    (vector (cdr (funcall reader 'next)) (funcall reader 'pos))))
+    (vector (cdr (funcall reader 'next))
+            (funcall reader 'pos))))
 
 (defun %with-undefined-warnings (thunk)
   (let ((*unknown-functions* nil)

@@ -10,7 +10,6 @@ import {
     LispOutputStream,
     LispChar,
     LispClosure,
-    LispObject,
     LispStdInstance,
     LispReaderStream,
     LispReaderTextStream,
@@ -1229,7 +1228,6 @@ defp("%type-of", false, function(m, nargs){
     if (x === true) return S_BOOLEAN;
     if (LispSymbol.is(x)) return S_SYMBOL;
     if (LispCons.is(x)) return S_CONS;
-    if (LispObject.is(x)) return S_STANDARD_OBJECT;
     if (LispStdInstance.is(x)) return S_STANDARD_OBJECT;
     if (Number.isInteger(x)) return S_INTEGER;
     if (typeof x === "number") return S_NUMBER;
@@ -1730,25 +1728,6 @@ defp("%output-stream-p", false, function(m, nargs){
 });
 
 /* -----[ object allocation utils ]----- */
-
-defp("%objectp", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    return LispObject.is(m.pop());
-});
-
-defp("%object-vector", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var obj = m.pop();
-    checktype(obj, LispObject);
-    return obj.vector;
-});
-
-defp("%make-object", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var size = m.pop();
-    checktype(size, LispNumber);
-    return new LispObject(size);
-});
 
 defp("%std-instance-p", false, function(m, nargs){
     checknargs(nargs, 1, 1);
