@@ -13,43 +13,40 @@ export class LispChar {
     static is(x) { return x instanceof LispChar }
 
     // TODO: this table should be really long.
-    static #NAMES_TO = Object.assign(Object.create(null), {
-        " "      : "SPACE",
-        "\t"     : "TAB",
-        "\r"     : "RETURN",
-        "\n"     : "NEWLINE",
-        "\x0C"   : "PAGE",
-        "\x08"   : "BACKSPACE",
-        "\u2028" : "LINE_SEPARATOR",
-        "\u2029" : "PARAGRAPH_SEPARATOR",
-        "\xA0"   : "NO-BREAK_SPACE",
-    });
+    static #NAMES_TO = new Map(Object.entries({
+        " ": "SPACE",
+        "\t": "TAB",
+        "\r": "RETURN",
+        "\n": "NEWLINE",
+        "\x0C": "PAGE",
+        "\x08": "BACKSPACE",
+        "\u2028": "LINE_SEPARATOR",
+        "\u2029": "PARAGRAPH_SEPARATOR",
+        "\xA0": "NO-BREAK_SPACE",
+    }));
 
     static #NAMES_FROM = ((h) => {
-        for (var i in this.#NAMES_TO)
-            h[this.#NAMES_TO[i]] = i;
-        h.LINEFEED = "\n";
+        for (let [key, val] of this.#NAMES_TO)
+            h.set(val, key);
+        h.set("LINEFEED", "\n");
         return h;
-    })(Object.create(null));
+    })(new Map);
 
-    static #OBJECTS = Object.create(null);
+    static #OBJECTS = new Map();
 
     static fromName(name) {
-        if (name.length == 1)
-            return LispChar.get(name); // hack
-        name = name.toUpperCase();
-        if (Object.hasOwn(LispChar.#NAMES_FROM, name))
-            return LispChar.get(LispChar.#NAMES_FROM[name]);
-        return false;
+        if (name.length == 1) return LispChar.get(name); // hack
+        let ch = LispChar.#NAMES_FROM.get(name.toUpperCase());
+        return ch ? LispChar.get(ch) : false;
     }
 
     static fromCode(code) {
-        return new LispChar(String.fromCharCode(code));
+        return LispChar.get(String.fromCharCode(code));
     }
 
     static get(char) {
-        return LispChar.#OBJECTS[char] || (
-            LispChar.#OBJECTS[char] = new LispChar(char)
+        return LispChar.#OBJECTS.get(char) || (
+            LispChar.#OBJECTS.set(char, char = new LispChar(char)), char
         );
     }
 
@@ -70,7 +67,7 @@ export class LispChar {
     }
 
     name() {
-        return LispChar.#NAMES_TO[this.value] || this.value;
+        return LispChar.#NAMES_TO.get(this.value) || this.value;
     }
 
     code() {
@@ -79,7 +76,7 @@ export class LispChar {
 
     toString() {
         var ch = this.value;
-        return "#\\" + (LispChar.#NAMES_TO[ch] || ch);
+        return "#\\" + (LispChar.#NAMES_TO.get(ch) || ch);
     }
 
     serialize() {
