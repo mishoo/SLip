@@ -1,5 +1,20 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject, LispStdInstance } from "./types.js";
+import {
+    LispSymbol,
+    LispPackage,
+    LispHash,
+    LispProcess,
+    LispMutex,
+    LispStream,
+    LispInputStream,
+    LispOutputStream,
+    LispChar,
+    LispClosure,
+    LispObject,
+    LispStdInstance,
+    LispReaderStream,
+    LispReaderTextStream,
+} from "./types.js";
 import { LispPrimitiveError } from "./error.js";
 import { LispMachine, OP, STATUS_WAITING } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
@@ -122,9 +137,24 @@ function checknargs(n, min, max) {
     if (max != null && n > max) error("Too many arguments");
 };
 
+function length(x) {
+    if (LispCons.isList(x)) return LispCons.len(x);
+    if (LispString.is(x)) return x.length;
+    if (LispVector.is(x)) return x.length;
+    if (LispHash.is(x)) return x.size();
+    error("Unrecognized sequence in length");
+};
+
 function checktype(x, type) {
     if (!type.is(x)) error("Invalid type, expecting " + type.type + ", got: " + LispMachine.dump(x));
     return x;
+};
+
+function checkbounding(seq, start, end) {
+    if (!(start >= 0 && start < seq.length) ||
+        !(end === false || (end > start && end <= seq.length))) {
+        error(`Bad bounding indexes ${start}/${end} for sequence ${LispMachine.dump(seq)}`);
+    }
 };
 
 function as_string(thing) {
@@ -410,12 +440,7 @@ defp("cons", false, function(m, nargs){
 
 defp("length", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var x = m.pop();
-    if (LispCons.isList(x)) return LispCons.len(x);
-    if (LispString.is(x)) return x.length;
-    if (LispVector.is(x)) return x.length;
-    if (LispHash.is(x)) return x.size();
-    error("Unrecognized sequence in length");
+    return length(m.pop());
 });
 
 defp("elt", false, function(m, nargs){
@@ -748,6 +773,14 @@ defp("vector-splice", true, function(m, nargs){
         a.push.apply(a, content);
     }
     return vector.splice.apply(vector, a);
+});
+
+defp("seq->string", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let seq = m.pop();
+    if (LispList.is(seq)) return LispCons.toArray(seq).map(x => x.valueOf()).join("");
+    if (LispVector.is(seq)) return seq.map(x => x.valueOf()).join("");
+    error("Unsupported sequence");
 });
 
 defp("vector-subseq", false, function(m, nargs){
@@ -1455,13 +1488,6 @@ defp("%stream-next", true, function(m, nargs){
     var stream = m.pop();
     checktype(stream, LispInputStream);
     return stream.next();
-});
-
-defp("%stream-prev", true, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var stream = m.pop();
-    checktype(stream, LispInputStream);
-    return stream.prev();
 });
 
 defp("%make-output-stream", false, function(_, nargs){
@@ -2701,3 +2727,71 @@ defp("sleep", true, function(m, nargs){
 });
 
 grok_xref_info(PRIMITIVES_XREF, "js/primitives.js");
+
+/* -----[ async streams ]----- */
+
+defp("%async-open-file", true, async function(m, nargs){
+    checknargs(nargs, 1, 3);
+    let binary = nargs > 2 ? m.pop() : false;
+    let output = nargs > 1 ? m.pop() : false;
+    let filename = checktype(m.pop(), LispString);
+
+    try {
+        let response = await fetch(filename);
+        if (response.ok) {
+            let body = response.body;
+            let stream = binary ? new LispReaderStream(body) : new LispReaderTextStream(body);
+            m.push(stream);
+            m.process.resume();
+        } else {
+            error(response.statusText);
+        }
+    } catch(ex) {
+        error(ex);
+    }
+
+    function error(ex) {
+        m.lisp_error("Cannot open file ~S (~S)", filename, String(ex));
+        m.process.resume();
+    }
+});
+
+defp("%async-read-value", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let stream = checktype(m.pop(), LispReaderStream);
+    if (stream.eof) return false;
+    if (stream.has_data()) return stream.next();
+    // going async
+    m.process.pause();
+    stream.fetch().then(() => {
+        m.push(stream.next());
+        m.process.resume();
+    });
+});
+
+defp("%async-read-sequence", true, function(m, nargs){
+    checknargs(nargs, 2, 4);
+    let end = nargs > 3 ? m.pop() : false;
+    let start = nargs > 2 ? m.pop_number() : 0;
+    let seq = checktype(m.pop(), LispVector);
+    let stream = checktype(m.pop(), LispReaderStream);
+    checkbounding(seq, start, end);
+    if (stream.eof) return start;
+    if (end === false) end = length(seq);
+    let pos = stream.read_sequence(seq, start, end);
+    if (pos === end) return pos;
+    // going async
+    m.process.pause();
+    (function loop(){
+        stream.fetch().then(() => {
+            pos = stream.read_sequence(seq, pos, end);
+            if (stream.eof || pos === end) {
+                // push return value and resume lisp process.
+                m.push(pos);
+                m.process.resume();
+            } else {
+                loop();
+            }
+        });
+    })();
+});

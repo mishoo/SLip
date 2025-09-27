@@ -1125,6 +1125,10 @@ export class LispMachine {
         //if (this.trace) this.trace = [ closure, args ];
     }
 
+    lisp_error(...args) {
+        this._callnext(LispSymbol.get("ERROR").function, LispCons.fromArray(args));
+    }
+
     run(quota) {
         while (quota-- > 0) {
             if (this.pc < 0) {
@@ -1392,7 +1396,11 @@ let OP_RUN = [
         let nargs = m.code[m.pc++];
         if (nargs === -1) nargs = m.n_args;
         let ret = name.primitive(m, nargs);
-        if (ret !== undefined) m.push(ret);
+        if (ret instanceof Promise) {
+            m.process.pause();
+        } else if (ret !== undefined) {
+            m.push(ret);
+        }
     },
     /*OP.NIL*/ (m) => {
         m.push(false);

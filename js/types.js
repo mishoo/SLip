@@ -132,25 +132,12 @@ export class LispInputStream extends LispStream {
         }
         return false;
     }
-    prev() {
-        if (this.pos > 0) {
-            var ch = this.text.charAt(--this.pos);
-            if (this.col-- == 0) this._resetPos();
-            return LispChar.get(ch);
-        }
-        return false;
-    }
     skip_to(ch) {
         var pos = this.text.indexOf(ch, this.pos);
         if (pos <= 0) pos = this.text.length;
         var diff = pos - this.pos;
         this.pos = pos;
         return diff;
-    }
-    _resetPos() {
-        var a = this.text.substr(0, this.pos).split(/\r?\n/);
-        this.line = a.length;
-        this.col = a[this.line - 1].length;
     }
 }
 
@@ -171,6 +158,54 @@ export class LispOutputStream extends LispStream {
     }
     get() {
         return this.text;
+    }
+}
+
+export class LispReaderStream {
+    static type = "reader-stream";
+    static is(x) { return x instanceof LispReaderStream };
+    constructor(stream) {
+        this.reader = stream.getReader();
+        this.buffer = null;
+        this.index = 0;
+        this.eof = false;
+    }
+    has_data(length = false) {
+        return !this.eof && this.buffer && this.index < this.buffer.length &&
+            (length === false || this.index + length <= this.buffer.length);
+    }
+    async fetch() {
+        if (this.eof) return false;
+        let { value, done } = await this.reader.read();
+        if (done) this.eof = true;
+        this.buffer = value;
+        this.index = 0;
+    }
+    peek() {
+        return this.eof ? false : this.transform(this.buffer[this.index]);
+    }
+    next() {
+        return this.eof ? false : this.transform(this.buffer[this.index++]);
+    }
+    read_sequence(seq, start, end) {
+        if (!this.buffer || this.eof) return start;
+        let j = start;
+        while (this.index < this.buffer.length && j < end) {
+            seq[j++] = this.transform(this.buffer[this.index++]);
+        }
+        return j;
+    }
+    transform(x) {
+        return x;
+    }
+}
+
+export class LispReaderTextStream extends LispReaderStream {
+    constructor(stream) {
+        super(stream.pipeThrough(new TextDecoderStream()));
+    }
+    transform(x) {
+        return LispChar.get(x);
     }
 }
 
