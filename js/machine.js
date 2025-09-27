@@ -1084,18 +1084,6 @@ export class LispMachine {
         return this.loop();
     }
 
-    _call(closure, args) {
-        args = LispCons.toArray(args);
-        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
-        this.code = closure.code;
-        this.env = closure.env;
-        this.n_args = args.length;
-        this.pc = 0;
-        this.f = closure;
-        while (this.pc >= 0) vmrun(this);
-        return this.pop();
-    }
-
     _callnext(closure, args) {
         //if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
         if (args !== undefined) {

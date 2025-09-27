@@ -422,7 +422,7 @@
              (make-regexp str mods)))
 
          (skip-comment ()
-           (%stream-skip-to input #\Newline))
+           (read-while (lambda (ch) (not (eq ch #\Newline)))))
 
          (read-symbol-name ()
            (read-while

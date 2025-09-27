@@ -1474,15 +1474,6 @@ defp("%stream-peek", false, function(m, nargs){
     return stream.peek();
 });
 
-defp("%stream-skip-to", false, function(m, nargs){
-    checknargs(nargs, 2, 2);
-    var ch = m.pop(), stream = m.pop();
-    checktype(stream, LispInputStream);
-    if (LispChar.is(ch)) ch = ch.value;
-    checktype(ch, LispString);
-    return stream.skip_to(ch);
-});
-
 defp("%stream-next", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var stream = m.pop();
@@ -1510,10 +1501,8 @@ defp("%stream-get", false, function(m, nargs){
     return stream.get();
 });
 
-defp("%get-file-contents", false, function(m, nargs){
-    checknargs(nargs, 1, 2);
-    var cont = nargs == 2 ? m.pop() : false;
-    if (cont !== false) checktype(cont, LispClosure);
+defp("%get-file-contents", false, function (m, nargs) {
+    checknargs(nargs, 1, 1);
     var url = m.pop();
     checktype(url, LispString);
 
@@ -1521,28 +1510,15 @@ defp("%get-file-contents", false, function(m, nargs){
         // local storage takes priority
         let content = ls_get_file_contents(url);
         if (content != null) {
-            if (cont) {
-                return m._callnext(cont, new LispCons(content, false));
-            } else {
-                return content;
-            }
+            return content;
         }
     }
 
     var xhr = new XMLHttpRequest();
     url += "?killCache=" + Date.now(); // is this a good idea?
-    if (cont) {
-        xhr.open("GET", url, true);
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState == 4)
-                m._call(cont, new LispCons(xhr.status == 200 ? xhr.responseText : false, false));
-        };
-        xhr.send(null);
-    } else {
-        xhr.open("GET", url, false); // XXX: synchronous is deprecated
-        xhr.send(null);
-        return cont ? false : xhr.status == 200 ? xhr.responseText : false;
-    }
+    xhr.open("GET", url, false); // XXX: synchronous is deprecated
+    xhr.send(null);
+    return xhr.status == 200 ? xhr.responseText : false;
 });
 
 /* -----[ local storage ]----- */
@@ -2726,14 +2702,12 @@ defp("sleep", true, function(m, nargs){
     m.process.pause();
 });
 
-grok_xref_info(PRIMITIVES_XREF, "js/primitives.js");
-
 /* -----[ async streams ]----- */
 
 defp("%async-open-file", true, async function(m, nargs){
     checknargs(nargs, 1, 3);
-    let binary = nargs > 2 ? m.pop() : false;
-    let output = nargs > 1 ? m.pop() : false;
+    let output = nargs > 2 ? m.pop() : false;
+    let binary = nargs > 1 ? m.pop() : false;
     let filename = checktype(m.pop(), LispString);
 
     try {
@@ -2795,3 +2769,6 @@ defp("%async-read-sequence", true, function(m, nargs){
         });
     })();
 });
+
+// keep this at the end of the file
+grok_xref_info(PRIMITIVES_XREF, "js/primitives.js");

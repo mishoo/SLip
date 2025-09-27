@@ -132,13 +132,6 @@ export class LispInputStream extends LispStream {
         }
         return false;
     }
-    skip_to(ch) {
-        var pos = this.text.indexOf(ch, this.pos);
-        if (pos <= 0) pos = this.text.length;
-        var diff = pos - this.pos;
-        this.pos = pos;
-        return diff;
-    }
 }
 
 export class LispOutputStream extends LispStream {
@@ -666,7 +659,6 @@ export class LispProcess {
     }
 
     set_timeout(timeout, closure) {
-        closure = closure.copy();
         var tm = setTimeout(() => {
             this.m.push(new LispRet(this.m, this.m.pc, true));
             this.m.n_args = 0;
