@@ -1350,6 +1350,7 @@
 (defconstant <sequence>          (defclass sequence (t) ()))
 (defconstant <array>             (defclass array (t) ()))
 (defconstant <number>            (defclass number (t) ()))
+(defconstant <integer>           (defclass integer (number) ()))
 (defconstant <character>         (defclass character (t) ()))
 (defconstant <regexp>            (defclass regexp (t) ()))
 (defconstant <function>          (defclass function (t) ()))
@@ -1372,6 +1373,7 @@
   (cond
     ((null x)                                         <null>)
     ((symbolp x)                                      <symbol>)
+    ((integerp x)                                     <integer>)
     ((numberp x)                                      <number>)
     ((consp x)                                        <cons>)
     ((charp x)                                        <character>)
