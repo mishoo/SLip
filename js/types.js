@@ -181,7 +181,7 @@ export class LispReaderStream {
         if (!this.buffer || this.eof) return start;
         let j = start;
         while (this.index < this.buffer.length && j < end) {
-            seq[j++] = this.transform(this.buffer[this.index++]);
+            seq[j++] = this.next();
         }
         return j;
     }
