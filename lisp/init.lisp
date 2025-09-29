@@ -58,6 +58,8 @@
      vector-push vectorp warn when with-output-to-string without-interrupts
      zerop λ
 
+     stream input-stream output-stream
+
      ))
 
   (export exported boot)

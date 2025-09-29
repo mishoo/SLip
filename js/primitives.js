@@ -41,8 +41,9 @@ const S_STRUCTURE           = LispSymbol.get("STRUCTURE");
 const S_VECTOR              = LispSymbol.get("VECTOR");
 const S_PACKAGE             = LispSymbol.get("PACKAGE");
 const S_THREAD              = LispSymbol.get("THREAD");
+const S_INPUT_STREAM        = LispSymbol.get("INPUT-STREAM");
+const S_OUTPUT_STREAM       = LispSymbol.get("OUTPUT-STREAM");
 const S_STANDARD_OBJECT     = LispSymbol.get("STANDARD-OBJECT");
-const S_CLOSETTE_STRUCT     = LispSymbol.get("STD-INSTANCE", LispPackage.get("CLOSETTE")); // XXX: temporary.
 
 const LispList = {
     is: LispCons.isList,
@@ -1245,6 +1246,8 @@ defp("%type-of", false, function(m, nargs){
             return S_VECTOR;
         }
     }
+    if (LispInputStream.is(x)) return S_INPUT_STREAM;
+    if (LispOutputStream.is(x)) return S_OUTPUT_STREAM;
     if (LispPackage.is(x)) return S_PACKAGE;
     if (LispProcess.is(x)) return S_THREAD;
     return LispSymbol.get("T");

@@ -9,13 +9,14 @@
     (- (get-internal-run-time) t1)))
 
 (defun %test (thunk times)
+  (assert (> times 1) "TEST: you gotta run it at least twice, man..")
   (loop for i from 1 to times
         for time = (test1 thunk)
         do (format t "Sample ~D: ~Dms~%" i time)
-        summing time into total
-        minimizing time into min
-        maximizing time into max
-        finally (return (list min max (/ total times)))))
+        when (> i 1) sum time into total
+        and minimize time into min
+        and maximize time into max
+        finally (return (list min max (/ total (1- times))))))
 
 (defmacro test (form &key (times 5))
   `(%test (lambda () ,form) ,times))
