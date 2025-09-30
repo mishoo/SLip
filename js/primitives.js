@@ -5,17 +5,24 @@ import {
     LispHash,
     LispProcess,
     LispMutex,
-    LispStream,
-    LispInputStream,
-    LispOutputStream,
     LispChar,
     LispClosure,
     LispStdInstance,
-    LispReaderStream,
-    LispReaderTextStream,
 } from "./types.js";
+import {
+    LispInputStream,
+    LispTextInputStream,
+    LispTextMemoryInputStream,
+    LispTextReaderInputStream,
+    LispReaderInputStream,
+    LispOutputStream,
+    LispTextOutputStream,
+    LispTextMemoryOutputStream,
+    LispStream,
+    LispTextStream,
+} from "./streams.js";
 import { LispPrimitiveError } from "./error.js";
-import { LispMachine, OP, STATUS_WAITING } from "./machine.js";
+import { LispMachine, OP } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
 
 let ALL_PRIMITIVES = false;
@@ -1438,70 +1445,6 @@ defp("iterator-next", true, function(m, nargs){
     m.stack.set_values_array([ true, result.value ]);
 });
 
-/* -----[ simple streams ]----- */
-
-defp("%stream-line", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var stream = m.pop();
-    checktype(stream, LispStream);
-    return stream.line;
-});
-
-defp("%stream-col", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var stream = m.pop();
-    checktype(stream, LispStream);
-    return stream.col;
-});
-
-defp("%stream-pos", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var stream = m.pop();
-    checktype(stream, LispStream);
-    return stream.pos;
-});
-
-defp("%make-input-stream", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var text = m.pop();
-    checktype(text, LispString);
-    return new LispInputStream(text);
-});
-
-defp("%stream-peek", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var stream = m.pop();
-    checktype(stream, LispInputStream);
-    return stream.peek();
-});
-
-defp("%stream-next", true, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var stream = m.pop();
-    checktype(stream, LispInputStream);
-    return stream.next();
-});
-
-defp("%make-output-stream", false, function(_, nargs){
-    checknargs(nargs, 0, 0);
-    return new LispOutputStream();
-});
-
-defp("%stream-put", true, function(m, nargs){
-    checknargs(nargs, 1);
-    var text = strcat(m, nargs - 1);
-    var stream = m.pop();
-    checktype(stream, LispOutputStream);
-    return stream.put(text);
-});
-
-defp("%stream-get", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var stream = m.pop();
-    checktype(stream, LispOutputStream);
-    return stream.get();
-});
-
 defp("%get-file-contents", false, function (m, nargs) {
     checknargs(nargs, 1, 1);
     var url = m.pop();
@@ -1719,16 +1662,6 @@ defp("%ls-webdav-save-all", true, function(m, nargs){
 });
 
 /* -----[ /local storage ]----- */
-
-defp("%input-stream-p", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    return LispInputStream.is(m.pop());
-});
-
-defp("%output-stream-p", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    return LispOutputStream.is(m.pop());
-});
 
 /* -----[ object allocation utils ]----- */
 
@@ -2684,7 +2617,93 @@ defp("sleep", true, function(m, nargs){
     m.process.pause();
 });
 
-/* -----[ async streams ]----- */
+/* -----[ streams ]----- */
+
+defp("%stream-line", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var stream = m.pop();
+    checktype(stream, LispTextStream);
+    return stream.line;
+});
+
+defp("%stream-col", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var stream = m.pop();
+    checktype(stream, LispTextStream);
+    return stream.col;
+});
+
+defp("%stream-pos", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var stream = m.pop();
+    checktype(stream, LispInputStream);
+    return stream.position;
+});
+
+defp("%make-text-memory-input-stream", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var text = m.pop();
+    checktype(text, LispString);
+    return new LispTextMemoryInputStream(text);
+});
+
+defp("%make-text-memory-output-stream", false, function(_, nargs){
+    checknargs(nargs, 0, 0);
+    return new LispTextMemoryOutputStream();
+});
+
+defp("%stream-peek", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var stream = m.pop();
+    checktype(stream, LispInputStream);
+    if (!stream.try_fetch()) return stream.peek();
+    // going async
+    m.process.pause();
+    stream.fetch().then(() => {
+        // push return value and resume
+        m.push(stream.peek());
+        m.process.resume();
+    });
+});
+
+defp("%stream-next", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var stream = m.pop();
+    checktype(stream, LispInputStream);
+    if (!stream.try_fetch()) return stream.next();
+    // going async
+    m.process.pause();
+    stream.fetch().then(() => {
+        // push return value and resume
+        m.push(stream.next());
+        m.process.resume();
+    });
+});
+
+defp("%stream-put", true, function(m, nargs){
+    checknargs(nargs, 1);
+    var text = strcat(m, nargs - 1);
+    var stream = m.pop();
+    checktype(stream, LispOutputStream);
+    return stream.put(text);
+});
+
+defp("%get-output-stream-string", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var stream = m.pop();
+    checktype(stream, LispTextMemoryOutputStream);
+    return stream.get();
+});
+
+defp("%input-stream-p", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return LispInputStream.is(m.pop());
+});
+
+defp("%output-stream-p", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return LispOutputStream.is(m.pop());
+});
 
 defp("%async-open-file", true, async function(m, nargs){
     checknargs(nargs, 1, 3);
@@ -2696,7 +2715,7 @@ defp("%async-open-file", true, async function(m, nargs){
         let response = await fetch(filename);
         if (response.ok) {
             let body = response.body;
-            let stream = binary ? new LispReaderStream(body) : new LispReaderTextStream(body);
+            let stream = binary ? new LispReaderInputStream(body) : new LispTextReaderInputStream(body);
             m.push(stream);
             m.process.resume();
         } else {
@@ -2712,36 +2731,22 @@ defp("%async-open-file", true, async function(m, nargs){
     }
 });
 
-defp("%async-read-value", true, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    let stream = checktype(m.pop(), LispReaderStream);
-    if (stream.eof) return false;
-    if (stream.has_data()) return stream.next();
-    // going async
-    m.process.pause();
-    stream.fetch().then(() => {
-        m.push(stream.next());
-        m.process.resume();
-    });
-});
-
-defp("%async-read-sequence", true, function(m, nargs){
+defp("%read-sequence", true, function(m, nargs){
     checknargs(nargs, 2, 4);
     let end = nargs > 3 ? m.pop() : false;
     let start = nargs > 2 ? m.pop_number() : 0;
     let seq = checktype(m.pop(), LispVector);
-    let stream = checktype(m.pop(), LispReaderStream);
+    let stream = checktype(m.pop(), LispInputStream);
     checkbounding(seq, start, end);
-    if (stream.eof) return start;
     if (end === false) end = length(seq);
     let pos = stream.read_sequence(seq, start, end);
-    if (pos === end) return pos;
+    if (pos === end || !stream.try_fetch()) return pos;
     // going async
     m.process.pause();
     (function loop(){
         stream.fetch().then(() => {
             pos = stream.read_sequence(seq, pos, end);
-            if (stream.eof || pos === end) {
+            if (pos === end || !stream.try_fetch()) {
                 // push return value and resume lisp process.
                 m.push(pos);
                 m.process.resume();

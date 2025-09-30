@@ -6,14 +6,20 @@ import { LispChar } from "./types.js";
 export class LispInputStream {
     static type = "input-stream";
     static is(x) { return x instanceof LispInputStream }
+
+    reader = null;
+    buffer = null;
+    index = 0;
+    position = 0;
+
     _peek() {}
     _next() {}
     peek() { return this.transform(this._peek()) }
-    next() { return this.transform(this._next()) }
+    next() { return this.position++, this.transform(this._next()) }
     transform(val) { return val }
     read_sequence(seq, start, end) {
         let index = start;
-        while (this.peek() !== false && (end === false || index < end)) {
+        while (this._peek() !== false && (end === false || index < end)) {
             seq[index++] = this.next();
         }
         return index;
@@ -26,7 +32,7 @@ export class LispInputStream {
     // have an internal buffer (initial case) or (3) we have consumed
     // the internal buffer.
     try_fetch() {
-        return this.reader && !this.buffer || this.index >= this.buffer.length;
+        return this.reader && (!this.buffer || this.index >= this.buffer.length);
     }
     async fetch() {
         let { value, done } = await this.reader.read();
@@ -47,10 +53,10 @@ export class LispTextInputStream extends LispInputStream {
         this.col = 0;
     }
     _peek() {
-        return this.index < this.buffer.length ? this.buffer[this.index] : false;
+        return this.buffer && this.index < this.buffer.length ? this.buffer[this.index] : false;
     }
     _next() {
-        if (this.index < this.buffer.length) {
+        if (this.buffer && this.index < this.buffer.length) {
             let ch = this.buffer[this.index++];
             if (ch == "\n") ++this.line, this.col = 0;
             else ++this.col;
@@ -76,8 +82,15 @@ export class LispTextReaderInputStream extends LispTextInputStream {
     constructor(stream) {
         super();
         this.reader = stream.pipeThrough(new TextDecoderStream()).getReader();
-        this.buffer = null;
-        this.index = 0;
+    }
+}
+
+export class LispReaderInputStream extends LispTextInputStream {
+    static type = "reader-input-stream";
+    static is(x) { return x instanceof LispReaderInputStream }
+    constructor(stream) {
+        super();
+        this.reader = stream.getReader();
     }
 }
 
@@ -97,19 +110,27 @@ export class LispTextOutputStream extends LispOutputStream {
 export class LispTextMemoryOutputStream extends LispTextOutputStream {
     static type = "text-memory-output-stream";
     static is(x) { return x instanceof LispTextMemoryOutputStream }
+    constructor(init) {
+        super();
+        this.buffer = "";
+        if (init) this.put(init);
+    }
     put(str) {
+        if (LispChar.is(str)) str = str.value;
         var lines = str.split(/\r?\n/);
         this.line += lines.length - 1;
         this.col = lines.length > 1
             ? lines[lines.length - 1].length
             : this.col + lines[0].length;
         this.pos += str.length;
-        this.text += str;
+        this.buffer += str;
         this.onData(this, str);
-        return this.text;
+        return this.buffer;
     }
     get() {
-        return this.text;
+        let data = this.buffer;
+        this.buffer = "";
+        return data;
     }
 }
 
@@ -120,6 +141,17 @@ export class LispStream {
     static is(x) {
         return x instanceof LispInputStream
             || x instanceof LispOutputStream;
+    }
+    static [Symbol.hasInstance](x) {
+        return this.is(x);
+    }
+}
+
+export class LispTextStream {
+    static type = "text-stream";
+    static is(x) {
+        return x instanceof LispTextInputStream
+            || x instanceof LispTextOutputStream;
     }
     static [Symbol.hasInstance](x) {
         return this.is(x);

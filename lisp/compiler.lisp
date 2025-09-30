@@ -60,9 +60,9 @@
 
 (defvar *compiler-macros* (make-hash))
 
-(defvar *standard-output* (%make-output-stream))
-(defvar *error-output* (%make-output-stream))
-(defvar *trace-output* (%make-output-stream))
+(defvar *standard-output* (%make-text-memory-output-stream))
+(defvar *error-output* (%make-text-memory-output-stream))
+(defvar *trace-output* (%make-text-memory-output-stream))
 
 (defmacro cond clauses
   (when clauses
@@ -356,7 +356,7 @@
 ;;;; parser/compiler
 
 (defun lisp-reader (text eof)
-  (let ((input (%make-input-stream text))
+  (let ((input (%make-text-memory-input-stream text))
         (in-qq 0))
     (labels
         ((peek ()
@@ -366,13 +366,13 @@
            (%stream-next input))
 
          (read-while (pred)
-           (let ((out (%make-output-stream)))
+           (let ((out (%make-text-memory-output-stream)))
              (labels ((rec (ch)
                         (when (and ch (funcall pred ch))
                           (%stream-put out (next))
                           (rec (peek)))))
                (rec (peek)))
-             (%stream-get out)))
+             (%get-output-stream-string out)))
 
          (croak (msg)
            (when *current-file*
@@ -395,7 +395,7 @@
 
          (read-escaped (start end inces)
            (skip start)
-           (let ((out (%make-output-stream)))
+           (let ((out (%make-text-memory-output-stream)))
              (labels ((rec (ch escaped)
                         (cond
                           ((not ch)
@@ -404,7 +404,7 @@
                            (%stream-put out ch)
                            (rec (next) nil))
                           ((eq ch end)
-                           (%stream-get out))
+                           (%get-output-stream-string out))
                           ((eq ch #\\)
                            (if inces (%stream-put out #\\))
                            (rec (next) t))
@@ -2067,7 +2067,7 @@
                                  *current-file*))
              (reader (lisp-reader str 'EOF))
              (cache (make-hash))
-             (out (%make-output-stream))
+             (out (%make-text-memory-output-stream))
              (is-first t)
              (link-addr 0)
              (*xref-info* (vector))
@@ -2094,7 +2094,7 @@
                   (*xref-info* nil))
              (when (and *current-file* (plusp (length xref)))
                (comp1 `(%grok-xref-info ,*current-file* ,xref))))
-           (%stream-get out)))))
+           (%get-output-stream-string out)))))
 
   (set-symbol-function! 'compile #'compile)
   (set-symbol-function! 'compile-string #'compile-string))

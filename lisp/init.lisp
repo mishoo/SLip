@@ -822,11 +822,11 @@
               ,(caar syms))))))))
 
 (defmacro with-output-to-string ((var &optional string) &body body)
-  `(let ((,var (%make-output-stream)))
+  `(let ((,var (%make-text-memory-output-stream)))
      ,@(when string
          `((%stream-put ,var ,string)))
      ,@body
-     (%stream-get ,var)))
+     (%get-output-stream-string ,var)))
 
 (defmacro defun-memoize (name args &body body)
   (let ((memo (gensym "memo")))
