@@ -197,8 +197,13 @@ export class LispCons {
         return car(p);
     }
     static find(list, item, cmp) {
-        while (list !== false && !cmp(list.car, item))
-            list = cdr(list);
+        if (cmp) {
+            while (list !== false && !cmp(list.car, item))
+                list = cdr(list);
+        } else {
+            while (list !== false && list.car !== item)
+                list = cdr(list);
+        }
         return list;
     }
 

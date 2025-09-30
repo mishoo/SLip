@@ -499,6 +499,12 @@ export class LispQueue {
     push(el) {
         this.tail = this.tail.cdr = new LispCons(el, false);
     }
+    push_front(el) {
+        if (!LispCons.find(this.list.cdr, el)) {
+            this.list.cdr = new LispCons(el, this.list.cdr);
+            if (this.tail === this.list) this.tail = this.list.cdr;
+        }
+    }
     reenq(cell) {
         this.tail = this.tail.cdr = cell;
         cell.cdr = false;
@@ -526,7 +532,7 @@ class Message {
 let PID = 0;
 let QUEUE = new LispQueue();
 
-const run = () => {
+const start = () => {
     let count = 0, startTime = Date.now(), process, cell;
     try {
         while (true) {
@@ -569,10 +575,8 @@ const run = () => {
             console.log(process);
         }
     }
-    setTimeout(run, 0);
+    setTimeout(start, 0);
 };
-
-const start = () => setTimeout(run, 0);
 
 export class LispProcess {
     static type = "process";
@@ -595,7 +599,7 @@ export class LispProcess {
 
     resume() {
         this.m.status = STATUS_RUNNING;
-        QUEUE.push(this);
+        QUEUE.push_front(this);
         start();
     }
 
