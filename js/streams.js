@@ -84,6 +84,12 @@ export class LispTextReaderInputStream extends LispTextInputStream {
         super();
         this.reader = stream.pipeThrough(new TextDecoderStream()).getReader();
     }
+    async fetch() {
+        let { value, done } = await this.reader.read();
+        if (done) this.reader = null;
+        this.buffer = [...value];
+        this.index = 0;
+    }
 }
 
 export class LispReaderInputStream extends LispInputStream {
