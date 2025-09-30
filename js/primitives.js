@@ -165,10 +165,13 @@ function checkbounding(seq, start, end) {
 };
 
 function as_string(thing) {
+    if (LispString.is(thing)) return thing;
     if (LispSymbol.is(thing)) return LispSymbol.symname(thing);
-    if (LispChar.is(thing)) return thing.value;
+    if (LispChar.is(thing)) return thing.valueOf();
     if (LispPackage.is(thing)) return thing.name;
-    return thing;
+    if (LispVector.is(thing)) return thing.map(as_string).join("");
+    if (LispCons.is(thing)) return LispCons.toArray(thing).map(as_string).join("");
+    error("STRING: cannot coerce given object to string");
 };
 
 function as_list(thing) {
@@ -782,14 +785,6 @@ defp("vector-splice", true, function(m, nargs){
     return vector.splice.apply(vector, a);
 });
 
-defp("seq->string", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    let seq = m.pop();
-    if (LispList.is(seq)) return LispCons.toArray(seq).map(x => x.valueOf()).join("");
-    if (LispVector.is(seq)) return seq.map(x => x.valueOf()).join("");
-    error("Unsupported sequence");
-});
-
 defp("vector-subseq", false, function(m, nargs){
     checknargs(nargs, 1, 3);
     var end = nargs == 3 ? m.pop() : false;
@@ -936,6 +931,11 @@ defp("upcase", false, function(m, nargs){
     if (LispString.is(x)) return x.toUpperCase();
     if (LispChar.is(x)) return LispChar.get(x.value.toUpperCase());
     error("Unsupported argument type");
+});
+
+defp("string", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return as_string(m.pop());
 });
 
 defp("string-downcase", false, function(m, nargs){
@@ -2705,7 +2705,7 @@ defp("%output-stream-p", false, function(m, nargs){
     return LispOutputStream.is(m.pop());
 });
 
-defp("%async-open-file", true, async function(m, nargs){
+defp("%async-fetch", true, async function(m, nargs){
     checknargs(nargs, 1, 3);
     let output = nargs > 2 ? m.pop() : false;
     let binary = nargs > 1 ? m.pop() : false;
