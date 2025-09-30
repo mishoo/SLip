@@ -12,8 +12,12 @@ export class LispInputStream {
     index = 0;
     position = 0;
 
-    _peek() {}
-    _next() {}
+    _peek() {
+        return this.buffer && this.index < this.buffer.length ? this.buffer[this.index] : false;
+    }
+    _next() {
+        return this.buffer && this.index < this.buffer.length ? this.buffer[this.index++] : false;
+    }
     peek() { return this.transform(this._peek()) }
     next() { return this.position++, this.transform(this._next()) }
     transform(val) { return val }
@@ -52,9 +56,6 @@ export class LispTextInputStream extends LispInputStream {
         this.line = 1;
         this.col = 0;
     }
-    _peek() {
-        return this.buffer && this.index < this.buffer.length ? this.buffer[this.index] : false;
-    }
     _next() {
         if (this.buffer && this.index < this.buffer.length) {
             let ch = this.buffer[this.index++];
@@ -85,7 +86,7 @@ export class LispTextReaderInputStream extends LispTextInputStream {
     }
 }
 
-export class LispReaderInputStream extends LispTextInputStream {
+export class LispReaderInputStream extends LispInputStream {
     static type = "reader-input-stream";
     static is(x) { return x instanceof LispReaderInputStream }
     constructor(stream) {

@@ -2746,13 +2746,11 @@ defp("%read-sequence", true, function(m, nargs){
     (function loop(){
         stream.fetch().then(() => {
             pos = stream.read_sequence(seq, pos, end);
-            if (pos === end || !stream.try_fetch()) {
-                // push return value and resume lisp process.
-                m.push(pos);
-                m.process.resume();
-            } else {
-                loop();
-            }
+            if (pos < end && stream.try_fetch())
+                return loop();
+            // push return value and resume lisp process.
+            m.push(pos);
+            m.process.resume();
         });
     })();
 });
