@@ -37,8 +37,6 @@
 (defclass warning (condition) ())
 (defclass simple-warning (simple-condition warning) ())
 
-(defglobal <condition> (find-class 'condition))
-
 (defmethod print-object ((c simple-condition) (out output-stream))
   (let ((format-control (slot-value c 'format-control))
         (format-arguments (slot-value c 'format-arguments)))

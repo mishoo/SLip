@@ -80,9 +80,9 @@
 
 (defun rect-spiral (max)
   (save-excursion
-   (loop for n below max do
-         (forward n)
-         (left 81))))
+   (dotimes (n max)
+     (forward (/ n 1.5))
+     (left 81))))
 
 (defparameter iii 0)
 
@@ -96,10 +96,12 @@
   (clock (+ 160 (* 30 (sin (incf iii 0.05))))))
 
 (defun animate-clock ()
-  (without-interrupts
-    (when *canvas*
-      (draw-clock-frame)
-      (set-timeout 16 #'animate-clock))))
+  (when *canvas*
+    (without-interrupts (draw-clock-frame))
+    ;; this also works:
+    ;;   (sleep 0.016)
+    ;;   (animate-clock)
+    (set-timeout 16 #'animate-clock)))
 
 (with-canvas
   (let ((iii 0))
