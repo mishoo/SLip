@@ -50,11 +50,14 @@ export class LispInputStream {
 export class LispTextInputStream extends LispInputStream {
     static type = "text-input-stream";
     static is(x) { return x instanceof LispTextInputStream }
+
+    line = 1;
+    col = 0;
+
     transform(val) { return val === false ? false : LispChar.get(val) }
-    constructor() {
-        super();
-        this.line = 1;
-        this.col = 0;
+    makeBuffer(value) {
+        // splice it only if it has surrogate pairs
+        return /[\uD800-\uDFFF]/.test(value) ? [...value] : value;
     }
     _next() {
         if (this.buffer && this.index < this.buffer.length) {
@@ -72,7 +75,7 @@ export class LispTextMemoryInputStream extends LispTextInputStream {
     static is(x) { return x instanceof LispTextMemoryInputStream }
     constructor(text) {
         super();
-        this.buffer = text;
+        this.buffer = this.makeBuffer(text);
         this.index = 0;
     }
 }
@@ -86,8 +89,11 @@ export class LispTextReaderInputStream extends LispTextInputStream {
     }
     async fetch() {
         let { value, done } = await this.reader.read();
-        if (done) this.reader = null;
-        this.buffer = [...value];
+        if (done) {
+            this.reader = this.buffer = null;
+        } else {
+            this.buffer = this.makeBuffer(value);
+        }
         this.index = 0;
     }
 }
@@ -106,11 +112,21 @@ export class LispReaderInputStream extends LispInputStream {
 export class LispOutputStream {
     static type = "output-stream";
     static is(x) { return x instanceof LispOutputStream }
+
+    position = 0;
+    index = 0;
+    buffer = null;
+    writer = null;
+
     onData() {}
 }
 
 export class LispTextOutputStream extends LispOutputStream {
     static type = "text-output-stream";
+
+    line = 1;
+    col = 0;
+
     static is(x) { return x instanceof LispTextOutputStream }
 }
 
@@ -129,7 +145,7 @@ export class LispTextMemoryOutputStream extends LispTextOutputStream {
         this.col = lines.length > 1
             ? lines[lines.length - 1].length
             : this.col + lines[0].length;
-        this.pos += str.length;
+        this.position += str.length;
         this.buffer += str;
         this.onData(this, str);
         return this.buffer;
