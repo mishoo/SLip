@@ -1,5 +1,5 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure } from "./types.js";
+import { LispSymbol, LispPackage, LispHash, LispChar, LispClosure } from "./types.js";
 import { LispPrimitiveError } from "./error.js";
 import { repeat_string, pad_string } from "./utils.js";
 import { LispStack } from "./stack.js";
