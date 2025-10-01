@@ -300,8 +300,13 @@ export class LispPackage {
         }
         return "p(" + JSON.stringify(this.name) + ")";
     }
-    intern(name) {
-        let sym = this.symbols.get(name);
+    intern(name, sym) {
+        if (sym) {
+            if (!sym.pak) sym.pak = this;
+            this.symbols.set(name, sym);
+            return sym;
+        }
+        sym = this.symbols.get(name);
         if (!sym) {
             sym = this.symbols.set(name, new LispSymbol(name, this));
             if (this === LispPackage.BASE_PACK) {

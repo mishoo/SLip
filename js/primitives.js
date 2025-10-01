@@ -2014,10 +2014,11 @@ defp("export", true, function(m, nargs){
     }
     checktype(pak, LispPackage);
     LispCons.forEach(syms, function(sym){
-        if (sym instanceof LispSymbol && !sym.pak)
-            sym = pak.intern(sym.name);
-        else if (LispString.is(sym))
+        if (sym instanceof LispSymbol) {
+            sym = pak.intern(sym.name, sym);
+        } else if (LispString.is(sym)) {
             sym = pak.intern(sym);
+        }
         pak.export(sym);
     });
     return pak;
@@ -2640,10 +2641,11 @@ defp("%stream-col", false, function(m, nargs){
 });
 
 defp("%stream-pos", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var stream = m.pop();
-    checktype(stream, LispInputStream);
-    return stream.position;
+    checknargs(nargs, 1, 2);
+    let newpos = nargs > 1 ? m.pop() : false;
+    let stream = checktype(m.pop(), LispStream);
+    if (newpos) checktype(newpos, LispNumber);
+    return newpos === false ? stream.position : stream.set_position(newpos);
 });
 
 defp("%make-text-memory-input-stream", false, function(m, nargs){
