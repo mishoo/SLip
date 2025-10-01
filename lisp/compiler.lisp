@@ -42,8 +42,9 @@
 (defmacro defglobal (name val)
   (%global! name)
   (%::maybe-xref-info name 'defglobal)
-  `(progn (%global! ',name)
-          (setq ,name ,val)))
+  `(progn
+     (%global! ',name)
+     (setq ,name ,val)))
 
 (defvar *read-table* nil)
 (defvar *package* nil)
@@ -1517,7 +1518,7 @@
          (or body
              (let ((label (gensym "block")))
                (%seq (gen "BLOCK")
-                     (with-extenv (:lex (vector (list name :block label val?)))
+                     (with-extenv (:lex (vector (list name :block label val? more?)))
                        (comp-seq forms env val? more?))
                      (vector label)
                      (if more?
@@ -1530,7 +1531,8 @@
                          (throw name nil)))
               (data (cddr block))
               (label (%pop data))
-              (val? (%pop data)))
+              (val? (%pop data))
+              (more? (%pop data)))
          (%seq (comp value env val? t)
                (if val?
                    (gen "LRET" label (car block))
@@ -2190,9 +2192,9 @@
     "lisp/seq.lisp"
     "lisp/closette.lisp"
     "lisp/printer.lisp"
-    "lisp/ffi.lisp"
     "lisp/conditions.lisp"
     "lisp/stream.lisp"
+    "lisp/ffi.lisp"
     "ide/ide.lisp"))
 
 ;;;
