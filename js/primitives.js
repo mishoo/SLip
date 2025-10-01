@@ -1139,6 +1139,12 @@ defp("digitp", false, function(m, nargs){
     return ch >= 48 && ch <= 57;
 });
 
+defp("whitespacep", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let ch = checktype(m.pop(), LispChar);
+    return /[\n\r\u2028\u2029 \u00a0\t\f\u000b\u200b\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000\uFEFF]/.test(ch.valueOf());
+});
+
 defp("numberp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return LispNumber.is(m.pop());

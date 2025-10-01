@@ -29,6 +29,10 @@ export class LispInputStream {
         return index;
     }
 
+    set_position() {
+        return false;
+    }
+
     // For reader streams. This function should return TRUE only if it
     // makes sense to check asynchronously for additional data, that
     // is: (1) we have an attached reader and EOF wasn't yet seen (on
@@ -117,6 +121,10 @@ export class LispOutputStream {
     index = 0;
     buffer = null;
     writer = null;
+
+    set_position() {
+        return false;
+    }
 
     onData() {}
 }

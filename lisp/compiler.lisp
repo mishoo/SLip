@@ -63,6 +63,7 @@
 (defvar *standard-output* (%make-text-memory-output-stream))
 (defvar *error-output* (%make-text-memory-output-stream))
 (defvar *trace-output* (%make-text-memory-output-stream))
+(defvar *standard-input*)
 
 (defmacro cond clauses
   (when clauses
@@ -380,14 +381,7 @@
            (error/wp (strcat msg ", line: " (%stream-line input) ", col: " (%stream-col input))))
 
          (skip-ws ()
-           (read-while (lambda (ch)
-                         (%memq ch '(#\Space
-                                     #\Newline
-                                     #\Tab
-                                     #\Page
-                                     #\Line_Separator
-                                     #\Paragraph_Separator
-                                     #\NO-BREAK_SPACE)))))
+           (read-while #'whitespacep))
 
          (skip (expected)
            (unless (eq (next) expected)
@@ -2198,6 +2192,7 @@
     "lisp/printer.lisp"
     "lisp/ffi.lisp"
     "lisp/conditions.lisp"
+    "lisp/stream.lisp"
     "ide/ide.lisp"))
 
 ;;;

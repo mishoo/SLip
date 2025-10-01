@@ -15,48 +15,48 @@
    '(
 
      &allow-other-keys &aux &body &key &optional &rest &whole * *error-output*
-     *package* *read-table* *standard-output* *trace-output* + - / /= 1+ 1- <
-     <= = > >= abs acos adjoin aif and append apply aref asin assert atan atom
-     block boolean boundp caaaar caaadr caaar caadar caaddr caadr caar cadaar
-     cadadr cadar caddar cadddr caddr cadr car case catch cdaaar cdaadr cdaar
-     cdadar cdaddr cdadr cdar cddaar cddadr cddar cdddar cddddr cdddr cddr cdr
-     ceiling char character char-code char-equal char-greaterp char-lessp
-     char-name char-not-equal char-not-greaterp char-not-lessp char/= char<
-     char<= char= char> char>= charp clear-timeout code-char compile
-     compiler-macro-function complement cond cons consp constantly copy-list
-     copy-seq copy-tree cos current-thread debug decf declare defconstant
-     defglobal define-compiler-macro define-modify-macro define-setf-expander
-     defmacro defpackage defparameter defsetf defun defvar destructuring-bind
-     digitp disassemble do do* dolist dotimes downcase ecase elt eq eql equal
-     equalp error eval evenp every exp export expt fboundp fdefinition fifth
-     find-package find-symbol first fixnum flet floor fmakunbound foreach
-     fourth funcall function functionp gensym get get-internal-run-time
-     get-setf-expansion getf gethash go hash-copy hash-iterator hash-keys
-     hash-table hash-table-p hash-values identity if ignore import in-package
-     incf integer integerp intern it iterator-next keywordp labels lambda
-     lambda-list-keywords last length let let* letterp list list* listp load
-     locally log macroexpand macroexpand-1 macrolet make-array make-hash
-     make-list make-package make-regexp make-symbol make-thread make-vector
-     makunbound mapc mapcar max member min minusp mod most-negative-fixnum
-     most-positive-fixnum multiple-value-bind multiple-value-call
-     multiple-value-list multiple-value-prog1 multiple-value-setq name-char
-     nconc nil not notany notevery nreconc nreverse nth nthcdr null
-     number-fixed number-string number numberp oddp optimize or otherwise
-     package-name package packagep parse-integer parse-number plusp pop prog
-     prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
-     quote-regexp random regexp regexp-exec regexp-test regexpp remhash
-     replace-regexp rest return return-from revappend reverse rotatef round
-     rplaca rplacd schar second set-timeout setf setq shadow shiftf sin sleep
-     some space special speed sqrt standard-object string string-capitalize
-     string-downcase string-equal string-greaterp string-lessp
-     string-not-equal string-not-greaterp string-not-lessp string-upcase
-     string/= string< string<= string= string> string>= stringp structure
-     svref sxhash symbol symbol-function symbol-macrolet symbol-name
-     symbol-package symbol-plist symbol-value symbolp t tagbody tan third
-     thread threadp throw type type-of typep unintern unless unsigned-byte
-     unwind-protect upcase use-package values values-list vector vector-pop
-     vector-push vectorp warn when with-output-to-string without-interrupts
-     zerop λ
+     *package* *read-table* *standard-input* *standard-output* *trace-output*
+     + - / /= 1+ 1- < <= = > >= abs acos adjoin aif and append apply aref asin
+     assert atan atom block boolean boundp caaaar caaadr caaar caadar caaddr
+     caadr caar cadaar cadadr cadar caddar cadddr caddr cadr car case catch
+     cdaaar cdaadr cdaar cdadar cdaddr cdadr cdar cddaar cddadr cddar cdddar
+     cddddr cdddr cddr cdr ceiling char character char-code char-equal
+     char-greaterp char-lessp char-name char-not-equal char-not-greaterp
+     char-not-lessp char/= char< char<= char= char> char>= charp clear-timeout
+     code-char compile compiler-macro-function complement cond cons consp
+     constantly copy-list copy-seq copy-tree cos current-thread debug decf
+     declare defconstant defglobal define-compiler-macro define-modify-macro
+     define-setf-expander defmacro defpackage defparameter defsetf defun
+     defvar destructuring-bind digitp disassemble do do* dolist dotimes
+     downcase ecase elt eq eql equal equalp error eval evenp every exp export
+     expt fboundp fdefinition fifth find-package find-symbol first fixnum flet
+     floor fmakunbound foreach fourth funcall function functionp gensym get
+     get-internal-run-time get-setf-expansion getf gethash go hash-copy
+     hash-iterator hash-keys hash-table hash-table-p hash-values identity if
+     ignore import in-package incf integer integerp intern it iterator-next
+     keywordp labels lambda lambda-list-keywords last length let let* letterp
+     list list* listp load locally log macroexpand macroexpand-1 macrolet
+     make-array make-hash make-list make-package make-regexp make-symbol
+     make-thread make-vector makunbound mapc mapcar max member min minusp mod
+     most-negative-fixnum most-positive-fixnum multiple-value-bind
+     multiple-value-call multiple-value-list multiple-value-prog1
+     multiple-value-setq name-char nconc nil not notany notevery nreconc
+     nreverse nth nthcdr null number-fixed number-string number numberp oddp
+     optimize or otherwise package-name package packagep parse-integer
+     parse-number plusp pop prog prog* prog1 prog2 progn progv psetf psetq
+     push pushnew quasiquote quote quote-regexp random regexp regexp-exec
+     regexp-test regexpp remhash replace-regexp rest return return-from
+     revappend reverse rotatef round rplaca rplacd schar second set-timeout
+     setf setq shadow shiftf sin sleep some space special speed sqrt
+     standard-object string string-capitalize string-downcase string-equal
+     string-greaterp string-lessp string-not-equal string-not-greaterp
+     string-not-lessp string-upcase string/= string< string<= string= string>
+     string>= stringp structure svref sxhash symbol symbol-function
+     symbol-macrolet symbol-name symbol-package symbol-plist symbol-value
+     symbolp t tagbody tan third thread threadp throw type type-of typep
+     unintern unless unsigned-byte unwind-protect upcase use-package values
+     values-list vector vector-pop vector-push vectorp warn when
+     with-output-to-string without-interrupts zerop λ
 
      stream input-stream output-stream
 
