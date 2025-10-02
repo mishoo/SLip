@@ -29,6 +29,9 @@
 ;;; This program is available by anonymous FTP, from the /pub/pcl/mop
 ;;; directory on parcftp.xerox.com.
 
+;;; Modified for SLip by mihai.bazon@gmail.com (2025)
+;;; Original source: https://github.com/binghe/closette
+
 (in-package :sl)
 
 (export '(array sequence defclass defgeneric defmethod
@@ -50,7 +53,7 @@
           generic-function-name generic-function-lambda-list
           generic-function-methods generic-function-discriminating-function
           generic-function-method-class
-          method-lambda-list method-qualifiers method-specializers method-body
+          method-lambda-list method-qualifiers method-specializers
           method-generic-function method-function
           slot-definition-name slot-definition-initfunction
           slot-definition-initform slot-definition-initargs
@@ -72,7 +75,7 @@
           compute-applicable-methods-using-classes method-more-specific-p
           ensure-generic-function
           add-method remove-method find-method
-          compute-effective-method-function compute-method-function
+          compute-effective-method-function
           apply-methods apply-method
           find-generic-function ; Necessary artifact of this implementation
           ))
@@ -768,9 +771,8 @@
     ((lambda-list :initarg :lambda-list)     ; :accessor method-lambda-list
      (qualifiers :initarg :qualifiers)       ; :accessor method-qualifiers
      (specializers :initarg :specializers)   ; :accessor method-specializers
-     (body :initarg :body)                   ; :accessor method-body
      (generic-function :initform nil)        ; :accessor method-generic-function
-     (function))))                           ; :accessor method-function
+     (function :initarg :function))))        ; :accessor method-function
 
 (defvar the-class-standard-method)    ;standard-method's class metaobject
 
@@ -785,10 +787,6 @@
 (defun method-specializers (method) (slot-value method 'specializers))
 (defun (setf method-specializers) (new-value method)
   (setf (slot-value method 'specializers) new-value))
-
-(defun method-body (method) (slot-value method 'body))
-(defun (setf method-body) (new-value method)
-  (setf (slot-value method 'body) new-value))
 
 (defun method-generic-function (method)
   (slot-value method 'generic-function))
@@ -903,17 +901,31 @@
 
 ;;; defmethod
 
+(defun %no-next-method (generic)
+  (error "No next method for the generic function ~S." generic))
+
 (defmacro defmethod (&rest args)
   (multiple-value-bind (function-name qualifiers lambda-list specializers body)
                        (parse-defmethod args)
     (multiple-value-bind (setter) (%:maybe-setter function-name)
       (when setter (setf function-name setter)))
     (%:maybe-xref-info function-name :method)
-    `(ensure-method (find-generic-function ',function-name)
-                    :lambda-list ',lambda-list
-                    :qualifiers ',qualifiers
-                    :specializers ,(canonicalize-specializers specializers)
-                    :body ',body)))
+    `(let (($generic (find-generic-function ',function-name)))
+       (ensure-method $generic
+                      :lambda-list ',lambda-list
+                      :qualifiers ',qualifiers
+                      :specializers ,(canonicalize-specializers specializers)
+                      :function (lambda ($args $next-emfun)
+                                  (flet ((call-next-method (&rest cnm-args)
+                                           (if $next-emfun
+                                               (funcall $next-emfun (or cnm-args $args))
+                                               (%no-next-method $generic)))
+                                         (next-method-p ()
+                                           (not (null $next-emfun))))
+                                    (apply (%:%fn ,function-name
+                                                  ,(kludge-arglist lambda-list)
+                                                  ,body)
+                                           $args)))))))
 
 (defun canonicalize-specializers (specializers)
   `(list ,@(mapcar #'canonicalize-specializer specializers)))
@@ -939,11 +951,7 @@
             qualifiers
             (extract-lambda-list specialized-lambda-list)
             (extract-specializers specialized-lambda-list)
-            (list* 'block
-                   (if (consp fn-spec)
-                       (cadr fn-spec)
-                       fn-spec)
-                   body))))
+            (list* 'progn body))))
 
 ;;; Several tedious functions for analyzing lambda lists
 
@@ -1049,16 +1057,14 @@
 
 (defun make-instance-standard-method (method-class
                                       &key lambda-list qualifiers
-                                      specializers body)
+                                      specializers function)
   (declare (ignore method-class))
   (let ((method (std-allocate-instance the-class-standard-method)))
     (setf (method-lambda-list method) lambda-list)
     (setf (method-qualifiers method) qualifiers)
     (setf (method-specializers method) specializers)
-    (setf (method-body method) body)
+    (setf (method-function method) function)
     (setf (method-generic-function method) nil)
-    (setf (method-function method)
-          (std-compute-method-function method))
     method))
 
 ;;; add-method
@@ -1104,14 +1110,25 @@
 
 ;;; Reader and write methods
 
+(defun %mk-reader (slot-name)
+  (lambda (args next-emfun)
+    (declare (ignore next-emfun))
+    (slot-value (car args) slot-name)))
+
 (defun add-reader-method (class fn-name slot-name)
   (ensure-method
    (ensure-generic-function fn-name :lambda-list '(object))
    :lambda-list '(object)
    :qualifiers ()
    :specializers (list class)
-   :body `(slot-value object ',slot-name))
+   :function (%mk-reader slot-name))
   (values))
+
+(defun %mk-writer (slot-name)
+  (lambda (args next-emfun)
+    (declare (ignore next-emfun))
+    (setf (slot-value (car args) slot-name)
+          (cadr args))))
 
 (defun add-writer-method (class fn-name slot-name)
   (ensure-method
@@ -1119,8 +1136,7 @@
    :lambda-list '(new-value object)
    :qualifiers ()
    :specializers (list (find-class 't) class)
-   :body `(setf (slot-value object ',slot-name)
-                new-value))
+   :function (%mk-writer slot-name))
   (values))
 
 ;;;
@@ -1214,7 +1230,7 @@
         (let ((next-emfun (compute-primary-emfun (cdr primaries)))
               (befores (remove-if-not #'before-method-p methods))
               (reverse-afters
-               (reverse (remove-if-not #'after-method-p methods))))
+               (nreverse (remove-if-not #'after-method-p methods))))
           (lambda (args)
             (dolist (before befores)
               (funcall (method-function before) args nil))
@@ -1232,7 +1248,7 @@
         (lambda (args)
           (funcall (method-function (car methods)) args next-emfun)))))
 
-;;; apply-method and compute-method-function
+;;; apply-method
 
 (defun apply-method (method args next-methods)
   (funcall (method-function method)
@@ -1241,23 +1257,6 @@
                nil
                (compute-effective-method-function
                 (method-generic-function method) next-methods))))
-
-(defun std-compute-method-function (method)
-  (let ((form (method-body method))
-        (lambda-list (method-lambda-list method)))
-    (compile
-     `(lambda (args next-emfun)
-        (flet ((call-next-method (&rest cnm-args)
-                 (if (null next-emfun)
-                     (error "No next method for the ~
-                              generic function ~S."
-                            (method-generic-function ',method))
-                     (funcall next-emfun (or cnm-args args))))
-               (next-method-p ()
-                 (not (null next-emfun))))
-          (apply (lambda ,(kludge-arglist lambda-list)
-                   ,form)
-                 args))))))
 
 ;;; N.B. The function kludge-arglist is used to pave over the differences
 ;;; between argument keyword compatibility for regular functions versus
@@ -1582,9 +1581,6 @@
                             (method-specializers method))))
   method)
 
-(defmethod initialize-instance :after ((method standard-method) &key)
-  (setf (method-function method) (compute-method-function method)))
-
 ;;;
 ;;; Methods having to do with generic function invocation.
 ;;;
@@ -1602,10 +1598,6 @@
 (defmethod compute-effective-method-function
            ((gf standard-generic-function) methods)
   (std-compute-effective-method-function gf methods))
-
-(defgeneric compute-method-function (method))
-(defmethod compute-method-function ((method standard-method))
-  (std-compute-method-function method))
 
 ;;; describe-object is a handy tool for enquiring minds:
 
