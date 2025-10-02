@@ -9,6 +9,9 @@
           simple-condition-format-arguments
           simple-warning
           simple-error
+          type-error
+          type-error-datum
+          type-error-expected-type
           primitive-error
           serious-condition
           warning
@@ -16,7 +19,8 @@
           handler-case
           handler-bind
           ignore-errors
-          make-condition))
+          make-condition
+          check-type))
 
 (defpackage :sl-cond
   (:use :sl :%))
@@ -32,6 +36,10 @@
                      :accessor simple-condition-format-arguments)))
 (defclass serious-condition (condition) ())
 (defclass error (serious-condition) ())
+(defclass type-error (error)
+  ((datum :initarg :datum :accessor type-error-datum)
+   (symbol :initarg :symbol :initform nil :accessor type-error-symbol)
+   (expected-type :initarg :expected-type :accessor type-error-expected-type)))
 (defclass simple-error (simple-condition error) ())
 (defclass primitive-error (simple-error) ())
 (defclass warning (condition) ())
@@ -44,6 +52,19 @@
      "<" (class-name (class-of c)) ": "
      (apply #'format out format-control format-arguments)
      ">")))
+
+(defmethod print-object ((c type-error) (out output-stream))
+  (let ((sym (type-error-symbol c)))
+    (cond
+      (sym
+       (format out "TYPE-ERROR: the value of ~S (~S) is not ~A"
+               (type-error-symbol c)
+               (type-error-datum c)
+               (type-error-expected-type c)))
+      (t
+       (format out "TYPE-ERROR: the value ~S is not ~A"
+               (type-error-datum c)
+               (type-error-expected-type c))))))
 
 (defparameter *handler-clusters* '())
 (defparameter *restart-clusters* '())
@@ -159,3 +180,20 @@
 
 (defun make-condition (datum &rest args)
   (%condition datum args 'simple-condition))
+
+(defmacro check-type (place typespec &optional string)
+  (cond
+    ((and (symbolp place)
+          (%:safe-atom-p place))
+     `(assert (typep ,place ',typespec)
+              'type-error
+              :datum ,place
+              :symbol ',place
+              :expected-type ,(or string `',typespec)))
+    (t
+     (let ((_place (gensym)))
+       `(let ((,_place ,place))
+          (assert (typep ,_place ',typespec)
+                  'type-error
+                  :datum ,_place
+                  :expected-type ,(or string `',typespec)))))))

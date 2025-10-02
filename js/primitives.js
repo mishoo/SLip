@@ -2698,7 +2698,7 @@ defp("%stream-put", true, function(m, nargs){
     checknargs(nargs, 1);
     var text = strcat(m, nargs - 1);
     var stream = m.pop();
-    checktype(stream, LispOutputStream);
+    checktype(stream, LispTextOutputStream);
     return stream.put(text);
 });
 

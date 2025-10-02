@@ -1,6 +1,7 @@
 (in-package :sl)
 
-(export '(peek-char read-char peek-byte read-byte
+(export '(peek-char read-char read-line
+          peek-byte read-byte
           read-sequence write-sequence
           with-input-from-string file-position
           stream-error stream-error-stream end-of-file))
@@ -50,6 +51,25 @@
         (if eof-error-p
             (error 'end-of-file :stream input-stream)
             eof-value))))
+
+(defun read-line (&optional (input-stream *standard-input*)
+                            (eof-error-p t)
+                            eof-value
+                            recursive-p)
+  (declare (ignore recursive-p))
+  (let* ((eof nil)
+         (line (with-output-to-string (out)
+                 (loop for ch = (%stream-next input-stream)
+                       unless ch do (progn
+                                      (setf eof t)
+                                      (return nil))
+                       until (eq #\Newline ch)
+                       do (%stream-put out ch)))))
+    (if (and eof (zerop (length line)))
+        (if eof-error-p
+            (error 'end-of-file :stream input-stream)
+            (values eof-value t))
+        (values line eof))))
 
 (defun file-position (stream &optional position)
   (%stream-pos stream position))
