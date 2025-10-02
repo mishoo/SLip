@@ -101,6 +101,22 @@ export class LispClosure {
     }
 }
 
+let HASH_EQUAL_CACHE = new WeakMap();
+let HASH_EQUAL_COUNT = 0;
+export function hash_equal_key(x) {
+    if (x === true) return "1";
+    if (x === false) return "0";
+    if (typeof x === "number") return "N" + x;
+    if (typeof x === "string") return "S" + x;
+    if (LispCons.is(x)) return "(" + hash_equal_key(x.car) + hash_equal_key(x.cdr) + ")";
+    let id = HASH_EQUAL_CACHE.get(x);
+    if (!id) {
+        id = ++HASH_EQUAL_COUNT;
+        HASH_EQUAL_CACHE.set(x, id);
+    }
+    return "=" + id;
+}
+
 export class LispHash {
     static type = "simple-hash";
     static is(x) { return x instanceof LispHash }

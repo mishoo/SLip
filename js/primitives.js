@@ -3,6 +3,7 @@ import {
     LispSymbol,
     LispPackage,
     LispHash,
+    hash_equal_key,
     LispProcess,
     LispMutex,
     LispChar,
@@ -1412,6 +1413,11 @@ defp("%hash-set", true, function(m, nargs){
     var hash = m.pop(), key = m.pop(), val = m.pop();
     checktype(hash, LispHash);
     return hash.set(key, val);
+});
+
+defp("hash-equal-key", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return hash_equal_key(m.pop());
 });
 
 defp("hash-copy", false, function(m, nargs){

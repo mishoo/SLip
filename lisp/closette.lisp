@@ -1148,7 +1148,7 @@
 (defun std-compute-discriminating-function (gf)
   (lambda (&rest args)
     (let* ((classes (mapcar #'class-of (required-portion gf args)))
-           (key (%:strjoin ";" (%:map1-vector #'class-name classes)))
+           (key (%:hash-equal-key classes))
            (emfun (gethash key (classes-to-emf-table gf))))
       (if emfun
           (funcall emfun args)
