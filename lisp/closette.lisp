@@ -81,7 +81,7 @@
           ))
 
 (defpackage :closette
-  (:use :sl :%))
+  (:use :sl))
 
 (in-package :closette)
 
@@ -398,8 +398,7 @@
         `(list
           :name ',name
           ,@(when initfunction
-              `(:initform ,initform
-                          :initfunction ,initfunction))
+              `(:initform ,initform :initfunction ,initfunction))
           ,@(when initargs `(:initargs ',initargs))
           ,@(when readers `(:readers ',readers))
           ,@(when writers `(:writers ',writers))
@@ -443,17 +442,27 @@
 
 ;;; Ensure class
 
+;; (defun ensure-class (name &rest all-keys
+;;                           &key (metaclass the-class-standard-class)
+;;                           &allow-other-keys)
+;;   (if (find-class name nil)
+;;       (error "Can't redefine the class named ~S." name)
+;;       (let ((class (apply (if (eq metaclass the-class-standard-class)
+;;                               #'make-instance-standard-class
+;;                               #'make-instance)
+;;                           metaclass :name name all-keys)))
+;;         (setf (find-class name) class)
+;;         class)))
+
 (defun ensure-class (name &rest all-keys
                           &key (metaclass the-class-standard-class)
                           &allow-other-keys)
-  (if (find-class name nil)
-      (error "Can't redefine the class named ~S." name)
-      (let ((class (apply (if (eq metaclass the-class-standard-class)
-                              #'make-instance-standard-class
-                              #'make-instance)
-                          metaclass :name name all-keys)))
-        (setf (find-class name) class)
-        class)))
+  (let ((class (apply (if (eq metaclass the-class-standard-class)
+                          #'make-instance-standard-class
+                          #'make-instance)
+                      metaclass :name name all-keys)))
+    (setf (find-class name) class)
+    class))
 
 ;;; make-instance-standard-class creates and initializes an instance of
 ;;; standard-class without falling into method lookup.  However, it cannot be
