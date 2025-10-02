@@ -1171,6 +1171,8 @@
                                                  locally-special))))))))
          ,@body))))
 
+(defvar *macroexpand-cache* (make-hash))
+
 (labels
     ((assert (p msg)
        (if p p (error/wp msg)))
@@ -1904,9 +1906,14 @@
            (comp-decl-seq body env val? more?))))
 
      (comp-macroexpand (expander form env val? more?)
-       (with-env (comp (let ((*whole-form* form))
-                         (apply expander (cdr form)))
-                       env val? more?)))
+       (let ((expansion (gethash form *macroexpand-cache*)))
+         (unless expansion
+           (setq expansion
+                 (%hash-set (let ((*whole-form* form))
+                              (apply expander (cdr form)))
+                            form
+                            *macroexpand-cache*)))
+         (with-env (comp expansion env val? more?))))
 
      (comp-mvb (names values-form body env val? more?)
        (cond
@@ -2056,13 +2063,14 @@
        (assert (and (consp exp)
                     (%memq (car exp) '(%fn lambda λ)))
                "Expecting (LAMBDA (...) ...) in COMPILE")
-       (%eval-bytecode (comp exp (make-environment) t nil)))
+       (let ((*macroexpand-cache* (make-hash)))
+         (%eval-bytecode (comp exp (make-environment) t nil))))
 
      (compile-string (str . filename)
        (let ((*current-file* (or (car filename)
                                  *current-file*))
              (reader (lisp-reader str 'EOF))
-             (cache (make-hash))
+             (serialize-cache (make-hash))
              (out (%make-text-memory-output-stream))
              (is-first t)
              (link-addr 0)
@@ -2077,7 +2085,7 @@
                         (if is-first
                             (setq is-first nil)
                             (%stream-put out #\,))
-                        (%stream-put out (%serialize-code code cache) #\Newline))))
+                        (%stream-put out (%serialize-code code serialize-cache) #\Newline))))
                   (rec ()
                     (let* ((token (funcall reader 'next))
                            (*current-pos* (car token))

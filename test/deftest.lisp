@@ -94,6 +94,8 @@
               and count (not ok) into failed
               and sum *compile-time* into compile-time
               and sum *run-time* into run-time
+              and do (when (and (not log) (not ok))
+                       (format t "#'~A FAILED~%" name))
               else count test into skipped
               finally (format t "~A tests, ~A skipped, ~A OK, ~A failed~%~
                                  Compile time: ~,2Fms~%~
