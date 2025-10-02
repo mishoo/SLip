@@ -1,6 +1,6 @@
 (in-package :sl)
 
-(export '(peek-char read-char read-line
+(export '(peek-char read-char read-line write-string write-line
           peek-byte read-byte
           read-sequence write-sequence
           with-input-from-string file-position
@@ -70,6 +70,28 @@
             (error 'end-of-file :stream input-stream)
             (values eof-value t))
         (values line eof))))
+
+(defun write-string (string &optional (output-stream *standard-output*)
+                            &key (start 0) end)
+  (check-type string string)
+  (when (eq output-stream t)
+    (setq output-stream *standard-output*))
+  (cond
+    (end
+     (%stream-put output-stream (%:substr string start (- end start))))
+    ((not (zerop start))
+     (%stream-put output-stream (%:substr string start)))
+    (t
+     (%stream-put output-stream string)))
+  string)
+
+(defun write-line (string &optional (output-stream *standard-output*)
+                          &rest args)
+  (when (eq output-stream t)
+    (setq output-stream *standard-output*))
+  (apply #'write-string string output-stream args)
+  (%stream-put output-stream #\Newline)
+  string)
 
 (defun file-position (stream &optional position)
   (%stream-pos stream position))
