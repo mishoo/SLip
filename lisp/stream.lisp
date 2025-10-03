@@ -95,6 +95,3 @@
 
 (defun file-position (stream &optional position)
   (%stream-pos stream position))
-
-(defun open-url (url &optional binary for-output)
-  (%async-fetch url binary for-output))

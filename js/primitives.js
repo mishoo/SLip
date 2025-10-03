@@ -19,6 +19,7 @@ import {
     LispOutputStream,
     LispTextOutputStream,
     LispTextMemoryOutputStream,
+    LispTextWriterOutputStream,
     LispStream,
     LispTextStream,
 } from "./streams.js";
@@ -2719,14 +2720,20 @@ defp("%output-stream-p", false, function(m, nargs){
     return LispOutputStream.is(m.pop());
 });
 
-defp("%async-fetch", true, async function(m, nargs){
-    checknargs(nargs, 1, 3);
-    let output = nargs > 2 ? m.pop() : false;
+defp("%http-input-stream", true, async function(m, nargs){
+    checknargs(nargs, 1, 2);
     let binary = nargs > 1 ? m.pop() : false;
-    let filename = checktype(m.pop(), LispString);
+    let url = checktype(m.pop(), LispString);
 
+    // Since the primitive is async (always returns a Promise), the
+    // LispMachine will automatically pause the process, so we don't
+    // have to call m.process.pause() here. But it would be no harm if
+    // we did. We do, however, need to resume it manually *after*
+    // pushing the return value, or *after* diverting to the error
+    // function. Note the emphasis on *after* — process.resume() kicks
+    // in immediately, not async.
     try {
-        let response = await fetch(filename);
+        let response = await fetch(url);
         if (response.ok) {
             let body = response.body;
             let stream = binary ? new LispReaderInputStream(body) : new LispTextReaderInputStream(body);
@@ -2740,9 +2747,16 @@ defp("%async-fetch", true, async function(m, nargs){
     }
 
     function error(ex) {
-        m.lisp_error("Cannot open file ~S (~S)", filename, String(ex));
+        m.lisp_error("Cannot open URL ~S (~S)", url, String(ex));
         m.process.resume();
     }
+});
+
+defp("%stream-close", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let stream = checktype(m.pop(), LispStream);
+    stream.close();
+    return false;               // XXX.
 });
 
 defp("%read-sequence", true, function(m, nargs){

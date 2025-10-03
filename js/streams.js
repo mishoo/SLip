@@ -33,6 +33,8 @@ export class LispInputStream {
         return false;
     }
 
+    close() {}
+
     // For reader streams. This function should return TRUE only if it
     // makes sense to check asynchronously for additional data, that
     // is: (1) we have an attached reader and EOF wasn't yet seen (on
@@ -127,6 +129,7 @@ export class LispOutputStream {
     }
 
     onData() {}
+    close() {}
 }
 
 export class LispTextOutputStream extends LispOutputStream {
@@ -136,6 +139,7 @@ export class LispTextOutputStream extends LispOutputStream {
     col = 0;
 
     static is(x) { return x instanceof LispTextOutputStream }
+    put(value) {}
 }
 
 export class LispTextMemoryOutputStream extends LispTextOutputStream {
@@ -162,6 +166,26 @@ export class LispTextMemoryOutputStream extends LispTextOutputStream {
         let data = this.buffer;
         this.buffer = "";
         return data;
+    }
+}
+
+export class LispTextWriterOutputStream extends LispTextOutputStream {
+    static type = "text-writer-output-stream";
+    static is(x) { return x instanceof LispTextWriterOutputStream }
+    constructor() {
+        super();
+        this.readable = new ReadableStream({
+            start: controller => {
+                this.controller = controller;
+            },
+            pull: () => {},
+        }).pipeThrough(new TextEncoderStream());
+    }
+    put(str) {
+        this.controller.enqueue(str);
+    }
+    close() {
+        this.controller.close();
     }
 }
 
