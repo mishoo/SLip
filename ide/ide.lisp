@@ -128,7 +128,7 @@
                    (substr b 1)))))))
 
 (labels ((symbol-completion (query all)
-           (setf all (mapcar #'symbol-name all))
+           (setf all (mapcar #'string all))
            (let* ((rx (make-regexp (strcat "^"
                                            (replace-regexp
                                             #/[-_.\/]/g
@@ -168,7 +168,8 @@
 
         ;; no colon?
         ((regexp-test #/[^:]/ query)
-         (symbol-completion query (as-list (%accessible-symbols *package* nil))))
+         (symbol-completion query (append (%:%list-packages)
+                                          (as-list (%accessible-symbols *package* nil)))))
 
         ;; dunno what to do here, just return empty list
         (t

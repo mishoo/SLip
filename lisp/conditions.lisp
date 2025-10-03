@@ -4,6 +4,7 @@
 (in-package :sl)
 
 (export '(condition
+          define-condition
           simple-condition
           simple-condition-format-control
           simple-condition-format-arguments
@@ -28,21 +29,39 @@
 (in-package :sl-cond)
 
 (defclass condition () (datum))
+
+(defmacro define-condition (name (&rest parent-types) slots &rest options)
+  (let ((report (cadr (assoc :report options))))
+    `(progn
+       (defclass ,name (,@(or parent-types '(condition)))
+         (,@slots)
+         (,@(remove :report options :key #'car)))
+       ,@(when report
+           `((defmethod print-object ((condition ,name) (stream output-stream))
+               (funcall ,report condition stream)))))))
+
 (defclass simple-condition (condition)
   ((format-control :initarg :format-control
                    :accessor simple-condition-format-control)
    (format-arguments :initarg :format-arguments
                      :initform nil
                      :accessor simple-condition-format-arguments)))
+
 (defclass serious-condition (condition) ())
+
 (defclass error (serious-condition) ())
+
 (defclass type-error (error)
   ((datum :initarg :datum :accessor type-error-datum)
    (symbol :initarg :symbol :initform nil :accessor type-error-symbol)
    (expected-type :initarg :expected-type :accessor type-error-expected-type)))
+
 (defclass simple-error (simple-condition error) ())
+
 (defclass primitive-error (simple-error) ())
+
 (defclass warning (condition) ())
+
 (defclass simple-warning (simple-condition warning) ())
 
 (defmethod print-object ((c simple-condition) (out output-stream))

@@ -12,10 +12,10 @@
 
 (in-package :sl-stream)
 
-(defclass stream-error (error)
+(define-condition stream-error (error)
   ((stream :initarg :stream :reader stream-error-stream)))
 
-(defclass end-of-file (stream-error) ())
+(define-condition end-of-file (stream-error) ())
 
 (defmacro with-input-from-string ((var str) &body body)
   `(let ((,var (%make-text-memory-input-stream ,str)))
