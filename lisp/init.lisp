@@ -70,8 +70,8 @@
 (in-package :sl)
 "
 
-(defun assert (cond . arguments)
-  (unless cond (apply #'error arguments)))
+(defun assert (test . arguments)
+  (unless test (apply #'error arguments)))
 
 (defun macroexpand-1 (form)
   (cond
