@@ -345,14 +345,19 @@
                          &rest options)
   (%:maybe-xref-info name :defclass)
   `(progn
-     (sl-type:defpredicate ,name (obj)
-       (subclassp (class-of obj) (find-class ',name)))
-     (ensure-class ',name
-                   :direct-superclasses
-                   ,(canonicalize-direct-superclasses direct-superclasses)
-                   :direct-slots
-                   ,(canonicalize-direct-slots direct-slots)
-                   ,@(canonicalize-defclass-options options))))
+     (let ((class
+            (ensure-class ',name
+                          :direct-superclasses
+                          ,(canonicalize-direct-superclasses direct-superclasses)
+                          :direct-slots
+                          ,(canonicalize-direct-slots direct-slots)
+                          ,@(canonicalize-defclass-options options))))
+       (sl-type:def-val-predicate class
+                                  (lambda (obj)
+                                    (subclassp (class-of obj) class)))
+       (sl-type:defpredicate ,name (obj)
+         (subclassp (class-of obj) class))
+       class)))
 
 (defun canonicalize-direct-superclasses (direct-superclasses)
   `(list ,@(mapcar #'canonicalize-direct-superclass direct-superclasses)))

@@ -5,7 +5,8 @@
 
 (defpackage :sl-type
   (:use :sl :%)
-  (:export #:defpredicate #:type-of-structure #:type-of-object))
+  (:export #:defpredicate #:def-val-predicate
+           #:type-of-structure #:type-of-object))
 
 (in-package :sl-type)
 
@@ -43,11 +44,15 @@
   ;; class hierarchy. So if built-in type is already defined, just do nothing.
   (unless (gethash name *built-in-types*)
     (%:maybe-xref-info name :type)
-    (let ((intname (intern (strcat (symbol-name name) "-SL-TYPE-INTERNAL"))))
+    (let ((intname (intern (strcat (symbol-name name) "-SL-TYPE-INTERNAL")
+                           (symbol-package name))))
       `(progn
          (setf (fdefinition ',intname) (%:%fn ,name ,args ,@body))
          (setf (gethash ',name *ext-types*) ',intname)
          ',name))))
+
+(defun def-val-predicate (val predicate)
+  (setf (gethash val *ext-types*) predicate))
 
 ;; built-in complex definitions
 

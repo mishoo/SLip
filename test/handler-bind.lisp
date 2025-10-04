@@ -124,13 +124,13 @@
      (error "an error")))
   good)
 
-;; (deftest handler-bind.17
-;;   (catch 'done
-;;     (handler-bind
-;;      ((#.(find-class 'error)
-;;          #'(lambda (c)
-;;              (throw 'done 'good))))
-;;      (error "an error")))
-;;   good)
+(deftest handler-bind.17
+  (catch 'done
+    (handler-bind
+     ((#.(find-class 'error)
+         #'(lambda (c)
+             (throw 'done 'good))))
+     (error "an error")))
+  good)
 
 ;;; More handler-bind tests elsewhere
