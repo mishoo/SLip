@@ -28,6 +28,8 @@
 
 (in-package :sl-cond)
 
+(import '(sl::with-collectors))
+
 (defclass condition () (datum))
 
 (defmacro define-condition (name (&rest parent-types) slots &rest options)
@@ -98,35 +100,20 @@
                 *handler-clusters*)))
      ,@body))
 
-(defmacro with-append-list ((var append &key (tail (gensym))) &body body)
-  `(let (,var ,tail)
-     (flet ((,append (x)
-              (setf ,tail
-                    (last (if ,tail
-                              (setf (cdr ,tail) x)
-                              (setf ,var x))))))
-       ,@body)))
-
 (defun handler-case-bindings (block-tag condition-variable clauses)
-  (with-append-list (body body-add)
-    (let ((bindings '()))
-      (let looop ((clauses clauses))
-        (when clauses
-          (let ((clause (car clauses))
-                (clause-tag (gensym)))
-            (destructuring-bind (typespec (&optional var) &body rest) clause
-              (push `(,typespec (lambda (temp)
+  (with-collectors (bindings (body nil body-add))
+    (dolist (clause clauses)
+      (let ((clause-tag (gensym)))
+        (destructuring-bind (typespec (&optional var) &body rest) clause
+          (bindings `(,typespec (lambda (temp)
                                   ,(when var
                                      `(setq ,condition-variable temp))
-                                  (go ,clause-tag)))
-                    bindings)
-              (body-add `(,clause-tag
-                          (return-from
-                           ,block-tag
-                            (let ,(when var `((,var ,condition-variable)))
-                              ,@rest))))))
-          (looop (cdr clauses))))
-      (cons (nreverse bindings) body))))
+                                  (go ,clause-tag))))
+          (body-add `(,clause-tag
+                      (return-from ,block-tag
+                        (let ,(when var `((,var ,condition-variable)))
+                          ,@rest)))))))
+    (cons bindings body)))
 
 (defmacro handler-case (form &rest clauses)
   (let ((has-no-error (%assq :no-error clauses)))

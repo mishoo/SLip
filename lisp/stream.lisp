@@ -95,3 +95,6 @@
 
 (defun file-position (stream &optional position)
   (%stream-pos stream position))
+
+(defun open-url (url &optional binary)
+  (%:%http-input-stream url binary))

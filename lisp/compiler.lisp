@@ -48,7 +48,6 @@
 
 (defvar *read-table* nil)
 (defvar *package* nil)
-(defvar *standard-input* nil)
 (defvar *current-file* nil)
 (defvar *current-pos* nil)
 (defvar *url-prefix* nil)
@@ -1741,15 +1740,12 @@
        (unless (or optional key has-key aux aok)
          ;; this should still be somewhat more efficient
          (return-from comp-extended-lambda
-           (cond
-             ((and required rest)
-              (comp-lambda-args-and-body name `(,@required . ,rest) body env))
-             (required
-              (comp-lambda-args-and-body name required body env))
-             (rest
-              (comp-lambda-args-and-body name rest body env))
-             (t
-              (comp-lambda-args-and-body name () body env)))))
+           (comp-lambda-args-and-body name (cond
+                                             ((and required rest)
+                                              `(,@required . ,rest))
+                                             (required)
+                                             (rest))
+                                      body env)))
        (with-declarations body
          (with-seq-output <<
            (setq env (extenv env :lex envcell))
