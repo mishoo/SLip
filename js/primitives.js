@@ -1157,6 +1157,12 @@ defp("integerp", false, function(m, nargs){
     return Number.isInteger(m.pop());
 });
 
+defp("floatp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let arg = m.pop();
+    return typeof arg === "number" && !Number.isInteger(arg);
+});
+
 defp("hash-table-p", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return LispHash.is(m.pop());

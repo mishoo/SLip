@@ -1,7 +1,7 @@
 (in-package :sl)
 
 (export '(type-of typep deftype typecase etypecase
-          fixnum input-stream output-stream satisfies mod))
+          fixnum float input-stream output-stream satisfies mod))
 
 (defpackage :sl-type
   (:use :sl :%)
@@ -195,6 +195,9 @@
 
 (deftype fixnum ()
   `(integer ,most-negative-fixnum ,most-positive-fixnum))
+
+(deftype float ()
+  `(and number (not integer)))
 
 (defun type-of (x)
   (let ((type (%:%type-of x)))

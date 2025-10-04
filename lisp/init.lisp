@@ -30,15 +30,15 @@
      defvar destructuring-bind digitp disassemble do do* dolist dotimes
      downcase ecase elt eq eql equal equalp error eval evenp every exp export
      expt fboundp fdefinition fifth find-package find-symbol first fixnum flet
-     floor fmakunbound foreach fourth funcall function functionp gensym get
-     get-internal-run-time get-setf-expansion getf gethash go hash-copy
-     hash-iterator hash-keys hash-table hash-table-p hash-values identity if
-     ignore import in-package incf integer integerp intern it iterator-next
-     keywordp labels lambda lambda-list-keywords last length let let* letterp
-     list list* listp load locally log macroexpand macroexpand-1 macrolet
-     make-array make-hash make-list make-package make-regexp make-symbol
-     make-thread make-vector makunbound mapc mapcar max member min minusp mod
-     most-negative-fixnum most-positive-fixnum multiple-value-bind
+     float floatp floor fmakunbound foreach fourth funcall function functionp
+     gensym get get-internal-run-time get-setf-expansion getf gethash go
+     hash-copy hash-iterator hash-keys hash-table hash-table-p hash-values
+     identity if ignore import in-package incf integer integerp intern it
+     iterator-next keywordp labels lambda lambda-list-keywords last length let
+     let* letterp list list* listp load locally log macroexpand macroexpand-1
+     macrolet make-array make-hash make-list make-package make-regexp
+     make-symbol make-thread make-vector makunbound mapc mapcar max member min
+     minusp mod most-negative-fixnum most-positive-fixnum multiple-value-bind
      multiple-value-call multiple-value-list multiple-value-prog1
      multiple-value-setq name-char nconc nil not notany notevery nreconc
      nreverse nth nthcdr null number-fixed number-string number numberp oddp
