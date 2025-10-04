@@ -1075,8 +1075,8 @@
 
 (define-compiler-macro eq (&whole form a b)
   (cond
-    ((null a) `(null ,b))
-    ((null b) `(null ,a))
+    ((not a) `(not ,b))
+    ((not b) `(not ,a))
     (t form)))
 
 (defun make-compiler-env ()

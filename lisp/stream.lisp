@@ -26,6 +26,7 @@
                             eof-value
                             recursive-p)
   (declare (ignore recursive-p))
+  (check-type input-stream text-input-stream)
   (let ((val (%stream-next input-stream)))
     (or val
         (if eof-error-p
@@ -38,6 +39,7 @@
                             eof-value
                             recursive-p)
   (declare (ignore recursive-p))
+  (check-type input-stream text-input-stream)
   (let ((val (if peek-type
                  (loop with test = (if (eq t peek-type) #'%:whitespacep
                                        (lambda (ch)
@@ -57,6 +59,7 @@
                             eof-value
                             recursive-p)
   (declare (ignore recursive-p))
+  (check-type input-stream text-input-stream)
   (let* ((eof nil)
          (line (with-output-to-string (out)
                  (loop for ch = (%stream-next input-stream)
@@ -73,9 +76,10 @@
 
 (defun write-string (string &optional (output-stream *standard-output*)
                             &key (start 0) end)
-  (check-type string string)
   (when (eq output-stream t)
     (setq output-stream *standard-output*))
+  (check-type string string)
+  (check-type output-stream text-output-stream)
   (cond
     (end
      (%stream-put output-stream (%:substr string start (- end start))))

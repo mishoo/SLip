@@ -58,7 +58,7 @@
      values-list vector vector-pop vector-push vectorp warn when
      with-output-to-string without-interrupts zerop λ
 
-     stream input-stream output-stream
+     stream input-stream output-stream text-input-stream text-output-stream
 
      ))
 

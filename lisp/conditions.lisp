@@ -78,9 +78,9 @@
   (let ((sym (type-error-symbol c)))
     (cond
       (sym
-       (format out "TYPE-ERROR: the value of ~S (~S) is not ~A"
+       (format out "TYPE-ERROR: the type of ~S (~S) is not ~A"
                (type-error-symbol c)
-               (type-error-datum c)
+               (type-of (type-error-datum c))
                (type-error-expected-type c)))
       (t
        (format out "TYPE-ERROR: the value ~S is not ~A"

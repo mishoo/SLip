@@ -52,6 +52,8 @@ const S_PACKAGE             = LispSymbol.get("PACKAGE");
 const S_THREAD              = LispSymbol.get("THREAD");
 const S_INPUT_STREAM        = LispSymbol.get("INPUT-STREAM");
 const S_OUTPUT_STREAM       = LispSymbol.get("OUTPUT-STREAM");
+const S_TEXT_INPUT_STREAM   = LispSymbol.get("TEXT-INPUT-STREAM");
+const S_TEXT_OUTPUT_STREAM  = LispSymbol.get("TEXT-OUTPUT-STREAM");
 const S_STANDARD_OBJECT     = LispSymbol.get("STANDARD-OBJECT");
 
 const LispList = {
@@ -1267,7 +1269,9 @@ defp("%type-of", false, function(m, nargs){
             return S_VECTOR;
         }
     }
+    if (LispTextInputStream.is(x)) return S_TEXT_INPUT_STREAM;
     if (LispInputStream.is(x)) return S_INPUT_STREAM;
+    if (LispTextOutputStream.is(x)) return S_TEXT_OUTPUT_STREAM;
     if (LispOutputStream.is(x)) return S_OUTPUT_STREAM;
     if (LispPackage.is(x)) return S_PACKAGE;
     if (LispProcess.is(x)) return S_THREAD;
@@ -2724,6 +2728,16 @@ defp("%input-stream-p", false, function(m, nargs){
 defp("%output-stream-p", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return LispOutputStream.is(m.pop());
+});
+
+defp("%text-input-stream-p", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return LispTextInputStream.is(m.pop());
+});
+
+defp("%text-output-stream-p", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return LispTextOutputStream.is(m.pop());
 });
 
 defp("%http-input-stream", true, async function(m, nargs){
