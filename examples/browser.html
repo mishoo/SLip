@@ -10,18 +10,23 @@
      // load fasls
      let machine = new LispMachine();
      let files = [
-       "../lisp/compiler.fasl",
-       "../lisp/init.fasl",
-       "../lisp/macroexpand.fasl",
-       "../lisp/tiny-clos.fasl",
-       "../lisp/printer.fasl",
-       "../lisp/format.fasl",
-       "../lisp/ffi.fasl",
-       "../lisp/conditions.fasl",
-       "../lisp/loop.fasl",
+       "../lisp/compiler.lisp",
+       "../lisp/init.lisp",
+       "../lisp/hash.lisp",
+       "../lisp/type.lisp",
+       "../lisp/macroexpand.lisp",
+       "../lisp/format.lisp",
+       "../lisp/struct.lisp",
+       "../lisp/loop.lisp",
+       "../lisp/list.lisp",
+       "../lisp/seq.lisp",
+       "../lisp/closette.lisp",
+       "../lisp/printer.lisp",
+       "../lisp/ffi.lisp",
+       "../lisp/conditions.lisp",
      ];
 
-     let responses = await Promise.all(files.map(url => fetch(url)));
+     let responses = await Promise.all(files.map(url => fetch(url.replace(/\.lisp$/, ".fasl"))));
      let data = await Promise.all(responses.map(x => x.text()));
      data.forEach(code => machine._exec(LispMachine.unserialize(code)));
 

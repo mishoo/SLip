@@ -10,86 +10,68 @@
       exported)
   (%use-package boot main)
   (%use-package main user)
-  (setq exported
-        '(atom quasiquote defmacro defun when unless labels flet foreach
-          prog1 prog2 or and cond member case otherwise mapcar mapc aif it push
-          error warn without-interrupts
-          eval compile load function functionp unwind-protect
-          apply funcall macrolet symbol-macrolet catch throw
-          quote lambda λ let let* if progn progv setq t nil not
-          tagbody go block return return-from
-          *package* *read-table*
-          elt rplaca rplacd nth nthcdr last reverse nreverse append nconc nreconc revappend
-          char-name char-code name-char code-char upcase downcase
-          charp char= char< char<= char> char>= char/= letterp digitp
-          stringp string= string< string<= string> string>= string/=
-          char-equal char-not-equal char-lessp char-greaterp char-not-lessp char-not-greaterp
-          string-equal string-not-equal string-lessp string-greaterp string-not-lessp string-not-greaterp
-          make-regexp regexp-test regexp-exec replace-regexp quote-regexp regexpp
-          vectorp vector svref vector-push vector-pop make-vector
-          getf
-          list list* copy-list copy-seq listp cons consp eq eql equal equalp gensym length
-          declare locally type ignore special optimize speed debug space fixnum integer unsigned-byte
-          identity constantly
+  (setq
+   exported
+   '(
 
-          most-positive-fixnum most-negative-fixnum
+     &allow-other-keys &aux &body &key &optional &rest &whole * *error-output*
+     *package* *read-table* *standard-input* *standard-output* *trace-output*
+     + - / /= 1+ 1- < <= = > >= abs acos adjoin aif and append apply aref asin
+     assert atan atom block boolean boundp caaaar caaadr caaar caadar caaddr
+     caadr caar cadaar cadadr cadar caddar cadddr caddr cadr car case catch
+     cdaaar cdaadr cdaar cdadar cdaddr cdadr cdar cddaar cddadr cddar cdddar
+     cddddr cdddr cddr cdr ceiling char character char-code char-equal
+     char-greaterp char-lessp char-name char-not-equal char-not-greaterp
+     char-not-lessp char/= char< char<= char= char> char>= charp clear-timeout
+     code-char compile compiler-macro-function complement cond cons consp
+     constantly copy-list copy-seq copy-tree cos current-thread debug decf
+     declare defconstant defglobal define-compiler-macro define-modify-macro
+     define-setf-expander defmacro defpackage defparameter defsetf defun
+     defvar destructuring-bind digitp disassemble do do* dolist dotimes
+     downcase ecase elt eq eql equal equalp error eval evenp every exp export
+     expt fboundp fdefinition fifth find-package find-symbol first fixnum flet
+     float floatp floor fmakunbound foreach fourth funcall function functionp
+     gensym get get-internal-run-time get-setf-expansion getf gethash go
+     hash-copy hash-iterator hash-keys hash-table hash-table-p hash-values
+     identity if ignore import in-package incf integer integerp intern it
+     iterator-next keywordp labels lambda lambda-list-keywords last length let
+     let* letterp list list* listp load locally log macroexpand macroexpand-1
+     macrolet make-array make-hash make-list make-package make-regexp
+     make-symbol make-thread make-vector makunbound mapc mapcar max member min
+     minusp mod most-negative-fixnum most-positive-fixnum multiple-value-bind
+     multiple-value-call multiple-value-list multiple-value-prog1
+     multiple-value-setq name-char nconc nil not notany notevery nreconc
+     nreverse nth nthcdr null number-fixed number-string number numberp oddp
+     optimize or otherwise package-name package packagep parse-integer
+     parse-number plusp pop prog prog* prog1 prog2 progn progv psetf psetq
+     push pushnew quasiquote quote quote-regexp random regexp regexp-exec
+     regexp-test regexpp remhash replace-regexp rest return return-from
+     revappend reverse rotatef round rplaca rplacd schar second set-timeout
+     setf setq shadow shiftf sin sleep some space special speed sqrt
+     standard-object string string-capitalize string-downcase string-equal
+     string-greaterp string-lessp string-not-equal string-not-greaterp
+     string-not-lessp string-upcase string/= string< string<= string= string>
+     string>= stringp structure svref sxhash symbol symbol-function
+     symbol-macrolet symbol-name symbol-package symbol-plist symbol-value
+     symbolp t tagbody tan third thread threadp throw type type-of typep
+     unintern unless unsigned-byte unwind-protect upcase use-package values
+     values-list vector vector-pop vector-push vectorp warn when
+     with-output-to-string without-interrupts zerop λ
 
-          numberp zerop plusp minusp evenp oddp parse-number parse-integer number-fixed number-string
-          < <= > >= + - * / = /= null 1+ 1- floor ceiling round mod
-          abs sin asin cos acos tan atan exp log sqrt expt random
-          min max
+     stream input-stream output-stream text-input-stream text-output-stream
 
-          make-hash hashp hash-get hash-set hash-copy hash-keys hash-values
-          hash-iterator iterator-next
+     ))
 
-          macroexpand-1 disassemble
-
-          make-package find-package make-symbol symbol-name symbol-package symbol-function
-          packagep symbolp keywordp intern shadow find-symbol package-name
-          threadp make-thread current-thread set-timeout clear-timeout
-
-          car cdr caar cadr cdar cddr caaar caadr cadar caddr cdaar cdadr
-          cddar cdddr caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
-          cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
-          first second third fourth fifth rest destructuring-bind
-
-          boundp makunbound fboundp fmakunbound
-
-          get-internal-run-time
-          compiler-macro-function
-          symbol-value
-
-          values multiple-value-bind multiple-value-call values-list
-          multiple-value-list multiple-value-setq multiple-value-prog1
-
-          *standard-output* *error-output* *trace-output*
-
-          lambda-list-keywords
-          &key &rest &body &whole &optional &aux &allow-other-keys
-
-          define-modify-macro macroexpand-1 macroexpand defpackage in-package
-          defparameter defglobal every some notany notevery defsetf
-          define-setf-expander get-setf-expansion setf psetf push pop
-          define-compiler-macro incf decf dolist collect-if remove
-          remove-duplicates merge stable-sort dotimes do do* complement adjoin
-          pushnew nth use-package with-output-to-string prog prog* make-list
-          make-array aref copy-tree
-
-          sxhash))
-
-  (%export exported boot)
-  (%export exported main)
+  (export exported boot)
+  (export exported main)
   (setq *package* main))
 
 "
 (in-package :sl)
 "
 
-(defmacro import (symbols &optional (package *package*))
-  `(%import ,symbols ,package))
-
-(defmacro export (symbols &optional (package *package*))
-  `(%export ,symbols ,package))
+(defun assert (test . arguments)
+  (unless test (apply #'error arguments)))
 
 (defun macroexpand-1 (form)
   (cond
@@ -98,7 +80,8 @@
     ((and (eq 'progn (car form))
           (null (cdr form)))
      nil)
-    ((aif (or (%:find-macrolet-in-compiler-env (car form))
+    (t
+     (aif (or (%:find-macrolet-in-compiler-env (car form))
               (%macro (car form)))
           (let ((%:*whole-form* form))
             (apply it (cdr form)))
@@ -125,35 +108,32 @@
        ,@(map1 (lambda (opt)
                  (case (car opt)
                    (:export
-                    `(%export (list ,@(cdr opt)) ,pak))
+                    `(export ',(cdr opt) ,pak))
                    (:import-from
                     (destructuring-bind (source &rest names) (cdr opt)
                       (setq source (find-package source))
-                      `(%import ',(map1 (lambda (name)
-                                          (find-symbol name source))
-                                        names)
-                                ,pak)))))
+                      `(import ',(map1 (lambda (name)
+                                         (find-symbol name source))
+                                       names)
+                               ,pak)))))
                options)
        ,pak)))
 
 (defmacro in-package (name)
-  (setq *package* (find-package name)) nil)
+  `(setq *package* (find-package ',name)))
 
-(defmacro defparameter (name val)
-  (%special! name)
-  (%::maybe-xref-info name 'defparameter)
-  `(progn (%special! ',name)
-          (setq ,name ,val)))
-
-(defmacro defglobal (name val)
-  (%global! name)
-  (%::maybe-xref-info name 'defglobal)
-  `(progn (%global! ',name)
-          (setq ,name ,val)))
+(defun some1 (test list)
+  (let rec ((list list))
+    (when list
+      (aif (funcall test (%pop list))
+           it
+           (rec list)))))
 
 (defun finished (tails)
-  (when tails
-    (if (car tails) (finished (cdr tails)) t)))
+  (some1 #'null tails))
+
+(define-compiler-macro finished (tails)
+  `(some1 #'null ,tails))
 
 (defun mapcar (f . lists)
   (let rec (ret (tails lists))
@@ -172,12 +152,6 @@
      `(map2 ,func ,@lists))
     (form)))
 
-(defun mapc (f . lists)
-  (let rec ((tails lists))
-    (if (finished tails)
-        (car lists)
-        (rec (map1 #'cdr tails)))))
-
 ;; every returns false as soon as any invocation of predicate
 ;; returns false. If the end of a sequence is reached, every returns
 ;; true. Thus, every returns true if and only if every invocation of
@@ -185,8 +159,22 @@
 (defun every (test . lists)
   (let scan ((tails lists))
     (if (finished tails) t
-        (and (apply test (map1 #'car tails))
-             (scan (map1 #'cdr tails))))))
+        (and (apply test (mapcar #'car tails))
+             (scan (mapcar #'cdr tails))))))
+
+(defun every1 (test list)
+  (let rec ((list list))
+    (if (not list) t
+        (when (funcall test (%pop list))
+          (rec list)))))
+
+(define-compiler-macro every (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to EVERY"))
+    ((null (cdr lists))
+     `(every1 ,func ,@lists))
+    (form)))
 
 ;; some returns the first non-nil value which is returned by an
 ;; invocation of predicate. If the end of a sequence is reached
@@ -196,8 +184,16 @@
 (defun some (test . lists)
   (let scan ((tails lists))
     (if (finished tails) nil
-        (or (apply test (map1 #'car tails))
-            (scan (map1 #'cdr tails))))))
+        (or (apply test (mapcar #'car tails))
+            (scan (mapcar #'cdr tails))))))
+
+(define-compiler-macro some (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to SOME"))
+    ((null (cdr lists))
+     `(some1 ,func ,@lists))
+    (form)))
 
 ;; notany returns false as soon as any invocation of predicate
 ;; returns true. If the end of a sequence is reached, notany returns
@@ -206,9 +202,24 @@
 (defun notany (test . lists)
   (let scan ((tails lists))
     (if (finished tails) t
-        (if (apply test (map1 #'car tails))
+        (if (apply test (mapcar #'car tails))
             nil
-            (scan (map1 #'cdr tails))))))
+            (scan (mapcar #'cdr tails))))))
+
+(defun notany1 (test list)
+  (let rec ((list list))
+    (if (not list) t
+        (if (funcall test (%pop list))
+            nil
+            (rec list)))))
+
+(define-compiler-macro notany (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to NOTANY"))
+    ((null (cdr lists))
+     `(notany1 ,func ,@lists))
+    (form)))
 
 ;; notevery returns true as soon as any invocation of predicate
 ;; returns false. If the end of a sequence is reached, notevery
@@ -217,11 +228,52 @@
 (defun notevery (test . lists)
   (let scan ((tails lists))
     (if (finished tails) nil
-        (if (apply test (map1 #'car tails))
-            (scan (map1 #'cdr tails))
+        (if (apply test (mapcar #'car tails))
+            (scan (mapcar #'cdr tails))
             t))))
 
+(defun notevery1 (test list)
+  (let rec ((list list))
+    (when list
+      (if (funcall test (%pop list))
+          (rec list)
+          t))))
+
+(define-compiler-macro notevery (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to NOTEVERY"))
+    ((null (cdr lists))
+     `(notevery1 ,func ,@lists))
+    (form)))
+
 ;;; setf
+
+(defmacro with-collectors ((&rest names) &body body)
+  (let (lists tails syms adders)
+    (flet ((mk-collector (arg)
+             (let* ((name (if (consp arg) (car arg) arg))
+                    (vlist (gensym (strcat "L" name)))
+                    (vtail (gensym (strcat "T" name)))
+                    (vadd (if (consp arg) (cadr arg) arg))
+                    (vconc (if (consp arg) (caddr arg))))
+               (push vlist lists)
+               (push vtail tails)
+               (push `(,name (cdr ,vlist)) syms)
+               (when vadd
+                 (push `(,vadd (el)
+                         `(setq ,',vtail (setf (cdr ,',vtail) (cons ,el nil))))
+                       adders))
+               (when vconc
+                 (push `(,vconc (lst)
+                         `(setq ,',vtail (last (setf (cdr ,',vtail) ,lst))))
+                       adders)))))
+      (foreach names #'mk-collector)
+      `(let (,@(mapcar (lambda (name) `(,name (list nil))) lists))
+         (let (,@(mapcar #'list tails lists))
+           (macrolet (,@adders)
+             (symbol-macrolet (,@syms)
+               ,@body)))))))
 
 (defmacro %mvb-internal (names form &body body)
   `(multiple-value-bind ,names ,form ,@body))
@@ -237,9 +289,9 @@
                           (%fn ,access-fn (,@lambda-list)
                                (lambda (,arg)
                                  (symbol-macrolet
-                                     (,@(map1 (lambda (sym)
-                                                `(,sym ',sym))
-                                              store-vars))
+                                     (,@(mapcar (lambda (sym)
+                                                  `(,sym ',sym))
+                                                store-vars))
                                    `(%mvb-internal ,'(,@store-vars) ,,arg
                                                    ,,@body)))))))
     (t
@@ -287,9 +339,9 @@
          (return-from get-setf-expansion (get-setf-expansion form)))
        (when setf-exp
          (return-from get-setf-expansion (apply expander (cdr form))))
-       (let* ((temps (map1 (lambda (subform)
-                             (gensym "temp"))
-                           (cdr form)))
+       (let* ((temps (mapcar (lambda (subform)
+                               (gensym "temp"))
+                             (cdr form)))
               (vals (list (gensym "new")))
               (store-form (cond
                             ((functionp expander)
@@ -317,15 +369,17 @@
   (let ((setter (maybe-setter `(setf ,(car form)))))
     (cond
       ((or (safe-atom-p value)
+           (and (consp value)
+                (eq 'quote (car value)))
            (every #'safe-atom-p (cdr form)))
        ;; it's safe to compute the value first.
        `(,setter ,value ,@(cdr form)))
       (t
-       (let ((tmpvars (map1 (lambda (val)
-                              (list (gensym) val))
-                            (cdr form))))
+       (let ((tmpvars (mapcar (lambda (val)
+                                (list (gensym) val))
+                              (cdr form))))
          `(let (,@tmpvars)
-            (,setter ,value ,@(map1 #'car tmpvars))))))))
+            (,setter ,value ,@(mapcar #'car tmpvars))))))))
 
 (defun %call-setf-expansion (temps vals stores set value)
   ;; this got ugly, because I'd like to dig the values and bind
@@ -406,9 +460,9 @@
   (let* ((place (make-symbol "place"))
          (parsed (parse-lambda-list lambda-list))
          (args (append (getf parsed :required)
-                       (map1 (lambda (arg)
-                               (if (consp arg) (car arg) arg))
-                             (getf parsed :optional)))))
+                       (mapcar (lambda (arg)
+                                 (if (consp arg) (car arg) arg))
+                               (getf parsed :optional)))))
     (when (or (getf parsed :has-key)
               (getf parsed :aux)
               (getf parsed :aok))
@@ -419,37 +473,27 @@
                            (list* ,@args ,(getf parsed :rest))
                            ',function))))
 
-(defmacro psetf args
-  (let ((temps nil)
-        (places nil)
-        (values nil))
-    (let rec ((args args))
-      (cond
-        ((null args))
-        ((null (cadr args))
-         (error "Odd number of forms in psetf"))
-        (t
-         (push (gensym "psetf") temps)
-         (push (car args) places)
-         (push (cadr args) values)
-         (rec (cddr args)))))
-    (setf temps (nreverse temps)
-          places (nreverse places)
-          values (nreverse values))
-    `(let ,(map2 #'list temps values)
-       ,@(map2 (lambda (var set)
-                 `(setf ,var ,set))
-               places temps))))
-
-(defsetf car rplaca)
-(defsetf cdr rplacd)
+(defsetf car %rplaca)
+(defsetf cdr %rplacd)
 
 (defun (setf symbol-function) (func sym)
   (%::maybe-xref-info sym 'defun)
   (set-symbol-function! sym func))
 
+(defun fdefinition (sym)
+  (symbol-function sym))
+
+(defun (setf fdefinition) (func sym)
+  (set-symbol-function! sym func))
+
 (defun (setf symbol-value) (value sym)
   (set-symbol-value! sym value))
+
+(defun (setf symbol-plist) (plist sym)
+  (%:%set-symbol-plist plist sym))
+
+(define-compiler-macro (setf symbol-plist) (plist sym)
+  `(%:%set-symbol-plist ,plist ,sym))
 
 (defmacro push (obj place)
   (cond
@@ -457,10 +501,12 @@
      `(setq ,place (cons ,obj ,place)))
     ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                           (get-setf-expansion place)
-       (let ((item (gensym "item")))
-         `(let ((,item ,obj)
-                ,@(map2 #'list temps value-forms))
-            (symbol-macrolet ((,(car store-vars) (cons ,item ,get-form)))
+       (let ((item (gensym "item"))
+             (newval (gensym "newval")))
+         `(let* ((,item ,obj)
+                 ,@(mapcar #'list temps value-forms)
+                 (,newval (cons ,item ,get-form)))
+            (symbol-macrolet ((,(car store-vars) ,newval))
               ,store-form)))))))
 
 (defmacro pop (place)
@@ -470,7 +516,7 @@
        `(%:%pop ,place))
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
                             (get-setf-expansion place)
-         `(let* (,@(map2 #'list temps value-forms)
+         `(let* (,@(mapcar #'list temps value-forms)
                  (,v ,get-form))
             (symbol-macrolet ((,(car store-vars) (cdr ,v)))
               ,store-form)
@@ -490,8 +536,11 @@
                  ,newval)
               `(getf ,get ,vindicator ,vdefault)))))
 
-(defun (setf compiler-macro-function) (handler name)
-  (setf (getf %:*compiler-macros* name) handler))
+(defun get (symbol indicator &optional default)
+  (getf (symbol-plist symbol) indicator default))
+
+(defun (setf get) (value symbol indicator &optional default)
+  (setf (getf (symbol-plist symbol) indicator default) value))
 
 (defun constantly (value)
   (lambda args
@@ -499,103 +548,15 @@
     value))
 
 (defun (setf svref) (value vector index)
-  (vector-set vector index value))
+  (vector-set value vector index))
+
+(define-compiler-macro (setf svref) (value vector index)
+  `(vector-set ,value ,vector ,index))
 
 (define-modify-macro incf (&optional (add 1)) +)
 (define-modify-macro decf (&optional (add 1)) -)
 
 ;;; lists
-
-(defmacro dolist ((var list-form &rest result-form) &body body)
-  (let ((list (gensym "list"))
-        (next (gensym "next"))
-        (end (gensym "end")))
-    (multiple-value-bind (body declarations) (%:dig-declarations body)
-      `(block nil
-         (let (,var (,list ,list-form))
-           (declare ,@declarations)
-           (tagbody
-            ,next
-            (unless ,list
-              (go ,end))
-            (setf ,var (pop ,list))
-            ,@body
-            (go ,next)
-            ,end
-            (setf ,var nil))
-           ,@result-form)))))
-
-(defmacro with-collectors ((&rest names) &body body)
-  (let (lists tails syms adders)
-    (flet ((mk-collector (name)
-             (let ((vlist (gensym))
-                   (vtail (gensym))
-                   (vadd name))
-               (push vlist lists)
-               (push vtail tails)
-               (push `(,name (cdr ,vlist)) syms)
-               (push `(,vadd (el)
-                       (setf ,vtail (setf (cdr ,vtail)
-                                          (cons el nil))))
-                     adders))))
-      (foreach names #'mk-collector)
-      `(let* (,@(mapcar (lambda (name) `(,name (list nil)))
-                        lists)
-              ,@(mapcar #'list tails lists))
-         (flet (,@adders)
-           (symbol-macrolet (,@syms)
-             ,@body))))))
-
-(defun collect-if (test list)
-  (with-collectors (elements)
-    (dolist (el list)
-      (when (funcall test el)
-        (elements el)))
-    elements))
-
-(defun remove (item list)
-  (collect-if (lambda (x)
-                (not (eq x item))) list))
-
-(defun remove-duplicates (list &key (test #'eql) from-end)
-  (labels ((rmv (list ret)
-             (if list
-                 (let ((current (car list)))
-                   (rmv (collect-if (lambda (x)
-                                      (not (funcall test current x)))
-                                    (cdr list))
-                        (cons current ret)))
-                 ret)))
-    (if from-end
-        (nreverse (rmv list nil))
-        (rmv (reverse list) nil))))
-
-(defun merge (a b predicate)
-  (let* ((ret (list nil))
-         (p ret))
-    (macrolet ((add (cell)
-                 `(setf p (setf (cdr p) ,cell))))
-      (tagbody
-       next
-       (cond ((and a b)
-              (if (funcall predicate (car b) (car a))
-                  (setf b (cdr (add b)))
-                  (setf a (cdr (add a))))
-              (go next))
-             (a (add a))
-             (b (add b))))
-      (cdr ret))))
-
-(defun stable-sort (list predicate)
-  (let sort ((list list))
-    (cond ((not list) nil)
-          ((not (cdr list)) list)
-          (t (let ((a list)
-                   (b (%nhalf-list list)))
-               (merge (sort a) (sort b) predicate))))))
-
-(setf (symbol-function 'sort) #'stable-sort)
-(export '(sort export import))
 
 (defmacro first (list)
   `(car ,list))
@@ -615,7 +576,59 @@
 (defmacro rest (list)
   `(cdr ,list))
 
+(defun mapc1 (f list)
+  (let rec ((p list))
+    (if (not p) list
+        (progn
+          (funcall f (pop p))
+          (rec p)))))
+
+(defun mapc2 (f list1 list2)
+  (let rec ((p list1)
+            (q list2))
+    (if (not (and p q)) list1
+        (progn
+          (funcall f (pop p) (pop q))
+          (rec p q)))))
+
+(defun mapc (f . lists)
+  (let ((first (car lists)))
+    (let rec ((lists lists))
+      (if (finished lists) first
+          (progn
+            (apply f (mapcar #'car lists))
+            (rec (mapcar #'cdr lists)))))))
+
+(define-compiler-macro mapc (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPC"))
+    ((null (cdr lists))
+     `(mapc1 ,func ,@lists))
+    ((null (cddr lists))
+     `(mapc2 ,func ,@lists))
+    (form)))
+
 ;;; basic looping
+
+(defmacro dolist ((var list-form &rest result-form) &body body)
+  (let ((list (gensym "list"))
+        (next (gensym "next"))
+        (end (gensym "end")))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let (,var (,list ,list-form))
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (unless ,list
+              (go ,end))
+            (setf ,var (pop ,list))
+            ,@body
+            (go ,next)
+            ,end
+            (setf ,var nil))
+           ,@result-form)))))
 
 (defmacro dotimes ((var count-form &rest result-form) &body body)
   (let ((count (gensym))
@@ -638,29 +651,6 @@
 
 ;;; do and do* differ by exactly two characters, but oh well... copy-paste FTW.
 
-(defmacro do (vars (end-test-form &rest result-form) &body body)
-  (let ((next (gensym "next"))
-        (end (gensym "end"))
-        (step (apply #'nconc (mapcar (lambda (var)
-                                       (when (> (length var) 2)
-                                         (list (car var) (caddr var))))
-                                     vars))))
-    (multiple-value-bind (body declarations) (%:dig-declarations body)
-      `(block nil
-         (let ,(mapcar (lambda (var)
-                         (list (car var) (cadr var)))
-                       vars)
-           (declare ,@declarations)
-           (tagbody
-            ,next
-            (when ,end-test-form
-              (go ,end))
-            ,@body
-            (psetf ,@step)
-            (go ,next)
-            ,end)
-           ,@result-form)))))
-
 (defmacro do* (vars (end-test-form &rest result-form) &body body)
   (let ((next (gensym "next"))
         (end (gensym "end"))
@@ -679,7 +669,64 @@
             (when ,end-test-form
               (go ,end))
             ,@body
-            (setf ,@step)
+            (setq ,@step)
+            (go ,next)
+            ,end)
+           ,@result-form)))))
+
+(defmacro psetf args
+  ;; if the places to set are plain symbols (not bound by symbol-macrolet)
+  ;; turn it into a %psetq, which is handled more efficiently by the compiler.
+  (when (= 2 (length args))
+    (return-from psetf `(progn (setf ,@args) nil)))
+  (let rec ((p args))
+    (if (not p) (return-from psetf `(%:%psetq ,@args))
+        (if (%:safe-atom-p (car p))
+            (if (cdr p) (rec (cddr p))
+                (error "PSETF: missing last value")))))
+  (with-collectors (setters)
+    (let* ((code (list nil))
+           (cell code))
+      (do* ((args args (cddr args)))
+           ((null args) (progn
+                          (setters nil)
+                          (setf (car cell) (car setters)
+                                (cdr cell) (cdr setters))
+                          (car code)))
+        (let ((place (car args))
+              (value (cadr args)))
+          (multiple-value-bind (temps vals stores set get)
+                               (get-setf-expansion place)
+            (setters set)
+            (let ((next-cell (list nil)))
+              (setf (car cell)
+                    `(let (,@(mapcar #'list temps vals))
+                       (multiple-value-bind ,stores ,value
+                         . ,next-cell)))
+              (setf cell next-cell))))))))
+
+(defmacro psetq args
+  `(psetf ,@args))
+
+(defmacro do (vars (end-test-form &rest result-form) &body body)
+  (let ((next (gensym "next"))
+        (end (gensym "end"))
+        (step (apply #'nconc (mapcar (lambda (var)
+                                       (when (> (length var) 2)
+                                         (list (car var) (caddr var))))
+                                     vars))))
+    (multiple-value-bind (body declarations) (%:dig-declarations body)
+      `(block nil
+         (let ,(mapcar (lambda (var)
+                         (list (car var) (cadr var)))
+                       vars)
+           (declare ,@declarations)
+           (tagbody
+            ,next
+            (when ,end-test-form
+              (go ,end))
+            ,@body
+            (psetq ,@step)
             (go ,next)
             ,end)
            ,@result-form)))))
@@ -713,13 +760,14 @@
                lst
                (rec (cdr lst)))))))))
 
+(defconstant +member-safe-test+ (list `#'eql #'eql `#'eq #'eq 'eql 'eq ''eql ''eq))
+(defconstant +member-safe-key+ (list `#'identity #'identity 'identity ''identity))
+
 (define-compiler-macro member (&whole form item lst &key test test-not key)
   (cond
     ((and (not test-not)
-          (or (not test) (member test (list `#'eql #'eql `#'eq #'eq 'eql 'eq ''eql ''eq)
-                                 :test #'equal))
-          (or (not key) (member key (list `#'identity #'identity 'identity ''identity)
-                                :test #'equal)))
+          (or (not test) (member test +member-safe-test+ :test #'equal))
+          (or (not key) (member key +member-safe-key+ :test #'equal)))
      `(%:%memq ,item ,lst))
     (t form)))
 
@@ -764,21 +812,21 @@
                                              (mapcar #'list temps value-forms)))
                                          syms)))
           (multiple-value-bind ,(mapcar #'car syms) ,value-form
-            (let (,@(append (mapcar (lambda (exp)
-                                      (let ((store-vars (cadddr exp)))
-                                        `(,(car store-vars) ,(car exp))))
-                                    syms)))
+            (let (,@(mapcar (lambda (exp)
+                              (let ((store-vars (cadddr exp)))
+                                `(,(car store-vars) ,(car exp))))
+                            syms))
               ,@(mapcar (lambda (exp)
                           (elt exp 4))
                         syms)
               ,(caar syms))))))))
 
 (defmacro with-output-to-string ((var &optional string) &body body)
-  `(let ((,var (%make-output-stream)))
+  `(let ((,var (%make-text-memory-output-stream)))
      ,@(when string
          `((%stream-put ,var ,string)))
      ,@body
-     (%stream-get ,var)))
+     (%get-output-stream-string ,var)))
 
 (defmacro defun-memoize (name args &body body)
   (let ((memo (gensym "memo")))
@@ -787,23 +835,34 @@
          (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
          (defun ,name ,args
            (declare ,@declarations)
-           (or (hash-get ,memo ,(car args))
-               (hash-set ,memo ,(car args) (progn ,@body))))))))
+           (or (gethash ,(car args) ,memo)
+               (%hash-set (progn ,@body) ,(car args) ,memo)))))))
 
 (defmacro defun-memoize2 (name args &body body)
-  (let ((memo (gensym "memo")))
+  (let ((memo (gensym "memo"))
+        (val (gensym "val"))
+        (h1 (gensym))
+        (weak1 (if (consp name) (member :weak1 name)))
+        (weak2 (if (consp name) (member :weak2 name)))
+        (name (if (consp name) (car name) name)))
+    (unless (symbolp name)
+      (error "DEFUN-MEMOIZE2: name must be a symbol"))
     (multiple-value-bind (body declarations) (%:dig-declarations body)
-      `(let ((,memo (make-hash)))
+      `(let ((,memo (,(if weak1 'make-weak-hash 'make-hash))))
          (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
          (defun ,name ,args
            (declare ,@declarations)
-           (aif (hash-get ,memo ,(car args))
-                (or (hash-get it ,(cadr args))
-                    (hash-set it ,(cadr args) (progn ,@body)))
-                (let ((val (progn ,@body)))
-                  (hash-set ,memo ,(car args)
-                            (make-hash ,(cadr args) val))
-                  val)))))))
+           (let ((,h1 (gethash ,(car args) ,memo)))
+             (if ,h1
+                 (or (gethash ,(cadr args) ,h1)
+                     (%hash-set (progn ,@body) ,(cadr args) ,h1))
+                 (let ((,val (progn ,@body)))
+                   (%hash-set (,(if weak2 'make-weak-hash 'make-hash)
+                               ,(cadr args) ,val) ,(car args) ,memo)
+                   ,val))))))))
+
+(defun clear-memoize-cache (symbol)
+  (clrhash (%get-symbol-prop symbol "MEMOIZE")))
 
 (defmacro prog (bindings &body body)
   (multiple-value-bind (body declarations) (%:dig-declarations body)
@@ -875,30 +934,155 @@
      (error "SETF ELT: Unknown sequence"))))
 
 (defun copy-tree (tree)
-  (if (consp tree)
+  (if (atom tree) tree
       (cons (copy-tree (car tree))
-            (copy-tree (cdr tree)))
-      tree))
+            (copy-tree (cdr tree)))))
 
-(defun (setf cadr) (value list)
-  (setf (car (cdr list)) value))
+;; We do this for completion, to have (SETF CAR) and (SETF CDR) defined. It
+;; will not endless-loop, because we have a DEFSETF for CAR and CDR somewhere
+;; above (the macro instilled by DEFSETF takes precedence over the function).
+(defun (setf car) (val list)
+  (setf (car list) val))
+
+(defun (setf cdr) (val list)
+  (setf (cdr list) val))
+
+(defun (setf caar) (val list)
+  (setf (car (car list)) val))
+
+(defun (setf cadr) (val list)
+  (setf (car (cdr list)) val))
+
+(defun (setf cdar) (val list)
+  (setf (cdr (car list)) val))
+
+(defun (setf cddr) (val list)
+  (setf (cdr (cdr list)) val))
+
+(defun (setf caaar) (val list)
+  (setf (car (caar list)) val))
+
+(defun (setf caadr) (val list)
+  (setf (car (cadr list)) val))
+
+(defun (setf cadar) (val list)
+  (setf (car (cdar list)) val))
+
+(defun (setf caddr) (val list)
+  (setf (car (cddr list)) val))
+
+(defun (setf cdaar) (val list)
+  (setf (cdr (caar list)) val))
+
+(defun (setf cdadr) (val list)
+  (setf (cdr (cadr list)) val))
+
+(defun (setf cddar) (val list)
+  (setf (cdr (cdar list)) val))
+
+(defun (setf cdddr) (val list)
+  (setf (cdr (cddr list)) val))
+
+(defun (setf caaaar) (val list)
+  (setf (car (caaar list)) val))
+
+(defun (setf caaadr) (val list)
+  (setf (car (caadr list)) val))
+
+(defun (setf caadar) (val list)
+  (setf (car (cadar list)) val))
+
+(defun (setf caaddr) (val list)
+  (setf (car (caddr list)) val))
+
+(defun (setf cadaar) (val list)
+  (setf (car (cdaar list)) val))
+
+(defun (setf cadadr) (val list)
+  (setf (car (cdadr list)) val))
+
+(defun (setf caddar) (val list)
+  (setf (car (cddar list)) val))
+
+(defun (setf cadddr) (val list)
+  (setf (car (cdddr list)) val))
+
+(defun (setf cdaaar) (val list)
+  (setf (cdr (caaar list)) val))
+
+(defun (setf cdaadr) (val list)
+  (setf (cdr (caadr list)) val))
+
+(defun (setf cdadar) (val list)
+  (setf (cdr (cadar list)) val))
+
+(defun (setf cdaddr) (val list)
+  (setf (cdr (caddr list)) val))
+
+(defun (setf cddaar) (val list)
+  (setf (cdr (cdaar list)) val))
+
+(defun (setf cddadr) (val list)
+  (setf (cdr (cdadr list)) val))
+
+(defun (setf cdddar) (val list)
+  (setf (cdr (cddar list)) val))
+
+(defun (setf cddddr) (val list)
+  (setf (cdr (cdddr list)) val))
+
+(defmacro with-places ((places &key
+                               (temp-vars 'temp-vars)
+                               (temp-vals 'temp-vals)
+                               (store-main-vars 'store-main-vars)
+                               (store-other-vars 'store-other-vars)
+                               (setters 'setters)
+                               (getters 'getters))
+                       &body body)
+  `(with-collectors (,temp-vars ,temp-vals ,store-main-vars ,store-other-vars ,setters ,getters)
+     (dolist (place ,places)
+       (multiple-value-bind (place-temps place-vals place-stores place-set place-get)
+                            (get-setf-expansion place)
+         (dolist (el place-temps) (,temp-vars el))
+         (dolist (el place-vals) (,temp-vals el))
+         (dolist (el (cdr place-stores)) (,store-other-vars el))
+         (,store-main-vars (car place-stores))
+         (,setters place-set)
+         (,getters place-get)))
+     ,@body))
 
 (define-setf-expander values (&rest places)
-  (with-collectors (temp-vars temp-vals store-main-vars store-other-vars setters getters)
-    (dolist (place places)
-      (multiple-value-bind (place-temps place-vals place-stores place-set place-get)
-                           (get-setf-expansion place)
-        (foreach place-temps #'temp-vars)
-        (foreach place-vals #'temp-vals)
-        (foreach (cdr place-stores) #'store-other-vars)
-        (store-main-vars (car place-stores))
-        (setters place-set)
-        (getters place-get)))
+  (with-places (places)
     (values temp-vars
             temp-vals
             store-main-vars
             `(let (,@store-other-vars)
                (values ,@setters))
             `(values ,@getters))))
+
+(defmacro rotatef (&rest places)
+  (with-places (places)
+    `(let (,@(mapcar #'list temp-vars temp-vals))
+       (let (,@(mapcar #'list
+                       store-main-vars
+                       (nconc (cdr getters) (list (car getters)))))
+         (let (,@store-other-vars)
+           ,@setters
+           nil)))))
+
+(defmacro shiftf (&rest args)
+  (let* ((oldvalue (gensym))
+         (args (reverse args))
+         (newvalue (pop args)))
+    (with-places ((nreverse args))
+      (let ((getters getters))
+        `(let (,@(mapcar #'list temp-vars temp-vals))
+           (let ((,oldvalue ,(pop getters)))
+             (let (,@(mapcar #'list
+                             store-main-vars
+                             (nconc getters (list newvalue))))
+               (let (,@store-other-vars)
+                 ,@setters
+                 ,oldvalue))))))))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))

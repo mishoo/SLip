@@ -4,9 +4,15 @@
 (in-package :sl)
 
 (export '(condition
+          define-condition
           simple-condition
+          simple-condition-format-control
+          simple-condition-format-arguments
           simple-warning
           simple-error
+          type-error
+          type-error-datum
+          type-error-expected-type
           primitive-error
           serious-condition
           warning
@@ -15,37 +21,71 @@
           handler-bind
           ignore-errors
           make-condition
-          assert
-          error
-          warn
-          typep))
+          check-type))
 
 (defpackage :sl-cond
   (:use :sl :%))
 
 (in-package :sl-cond)
 
-(defun typep (obj type)
-  (if (is-a obj type) t nil))
+(import '(sl::with-collectors))
 
 (defclass condition () (datum))
-(defclass simple-condition (condition) (:format-control :format-arguments))
+
+(defmacro define-condition (name (&rest parent-types) slots &rest options)
+  (let ((report (cadr (assoc :report options))))
+    `(progn
+       (defclass ,name (,@(or parent-types '(condition)))
+         (,@slots)
+         (,@(remove :report options :key #'car)))
+       ,@(when report
+           `((defmethod print-object ((condition ,name) (stream output-stream))
+               (funcall ,report condition stream)))))))
+
+(defclass simple-condition (condition)
+  ((format-control :initarg :format-control
+                   :accessor simple-condition-format-control)
+   (format-arguments :initarg :format-arguments
+                     :initform nil
+                     :accessor simple-condition-format-arguments)))
+
 (defclass serious-condition (condition) ())
+
 (defclass error (serious-condition) ())
+
+(defclass type-error (error)
+  ((datum :initarg :datum :accessor type-error-datum)
+   (symbol :initarg :symbol :initform nil :accessor type-error-symbol)
+   (expected-type :initarg :expected-type :accessor type-error-expected-type)))
+
 (defclass simple-error (simple-condition error) ())
+
 (defclass primitive-error (simple-error) ())
+
 (defclass warning (condition) ())
+
 (defclass simple-warning (simple-condition warning) ())
 
-(defglobal <condition> (find-class 'condition))
-
 (defmethod print-object ((c simple-condition) (out output-stream))
-  (let ((format-control (slot-ref c :format-control))
-        (format-arguments (slot-ref c :format-arguments)))
+  (let ((format-control (slot-value c 'format-control))
+        (format-arguments (slot-value c 'format-arguments)))
     (strcat
-     "<" (class-name (class-of c)) ": "
+     "<" (class-name (class-of c)) ": "
      (apply #'format out format-control format-arguments)
      ">")))
+
+(defmethod print-object ((c type-error) (out output-stream))
+  (let ((sym (type-error-symbol c)))
+    (cond
+      (sym
+       (format out "TYPE-ERROR: the type of ~S (~S) is not ~A"
+               (type-error-symbol c)
+               (type-of (type-error-datum c))
+               (type-error-expected-type c)))
+      (t
+       (format out "TYPE-ERROR: the value ~S is not ~A"
+               (type-error-datum c)
+               (type-error-expected-type c))))))
 
 (defparameter *handler-clusters* '())
 (defparameter *restart-clusters* '())
@@ -60,35 +100,20 @@
                 *handler-clusters*)))
      ,@body))
 
-(defmacro with-append-list ((var append &key (tail (gensym))) &body body)
-  `(let (,var ,tail)
-     (flet ((,append (x)
-              (setf ,tail
-                    (last (if ,tail
-                              (setf (cdr ,tail) x)
-                              (setf ,var x))))))
-       ,@body)))
-
 (defun handler-case-bindings (block-tag condition-variable clauses)
-  (with-append-list (body body-add)
-    (let ((bindings '()))
-      (let looop ((clauses clauses))
-        (when clauses
-          (let ((clause (car clauses))
-                (clause-tag (gensym)))
-            (destructuring-bind (typespec (&optional var) &body rest) clause
-              (push `(,typespec (lambda (temp)
+  (with-collectors (bindings (body nil body-add))
+    (dolist (clause clauses)
+      (let ((clause-tag (gensym)))
+        (destructuring-bind (typespec (&optional var) &body rest) clause
+          (bindings `(,typespec (lambda (temp)
                                   ,(when var
                                      `(setq ,condition-variable temp))
-                                  (go ,clause-tag)))
-                    bindings)
-              (body-add `(,clause-tag
-                          (return-from
-                           ,block-tag
-                            (let ,(when var `((,var ,condition-variable)))
-                              ,@rest))))))
-          (looop (cdr clauses))))
-      (cons (nreverse bindings) body))))
+                                  (go ,clause-tag))))
+          (body-add `(,clause-tag
+                      (return-from ,block-tag
+                        (let ,(when var `((,var ,condition-variable)))
+                          ,@rest)))))))
+    (cons bindings body)))
 
 (defmacro handler-case (form &rest clauses)
   (let ((has-no-error (%assq :no-error clauses)))
@@ -122,10 +147,6 @@
      (error (condition)
        (values nil condition))))
 
-(defun existing-condition-name? (name)
-  (let ((class (find-class name)))
-    (and class (%memq <condition> (class-cpl class)))))
-
 (defun %condition (datum arguments default-class)
   (cond ((typep datum 'condition) datum)
         ((or (stringp datum)
@@ -133,7 +154,7 @@
          (make-instance default-class
                         :format-control datum
                         :format-arguments arguments))
-        ((existing-condition-name? datum)
+        (t
          (apply #'make-instance datum arguments))))
 
 (defun signal (datum . arguments)
@@ -156,9 +177,6 @@
     ;; XXX: no debugger
     (%error condition)))
 
-(defun assert (cond . arguments)
-  (unless cond (apply #'error arguments)))
-
 (defun primitive-error (fmt . arguments)
   (error 'primitive-error :format-control fmt :format-arguments arguments))
 
@@ -168,3 +186,20 @@
 
 (defun make-condition (datum &rest args)
   (%condition datum args 'simple-condition))
+
+(defmacro check-type (place typespec &optional string)
+  (cond
+    ((and (symbolp place)
+          (%:safe-atom-p place))
+     `(assert (typep ,place ',typespec)
+              'type-error
+              :datum ,place
+              :symbol ',place
+              :expected-type ,(or string `',typespec)))
+    (t
+     (let ((_place (gensym)))
+       `(let ((,_place ,place))
+          (assert (typep ,_place ',typespec)
+                  'type-error
+                  :datum ,_place
+                  :expected-type ,(or string `',typespec)))))))

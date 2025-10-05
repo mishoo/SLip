@@ -1,51 +1,24 @@
-(in-package :sl)
-
-(export '(print-object
-          print-object-to-string
-          *print-readably*
-          *print-escape*
-          *print-base*
-          *print-radix*
-          *print-pretty*))
-
 (defpackage :sl-print
   (:use :sl :%))
 
 (in-package :sl-print)
 
-(defgeneric print-object)
+(import '(sl-struct::find-structure
+          sl-struct::structure-name
+          sl-struct::structure-slots
+          sl-struct::structure-print-object
+          sl-struct::structure-print-function))
 
-(defparameter *print-readably* nil)
-(defparameter *print-escape* t)
-(defparameter *print-base* 10)
-(defparameter *print-radix* nil)
-(defparameter *print-pretty* t)
-
-(defmacro def-print ((type) &body body)
-  `(defmethod print-object ((,type ,type) (out output-stream))
+(defmacro def-print ((type &optional (name type)) &body body)
+  `(defmethod print-object ((,name ,type) (out output-stream))
      (macrolet ((<< args
                   `(%stream-put out ,@args)))
        ,@body)))
 
-(let ((%to-string (%js-eval "function to_string(obj) { return obj + '' }")))
-  (def-print (unknown-class)
-    (<< "<UNKNOWN-CLASS " (%js-apply %to-string nil (vector unknown-class)) ">")))
+(defconstant %to-string (%js-eval "function to_string(obj) { return obj + '' }"))
 
-(def-print (object)
-  (<< "<OBJECT")
-  (let* ((class (class-of object))
-         (name (class-name class)))
-    (when name
-      (<< " " name)))
-  (<< ">"))
-
-(def-print (primitive)
-  (<< "<PRIMITIVE")
-  (let* ((class (class-of primitive))
-         (name (class-name class)))
-    (when name
-      (<< " " name)))
-  (<< ">"))
+(def-print (t obj)
+  (<< (%js-apply %to-string nil (vector obj))))
 
 (def-print (number)
   (<< (number-string number *print-base*)))
@@ -58,22 +31,16 @@
     (t
      (<< "#'#:anonymous-function"))))
 
-(def-print (hash)
-  (<< "<HASH[" (length hash) "]")
-  (let rec ((keys (%:as-list (hash-keys hash)))
-            (vals (%:as-list (hash-values hash))))
+(def-print (hash-table)
+  (<< "#<HASH[" (length hash-table) "]")
+  (let rec ((keys (%:as-list (hash-keys hash-table)))
+            (vals (%:as-list (hash-values hash-table))))
     (when keys
       (<< " ")
       (print-object (car keys) out)
       (<< " ")
       (print-object (car vals) out)
       (rec (cdr keys) (cdr vals))))
-  (<< ">"))
-
-(def-print (class)
-  (<< "<CLASS")
-  (when (class-name class)
-    (<< " " (class-name class)))
   (<< ">"))
 
 (def-print (cons)
@@ -113,6 +80,35 @@
            (print-object list out)))))
     (<< ")")))
 
+(defun default-print-structure (obj def out)
+  (macrolet ((<< args
+               `(%stream-put out ,@args)))
+    (let* ((name (structure-name def))
+           (slots (structure-slots def)))
+      (<< "#S(")
+      (print-object name out)
+      (foreach-index slots (lambda (slot index)
+                             (<< " ")
+                             (print-object (intern (strcat (getf slot :name)) "KEYWORD") out)
+                             (<< " ")
+                             (print-object (svref obj (+ index 2)) out)))
+      (<< ")"))))
+
+(def-print (structure-object structure)
+  (let* ((def (find-structure (svref structure 1)))
+         (print-object (structure-print-object def))
+         (print-function (structure-print-function def)))
+    (cond
+      (print-object
+       (funcall print-object structure out))
+      (print-function
+       (funcall print-function structure out *indentation*))
+      (t
+       (default-print-structure structure def out)))))
+
+(def-print (structure-class structure)
+  (<< "#<STRUCTURE " (sl-struct::structure-name structure) ">"))
+
 (def-print (vector)
   (when *print-pretty*
     (return-from print-object (pprint-object vector out)))
@@ -129,14 +125,14 @@
 (def-print (string)
   (<< (if *print-escape* (%dump string) string)))
 
-(def-print (char)
-  (<< (if *print-escape* (%dump char) char)))
+(def-print (character)
+  (<< (if *print-escape* (%dump character) character)))
 
 (def-print (regexp)
   (<< "#" (%dump regexp)))
 
 (def-print (package)
-  (<< "<PACKAGE " (package-name package) ">"))
+  (<< "#<PACKAGE " (package-name package) ">"))
 
 (def-print (null)
   (<< "NIL"))
@@ -157,10 +153,6 @@
                   ((%symbol-accessible symbol pak)
                    (<< (package-name pak) "::")))))
         (<< (symbol-name symbol)))))
-
-(defun print-object-to-string (obj)
-  (with-output-to-string (out)
-    (print-object obj out)))
 
 ;;;; pretty printing
 ;;
@@ -457,7 +449,7 @@
       (%pp-object thing)
       (%pp-body-indent body))))
 
-(def-pretty-print (setq setf) (&rest exps)
+(def-pretty-print (setq setf psetq psetf) (&rest exps)
   (with-indent (%stream-col *pp-stream*)
     (with-parens
       (<< (%pp-symbol symbol) " ")
@@ -469,11 +461,12 @@
               (<< #\Newline)
               (indent))
             (%pp-object (car exps))
-            (<< " ")
-            (%pp-object (cadr exps))
+            (when (cdr exps)
+              (<< " ")
+              (%pp-object (cadr exps)))
             (rec (cddr exps) nil)))))))
 
-(defgeneric pprint-object)
+(defgeneric pprint-object (object stream))
 
 (defmethod pprint-object (object (output output-stream))
   (let ((*print-pretty* nil))

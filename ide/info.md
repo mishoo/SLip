@@ -55,61 +55,61 @@ focus.
 Here's a few keybindings you can use in Lisp buffers (there are *many* key
 bindings; to get a crude list of all of them, press `C-h m`):
 
-- `C-c s r` -- at any time this switches to the REPL buffer.
+- `C-c s r` — at any time this switches to the REPL buffer.
 
-- `C-c s s` -- at any time this switches to the output buffer. This is where
+- `C-c s s` — at any time this switches to the output buffer. This is where
   text sent to `*standard-output*`, `*error-output*` and `*trace-output*`
   goes. Output goes to the REPL buffer as well, just above the prompt, but
   it's buffered until newline.
 
-- `M-.` -- go to definition of symbol at point (after which you can use `M-,`
-  to go back). Note that some symbols lack xref info (e.g. primitive
-  functions). But those defined in Lisp should have it, for example try `loop`.
+- `M-.` — jump to definition of symbol at point (after which you can use `M-,`
+  to go back). Note that some symbols might lack cross-reference info. If
+  multiple definitions are known, you'll get a menu to chose from.
 
-- `M-C-x` (or `C-c C-c`) -- evaluate the current toplevel expression.
+- `M-C-x` (or `C-c C-c`) — evaluate the current toplevel expression.
 
-- `C-c C-r` -- evaluate the selection (region).
+- `C-c C-r` — evaluate the selection (region).
 
-- `C-c Enter` -- macroexpand-1 the current expression (the cursor must be on
+- `C-c Enter` — macroexpand-1 the current expression (the cursor must be on
   the opening paren). The output goes to the REPL.
 
-- `C-c M-m` -- macroexpand-all the current expression.
+- `C-c M-m` — macroexpand-all the current expression.
 
-- `C-c Delete` -- clear the REPL buffer.
+- `C-c Delete` — clear the REPL buffer.
 
-- `S-Tab` -- complete the current symbol.
+- `S-Tab` — complete the current symbol.
 
 You can load and save files (see the section about the “filesystem” below):
 
-- `C-x C-f` -- load a file.
+- `C-x C-f` — load a file.
 
-- `C-x C-s` -- save the current buffer.
+- `C-x C-s` — save the current buffer.
 
 In addition to the above, the following key bindings are available in the REPL:
 
-- `C-c M-p` -- change REPL package. Note that `%` is the bootstrap package,
+- `C-c M-p` — change REPL package. Note that `%` is the bootstrap package,
   where primitives are defined. It's unfortunate that it shows up first, due
   to alphabetic ordering. I'll fix this someday. Do not go there. 😅
 
-- `C-c M-o` -- clear the REPL buffer.
+- `C-c M-o` — clear the REPL buffer.
 
-- `Enter` -- evaluate the expression at prompt and display the result; but if
+- `Enter` — evaluate the expression at prompt and display the result; but if
   the expression is incomplete (e.g. missing a closing paren), this will just
   newline and indent. If the cursor is somewhere above the prompt, this will
   just copy the current expression to prompt, like in SLIME.
 
-- `C-Enter` -- always newline and indent.
+- `C-Enter` — always newline and indent.
 
-- `M-p` or `C-ArrowUp` -- previous history item.
+- `M-p` or `C-ArrowUp` — previous history item.
 
-- `M-n` or `C-ArrowDown` -- next history item.
+- `M-n` or `C-ArrowDown` — next history item.
 
 - to search history, type what you want to search at the prompt, and then
   `M-p` or `M-n`.
 
-- `M-C-Delete` -- delete input, return to prompt.
+- `M-C-Delete` — delete input, return to prompt.
 
-- `Tab` -- complete current symbol.
+- `Tab` — complete current symbol.
 
 ## The filesystem
 
@@ -147,20 +147,20 @@ exactly Common Lisp, but that's what I'm dreaming.
 
 ### Local store primitives
 
-- `(%:%ls-dump-store)` -- if you have anything interesting in your local store
+- `(%:%ls-dump-store)` — if you have anything interesting in your local store
   that you wish to show me, that's the easiest way. It will open a window with
   a JSON dump of your localStorage files saved from this page. Feel free to
   send it over (censor it first, if necessary).
 
-- `(%:%ls-purge-fasls)` -- discard object files (.fasl) from your local storage.
+- `(%:%ls-purge-fasls)` — discard object files (.fasl) from your local storage.
 
-- `(%:%ls-clear-store)` -- purge all SLip files saved into your localStorage.
+- `(%:%ls-clear-store)` — purge all SLip files saved into your localStorage.
   This will not affect your REPL history, as it's saved on another key (check
   local storage in your browser's developer console).
 
-- `(%:%ls-delete-path path)` -- delete the given `path` from your
-  localStorage. You can pass a “directory” — it and everything below will be
-  purged, no questions asked.
+- `(%:%ls-delete-path path)` — delete the given `path` from your localStorage.
+  You can pass a “directory” — it and everything below will be purged, no
+  questions asked.
 
 - `(%:%ls-get-file-contents filename)` and `(%:%ls-set-file-contents filename
   content)` — get or set the content of the given file.

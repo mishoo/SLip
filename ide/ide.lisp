@@ -41,20 +41,20 @@
         (pass-args (gensym)))
     `(labels ((,name ,args ,@body))
        (setf (symbol-function ',name) #',name)
-       (hash-set *handlers* ,(symbol-name what)
-                 (lambda (req-id . ,pass-args)
-                   (make-thread
-                    (lambda ()
-                      (block out
-                        (handler-bind
-                            ((warning (lambda (x)
-                                        (send-ymacs-notify :warning (format nil "~A" x))))
-                             (error (lambda (x)
-                                      (send-ymacs-notify :error (format nil "~A" x))
-                                      (return-from out x))))
-                          (let ((ret (apply #',name ,pass-args)))
-                            (send-ymacs-reply req-id ,what ret)
-                            ret))))))))))
+       (setf (gethash ,(symbol-name what) *handlers*)
+             (lambda (req-id . ,pass-args)
+               (make-thread
+                (lambda ()
+                  (block out
+                    (handler-bind
+                        ((warning (lambda (x)
+                                    (send-ymacs-notify :warning (format nil "~A" x))))
+                         (error (lambda (x)
+                                  (send-ymacs-notify :error (format nil "~A" x))
+                                  (return-from out x))))
+                      (let ((ret (apply #',name ,pass-args)))
+                        (send-ymacs-reply req-id ,what ret)
+                        ret))))))))))
 
 (define-handler :read (pak str)
   (let ((*package* (or (and pak (find-package pak))
@@ -128,7 +128,7 @@
                    (substr b 1)))))))
 
 (labels ((symbol-completion (query all)
-           (setf all (mapcar #'symbol-name all))
+           (setf all (mapcar #'string all))
            (let* ((rx (make-regexp (strcat "^"
                                            (replace-regexp
                                             #/[-_.\/]/g
@@ -168,7 +168,8 @@
 
         ;; no colon?
         ((regexp-test #/[^:]/ query)
-         (symbol-completion query (as-list (%accessible-symbols *package* nil))))
+         (symbol-completion query (append (%:%list-packages)
+                                          (as-list (%accessible-symbols *package* nil)))))
 
         ;; dunno what to do here, just return empty list
         (t

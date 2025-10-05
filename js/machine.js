@@ -1,5 +1,5 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispProcess, LispMutex, LispStream, LispInputStream, LispOutputStream, LispChar, LispClosure, LispObject } from "./types.js";
+import { LispSymbol, LispPackage, LispHash, LispChar, LispClosure } from "./types.js";
 import { LispPrimitiveError } from "./error.js";
 import { repeat_string, pad_string } from "./utils.js";
 import { LispStack } from "./stack.js";
@@ -90,8 +90,8 @@ export const OP = {
     CDDDAR: 69,
     CDDDDR: 70,
     PROGV: 71,
-    LRET2: 72,
-    LJUMP2: 73,
+    NULLS: 72,
+    LSETPS: 73,
     XARGS: 74,
     LPOP: 75,
     EQ: 76,
@@ -188,8 +188,8 @@ const OP_LEN = [
     0 /* CDDDAR */,
     0 /* CDDDDR */,
     0 /* PROGV */,
-    2 /* LRET2 */,
-    2 /* LJUMP2 */,
+    1 /* NULLS */,
+    2 /* LSETPS */,
     5 /* XARGS */,
     2 /* LPOP */,
     0 /* EQ */,
@@ -245,8 +245,8 @@ export class LispRet {
 }
 
 class LispCleanup {
-    constructor(ret, addr) {
-        this.ret = ret;
+    constructor(m, addr) {
+        this.ret = new LispLongRet(m);
         this.addr = addr;
     }
     run(m) {
@@ -277,21 +277,17 @@ class LispLongRet {
     }
     run(m, addr, retval) {
         // figure out if we need to execute cleanup hooks
-        let doit;
-        (doit = (m) => {
-            var p = m.denv;
-            while (p && p !== this.denv) {
-                var c = p.car;
-                if (c instanceof LispCleanup) {
-                    c.run(m);
-                    m.push(doit);
-                    return;
-                }
-                p = p.cdr;
+        while (m.denv && m.denv !== this.denv) {
+            let c = m.denv.car;
+            m.denv = m.denv.cdr;
+            if (c instanceof LispCleanup) {
+                c.run(m);
+                m.push(this.run.bind(this, m, addr, retval));
+                return;
             }
-            this.unwind(m, addr);
-            if (arguments.length === 3) m.push(retval);
-        })(m);
+        }
+        this.unwind(m, addr);
+        if (retval !== undefined) m.push(retval);
     }
 }
 
@@ -649,6 +645,36 @@ var optimize = (function(){
             }
             break;
         }
+        if (i+3 < code.length && (code[i+0][0] === "NIL" &&
+                                  code[i+1][0] === "VAR" &&
+                                  code[i+2][0] === "NIL" &&
+                                  code[i+3][0] === "VAR")) {
+            code.splice(i, 4, [ "NULLS", 2 ]);
+            return true;
+        }
+        if (i+2 < code.length && (code[i+0][0] === "NIL" &&
+                                  code[i+1][0] === "VAR" &&
+                                  code[i+2][0] === "NULLS")) {
+            code.splice(i, 3, [ "NULLS", 1 + code[i+2][1] ]);
+            return true;
+        }
+        if (i+2 < code.length && (code[i+0][0] === "NULLS" &&
+                                  code[i+1][0] === "NIL" &&
+                                  code[i+2][0] === "VAR")) {
+            code.splice(i, 3, [ "NULLS", 1 + code[i+0][1] ]);
+            return true;
+        }
+        if (i+1 < code.length && (code[i+0][0] === "NULLS" &&
+                                  code[i+1][0] === "NULLS")) {
+            code.splice(i, 2, [ "NULLS", code[i+0][1] + code[i+1][1] ]);
+            return true;
+        }
+        if (i+1 < code.length && (code[i+0][0] === "LSET" &&
+                                  code[i+1][0] === "POP")) {
+            code[i+0][0] = "LSETPS";
+            code.splice(i+1, 1);
+            return true;
+        }
     };
     return function optimize(code) {
         let pass = 0;
@@ -738,27 +764,65 @@ function indent(level) {
 }
 
 function dump(thing) {
-    if (thing === false) return "NIL";
-    if (thing === true) return "T";
-    if (typeof thing == "string") return JSON.stringify(LispChar.sanitize(thing));
-    if (thing instanceof LispCons) {
-        if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
-            return "'" + dump(LispCons.cadr(thing));
-        var ret = "(", first = true;
-        while (thing !== false) {
-            if (!first) ret += " ";
-            else first = false;
-            ret += dump(LispCons.car(thing));
-            thing = LispCons.cdr(thing);
-            if (!LispCons.isList(thing)) {
-                ret += " . " + dump(thing);
-                break;
+    let cache = new Map();
+    (function walk(thing){
+        if (thing instanceof LispCons) {
+            if (cache.has(thing)) {
+                cache.set(thing, cache.get(thing) + 1);
+            } else {
+                cache.set(thing, 1);
+                LispCons.forEach(thing, walk);
             }
         }
-        return ret + ")";
-    }
-    if (Array.isArray(thing)) return `#(${thing.map(dump).join(" ")})`;
-    return String(thing);
+        else if (Array.isArray(thing)) {
+            if (cache.has(thing)) {
+                cache.set(thing, cache.get(thing) + 1);
+            } else {
+                cache.set(thing, 1);
+                thing.forEach(walk);
+            }
+        }
+    })(thing);
+    let dumped = new Map(), ref = 0;
+    return function idump(thing) {
+        if (thing === false) return "NIL";
+        if (thing === true) return "T";
+        if (typeof thing === "string") return JSON.stringify(LispChar.sanitize(thing));
+        if (LispSymbol.is(thing)) {
+            if (thing.pak === KEYWORD_PACK) return ":" + thing.name;
+            if (thing.pak) return thing.pak.name + "::" + thing.name;
+            return thing.name;
+        }
+        if (dumped.has(thing)) {
+            return "#" + dumped.get(thing);
+        }
+        let ret = "";
+        if (cache.get(thing) > 1) {
+            dumped.set(thing, ++ref);
+            ret += "#" + ref + "=";
+        }
+        if (thing instanceof LispCons) {
+            if (LispCons.car(thing) === S_QUOTE && LispCons.len(thing) == 2)
+                return ret + "'" + idump(LispCons.cadr(thing));
+            ret += "(";
+            let first = true;
+            while (thing !== false) {
+                if (!first) ret += " ";
+                else first = false;
+                ret += idump(LispCons.car(thing));
+                thing = LispCons.cdr(thing);
+                if (!LispCons.isList(thing)) {
+                    ret += " . " + idump(thing);
+                    break;
+                }
+            }
+            return ret + ")";
+        }
+        if (Array.isArray(thing)) {
+            return ret + `#(${thing.map(idump).join(" ")})`;
+        }
+        return String(thing);
+    }(thing);
 }
 
 const OP_REV = Object.keys(OP);
@@ -839,11 +903,11 @@ function serialize(code, strip, cache) {
 export function unserialize(code) {
     var names = [], values = [], cache = [];
     names.push("s"); values.push(function(name, pak){
-        if (arguments.length == 1 && typeof name == "number") {
+        let sym;
+        if (arguments.length === 1 && typeof name == "number") {
             return cache[name];
         }
-        let sym;
-        if (pak !== false) {
+        if (pak) {
             pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
             sym = LispSymbol.get(name, pak);
         } else {
@@ -853,7 +917,7 @@ export function unserialize(code) {
         return sym;
     });
     names.push("p"); values.push(function(name){
-        if (arguments.length == 1 && typeof name == "number") {
+        if (typeof name === "number") {
             return cache[name];
         }
         let pak = LispPackage.get(name);
@@ -991,6 +1055,10 @@ export class LispMachine {
         //if (this.trace) this.trace = [ closure, args ];
         try {
             return this.loop();
+        } catch(ex) {
+            console.log(ex);
+            console.log(this.backtrace());
+            //console.log(LispMachine.disassemble(machine.code));
         } finally {
             //this.trace = save_trace;
             this.f = save_f;
@@ -1010,18 +1078,6 @@ export class LispMachine {
         this.pc = 0;
         this.f = null;
         return this.loop();
-    }
-
-    _call(closure, args) {
-        args = LispCons.toArray(args);
-        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
-        this.code = closure.code;
-        this.env = closure.env;
-        this.n_args = args.length;
-        this.pc = 0;
-        this.f = closure;
-        while (this.pc >= 0) vmrun(this);
-        return this.pop();
     }
 
     _callnext(closure, args) {
@@ -1051,6 +1107,10 @@ export class LispMachine {
         this.pc = 0;
         this.f = closure;
         //if (this.trace) this.trace = [ closure, args ];
+    }
+
+    lisp_error(...args) {
+        this._callnext(LispSymbol.get("ERROR").function, LispCons.fromArray(args));
     }
 
     run(quota) {
@@ -1237,7 +1297,7 @@ let OP_RUN = [
     },
     /*OP.UPOPEN*/ (m) => {
         let addr = m.code[m.pc++];
-        let c = new LispCleanup(new LispLongRet(m), addr);
+        let c = new LispCleanup(m, addr);
         m.dynpush(c);
     },
     /*OP.UPEXIT*/ (m) => {
@@ -1247,7 +1307,7 @@ let OP_RUN = [
         m.push(() => {});
     },
     /*OP.UPCLOSE*/ (m) => {
-        m.pop()(m);
+        m.pop()();
     },
     /*OP.CATCH*/ (m) => {
         let addr = m.code[m.pc++];
@@ -1320,7 +1380,11 @@ let OP_RUN = [
         let nargs = m.code[m.pc++];
         if (nargs === -1) nargs = m.n_args;
         let ret = name.primitive(m, nargs);
-        if (ret !== undefined) m.push(ret);
+        if (ret instanceof Promise) {
+            m.process.pause();
+        } else if (ret !== undefined) {
+            m.push(ret);
+        }
     },
     /*OP.NIL*/ (m) => {
         m.push(false);
@@ -1450,11 +1514,14 @@ let OP_RUN = [
         }
         m.dynpush(frame);
     },
-    /*OP.LRET2*/ (m) => {
-        error("Unused instruction slot");
+    /*OP.NULLS*/ (m) => {
+        let n = m.code[m.pc++];
+        while (n > 0) m.env.car.push(false), --n;
     },
-    /*OP.LJUMP2*/ (m) => {
-        error("Unused instruction slot");
+    /*OP.LSETPS*/ (m) => {
+        let i = m.code[m.pc++];
+        let j = m.code[m.pc++];
+        frame(m.env, i)[j] = m.pop();
     },
     /*OP.XARGS*/ (m) => {
         let required = m.code[m.pc++];

@@ -1,17 +1,55 @@
 (in-package :sl)
 
-(export '(format formatter time))
+(export '(print-object
+          print-unreadable-object
+          print-object-to-string
+          *print-readably*
+          *print-escape*
+          *print-base*
+          *print-radix*
+          *print-pretty*
+          format formatter time))
 
 (defpackage :sl-format
   (:use :sl :%))
 
 (in-package :sl-format)
 
+(defparameter *print-readably* nil)
+(defparameter *print-escape* t)
+(defparameter *print-base* 10)
+(defparameter *print-radix* nil)
+(defparameter *print-pretty* t)
+
 (import 'sl::defun-memoize)
 
 (defparameter *format-handlers* (make-hash))
 
 (defparameter *format-current-args* nil)
+
+(defun print-object-to-string (obj)
+  (with-output-to-string (out)
+    (print-object obj out)))
+
+(defmacro print-unreadable-object ((object stream &key type identity) &body body)
+  (let ((_stream (gensym))
+        (_object (gensym)))
+    `(let ((,_stream ,stream)
+           (,_object ,object))
+       (%stream-put ,_stream "#<")
+       ,@(when type
+           `((%stream-put ,_stream (%:%dump (type-of ,object)))
+             ,@(when (or body identity)
+                 `((%stream-put ,_stream " ")))))
+       ,@body
+       ,@(when identity
+           `(,@(when (or type body)
+                 `((%stream-put ,_stream " ")))
+             (%stream-put ,_stream (%:%dump ,object))))
+       (%stream-put ,_stream ">"))))
+
+(defun print-object (obj stream)
+  (%stream-put stream (%dump obj)))
 
 ;; check out some fine unhygienic macros
 
@@ -31,13 +69,13 @@
 
 (defmacro def-format (char cmdargs &body body)
   (let ((v (gensym)))
-    `(hash-set *format-handlers* ,(upcase char)
-               (lambda (output args colmod? atmod? . ,v)
-                 (with-format-args ,cmdargs ,v ,@body)))))
+    `(setf (gethash ,(upcase char) *format-handlers*)
+           (lambda (output args colmod? atmod? . ,v)
+             (with-format-args ,cmdargs ,v ,@body)))))
 
 (defmacro with-input (instr &body body)
   (let ((stream (gensym)))
-    `(let ((,stream (%make-input-stream ,instr)))
+    `(let ((,stream (%make-text-memory-input-stream ,instr)))
        (labels ((peek () (%stream-peek ,stream))
                 (next () (%stream-next ,stream))
                 (croak (msg)
@@ -45,13 +83,13 @@
                                  ", line: " (%stream-line ,stream)
                                  ", col: " (%stream-col ,stream))))
                 (read-while (pred)
-                  (let ((out (%make-output-stream)) rec)
+                  (let ((out (%make-text-memory-output-stream)) rec)
                     (labels ((rec (ch)
                                (when (and ch (funcall pred ch))
                                  (%stream-put out (next))
                                  (rec (peek)))))
                       (rec (peek)))
-                    (%stream-get out)))
+                    (%get-output-stream-string out)))
                 (skip-ws ()
                   (read-while (lambda (ch)
                                 (member ch '(#\Space
@@ -105,6 +143,8 @@
                (case directive
                  (#\{
                   (slurp #\} nil))
+                 (#\(
+                  (slurp #\) nil))
                  (#\[
                   (slurp #\] (lambda (sublist)
                                (let ((ret (list)))
@@ -171,7 +211,7 @@
     (when list
       (let ((x (car list)))
         (cond ((listp x)
-               (let ((handler (hash-get *format-handlers* (car x)))
+               (let ((handler (gethash (car x) *format-handlers*))
                      (cmdargs (cdr x)))
                  (setf args (apply handler stream args cmdargs))))
               (t
@@ -262,13 +302,31 @@
     (%stream-put output (%pad-string x mincol padchar))
     (cdr args)))
 
+(def-format #\( (#:ignored #:ignored sublist)
+  (let* ((args args)
+         (str (with-output-to-string (out)
+                (setf args (%exec-format sublist args out)))))
+    (%stream-put output
+                 (cond
+                   ((and colmod? atmod?)
+                    (string-upcase str))
+                   (colmod?
+                    (string-capitalize str))
+                   (atmod?
+                    (%:string-capitalize-1 str))
+                   (t
+                    (string-downcase str))))
+    args))
+
+(def-format #\) ()
+  (error "Unmatched ~~)"))
+
 ;;; iteration
 
 (def-format #\{ (ensure-once? #:end-at? sublist maxn)
   ;; "If str is empty, then an argument is used as str."
   (unless sublist
-    (setf sublist (%parse-format (car args))
-          args (cdr args)))
+    (setf sublist (%parse-format (pop args))))
   ;; "if atmod, use the rest of the arguments as list"
   (let ((*format-current-args* (if atmod? args (car args))))
     (catch 'abort-format-iteration
@@ -278,7 +336,7 @@
                  (if list
                      (let ((x (car list)))
                        (if (listp x)
-                           (let ((handler (hash-get *format-handlers* (car x)))
+                           (let ((handler (gethash (car x) *format-handlers*))
                                  (cmdargs (cdr x)))
                              (setf *format-current-args*
                                    (apply handler output *format-current-args* cmdargs)))
@@ -290,8 +348,8 @@
         (if colmod?
             ;; iterate once for each argument sublist
             (foreach *format-current-args*
-              (lambda (*format-current-args*)
-                (iterate sublist 0)))
+                     (lambda (*format-current-args*)
+                       (iterate sublist 0)))
             ;; normal case (no colmod)
             (iterate sublist 0)))))
   (if atmod? nil (cdr args)))
@@ -357,9 +415,9 @@
   (labels ((doit (stream)
              (%exec-format parsed args stream)))
     (cond ((eq stream nil)
-           (let ((out (%make-output-stream)))
+           (let ((out (%make-text-memory-output-stream)))
              (doit out)
-             (%stream-get out)))
+             (%get-output-stream-string out)))
           ((eq stream t)
            (doit *standard-output*))
           (t (doit stream)))))
@@ -382,4 +440,10 @@
   (let ((t1 (gensym)))
     `(let ((,t1 (get-internal-run-time)))
        (multiple-value-prog1 (progn ,@body)
-         (format t "Evaluation time: ~Ams~%" (- (get-internal-run-time) ,t1))))))
+         (format t "Evaluation time: ~,2Fms~%" (- (get-internal-run-time) ,t1))))))
+
+(defun error args
+  (%error (apply #'format nil args)))
+
+(defun warn args
+  (%warn (apply #'format nil args)))

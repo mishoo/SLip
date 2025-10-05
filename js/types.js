@@ -13,43 +13,40 @@ export class LispChar {
     static is(x) { return x instanceof LispChar }
 
     // TODO: this table should be really long.
-    static #NAMES_TO = Object.assign(Object.create(null), {
-        " "      : "SPACE",
-        "\t"     : "TAB",
-        "\r"     : "RETURN",
-        "\n"     : "NEWLINE",
-        "\x0C"   : "PAGE",
-        "\x08"   : "BACKSPACE",
-        "\u2028" : "LINE_SEPARATOR",
-        "\u2029" : "PARAGRAPH_SEPARATOR",
-        "\xA0"   : "NO-BREAK_SPACE",
-    });
+    static #NAMES_TO = new Map(Object.entries({
+        " ": "SPACE",
+        "\t": "TAB",
+        "\r": "RETURN",
+        "\n": "NEWLINE",
+        "\x0C": "PAGE",
+        "\x08": "BACKSPACE",
+        "\u2028": "LINE_SEPARATOR",
+        "\u2029": "PARAGRAPH_SEPARATOR",
+        "\xA0": "NO-BREAK_SPACE",
+    }));
 
     static #NAMES_FROM = ((h) => {
-        for (var i in this.#NAMES_TO)
-            h[this.#NAMES_TO[i]] = i;
-        h.LINEFEED = "\n";
+        for (let [key, val] of this.#NAMES_TO)
+            h.set(val, key);
+        h.set("LINEFEED", "\n");
         return h;
-    })(Object.create(null));
+    })(new Map);
 
-    static #OBJECTS = Object.create(null);
+    static #OBJECTS = new Map();
 
     static fromName(name) {
-        if (name.length == 1)
-            return LispChar.get(name); // hack
-        name = name.toUpperCase();
-        if (Object.hasOwn(LispChar.#NAMES_FROM, name))
-            return LispChar.get(LispChar.#NAMES_FROM[name]);
-        return false;
+        if (name.length == 1) return LispChar.get(name); // hack
+        let ch = LispChar.#NAMES_FROM.get(name.toUpperCase());
+        return ch ? LispChar.get(ch) : false;
     }
 
     static fromCode(code) {
-        return new LispChar(String.fromCharCode(code));
+        return LispChar.get(String.fromCharCode(code));
     }
 
     static get(char) {
-        return LispChar.#OBJECTS[char] || (
-            LispChar.#OBJECTS[char] = new LispChar(char)
+        return LispChar.#OBJECTS.get(char) || (
+            LispChar.#OBJECTS.set(char, char = new LispChar(char)), char
         );
     }
 
@@ -69,12 +66,8 @@ export class LispChar {
         return this.value;
     }
 
-    toString() {
-        return this.value;
-    }
-
     name() {
-        return LispChar.#NAMES_TO[this.value] || this.value;
+        return LispChar.#NAMES_TO.get(this.value) || this.value;
     }
 
     code() {
@@ -83,7 +76,7 @@ export class LispChar {
 
     toString() {
         var ch = this.value;
-        return "#\\" + (LispChar.#NAMES_TO[ch] || ch);
+        return "#\\" + (LispChar.#NAMES_TO.get(ch) || ch);
     }
 
     serialize() {
@@ -104,78 +97,24 @@ export class LispClosure {
         return new LispClosure(this.code, this.name, this.env);
     }
     toString() {
-        return "<function" + (this.name ? " " + this.name : "") + ">";
+        return "#<FUNCTION" + (this.name ? " " + this.name : "") + ">";
     }
 }
 
-export class LispStream {
-    static type = "stream";
-    static is(x) { return x instanceof LispStream }
-    constructor(text) {
-        this.text = text || "";
-        this.line = 1;
-        this.col = 0;
-        this.pos = 0;
+let HASH_EQUAL_CACHE = new WeakMap();
+let HASH_EQUAL_COUNT = 0;
+export function hash_equal_key(x) {
+    if (x === true) return "1";
+    if (x === false) return "0";
+    if (typeof x === "number") return "N" + x;
+    if (typeof x === "string") return "S" + x;
+    if (LispCons.is(x)) return "(" + hash_equal_key(x.car) + hash_equal_key(x.cdr) + ")";
+    let id = HASH_EQUAL_CACHE.get(x);
+    if (!id) {
+        id = ++HASH_EQUAL_COUNT;
+        HASH_EQUAL_CACHE.set(x, id);
     }
-}
-
-export class LispInputStream extends LispStream {
-    static type = "input-stream";
-    static is(x) { return x instanceof LispInputStream }
-    peek() {
-        return this.pos < this.text.length
-            ? LispChar.get(this.text.charAt(this.pos))
-            : false;
-    }
-    next() {
-        if (this.pos < this.text.length) {
-            var ch = this.text.charAt(this.pos++);
-            if (ch == "\n") ++this.line, this.col = 0;
-            else ++this.col;
-            return LispChar.get(ch);
-        }
-        return false;
-    }
-    prev() {
-        if (this.pos > 0) {
-            var ch = this.text.charAt(--this.pos);
-            if (this.col-- == 0) this._resetPos();
-            return LispChar.get(ch);
-        }
-        return false;
-    }
-    skip_to(ch) {
-        var pos = this.text.indexOf(ch, this.pos);
-        if (pos <= 0) pos = this.text.length;
-        var diff = pos - this.pos;
-        this.pos = pos;
-        return diff;
-    }
-    _resetPos() {
-        var a = this.text.substr(0, this.pos).split(/\r?\n/);
-        this.line = a.length;
-        this.col = a[this.line - 1].length;
-    }
-}
-
-export class LispOutputStream extends LispStream {
-    static type = "output-stream";
-    static is(x) { return x instanceof LispOutputStream }
-    onData(){}
-    put(str) {
-        var lines = str.split(/\r?\n/);
-        this.line += lines.length - 1;
-        this.col = lines.length > 1
-            ? lines[lines.length - 1].length
-            : this.col + lines[0].length;
-        this.pos += str.length;
-        this.text += str;
-        this.onData(this, str);
-        return this.text;
-    }
-    get() {
-        return this.text;
-    }
+    return "=" + id;
 }
 
 export class LispHash {
@@ -184,10 +123,12 @@ export class LispHash {
     static fromObject(obj) {
         return new LispHash(Object.entries(obj));
     }
-    constructor(init = null) {
-        this.data = new Map(init);
+    constructor(init = null, weak = false) {
+        this.weak = weak;
+        this.data = weak ? new WeakMap(init) : new Map(init);
     }
     toObject() {
+        if (this.weak) throw new LispPrimitiveError("Cannot serialize weak map");
         let obj = Object.create(null);
         this.data.entries().forEach(([ key, val ]) => obj[key] = val);
         return obj;
@@ -200,42 +141,49 @@ export class LispHash {
         return val;
     }
     delete(name) {
-        this.data.delete(name);
+        return this.data.delete(name);
     }
     has(key) {
         return this.data.has(key);
     }
     size() {
-        return this.data.size;
+        return this.weak ? 0 : this.data.size;
+    }
+    clear() {
+        if (!this.weak) this.data.clear();
     }
     serialize() {
         return "h(" + LispChar.sanitize(JSON.stringify(this.toObject())) + ")";
     }
     copy() {
-        return new LispHash(this.data);
+        return this.weak ? false : new LispHash(this.data);
     }
     keys() {
-        return [ ...this.data.keys() ];
+        return this.weak ? false : [ ...this.data.keys() ];
     }
     values() {
-        return [ ...this.data.values() ];
+        return this.weak ? false : [ ...this.data.values() ];
     }
     iterator() {
-        return this.data.entries();
+        return this.weak ? false : this.data.entries();
     }
     [Symbol.iterator]() {
-        return this.data.entries();
+        return this.weak ? false : this.data.entries();
+    }
+    toString() {
+        return this.weak ? `#<WEAK-HASH[${this.size()}]>` : `#<HASH[${this.size()}]>`;
     }
 }
 
-export class LispObject {
-    static type = "object";
-    static is(x) { return x instanceof LispObject }
+export class LispStdInstance {
+    static type = "std-instance";
+    static is(x) { return x instanceof LispStdInstance }
     toString() {
-        return "<object " + this.vector[0].vector[2] + ">";
+        return "#<STD-INSTANCE>";
     }
-    constructor(size) {
-        this.vector = new Array(size).fill(false);
+    constructor(klass, slots) {
+        this.klass = klass;
+        this.slots = slots;
     }
 }
 
@@ -258,10 +206,10 @@ export class LispPackage {
     constructor(name) {
         this.name = name + "";
         this.symbols = new LispHash();
-        this.exports = [];
+        this.exports = new Map();
         this.uses = [];
     }
-    toString() { return "<package " + this.name + ">" }
+    toString() { return "#<PACKAGE " + this.name + ">" }
     serialize(cache) {
         if (cache) {
             let id = cache.get(this);
@@ -270,23 +218,30 @@ export class LispPackage {
         }
         return "p(" + JSON.stringify(this.name) + ")";
     }
-    intern(name) {
-        let sym = this.symbols.get(name);
+    intern(name, sym) {
+        if (sym) {
+            if (!sym.pak) sym.pak = this;
+            this.symbols.set(name, sym);
+            return sym;
+        }
+        sym = this.symbols.get(name);
         if (!sym) {
             sym = this.symbols.set(name, new LispSymbol(name, this));
             if (this === LispPackage.BASE_PACK) {
-                this.exports.push(sym);
+                this.exports.set(name, sym);
             }
         }
         return sym;
     }
     unintern(name) {
         this.symbols.delete(name);
+        this.exports.delete(name);
     }
     export(sym) {
-        sym = this.find(LispSymbol.symname(sym));
-        if (sym && this.exports.indexOf(sym) < 0) {
-            this.exports.push(sym);
+        let name = LispSymbol.symname(sym);
+        sym = this.find(name);
+        if (sym && !this.exports.has(name)) {
+            this.exports.set(name, sym);
             return true;
         }
         return false;
@@ -302,38 +257,21 @@ export class LispPackage {
         return sym;
     }
     find_exported(name) {
-        var a = this.exports;
-        for (var i = a.length; --i >= 0;) {
-            var sym = a[i];
-            if (LispSymbol.symname(sym) == name)
-                return sym;
-        }
-        return false;
+        return this.exports.get(name) || false;
     }
     find_internal(name) {
-        return this.symbols.get(name);
-    }
-    find_accessible(name) {
-        var sym = this.find_exported(name);
-        if (!sym) {
-            var a = this.uses;
-            for (var i = a.length; --i >= 0;) {
-                sym = a[i].find_accessible(name);
-                if (sym) break;
-            }
-        }
-        return sym;
+        return this.symbols.get(name) || false;
     }
     all_accessible() {
-        var ret = this.symbols.values();
+        var ret = [ ...this.symbols.values() ];
         var a = this.uses;
         for (var i = a.length; --i >= 0;) {
-            ret.push.apply(ret, a[i].exports);
+            ret.push(...a[i].exports.values());
         }
-        return ret;
+        return [ ...new Set(ret) ];
     }
     all_exported() {
-        return [ ...this.exports ];
+        return [ ...this.exports.values() ];
     }
     all_interned() {
         return this.symbols.values();
@@ -349,9 +287,6 @@ export class LispPackage {
     }
     find_or_intern(name) {
         return this.find(name) || this.intern(name);
-    }
-    external(sym) {
-        return this.exports.indexOf(sym) >= 0;
     }
     alias(nickname) {
         LispPackage.#PACKAGES[nickname] = this;
@@ -385,6 +320,7 @@ export class LispSymbol {
             this.pak = pak || false;
             this.value = undefined;
             this.vlist = Object.create(null);
+            this.plist = false;
             this.primitive = false;
             this.function = false;
         }
@@ -428,12 +364,19 @@ export class LispSymbol {
 
 (function(BASE_PACK){
     BASE_PACK.PACKAGE_VAR = special("*PACKAGE*", BASE_PACK);
-    special("MOST-POSITIVE-FIXNUM", Number.MAX_SAFE_INTEGER);
-    special("MOST-NEGATIVE-FIXNUM", Number.MIN_SAFE_INTEGER);
+    global("MOST-POSITIVE-FIXNUM", Number.MAX_SAFE_INTEGER);
+    global("MOST-NEGATIVE-FIXNUM", Number.MIN_SAFE_INTEGER);
 
     function special(name, value = false) {
         let sym = BASE_PACK.intern(name);
         sym.setv("special", true);
+        sym.setv("global", true);
+        sym.value = value;
+        return sym;
+    }
+    function global(name, value = false) {
+        let sym = BASE_PACK.intern(name);
+        sym.setv("global", true);
         sym.value = value;
         return sym;
     }
@@ -479,6 +422,12 @@ export class LispQueue {
     push(el) {
         this.tail = this.tail.cdr = new LispCons(el, false);
     }
+    push_front(el) {
+        if (!LispCons.find(this.list.cdr, el)) {
+            this.list.cdr = new LispCons(el, this.list.cdr);
+            if (this.tail === this.list) this.tail = this.list.cdr;
+        }
+    }
     reenq(cell) {
         this.tail = this.tail.cdr = cell;
         cell.cdr = false;
@@ -506,7 +455,7 @@ class Message {
 let PID = 0;
 let QUEUE = new LispQueue();
 
-const run = () => {
+const start = () => {
     let count = 0, startTime = Date.now(), process, cell;
     try {
         while (true) {
@@ -549,10 +498,8 @@ const run = () => {
             console.log(process);
         }
     }
-    setTimeout(run, 0);
+    setTimeout(start, 0);
 };
-
-const start = () => setTimeout(run, 0);
 
 export class LispProcess {
     static type = "process";
@@ -570,13 +517,17 @@ export class LispProcess {
     }
 
     toString() {
-        return "<process " + this.pid + ">";
+        return "#<PROCESS " + this.pid + ">";
     }
 
     resume() {
         this.m.status = STATUS_RUNNING;
-        QUEUE.push(this);
+        QUEUE.push_front(this);
         start();
+    }
+
+    pause() {
+        this.m.status = STATUS_WAITING;
     }
 
     run(quota) {
@@ -621,7 +572,6 @@ export class LispProcess {
     }
 
     set_timeout(timeout, closure) {
-        closure = closure.copy();
         var tm = setTimeout(() => {
             this.m.push(new LispRet(this.m, this.m.pc, true));
             this.m.n_args = 0;

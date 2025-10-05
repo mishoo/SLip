@@ -32,8 +32,8 @@ function webdav_load(filename, cont) {
     var xhr = new XMLHttpRequest();
     xhr.open("GET", webdav_url(filename), true);
     xhr.onreadystatechange = function() {
-        if (xhr.readyState == 4) {
-            if (xhr.status == 200) {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
                 cont(false, xhr.responseText);
             } else {
                 cont(true);
@@ -48,7 +48,7 @@ function webdav_save(filename, content, cont) {
     var xhr = new XMLHttpRequest();
     xhr.open("PUT", webdav_url(filename), true);
     xhr.onreadystatechange = function() {
-        if (xhr.readyState == 4) {
+        if (xhr.readyState === 4) {
             if (xhr.status >= 200 && xhr.status < 300) {
                 cont(false);
             } else {
@@ -62,12 +62,12 @@ function webdav_save(filename, content, cont) {
 class Repl_Tokenizer extends Ymacs_Lang_Lisp {
     readCustom() {
         let s = this._stream, m;
-        if (s.col == 0 && (m = s.lookingAt(/^[^<\s,'`]+?>/))) {
-            this.t("sl-prompt builtin", m[0].length);
+        if (s.col === 0 && (m = s.lookingAt(/^[^<\s,'`]+?>/))) {
+            this.t("type sl-prompt", m[0].length);
             this.newArg();
             return true;
         }
-        if (s.col == 0 && (m = s.lookingAt(/^!(WARN|ERROR):/))) {
+        if (s.col === 0 && (m = s.lookingAt(/^!(WARN|ERROR):/))) {
             this.t("sl-error", m[0].length);
             this.newArg();
             return true;
@@ -209,7 +209,7 @@ function find_toplevel_sexp(buffer, blink, noerror) {
     while (exp && exp.parent && exp.parent.parent) {
         exp = exp.parent;
     }
-    if (exp.type == "caret" && exp.parent && !exp.parent.parent) {
+    if (exp.type === "caret" && exp.parent && !exp.parent.parent) {
         exp = exp.parent.value[exp.index + 1] || exp.parent.value[exp.index - 1];
     }
     if (exp == null || !exp.parent) {
@@ -310,9 +310,9 @@ Ymacs_Buffer.newCommands({
         var p = this.cmd("lisp_make_quick_parser");
         p.parse(pos);
         var expr = p.cont_exp();
-        if (expr && expr.type == "caret")
+        if (expr && expr.type === "caret")
             expr = expr.parent.value[expr.index + 1];
-        if (expr && (expr.type == "symbol" || expr.type == "function"))
+        if (expr && (expr.type === "symbol" || expr.type === "function"))
             return expr;
     },
     sl_repl_eval_or_copy_sexp: Ymacs_Interactive("d", function(point){
@@ -331,7 +331,7 @@ Ymacs_Buffer.newCommands({
     }),
     sl_repl_beginning_of_input: Ymacs_Interactive("d", function(point){
         var m = this.getq("sl_repl_marker").getPosition();
-        if (this._positionToRowCol(point).row == this._positionToRowCol(m).row)
+        if (this._positionToRowCol(point).row === this._positionToRowCol(m).row)
             this.cmd("goto_char", m);
         else this.cmd("beginning_of_indentation_or_line");
     }),
@@ -367,11 +367,13 @@ Ymacs_Buffer.newCommands({
                     this.cmd("find_file", filename);
                 }
             };
-            if (debug.length == 1) {
+            if (debug.length === 1) {
                 goto(0);
             } else {
                 this.cmd("popup_menu", {
-                    items: debug.map(stuff => stuff[0].name ?? stuff[0]),
+                    items: debug.map(([sym, file, line]) => ({
+                        label: Ymacs.raw(`<b>${sym.name ?? sym}</b> (${file}:${line})`)
+                    })),
                     onSelect: goto,
                 });
             }
@@ -493,7 +495,7 @@ Ymacs_Buffer.newCommands({
         var a = HISTORY_COMPLETIONS;
         if (!/^sl_repl_history/.test(this.previousCommand)) {
             a = HISTORY_COMPLETIONS = get_relevant_history(this);
-        } else if (this.previousCommand == "sl_repl_history_forward") {
+        } else if (this.previousCommand === "sl_repl_history_forward") {
             a.push(a.shift());
         }
         if (a.length > 0) {
@@ -506,7 +508,7 @@ Ymacs_Buffer.newCommands({
         var a = HISTORY_COMPLETIONS;
         if (!/^sl_repl_history/.test(this.previousCommand)) {
             a = HISTORY_COMPLETIONS = get_relevant_history(this);
-        } else if (this.previousCommand == "sl_repl_history_back") {
+        } else if (this.previousCommand === "sl_repl_history_back") {
             a.unshift(a.pop());
         }
         if (a.length > 0) {
@@ -746,7 +748,7 @@ function list_local_fasls() {
     let fasls = [];
     (function dive(prefix, store){
         if (store) for (let [ key, val ] of Object.entries(store)) {
-            if (typeof val == "object") {
+            if (typeof val === "object") {
                 dive(prefix + key + "/", val);
             } else if (/\.fasl$/.test(key)) {
                 fasls.push(prefix + key);
@@ -795,7 +797,7 @@ export function make_desktop(load_files = []) {
     });
     var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL({ ls_keyName: ".slip" });
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        ymacs.setColorTheme([ "ef-maris-dark" ]);
+        ymacs.setColorTheme([ "ef-elea-dark" ]);
     } else {
         ymacs.setColorTheme([ "ef-duo-light" ]);
     }
@@ -839,7 +841,7 @@ export function make_desktop(load_files = []) {
         setTimeout(() => {
             ymacs.focus();
             let buf = get_repl_buffer();
-            if (load_files.length == 0) {
+            if (load_files.length === 0) {
                 load_files = ["ide/info.md"];
             }
             buf.cmd("sl_repl_prompt");
