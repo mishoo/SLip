@@ -173,44 +173,19 @@
     ,(all-lambda-mexp (cadr f))
     ,@(all-mexp (cddr f))))
 
-(defun flatten-progn (forms)
-  (let dig ((forms forms)
-            (result nil)
-            (rest nil))
-    (cond
-      ((null forms)
-       (if rest
-           (dig (car rest) result (cdr rest))
-           (nreverse result)))
-      ((and (consp (car forms))
-            (eq 'progn (caar forms)))
-       (dig (cdar forms)
-            result
-            (cons (cdr forms) rest)))
-      (t
-       (dig (cdr forms)
-            (cons (car forms) result)
-            rest)))))
-
 (defun progn-mexp (f)
   (if (cddr f)
-      (flatten-progn `(progn ,@(all-mexp (cdr f))))
+      (%:flatten 'progn `(progn ,@(all-mexp (cdr f))))
       (mexp (cadr f))))
 
 (defun macrolet-mexp (f)
   (let ((defs (nreverse
                (mapcar (lambda (md)
-                         (let* ((name (car md))
-                                (args (cadr md))
-                                (body (cddr md))
-                                (func (cond
-                                        ((%:ordinary-lambda-list-p args)
-                                         (compile (list* '%:%fn name args body)))
-                                        (t
-                                         (let ((val (gensym "macrolet")))
-                                           (compile `(%fn ,name ,val
-                                                          ,(%:%fn-destruct t args val body))))))))
-                           (list name :func :macro func)))
+                         (let ((name (car md))
+                               (args (cadr md))
+                               (body (cddr md)))
+                           (list name :func
+                                 :macro (compile (%:macro-lambda name args body)))))
                        (cadr f)))))
     (let ((%:*compiler-env* (%:extend-compiler-env `(:lex ,(as-vector defs)))))
       (if (cdddr f)

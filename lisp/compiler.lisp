@@ -1173,6 +1173,25 @@
 
 (defvar *macroexpand-cache* (make-hash))
 
+(defun flatten (sym forms)
+  (let dig ((forms forms)
+            (result nil)
+            (rest nil))
+    (cond
+      ((null forms)
+       (if rest
+           (dig (car rest) result (cdr rest))
+           (nreverse result)))
+      ((and (consp (car forms))
+            (eq sym (caar forms)))
+       (dig (cdar forms)
+            result
+            (cons (cdr forms) rest)))
+      (t
+       (dig (cdr forms)
+            (cons (car forms) result)
+            rest)))))
+
 (labels
     ((assert (p msg)
        (if p p (error/wp msg)))
@@ -1299,7 +1318,7 @@
              (arg-count x 2 3)
              (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
             ((or)
-             (comp-or (cdr x) env val? more?))
+             (comp-or (flatten 'or (cdr x)) env val? more?))
             ((not null)
              (arg-count x 1 1)
              (if val?
@@ -1874,33 +1893,29 @@
        (let ((name (car def))
              (args (cadr def))
              (body (cddr def)))
-         (cond
-           ((ordinary-lambda-list-p args)
-            (compile (list* '%fn name args body)))
-           (t
-            (let ((val (gensym "macrolet")))
-              (compile `(%fn ,name ,val
-                             ,(%fn-destruct t args val body))))))))
+         (compile (macro-lambda name args body))))
 
      (comp-macrolet (bindings body env val? more?)
        (when bindings
          (setq env (extenv env :lex
                            (cons '%skip-count
                                  (map1-vector
-                                  (lambda (def)
-                                    (list (car def) :func
-                                          :macro (comp-macrolet-function def)))
+                                  (lambda (el)
+                                    (list (car el) :func
+                                          :macro (comp-macrolet-function el)))
                                   bindings)))))
        (with-env (comp-decl-seq body env val? more?)))
 
      (comp-symbol-macrolet (bindings body env val? more?)
-       (let ((ext (map1-vector (lambda (el)
-                                 (let ((name (car el))
-                                       (expansion (cadr el)))
-                                   (list name :var :smac expansion)))
-                               bindings)))
-         (with-extenv (:lex (cons '%skip-count ext))
-           (comp-decl-seq body env val? more?))))
+       (when bindings
+         (setq env (extenv env :lex
+                           (cons '%skip-count
+                                 (map1-vector
+                                  (lambda (el)
+                                    (list (car el) :var
+                                          :smac (cadr el)))
+                                  bindings)))))
+       (with-env (comp-decl-seq body env val? more?)))
 
      (comp-macroexpand (expander form env val? more?)
        (let ((expansion (gethash form *macroexpand-cache*)))
