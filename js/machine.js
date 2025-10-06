@@ -226,7 +226,6 @@ export class LispRet {
         this.pc = pc;
         this.env = m.env;
         this.denv = m.denv;
-        this.n_args = m.n_args;
         this.noretval = noretval;
         //if (m.trace) this.trace = m.trace.slice();
     }
@@ -236,7 +235,6 @@ export class LispRet {
         m.pc = this.pc;
         m.env = this.env;
         m.denv = this.denv;
-        m.n_args = this.n_args;
         if (!this.noretval) {
             m.push(retval);
         }
@@ -262,7 +260,6 @@ class LispLongRet {
         this.env = m.env;
         this.denv = m.denv;
         this.slen = m.stack.sp;
-        this.n_args = m.n_args;
         //if (m.trace) this.trace = m.trace.slice();
     }
     unwind(m, addr) {
@@ -272,7 +269,6 @@ class LispLongRet {
         m.denv = this.denv;
         m.stack.sp = this.slen;
         m.pc = addr;
-        m.n_args = this.n_args;
         //if (this.trace) m.trace = this.trace;
     }
     run(m, addr, retval) {

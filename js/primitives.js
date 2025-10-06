@@ -1812,9 +1812,6 @@ defp("%global!", true, function(m, nargs){
         var name = m.pop();
         checktype(name, LispSymbol);
         name.setv("global", true);
-        if (name.value === undefined) {
-            name.value = false;
-        }
     }
     return false;
 });

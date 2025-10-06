@@ -125,9 +125,8 @@
 (defun some1 (test list)
   (let rec ((list list))
     (when list
-      (aif (funcall test (%pop list))
-           it
-           (rec list)))))
+      (or (funcall test (%pop list))
+          (rec list)))))
 
 (defun finished (tails)
   (some1 #'null tails))

@@ -39,12 +39,13 @@
      (%set-symbol-prop ',name :constant t)
      (setq ,name ,val)))
 
-(defmacro defglobal (name val)
+(defmacro defglobal (name &optional (val nil val-passed-p))
   (%global! name)
   (%::maybe-xref-info name 'defglobal)
   `(progn
      (%global! ',name)
-     (setq ,name ,val)))
+     ,@(when val-passed-p
+         `((setq ,name ,val)))))
 
 (defvar *read-table* nil)
 (defvar *package* nil)

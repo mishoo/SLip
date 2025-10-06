@@ -182,8 +182,8 @@
 ;;; standard-class must be determined without making any further slot
 ;;; references.
 
-(defvar the-slots-of-standard-class) ;standard-class's class-slots
-(defvar the-class-standard-class)    ;standard-class's class metaobject
+(defglobal the-slots-of-standard-class) ;standard-class's class-slots
+(defglobal the-class-standard-class)    ;standard-class's class metaobject
 
 ;; XXX: memoizing SLOT-LOCATION improves speed dramatically, so let's leave
 ;; this on for the moment. In the event we'll ever support class redefinition
@@ -193,24 +193,19 @@
            (eq class the-class-standard-class))
       (position 'effective-slots the-slots-of-standard-class
                 :key #'slot-definition-name)
-      (let ((slot (find slot-name
-                        (class-slots class)
-                        :key #'slot-definition-name)))
-        (if (null slot)
+      (let ((pos (position slot-name (class-slots class)
+                           :key #'slot-definition-name)))
+        (or pos
             (error "The slot ~S is missing from the class ~S."
-                   slot-name class)
-            (let ((pos (position slot (class-slots class))))
-              (if (null pos)
-                  (error "The slot ~S is not an instance ~
-                           slot in the class ~S."
-                         slot-name class)
-                  pos))))))
+                   slot-name class)))))
 
-(defun slot-contents (slots location)
-  (svref slots location))
+;; (defun slot-contents (slots location)
+;;   (svref slots location))
+;; (defun (setf slot-contents) (new-value slots location)
+;;   (setf (svref slots location) new-value))
 
-(defun (setf slot-contents) (new-value slots location)
-  (setf (svref slots location) new-value))
+(defmacro slot-contents (slots location)
+  `(svref ,slots ,location))
 
 (defun std-slot-value (instance slot-name)
   (let* ((location (slot-location (class-of instance) slot-name))
@@ -732,7 +727,7 @@
      ; :accessor classes-to-emf-table
      (classes-to-emf-table :initform (make-hash-table)))))
 
-(defvar the-class-standard-gf) ;standard-generic-function's class metaobject
+(defglobal the-class-standard-gf) ;standard-generic-function's class metaobject
 
 (defun generic-function-name (gf)
   (slot-value gf 'name))
@@ -788,7 +783,7 @@
      (generic-function :initform nil)        ; :accessor method-generic-function
      (function :initarg :function))))        ; :accessor method-function
 
-(defvar the-class-standard-method)    ;standard-method's class metaobject
+(defglobal the-class-standard-method)    ;standard-method's class metaobject
 
 (defun method-lambda-list (method) (slot-value method 'lambda-list))
 (defun (setf method-lambda-list) (new-value method)
