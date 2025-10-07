@@ -1391,6 +1391,8 @@
              (comp-unwind-protect (cadr x) (cddr x) env val? more?))
             ((funcall)
              (comp-funcall (cadr x) (cddr x) env val? more?))
+            ((apply)
+             (comp-apply (cadr x) (cddr x) env val? more?))
             ((%op)
              (comp-op (cadr x) (cddr x) env val? more?))
             (otherwise
@@ -1679,19 +1681,29 @@
            (comp-call nil f args env val? more?)
            (comp-call t 'funcall (list* f args) env val? more?)))
 
-     (comp-call (local f args env val? more?)
+     (comp-apply (f args env val? more?)
+       (if (or (safe-atom-p f)
+               (let rec ((args args))
+                 (if (not args)
+                     t
+                     (and (safe-atom-p (car args))
+                          (rec (cdr args))))))
+           (comp-call nil f args env val? more? :apply t)
+           (comp-call t 'apply (list* f args) env val? more? :apply t)))
+
+     (comp-call (local f args env val? more? &key apply)
        (labels ((mkret (the-function)
                   (cond
                     (more? (let ((k (mklabel)))
                              (%seq (gen "SAVE" k)
                                    (comp-list args env)
                                    the-function
-                                   (gen "CALL" (length args))
+                                   (gen (if apply "APPLY" "CALL") (length args))
                                    (vector k)
                                    (unless val? (gen "POP")))))
                     (t (%seq (comp-list args env)
                              the-function
-                             (gen "CALL" (length args)))))))
+                             (gen (if apply "APPLY" "CALL") (length args)))))))
          (cond
            ((or (numberp f)
                 (stringp f)
