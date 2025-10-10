@@ -113,6 +113,7 @@ export const OP = {
     NUMNEQ: 92,
     PLUSP: 93,
     MINUSP: 94,
+    APPLY: 95,
 };
 
 const OP_LEN = [
@@ -211,6 +212,7 @@ const OP_LEN = [
     0 /* NUMNEQ */,
     0 /* PLUSP */,
     0 /* MINUSP */,
+    1 /* APPLY */,
 ];
 
 export function want_bound(name, val) {
@@ -226,7 +228,6 @@ export class LispRet {
         this.pc = pc;
         this.env = m.env;
         this.denv = m.denv;
-        this.n_args = m.n_args;
         this.noretval = noretval;
         //if (m.trace) this.trace = m.trace.slice();
     }
@@ -236,7 +237,6 @@ export class LispRet {
         m.pc = this.pc;
         m.env = this.env;
         m.denv = this.denv;
-        m.n_args = this.n_args;
         if (!this.noretval) {
             m.push(retval);
         }
@@ -262,7 +262,6 @@ class LispLongRet {
         this.env = m.env;
         this.denv = m.denv;
         this.slen = m.stack.sp;
-        this.n_args = m.n_args;
         //if (m.trace) this.trace = m.trace.slice();
     }
     unwind(m, addr) {
@@ -272,7 +271,6 @@ class LispLongRet {
         m.denv = this.denv;
         m.stack.sp = this.slen;
         m.pc = addr;
-        m.n_args = this.n_args;
         //if (this.trace) m.trace = this.trace;
     }
     run(m, addr, retval) {
@@ -376,7 +374,7 @@ var optimize = (function(){
             code.splice(i, 2, [ "TJUMPK", code[i+1][1] ]);
             return true;
         }
-        if (/^(?:JUMP|LJUMP|RET|LRET|CALL)$/.test(el[0])) {
+        if (/^(?:JUMP|LJUMP|RET|LRET|CALL|APPLY)$/.test(el[0])) {
             for (var j = i + 1; j < code.length; ++j) {
                 if (code[j] instanceof LispSymbol) break;
             }
@@ -1678,6 +1676,25 @@ let OP_RUN = [
     },
     /*OP.MINUSP*/ (m) => {
         m.push(m.pop_number() < 0);
+    },
+    /*OP.APPLY*/ (m) => {
+        let count = m.code[m.pc++];
+        let arg = m.pop();
+        let closure = arg instanceof LispSymbol ? arg.function : arg;
+        if (!(closure instanceof LispClosure))
+            error("OP.APPLY invalid function: " + dump(arg));
+        //if (m.trace) m.trace.push([ closure, m.stack.slice(-count) ]);
+        arg = m.pop();          // rest arguments
+        while (arg !== false) {
+            m.push(LispCons.car(arg));
+            arg = arg.cdr;
+            count++;
+        }
+        m.n_args = count - 1;
+        m.code = closure.code;
+        m.env = closure.env;
+        m.pc = 0;
+        m.f = closure;
     },
 ];
 

@@ -100,6 +100,8 @@ import "../js/primitives.js";
         div.scrollIntoView();
     };
 
+    let total = 0;
+
     function compile(files, cont, nosave) {
         if (files.length == 0) return cont ? cont() : null;
         var filename = files[0];
@@ -107,7 +109,9 @@ import "../js/primitives.js";
         if (!nosave) log(`<b>Compiling ${filename}</b>`);
         var bytecode = machine.atomic_call(LispSymbol.get("%LOAD").function, [ filename ]);
         if (!nosave) {
-            log(`... <span style='color: green'>${(performance.now() - time).toFixed(2)}ms, ${bytecode.length} chars</span>`);
+            let diff = performance.now() - time;
+            total += diff;
+            log(`... <span style='color: green'>${diff.toFixed(2)}ms, ${bytecode.length} chars</span>`);
             var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
             save(fasl, bytecode, function(error){
                 if (error) {
@@ -123,6 +127,7 @@ import "../js/primitives.js";
     };
 
     function recompile_all() {
+        total = 0;
         document.addEventListener("ymacs-slip-warning", (ev) => {
             ev.preventDefault();
             log(`<span style='color: red'>WARN: ${ev.message}</span>`);
@@ -136,6 +141,7 @@ import "../js/primitives.js";
                     let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
                     //lisp_files.unshift("lisp/compiler.lisp");
                     compile(lisp_files, function () {
+                        log(`<span style='color: blue'>Total compile time: ${total.toFixed(2)}ms</span>`);
                         log("<span style='color: green'><b>DONE — press ENTER to reload</b></span>");
                         document.addEventListener("keydown", ev => {
                             if (ev.key == "Enter") {

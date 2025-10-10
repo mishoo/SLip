@@ -39,12 +39,13 @@
      (%set-symbol-prop ',name :constant t)
      (setq ,name ,val)))
 
-(defmacro defglobal (name val)
+(defmacro defglobal (name &optional (val nil val-passed-p))
   (%global! name)
   (%::maybe-xref-info name 'defglobal)
   `(progn
      (%global! ',name)
-     (setq ,name ,val)))
+     ,@(when val-passed-p
+         `((setq ,name ,val)))))
 
 (defvar *read-table* nil)
 (defvar *package* nil)
@@ -356,8 +357,10 @@
 
 ;;;; parser/compiler
 
-(defun lisp-reader (text eof)
-  (let ((input (%make-text-memory-input-stream text))
+(defun lisp-reader (input eof)
+  (let ((input (if (stringp input)
+                   (%make-text-memory-input-stream input)
+                   input))
         (in-qq 0))
     (labels
         ((peek ()
@@ -478,6 +481,7 @@
              (#\: (next) (make-symbol (upcase (read-symbol-name))))
              (#\. (next) (eval (read-token)))
              ((#\b #\B) (next) (read-base2-number))
+             ((#\o #\O) (next) (read-base8-number))
              ((#\x #\X) (next) (read-base16-number))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
 
@@ -486,6 +490,12 @@
              (if (regexp-test #/^[01]+$/ digits)
                  (parse-integer digits 2)
                  (croak (strcat "Bad base2 number: " digits)))))
+
+         (read-base8-number ()
+           (let ((digits (read-symbol-name)))
+             (if (regexp-test #/^[0-7]+$/ digits)
+                 (parse-integer digits 8)
+                 (croak (strcat "Bad base8 number: " digits)))))
 
          (read-base16-number ()
            (let ((digits (read-symbol-name)))
@@ -1172,6 +1182,25 @@
 
 (defvar *macroexpand-cache* (make-hash))
 
+(defun flatten (sym forms)
+  (let dig ((forms forms)
+            (result nil)
+            (rest nil))
+    (cond
+      ((null forms)
+       (if rest
+           (dig (car rest) result (cdr rest))
+           (nreverse result)))
+      ((and (consp (car forms))
+            (eq sym (caar forms)))
+       (dig (cdar forms)
+            result
+            (cons (cdr forms) rest)))
+      (t
+       (dig (cdr forms)
+            (cons (car forms) result)
+            rest)))))
+
 (labels
     ((assert (p msg)
        (if p p (error/wp msg)))
@@ -1298,7 +1327,7 @@
              (arg-count x 2 3)
              (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
             ((or)
-             (comp-or (cdr x) env val? more?))
+             (comp-or (flatten 'or (cdr x)) env val? more?))
             ((not null)
              (arg-count x 1 1)
              (if val?
@@ -1371,6 +1400,8 @@
              (comp-unwind-protect (cadr x) (cddr x) env val? more?))
             ((funcall)
              (comp-funcall (cadr x) (cddr x) env val? more?))
+            ((apply)
+             (comp-apply (cadr x) (cddr x) env val? more?))
             ((%op)
              (comp-op (cadr x) (cddr x) env val? more?))
             (otherwise
@@ -1659,19 +1690,29 @@
            (comp-call nil f args env val? more?)
            (comp-call t 'funcall (list* f args) env val? more?)))
 
-     (comp-call (local f args env val? more?)
+     (comp-apply (f args env val? more?)
+       (if (or (safe-atom-p f)
+               (let rec ((args args))
+                 (if (not args)
+                     t
+                     (and (safe-atom-p (car args))
+                          (rec (cdr args))))))
+           (comp-call nil f args env val? more? :apply t)
+           (comp-call t 'apply (list* f args) env val? more? :apply t)))
+
+     (comp-call (local f args env val? more? &key apply)
        (labels ((mkret (the-function)
                   (cond
                     (more? (let ((k (mklabel)))
                              (%seq (gen "SAVE" k)
                                    (comp-list args env)
                                    the-function
-                                   (gen "CALL" (length args))
+                                   (gen (if apply "APPLY" "CALL") (length args))
                                    (vector k)
                                    (unless val? (gen "POP")))))
                     (t (%seq (comp-list args env)
                              the-function
-                             (gen "CALL" (length args)))))))
+                             (gen (if apply "APPLY" "CALL") (length args)))))))
          (cond
            ((or (numberp f)
                 (stringp f)
@@ -1873,33 +1914,29 @@
        (let ((name (car def))
              (args (cadr def))
              (body (cddr def)))
-         (cond
-           ((ordinary-lambda-list-p args)
-            (compile (list* '%fn name args body)))
-           (t
-            (let ((val (gensym "macrolet")))
-              (compile `(%fn ,name ,val
-                             ,(%fn-destruct t args val body))))))))
+         (compile (macro-lambda name args body))))
 
      (comp-macrolet (bindings body env val? more?)
        (when bindings
          (setq env (extenv env :lex
                            (cons '%skip-count
                                  (map1-vector
-                                  (lambda (def)
-                                    (list (car def) :func
-                                          :macro (comp-macrolet-function def)))
+                                  (lambda (el)
+                                    (list (car el) :func
+                                          :macro (comp-macrolet-function el)))
                                   bindings)))))
        (with-env (comp-decl-seq body env val? more?)))
 
      (comp-symbol-macrolet (bindings body env val? more?)
-       (let ((ext (map1-vector (lambda (el)
-                                 (let ((name (car el))
-                                       (expansion (cadr el)))
-                                   (list name :var :smac expansion)))
-                               bindings)))
-         (with-extenv (:lex (cons '%skip-count ext))
-           (comp-decl-seq body env val? more?))))
+       (when bindings
+         (setq env (extenv env :lex
+                           (cons '%skip-count
+                                 (map1-vector
+                                  (lambda (el)
+                                    (list (car el) :var
+                                          :smac (cadr el)))
+                                  bindings)))))
+       (with-env (comp-decl-seq body env val? more?)))
 
      (comp-macroexpand (expander form env val? more?)
        (let ((expansion (gethash form *macroexpand-cache*)))
@@ -2062,9 +2099,8 @@
        (let ((*macroexpand-cache* (make-hash)))
          (%eval-bytecode (comp exp (make-environment) t nil))))
 
-     (compile-string (str . filename)
-       (let ((*current-file* (or (car filename)
-                                 *current-file*))
+     (compile-string (str &optional (filename *current-file*))
+       (let ((*current-file* filename)
              (reader (lisp-reader str 'EOF))
              (serialize-cache (make-hash))
              (out (%make-text-memory-output-stream))
