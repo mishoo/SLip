@@ -795,31 +795,6 @@
 (defmacro use-package (source &optional (target *package*))
   `(%use-package (find-package ,source) (find-package ,target)))
 
-(defmacro multiple-value-setq ((&rest places) value-form)
-  (cond
-    ((null places)
-     `(values ,value-form))
-    (t
-     (let ((syms (mapcar (lambda (place)
-                           (list* (gensym "mvs")
-                                  (multiple-value-list
-                                   (get-setf-expansion place))))
-                         places)))
-       `(let* (,@(apply #'append (mapcar (lambda (exp)
-                                           (let ((temps (cadr exp))
-                                                 (value-forms (caddr exp)))
-                                             (mapcar #'list temps value-forms)))
-                                         syms)))
-          (multiple-value-bind ,(mapcar #'car syms) ,value-form
-            (let (,@(mapcar (lambda (exp)
-                              (let ((store-vars (cadddr exp)))
-                                `(,(car store-vars) ,(car exp))))
-                            syms))
-              ,@(mapcar (lambda (exp)
-                          (elt exp 4))
-                        syms)
-              ,(caar syms))))))))
-
 (defmacro with-output-to-string ((var &optional string) &body body)
   `(let ((,var (%make-text-memory-output-stream)))
      ,@(when string
@@ -1058,6 +1033,11 @@
             `(let (,@store-other-vars)
                (values ,@setters))
             `(values ,@getters))))
+
+(defmacro multiple-value-setq ((&rest places) value-form)
+  (if (null places)
+      `(values ,value-form)
+      `(values (setf (values ,@places) ,value-form))))
 
 (defmacro rotatef (&rest places)
   (with-places (places)

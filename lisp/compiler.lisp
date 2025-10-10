@@ -357,8 +357,10 @@
 
 ;;;; parser/compiler
 
-(defun lisp-reader (text eof)
-  (let ((input (%make-text-memory-input-stream text))
+(defun lisp-reader (input eof)
+  (let ((input (if (stringp input)
+                   (%make-text-memory-input-stream input)
+                   input))
         (in-qq 0))
     (labels
         ((peek ()
@@ -479,6 +481,7 @@
              (#\: (next) (make-symbol (upcase (read-symbol-name))))
              (#\. (next) (eval (read-token)))
              ((#\b #\B) (next) (read-base2-number))
+             ((#\o #\O) (next) (read-base8-number))
              ((#\x #\X) (next) (read-base16-number))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
 
@@ -487,6 +490,12 @@
              (if (regexp-test #/^[01]+$/ digits)
                  (parse-integer digits 2)
                  (croak (strcat "Bad base2 number: " digits)))))
+
+         (read-base8-number ()
+           (let ((digits (read-symbol-name)))
+             (if (regexp-test #/^[0-7]+$/ digits)
+                 (parse-integer digits 8)
+                 (croak (strcat "Bad base8 number: " digits)))))
 
          (read-base16-number ()
            (let ((digits (read-symbol-name)))
@@ -2090,9 +2099,8 @@
        (let ((*macroexpand-cache* (make-hash)))
          (%eval-bytecode (comp exp (make-environment) t nil))))
 
-     (compile-string (str . filename)
-       (let ((*current-file* (or (car filename)
-                                 *current-file*))
+     (compile-string (str &optional (filename *current-file*))
+       (let ((*current-file* filename)
              (reader (lisp-reader str 'EOF))
              (serialize-cache (make-hash))
              (out (%make-text-memory-output-stream))
