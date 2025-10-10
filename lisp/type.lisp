@@ -187,10 +187,11 @@
            ;;
            ;; TODO: at least use DEFPREDICATE to intern a symbol, rather than
            ;; function object.
+           (%:maybe-xref-info name :type)
            `(setf (gethash ',name *ext-types*)
                   ,(%:macro-lambda name (cons '$obj lambda-list)
                                    `((typep $obj ,typespec))
-                                   :default-value '*)))))
+                                   :default-value ''*)))))
      ',name))
 
 (deftype fixnum ()
@@ -198,6 +199,16 @@
 
 (deftype float ()
   `(and number (not integer)))
+
+;; XXX: check (disassemble (gethash 'unsigned-byte *ext-types*)) - it's
+;; horrible. We should optimize and cache the expansion.
+(deftype unsigned-byte (&optional size)
+  (cond
+    ((eq size '*)
+     '(integer 0 *))
+    ((integerp size)
+     `(integer 0 ,(1- (expt 2 size))))
+    (t (error "UNSIGNED-BYTE: unsupported SIZE argument ~S" size))))
 
 (defun type-of (x)
   (let ((type (%:%type-of x)))
