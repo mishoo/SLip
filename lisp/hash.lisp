@@ -5,11 +5,13 @@
 (defpackage :sl-hash
   (:use :sl :%))
 
-(defun (setf gethash) (newvalue key hash)
+(defun (setf gethash) (newvalue key hash &optional default)
   (%hash-set newvalue key hash))
 
-(define-compiler-macro (setf gethash) (newvalue key hash)
-  `(%hash-set ,newvalue ,key ,hash))
+(define-compiler-macro (setf gethash) (newvalue key hash &optional default)
+  (if default
+      `(prog1 (%hash-set ,newvalue ,key ,hash) ,default)
+      `(%hash-set ,newvalue ,key ,hash)))
 
 (defun (setf compiler-macro-function) (handler name)
   (setf (gethash name %:*compiler-macros*) handler))
@@ -17,14 +19,18 @@
 (defun unsupported-test (test)
   (and test (not (or (eq test 'eq)
                      (eq test 'eql)
+                     (eq test 'equal)
                      (eq test #'eq)
-                     (eq test #'eql)))))
+                     (eq test #'eql)
+                     (eq test #'equal)))))
 
 (defun make-hash-table (&key test size rehash-size rehash-threshold)
   (declare (ignore size rehash-size rehash-threshold))
   (when (unsupported-test test)
     (warn "MAKE-HASH-TABLE: only EQ or EQL test is supported"))
-  (make-hash))
+  (if (or (eq test 'equal) (eq test #'equal))
+      (make-equal-hash)
+      (make-hash)))
 
 (define-compiler-macro make-hash-table (&whole form &key test size rehash-size rehash-threshold)
   (declare (ignore size rehash-size rehash-threshold))

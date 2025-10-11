@@ -58,6 +58,16 @@
   (load "test/ignore-errors.lisp")
   (load "test/error.lisp")
 
+  (load "test/hash/clrhash.lisp")
+  (load "test/hash/gethash.lisp")
+  (load "test/hash/hash-table.lisp")
+  (load "test/hash/hash-table-count.lisp")
+  (load "test/hash/hash-table-p.lisp")
+  (load "test/hash/make-hash-table.lisp")
+  (load "test/hash/maphash.lisp")
+  (load "test/hash/remhash.lisp")
+  (load "test/hash/with-hash-table-iterator.lisp")
+
   (load "test/cons/append.lisp")
   (load "test/cons/member.lisp")
   (load "test/cons/adjoin.lisp")
