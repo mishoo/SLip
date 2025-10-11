@@ -3,6 +3,7 @@ import {
     LispSymbol,
     LispPackage,
     LispHash,
+    LispHashEqual,
     hash_equal_key,
     LispProcess,
     LispMutex,
@@ -1382,6 +1383,11 @@ function make_hash(weak, m, nargs) {
 
 defp("make-hash", false, function(m, nargs){
     return make_hash(false, m, nargs);
+});
+
+defp("make-equal-hash", false, function(m, nargs){
+    checknargs(nargs, 0, 0);
+    return new LispHashEqual();
 });
 
 defp("make-weak-hash", false, function(m, nargs){

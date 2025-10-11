@@ -127,21 +127,15 @@ export class LispHash {
         this.weak = weak;
         this.data = weak ? new WeakMap(init) : new Map(init);
     }
-    toObject() {
-        if (this.weak) throw new LispPrimitiveError("Cannot serialize weak map");
-        let obj = Object.create(null);
-        this.data.entries().forEach(([ key, val ]) => obj[key] = val);
-        return obj;
-    }
     get(key) {
         return this.data.get(key);
     }
-    set(name, val) {
-        this.data.set(name, val);
+    set(key, val) {
+        this.data.set(key, val);
         return val;
     }
-    delete(name) {
-        return this.data.delete(name);
+    delete(key) {
+        return this.data.delete(key);
     }
     has(key) {
         return this.data.has(key);
@@ -152,11 +146,8 @@ export class LispHash {
     clear() {
         if (!this.weak) this.data.clear();
     }
-    serialize() {
-        return "h(" + LispChar.sanitize(JSON.stringify(this.toObject())) + ")";
-    }
     copy() {
-        return this.weak ? false : new LispHash(this.data);
+        return this.weak ? false : new this.constructor(this.data);
     }
     keys() {
         return this.weak ? false : [ ...this.data.keys() ];
@@ -168,10 +159,48 @@ export class LispHash {
         return this.weak ? false : this.data.entries();
     }
     [Symbol.iterator]() {
-        return this.weak ? false : this.data.entries();
+        return this.iterator();
     }
     toString() {
         return this.weak ? `#<WEAK-HASH[${this.size()}]>` : `#<HASH[${this.size()}]>`;
+    }
+}
+
+export class LispHashEqual extends LispHash {
+    constructor() {
+        super();
+    }
+    get(key) {
+        return this.data.get(hash_equal_key(key))[1];
+    }
+    set(key, val) {
+        this.data.set(hash_equal_key(key), [key, val]);
+        return val;
+    }
+    delete(key) {
+        return this.data.delete(hash_equal_key(key));
+    }
+    has(key) {
+        return this.data.has(hash_equal_key(key));
+    }
+    keys() {
+        return [ ...this.data.values().map(x => x[0]) ];
+    }
+    values() {
+        return [ ...this.data.values().map(x => x[1]) ];
+    }
+    toString() {
+        return `#<HASH[${this.size()}] :TEST #'EQUAL>`;
+    }
+    iterator() {
+        let it = this.data.entries();
+        return {
+            next() {
+                let x = it.next();
+                if (x.done) return x;
+                return { value: x.value[1], done: false };
+            }
+        };
     }
 }
 
