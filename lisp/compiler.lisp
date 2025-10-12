@@ -14,57 +14,11 @@
 
 (setq %::*package* (find-package "%"))
 
-(defmacro defparameter (name val &optional documentation)
-  (%special! name)
-  (%::maybe-xref-info name 'defparameter)
-  `(progn
-     (%special! ',name)
-     (setq ,name ,val)))
+(defmacro when (pred . body)
+  `(if ,pred (progn ,@body)))
 
-(defmacro defvar (name &optional (val nil val-passed-p) documentation)
-  (%special! name)
-  (%::maybe-xref-info name 'defvar)
-  `(progn
-     (%special! ',name)
-     ,@(when val-passed-p
-         `((unless (boundp ',name)
-             (setq ,name ,val))))))
-
-(defmacro defconstant (name val &optional documentation)
-  (%global! name)
-  (%set-symbol-prop name :constant t)
-  (%::maybe-xref-info name 'defconstant)
-  `(progn
-     (%global! ',name)
-     (%set-symbol-prop ',name :constant t)
-     (setq ,name ,val)))
-
-(defmacro defglobal (name &optional (val nil val-passed-p))
-  (%global! name)
-  (%::maybe-xref-info name 'defglobal)
-  `(progn
-     (%global! ',name)
-     ,@(when val-passed-p
-         `((setq ,name ,val)))))
-
-(defvar *read-table* nil)
-(defvar *package* nil)
-(defvar *current-file* nil)
-(defvar *current-pos* nil)
-(defvar *url-prefix* nil)
-(defvar *unknown-functions* nil)
-(defvar *unknown-variables* nil)
-(defvar *compiler-env* nil)
-(defvar *xref-info* nil)
-(defvar *whole-form* nil)
-(defvar *load-timing* nil)
-
-(defvar *compiler-macros* (make-hash))
-
-(defvar *standard-output* (%make-text-memory-output-stream))
-(defvar *error-output* (%make-text-memory-output-stream))
-(defvar *trace-output* (%make-text-memory-output-stream))
-(defvar *standard-input*)
+(defmacro unless (pred . body)
+  `(if ,pred nil (progn ,@body)))
 
 (defmacro cond clauses
   (when clauses
@@ -157,6 +111,12 @@
            (opt-cons x)))))
    #'qq))
 
+(defmacro defun (name args . body)
+  (multiple-value-bind (setter name) (%:maybe-setter name)
+    (maybe-xref-info name (if setter 'setf 'defun))
+    `(set-symbol-function! ',(or setter name)
+                           (%fn ,name ,args ,@body))))
+
 (defun maybe-xref-info (name type)
   (when *xref-info*
     (vector-push *xref-info*
@@ -165,7 +125,68 @@
 (defmacro quasiquote (thing)
   (qq thing))
 
-;;;; let the show begin
+(defmacro defparameter (name val &optional documentation)
+  (%special! name)
+  (%::maybe-xref-info name 'defparameter)
+  `(progn
+     (%special! ',name)
+     (setq ,name ,val)))
+
+(defmacro defvar (name &optional (val nil val-passed-p) documentation)
+  (%special! name)
+  (%::maybe-xref-info name 'defvar)
+  `(progn
+     (%special! ',name)
+     ,@(when val-passed-p
+         `((unless (boundp ',name)
+             (setq ,name ,val))))))
+
+(defmacro defconstant (name val &optional documentation)
+  (%global! name)
+  (%set-symbol-prop name :constant t)
+  (%::maybe-xref-info name 'defconstant)
+  `(progn
+     (%global! ',name)
+     (%set-symbol-prop ',name :constant t)
+     (setq ,name ,val)))
+
+(defmacro defglobal (name &optional (val nil val-passed-p))
+  (%global! name)
+  (%::maybe-xref-info name 'defglobal)
+  `(progn
+     (%global! ',name)
+     ,@(when val-passed-p
+         `((setq ,name ,val)))))
+
+(defvar *read-table* nil)
+(defvar *package* nil)
+(defvar *current-file* nil)
+(defvar *current-pos* nil)
+(defvar *url-prefix* nil)
+(defvar *unknown-functions* nil)
+(defvar *unknown-variables* nil)
+(defvar *compiler-env* nil)
+(defvar *xref-info* nil)
+(defvar *whole-form* nil)
+(defvar *load-timing* nil)
+(defvar *delay-eval* nil)
+
+(defvar *compiler-macros* (make-hash))
+
+(defvar *standard-output* (%make-text-memory-output-stream))
+(defvar *error-output* (%make-text-memory-output-stream))
+(defvar *trace-output* (%make-text-memory-output-stream))
+(defvar *standard-input*)
+
+(defmacro delay-eval body
+  (setq *delay-eval* t)
+  (list* 'progn body))
+
+(defmacro and exps
+  (cond
+    ((cdr exps) `(if ,(car exps) (and ,@(cdr exps))))
+    (exps (car exps))
+    (t t)))
 
 (defun maybe-setter (sym)
   (cond
@@ -179,12 +200,6 @@
     (t
      (values nil sym))))
 
-(defmacro defun (name args . body)
-  (multiple-value-bind (setter name) (%:maybe-setter name)
-    (maybe-xref-info name (if setter 'setf 'defun))
-    `(set-symbol-function! ',(or setter name)
-                           (%fn ,name ,args ,@body))))
-
 (defun error (msg)
   (%error msg))
 
@@ -195,12 +210,6 @@
   (error (if *current-pos*
              (strcat msg " (" (or *current-file* "line") ":" *current-pos* ")")
              msg)))
-
-(defmacro when (pred . body)
-  `(if ,pred (progn ,@body)))
-
-(defmacro unless (pred . body)
-  `(if ,pred nil (progn ,@body)))
 
 (defun map1 (func lst)
   (let rec ((ret nil) (lst lst))
@@ -262,37 +271,10 @@
        (rec (cdr lst) (cons (car lst) ret)))
       ((rec (cdr lst) ret)))))
 
-;; (defun index-of (el lst)
-;;   (let rec ((lst lst)
-;;             (index 0))
-;;     (when lst
-;;       (if (eq el (car lst))
-;;           index
-;;           (rec (cdr lst) (1+ index))))))
-
 (defmacro prog2 (exp1 exp2 . body)
   `(progn
      ,exp1
      (prog1 ,exp2 ,@body)))
-
-;; OR is implemented in the compiler now.
-;;
-;; (defmacro %or (x exps)
-;;   (cond
-;;     ((cdr exps) `(if (setq ,x ,(car exps)) ,x (%or ,x ,(cdr exps))))
-;;     (exps (car exps))))
-;; (defmacro or exps
-;;   (cond
-;;     ((cdr exps) (let ((x (gensym "OR")))
-;;                   `(let ((,x ,(car exps)))
-;;                      (if ,x ,x (%or ,x ,(cdr exps))))))
-;;     (exps (car exps))))
-
-(defmacro and exps
-  (cond
-    ((cdr exps) `(if ,(car exps) (and ,@(cdr exps))))
-    (exps (car exps))
-    (t t)))
 
 (defun %ecase-error (expr cases)
   (error (strcat (%dump expr)
@@ -950,8 +932,9 @@
       `(%::%fn ,name ,lambda-list ,@body)
       (let ((args (gensym "ARGS")))
         `(%::%fn ,name ,args
-                 ,(%fn-destruct t lambda-list args body :default-value (if default-value
-                                                                           `',default-value))))))
+                 ,(%fn-destruct t lambda-list args body
+                                :default-value (if default-value
+                                                   `',default-value))))))
 
 (defmacro defmacro (name lambda-list . body)
   (when (%primitivep name)
@@ -2098,7 +2081,7 @@
                     (%memq (car exp) '(%fn lambda λ)))
                "Expecting (LAMBDA (...) ...) in COMPILE")
        (let ((*macroexpand-cache* (make-hash)))
-         (%eval-bytecode (comp exp (make-environment) t nil))))
+         (%eval-opcode (comp exp (make-environment) t nil))))
 
      (compile-string (str &optional (filename *current-file*))
        (let ((*current-file* filename)
@@ -2108,11 +2091,16 @@
              (is-first t)
              (link-addr 0)
              (*xref-info* (vector))
-             (env (make-environment)))
+             (env (make-environment))
+             (delayed ()))
          (labels ((comp1 (form)
                     (let ((code (with-env (comp form env nil t))))
                       (when code
-                        (setq code (%exec-code code))
+                        (if *delay-eval*
+                            (push (setq code (%assemble-opcode code))
+                                  delayed)
+                            (setq code (%assemble-and-exec-opcode code)))
+                        (setq code (copy-seq code))
                         (%relocate-code code link-addr)
                         (setq link-addr (+ link-addr (length code)))
                         (if is-first
@@ -2121,20 +2109,38 @@
                         (%stream-put out (%serialize-code code serialize-cache) #\Newline))))
                   (rec ()
                     (let* ((token (funcall reader 'next))
-                           (*current-pos* (car token))
                            (form (cdr token)))
                       (unless (eq form 'EOF)
-                        (comp1 form)
+                        (let ((*current-pos* (car token))
+                              (*macroexpand-cache* (make-hash))
+                              (*delay-eval* nil))
+                          (comp1 form))
                         (rec)))))
            (rec)
-           (let* ((xref *xref-info*)
-                  (*xref-info* nil))
+           (let ((xref *xref-info*)
+                 (*xref-info* nil))
              (when (and *current-file* (plusp (length xref)))
                (comp1 `(%grok-xref-info ,*current-file* ,xref))))
-           (%get-output-stream-string out)))))
+           (unwind-protect
+               (%get-output-stream-string out)
+             (foreach (nreverse delayed) #'%eval-code))))))
 
   (set-symbol-function! 'compile #'compile)
-  (set-symbol-function! 'compile-string #'compile-string))
+  (set-symbol-function! '%compile-string #'compile-string))
+
+(defun compile-string args
+  (let rec ()
+    (let ((result (catch 'compiler
+                    (apply #'%compile-string args))))
+      (if (eq result 'restart)
+          (rec)
+          result))))
+
+;; (defvar *tmpbuild* 0)
+;; (when (and *xref-info*
+;;            (< (incf *tmpbuild*) 3))
+;;   (%:console.log "Rebuild" *tmpbuild*)
+;;   (throw 'compiler 'restart))
 
 (defun read1-from-string (str)
   (let ((reader (lisp-reader str 'EOF)))

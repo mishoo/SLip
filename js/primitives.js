@@ -2437,7 +2437,7 @@ defp("%machine.stack", false, function(m, nargs){
     return [...m.stack.data];
 });
 
-defp("%eval-bytecode", true, function(m, nargs){
+defp("%eval-opcode", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var code = m.pop();
     checktype(code, LispVector);
@@ -2446,12 +2446,31 @@ defp("%eval-bytecode", true, function(m, nargs){
     return m._callnext(f, false);
 });
 
+defp("%assemble-opcode", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var code = m.pop();
+    checktype(code, LispVector);
+    return LispMachine.assemble(code);
+});
+
+defp("%eval-code", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let code = m.pop();
+    checktype(code, LispVector);
+    code = [ ...code, ...LispMachine.assemble([
+        [ "NIL" ],
+        [ "RET" ],
+    ])];
+    let f = new LispClosure(code, false, new LispCons([], false));
+    return m._callnext(f, false);
+});
+
 // The following is called only in COMPILE-STRING (that is, at
 // compile time).  Its purpose is to evaluate the given code
 // into the compiler environment, and return the assembled
 // code.  COMPILE-STRING guarantees that the code passed here
 // doesn't leave a return value on the stack.
-defp("%exec-code", true, function(m, nargs){
+defp("%assemble-and-exec-opcode", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var code = m.pop();
     checktype(code, LispVector);
