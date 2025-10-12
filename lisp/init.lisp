@@ -806,7 +806,7 @@
   (let ((memo (gensym "memo")))
     (multiple-value-bind (body declarations) (%:dig-declarations body)
       `(let ((,memo (make-hash)))
-         (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
+         (%:%set-symbol-prop ',name :MEMOIZE ,memo)
          (defun ,name ,args
            (declare ,@declarations)
            (or (gethash ,(car args) ,memo)
@@ -823,7 +823,7 @@
       (error "DEFUN-MEMOIZE2: name must be a symbol"))
     (multiple-value-bind (body declarations) (%:dig-declarations body)
       `(let ((,memo (,(if weak1 'make-weak-hash 'make-hash))))
-         (%:%set-symbol-prop ',name "MEMOIZE" ,memo)
+         (%:%set-symbol-prop ',name :MEMOIZE ,memo)
          (defun ,name ,args
            (declare ,@declarations)
            (let ((,h1 (gethash ,(car args) ,memo)))
@@ -836,7 +836,7 @@
                    ,val))))))))
 
 (defun clear-memoize-cache (symbol)
-  (clrhash (%get-symbol-prop symbol "MEMOIZE")))
+  (clrhash (%get-symbol-prop symbol :MEMOIZE)))
 
 (defmacro prog (bindings &body body)
   (multiple-value-bind (body declarations) (%:dig-declarations body)

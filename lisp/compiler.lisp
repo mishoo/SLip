@@ -950,7 +950,8 @@
       `(%::%fn ,name ,lambda-list ,@body)
       (let ((args (gensym "ARGS")))
         `(%::%fn ,name ,args
-                 ,(%fn-destruct t lambda-list args body :default-value default-value)))))
+                 ,(%fn-destruct t lambda-list args body :default-value (if default-value
+                                                                           `',default-value))))))
 
 (defmacro defmacro (name lambda-list . body)
   (when (%primitivep name)

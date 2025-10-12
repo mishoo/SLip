@@ -191,7 +191,7 @@
            `(setf (gethash ',name *ext-types*)
                   ,(%:macro-lambda name (cons '$obj lambda-list)
                                    `((typep $obj ,typespec))
-                                   :default-value ''*)))))
+                                   :default-value '*)))))
      ',name))
 
 (deftype fixnum ()

@@ -331,6 +331,11 @@ export class LispPackage {
 
 export class LispSymbol {
     static type = "symbol";
+    static PROP_GLOBAL = {};
+    static PROP_SPECIAL = {};
+    static PROP_MACRO = {};
+    static PROP_SIDE_EFFECTS = {};
+    static PROP_XREF = {};
     static symname(sym) {
         return sym === false ? "NIL" : sym === true ? "T" : sym.name;
     }
@@ -348,7 +353,7 @@ export class LispSymbol {
             this.name = name + "";
             this.pak = pak || false;
             this.value = undefined;
-            this.vlist = Object.create(null);
+            this.vlist = new Map();
             this.plist = false;
             this.primitive = false;
             this.function = false;
@@ -370,19 +375,19 @@ export class LispSymbol {
         return code;
     }
     setv(key, val) {
-        return this.vlist[key] = val;
+        return this.vlist.set(key, val), val;
     }
     getv(key) {
-        return this.vlist[key] ?? false;
+        return this.vlist.get(key) ?? false;
     }
     macro() {
-        return this.getv("macro");
+        return this.getv(LispSymbol.PROP_MACRO);
     }
     special() {
-        return this.getv("special");
+        return this.getv(LispSymbol.PROP_SPECIAL);
     }
     global() {
-        return this.getv("global");
+        return this.getv(LispSymbol.PROP_GLOBAL);
     }
     toString() {
         if (this.pak?.name == "KEYWORD")
@@ -398,14 +403,14 @@ export class LispSymbol {
 
     function special(name, value = false) {
         let sym = BASE_PACK.intern(name);
-        sym.setv("special", true);
-        sym.setv("global", true);
+        sym.setv(LispSymbol.PROP_SPECIAL, true);
+        sym.setv(LispSymbol.PROP_GLOBAL, true);
         sym.value = value;
         return sym;
     }
     function global(name, value = false) {
         let sym = BASE_PACK.intern(name);
-        sym.setv("global", true);
+        sym.setv(LispSymbol.PROP_GLOBAL, true);
         sym.value = value;
         return sym;
     }
