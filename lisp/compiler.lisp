@@ -12,6 +12,20 @@
 (in-package :%)
 " ;; hack for Ymacs to get the right package
 
+(%global! '*v2-macros*)
+(if (not (boundp '*v2-macros*))
+    (setq *v2-macros* nil))
+
+(set-symbol-function! 'v2-mark-macro
+                      (lambda (fn)
+                        (console.log fn)
+                        (setq *v2-macros* (cons fn *v2-macros*))
+                        fn))
+
+(set-symbol-function! 'v2-macro-p
+                      (lambda (fn)
+                        (%memq fn *v2-macros*)))
+
 (setq %::*package* (find-package "%"))
 
 (defmacro when (pred . body)
@@ -178,8 +192,10 @@
 (defvar *trace-output* (%make-text-memory-output-stream))
 (defvar *standard-input*)
 
+(defvar *build-count* 0)
 (defmacro delay-eval body
-  (setq *delay-eval* t)
+  (if (zerop *build-count*)
+      (setq *delay-eval* t))
   (list* 'progn body))
 
 (defmacro and exps
@@ -790,151 +806,160 @@
 (defun %dbind-error-missing-sublist ()
   (error/wp "DESTRUCTURING-BIND: Missing sublist"))
 
-(defun %fn-destruct (macro? args values body &key default-value)
-  (let (names decls)
-    (let ((topv (gensym)) rec)
-      (labels
-          ((add (name val)
-             (cond
-               ((symbolp name)
-                (push `(,name ,val) decls))
-               ((consp name)
-                (let ((current (gensym "dstr")))
-                  (add current val)
-                  (rec nil nil nil nil name current 0)))
-               (t
-                (error/wp (strcat "Unknown destructuring pattern: " name)))))
-           (rec (optional? rest? key? aux? args values i)
-             (when args
-               (cond
-                 ((symbolp args)
-                  (add args values))
-                 ((consp args)
-                  (let ((thisarg (car args)))
-                    (cond
-                      ((symbolp thisarg)
-                       (case thisarg
-                         (&whole
-                          (when (plusp i) (error/wp "Misplaced &WHOLE"))
-                          (let ((thisarg (cadr args)))
-                            (unless thisarg
-                              (error/wp "Missing variable name for &WHOLE"))
-                            (add thisarg (if (and macro? (eq values topv))
-                                             `(or *whole-form* ,values)
-                                             values)))
-                          (rec nil nil nil nil (cddr args) values i))
+(delay-eval
+ (defun %fn-destruct (macro? args values body &key default-value)
+   (let (names decls)
+     (let ((topv (gensym))
+           (whole (if macro? (gensym))))
+       (labels
+           ((add (name val)
+              (cond
+                ((symbolp name)
+                 (push `(,name ,val) decls))
+                ((consp name)
+                 (let ((current (gensym "dstr")))
+                   (add current val)
+                   (rec nil nil nil nil name current 0)))
+                (t
+                 (error/wp (strcat "Unknown destructuring pattern: " name)))))
+            (rec (optional? rest? key? aux? args values i)
+              (when args
+                (cond
+                  ((symbolp args)
+                   (add args values))
+                  ((consp args)
+                   (let ((thisarg (car args)))
+                     (cond
+                       ((symbolp thisarg)
+                        (case thisarg
+                          (&whole
+                           (when (plusp i) (error/wp "Misplaced &WHOLE"))
+                           (let ((thisarg (cadr args)))
+                             (unless thisarg
+                               (error/wp "Missing variable name for &WHOLE"))
+                             (add thisarg (if macro?
+                                              `(or *whole-form* ,whole)
+                                              values)))
+                           (rec nil nil nil nil (cddr args) values i))
 
-                         (&optional
-                          (when (or optional? rest? key? aux?)
-                            (error/wp "Invalid &OPTIONAL"))
-                          (rec t nil nil nil (cdr args) values i))
+                          (&optional
+                           (when (or optional? rest? key? aux?)
+                             (error/wp "Invalid &OPTIONAL"))
+                           (rec t nil nil nil (cdr args) values i))
 
-                         ((&rest &body)
-                          (when (or rest? key? aux?)
-                            (error/wp "Invalid &REST/&BODY"))
-                          (let ((thisarg (cadr args)))
-                            (unless thisarg
-                              (error/wp "Missing variable name for &REST"))
-                            (add thisarg values))
-                          (rec nil t nil nil (cddr args) values i))
+                          ((&rest &body)
+                           (when (or rest? key? aux?)
+                             (error/wp "Invalid &REST/&BODY"))
+                           (let ((thisarg (cadr args)))
+                             (unless thisarg
+                               (error/wp "Missing variable name for &REST"))
+                             (add thisarg values))
+                           (rec nil t nil nil (cddr args) values i))
 
-                         (&key
-                          (when (or key? aux?)
-                            (error/wp "Invalid &KEY"))
-                          (rec nil nil t nil (cdr args) values i))
+                          (&key
+                           (when (or key? aux?)
+                             (error/wp "Invalid &KEY"))
+                           (rec nil nil t nil (cdr args) values i))
 
-                         (&aux
-                          (when aux?
-                            (error/wp "Invalid &AUX"))
-                          (rec nil nil nil t (cdr args) values i))
+                          (&aux
+                           (when aux?
+                             (error/wp "Invalid &AUX"))
+                           (rec nil nil nil t (cdr args) values i))
 
-                         (t
-                          (when (%memq thisarg names)
-                            (error/wp (strcat "Argument seen twice: " thisarg)))
-                          (push thisarg names)
-                          (cond
-                            (optional?
-                             (add thisarg (if default-value
-                                              `(or (%pop ,values) ,default-value)
-                                              `(%pop ,values))))
-                            (aux?
-                             (add thisarg nil))
-                            (key?
-                             (add thisarg (if default-value
-                                              `(getf ,values ,(intern (symbol-name thisarg)
-                                                                      #.+keyword-package+)
-                                                     ,default-value)
-                                              `(getf ,values ,(intern (symbol-name thisarg)
-                                                                      #.+keyword-package+)))))
-                            (t
-                             (add thisarg `(if ,values
-                                               (%pop ,values)
-                                               (%dbind-error-missing-arg ',thisarg)))))
-                          (rec optional? rest? key? aux? (cdr args) values (1+ i)))))
+                          (t
+                           (when (%memq thisarg names)
+                             (error/wp (strcat "Argument seen twice: " thisarg)))
+                           (push thisarg names)
+                           (cond
+                             (optional?
+                              (add thisarg (if default-value
+                                               `(or (%pop ,values) ,default-value)
+                                               `(%pop ,values))))
+                             (aux?
+                              (add thisarg nil))
+                             (key?
+                              (add thisarg (if default-value
+                                               `(getf ,values ,(intern (symbol-name thisarg)
+                                                                       #.+keyword-package+)
+                                                      ,default-value)
+                                               `(getf ,values ,(intern (symbol-name thisarg)
+                                                                       #.+keyword-package+)))))
+                             (t
+                              (add thisarg `(if ,values
+                                                (%pop ,values)
+                                                (%dbind-error-missing-arg ',thisarg)))))
+                           (rec optional? rest? key? aux? (cdr args) values (1+ i)))))
 
-                      ((consp thisarg)
-                       (cond
-                         (optional?
-                          (let ((thisarg (car thisarg))
-                                (default (if (cdr thisarg)
-                                             (cadr thisarg)
-                                             default-value))
-                                (thisarg-p (caddr thisarg)))
-                            (when thisarg-p
-                              (add thisarg-p `(if ,values t nil)))
-                            (add thisarg `(if ,values (%pop ,values) ,default))))
-                         (key?
-                          (let ((thisarg (car thisarg))
-                                (default (if (cdr thisarg)
-                                             (cadr thisarg)
-                                             default-value))
-                                (thisarg-p (caddr thisarg)))
-                            (when thisarg-p
-                              (add thisarg-p nil))
-                            (let* ((val (gensym))
-                                   (setdef `(if (eq ,val '%not-found)
-                                                ,default
-                                                (progn
-                                                  ,@(when thisarg-p
-                                                      `((setq ,thisarg-p t)))
-                                                  ,val))))
-                              (cond
-                                ((consp thisarg)
-                                 (add (cadr thisarg)
-                                      `(let ((,val (getf ,values ,(car thisarg)
-                                                         '%not-found)))
-                                         ,setdef)))
-                                ((add thisarg
-                                      `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
-                                                                          #.+keyword-package+)
-                                                         '%not-found)))
-                                         ,setdef)))))))
-                         (aux? (let ((thisarg (car thisarg))
-                                     (value (cadr thisarg)))
-                                 (add thisarg value)))
-                         (rest? (error/wp "Invalid argument list following &REST/&BODY"))
-                         (t
-                          (let ((sublist (gensym)))
-                            (add sublist `(if ,values (%pop ,values) (%dbind-error-missing-sublist)))
-                            (rec nil nil nil nil thisarg sublist 0))))
-                       (rec optional? rest? key? aux? (cdr args) values (1+ i))))))
-                 (t (error/wp "Invalid lambda-list"))))))
-        (rec nil nil nil nil args topv 0))
-      `(let* ((,topv ,values) ,@(nreverse decls))
-         ,@body))))
+                       ((consp thisarg)
+                        (cond
+                          (optional?
+                           (let ((thisarg (car thisarg))
+                                 (default (if (cdr thisarg)
+                                              (cadr thisarg)
+                                              default-value))
+                                 (thisarg-p (caddr thisarg)))
+                             (when thisarg-p
+                               (add thisarg-p `(if ,values t nil)))
+                             (add thisarg `(if ,values (%pop ,values) ,default))))
+                          (key?
+                           (let ((thisarg (car thisarg))
+                                 (default (if (cdr thisarg)
+                                              (cadr thisarg)
+                                              default-value))
+                                 (thisarg-p (caddr thisarg)))
+                             (when thisarg-p
+                               (add thisarg-p nil))
+                             (let* ((val (gensym))
+                                    (setdef `(if (eq ,val '%not-found)
+                                                 ,default
+                                                 (progn
+                                                   ,@(when thisarg-p
+                                                       `((setq ,thisarg-p t)))
+                                                   ,val))))
+                               (cond
+                                 ((consp thisarg)
+                                  (add (cadr thisarg)
+                                       `(let ((,val (getf ,values ,(car thisarg)
+                                                          '%not-found)))
+                                          ,setdef)))
+                                 ((add thisarg
+                                       `(let ((,val (getf ,values ,(intern (symbol-name thisarg)
+                                                                           #.+keyword-package+)
+                                                          '%not-found)))
+                                          ,setdef)))))))
+                          (aux? (let ((thisarg (car thisarg))
+                                      (value (cadr thisarg)))
+                                  (add thisarg value)))
+                          (rest? (error/wp "Invalid argument list following &REST/&BODY"))
+                          (t
+                           (let ((sublist (gensym)))
+                             (add sublist `(if ,values (%pop ,values) (%dbind-error-missing-sublist)))
+                             (rec nil nil nil nil thisarg sublist 0))))
+                        (rec optional? rest? key? aux? (cdr args) values (1+ i))))))
+                  (t (error/wp "Invalid lambda-list"))))))
+         (rec nil nil nil nil args topv 0))
+       `(let* (,@(if whole `((,whole ,values)))
+               (,topv ,(if whole `(cdr ,whole) values))
+               ,@(nreverse decls))
+          ,@body)))))
 
 (defmacro destructuring-bind (args values . body)
   (%fn-destruct nil args values body))
 
-(defun macro-lambda (name lambda-list body &key default-value)
-  (if (and (not default-value)
-           (ordinary-lambda-list-p lambda-list))
-      `(%::%fn ,name ,lambda-list ,@body)
-      (let ((args (gensym "ARGS")))
-        `(%::%fn ,name ,args
-                 ,(%fn-destruct t lambda-list args body
-                                :default-value (if default-value
-                                                   `',default-value))))))
+(delay-eval
+ (defun macro-lambda (name lambda-list body &key default-value)
+   (let ((form (gensym "FORM")))
+     (if (and (not default-value)
+              (ordinary-lambda-list-p lambda-list))
+         `(v2-mark-macro
+           (%::%fn ,name (,form)
+                   (apply (lambda ,lambda-list ,@body)
+                          (cdr ,form))))
+         `(v2-mark-macro
+           (%::%fn ,name (,form)
+                   ,(%fn-destruct t lambda-list form body
+                                  :default-value (if default-value
+                                                     `',default-value))))))))
 
 (defmacro defmacro (name lambda-list . body)
   (when (%primitivep name)
@@ -1926,8 +1951,10 @@
        (let ((expansion (gethash form *macroexpand-cache*)))
          (unless expansion
            (setq expansion
-                 (%hash-set (let ((*whole-form* form))
-                              (apply expander (cdr form)))
+                 (%hash-set (if (v2-macro-p expander)
+                                (funcall expander form)
+                                (let ((*whole-form* form))
+                                  (apply expander (cdr form))))
                             form
                             *macroexpand-cache*)))
          (with-env (comp expansion env val? more?))))
@@ -2128,6 +2155,11 @@
   (set-symbol-function! 'compile #'compile)
   (set-symbol-function! '%compile-string #'compile-string))
 
+(when (and *xref-info*
+           (< (incf *build-count*) 3))
+  (%:console.log "Rebuild" *build-count*)
+  (throw 'compiler 'restart))
+
 (defun compile-string args
   (let rec ()
     (let ((result (catch 'compiler
@@ -2135,12 +2167,6 @@
       (if (eq result 'restart)
           (rec)
           result))))
-
-;; (defvar *tmpbuild* 0)
-;; (when (and *xref-info*
-;;            (< (incf *tmpbuild*) 3))
-;;   (%:console.log "Rebuild" *tmpbuild*)
-;;   (throw 'compiler 'restart))
 
 (defun read1-from-string (str)
   (let ((reader (lisp-reader str 'EOF)))
