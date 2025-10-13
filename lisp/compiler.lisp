@@ -185,6 +185,7 @@
 (defvar *delay-eval* nil)
 
 (defvar *compiler-macros* (make-hash))
+(defvar *macroexpand-cache* nil)
 
 (defvar *standard-output* (%make-text-memory-output-stream))
 (defvar *error-output* (%make-text-memory-output-stream))
@@ -284,7 +285,8 @@
       ((null lst) (nreverse ret))
       ((funcall pred (car lst))
        (rec (cdr lst) (cons (car lst) ret)))
-      ((rec (cdr lst) ret)))))
+      (t
+       (rec (cdr lst) ret)))))
 
 (defmacro prog2 (exp1 exp2 . body)
   `(progn
@@ -618,7 +620,8 @@
        (dig (cdr args) t))
       ((macro-keyword-p (car args))
        nil)
-      ((dig (cdr args) seen)))))
+      (t
+       (dig (cdr args) seen)))))
 
 (defun parse-lambda-list (args)
   (let ((all nil)
@@ -1199,8 +1202,6 @@
                                                  locally-special))))))))
          ,@body))))
 
-(defvar *macroexpand-cache* (make-hash))
-
 (defun flatten (sym forms)
   (let dig ((forms forms)
             (result nil)
@@ -1697,10 +1698,13 @@
                      (vector l1)
                      (gen "VALUES" 1)
                      (unless more? (gen "RET")))))))
-         ((comp (car exps) env val? more?))))
+         (t
+          (comp (car exps) env val? more?))))
 
      (comp-funcall (f args env val? more?)
        (if (or (safe-atom-p f)
+               (and (consp f)
+                    (%memq (car f) '(lambda λ %fn)))
                (let rec ((args args))
                  (if (not args)
                      t
@@ -1711,6 +1715,8 @@
 
      (comp-apply (f args env val? more?)
        (if (or (safe-atom-p f)
+               (and (consp f)
+                    (%memq (car f) '(lambda λ %fn)))
                (let rec ((args args))
                  (if (not args)
                      t
@@ -1764,9 +1770,9 @@
               (error/wp (strcat f " is not a function")))
             (mkret (gen "FGVAR" (unknown-function (cadr f)))))
            ((and (consp f)
-                 (eq (car f) 'lambda)
-                 (not (cadr f)))
-            (assert (not args) "Too many arguments")
+                 (%memq (car f) '(lambda λ %fn))
+                 (not (cadr f))
+                 (not args))
             (comp-decl-seq (cddr f) env val? more?))
            (t (mkret (comp f env t t))))))
 
@@ -1781,7 +1787,8 @@
           (throw '$xargs '$xargs))
          ((%memq (car args) names)
           (error/wp (strcat "Duplicate function argument " (car args))))
-         ((gen-simple-args (cdr args)
+         (t
+          (gen-simple-args (cdr args)
                            (1+ n)
                            (cons (car args) names)))))
 
@@ -1926,7 +1933,8 @@
                    (more?
                     (<< (with-env (comp-decl-seq body env val? t))
                         (gen "UNFR" 1 0)))
-                   ((<< (with-env (comp-decl-seq body env val? nil))))))))
+                   (t
+                    (<< (with-env (comp-decl-seq body env val? nil))))))))
            (comp-decl-seq body env val? more?)))
 
      (comp-macrolet-function (def)
@@ -1988,7 +1996,8 @@
                   (more?
                    (<< (with-env (comp-seq body env val? t))
                        (gen "UNFR" 1 specials)))
-                  ((<< (with-env (comp-seq body env val? nil)))))))))
+                  (t
+                   (<< (with-env (comp-seq body env val? nil)))))))))
          (t
           (comp-decl-seq (list* values-form body) env val? more?))))
 
@@ -2020,7 +2029,8 @@
           (comp-named-let bindings (%pop body) body env val? more?))
          ((null body)
           (comp-seq `(,@(cadr (get-bindings bindings t)) nil) env val? more?))
-         ((with-seq-output <<
+         (t
+          (with-seq-output <<
             (with-declarations body
               (let* ((bindings (get-bindings bindings t))
                      (names (car bindings))
@@ -2040,7 +2050,8 @@
                   (more?
                    (<< (with-env (comp-seq body env val? t))
                        (gen "UNFR" 1 specials)))
-                  ((<< (with-env (comp-seq body env val? nil)))))))))))
+                  (t
+                   (<< (with-env (comp-seq body env val? nil)))))))))))
 
      (comp-let* (bindings body env val? more?)
        (cond
@@ -2052,7 +2063,8 @@
           (comp-let* (append bindings (cadar body))
                      (cddar body)
                      env val? more?))
-         ((with-seq-output <<
+         (t
+          (with-seq-output <<
             (with-declarations body
               (let* ((bindings (get-bindings bindings t))
                      (names (car bindings))
@@ -2077,7 +2089,8 @@
                   (more?
                    (<< (with-env (comp-seq body env val? t))
                        (gen "UNFR" 1 specials)))
-                  ((<< (with-env (comp-seq body env val? nil)))))))))))
+                  (t
+                   (<< (with-env (comp-seq body env val? nil)))))))))))
 
      (comp-catch (tag body env val? more?)
        (if body
@@ -2162,10 +2175,10 @@
   (set-symbol-function! 'compile #'compile)
   (set-symbol-function! '%compile-string #'compile-string))
 
-;; (when (and *xref-info*
-;;            (< (incf *build-count*) 3))
-;;   (%:console.log "Rebuild" *build-count*)
-;;   (throw 'compiler 'restart))
+;; (if (if *xref-info*
+;;         (< (setq *build-count* (1+ *build-count*)) 3))
+;;     (%:console.log "Rebuild" *build-count*)
+;;     (throw 'compiler 'restart))
 
 (defun compile-string args
   (let rec ()
