@@ -808,7 +808,8 @@
 (defun %fn-destruct (macro? args values body &key default-value)
   (let (names decls)
     (let ((topv (gensym))
-          (whole nil))
+          (whole nil)
+          (env nil))
       (labels
           ((whole ()
              (or whole (setq whole (gensym))))
@@ -839,6 +840,14 @@
                               (error/wp "Missing variable name for &WHOLE"))
                             (add thisarg (if (and macro? (eq topv values))
                                              (whole) values)))
+                          (rec nil nil nil nil (cddr args) values i))
+
+                         (&environment
+                          (unless macro?
+                            (error/wp "&environment can only appear in macro lambda lists"))
+                          (when env
+                            (error/wp "&environment seen more than once"))
+                          (setq env (cadr args))
                           (rec nil nil nil nil (cddr args) values i))
 
                          (&optional
@@ -938,6 +947,7 @@
                  (t (error/wp "Invalid lambda-list"))))))
         (rec nil nil nil nil args topv 0))
       `(let* (,@(if whole `((,whole ,values)))
+              ,@(if env `((,env *compiler-env*)))
               (,topv ,(if macro?
                           (if whole
                               `(cdr ,whole)
@@ -2249,6 +2259,25 @@
 
 (defun values-list (list)
   (apply #'values list))
+
+(defun macroexpand-1 (form &optional (*compiler-env* *compiler-env*))
+  (cond
+    ((atom form)
+     (or (%:find-symbol-macrolet-in-compiler-env form) form))
+    ((and (eq 'progn (car form))
+          (null (cdr form)))
+     nil)
+    (t
+     (aif (or (%:find-macrolet-in-compiler-env (car form))
+              (%macro (car form)))
+          (funcall it form)
+          form))))
+
+(defun macroexpand (form &optional (*compiler-env* *compiler-env*))
+  (let ((result (macroexpand-1 form)))
+    (if (eq result form)
+        result
+        (macroexpand result))))
 
 (defconstant *core-files*
   '("lisp/init.lisp"

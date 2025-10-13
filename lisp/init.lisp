@@ -14,31 +14,32 @@
    exported
    '(
 
-     &allow-other-keys &aux &body &key &optional &rest &whole * *error-output*
-     *package* *read-table* *standard-input* *standard-output* *trace-output*
-     + - / /= 1+ 1- < <= = > >= abs acos adjoin aif and append apply aref asin
-     assert atan atom block boolean boundp caaaar caaadr caaar caadar caaddr
-     caadr caar cadaar cadadr cadar caddar cadddr caddr cadr car case catch
-     cdaaar cdaadr cdaar cdadar cdaddr cdadr cdar cddaar cddadr cddar cdddar
-     cddddr cdddr cddr cdr ceiling char character char-code char-equal
-     char-greaterp char-lessp char-name char-not-equal char-not-greaterp
-     char-not-lessp char/= char< char<= char= char> char>= charp clear-timeout
-     code-char compile compiler-macro-function complement cond cons consp
-     constantly copy-list copy-seq copy-tree cos current-thread debug decf
-     declare defconstant defglobal define-compiler-macro define-modify-macro
-     define-setf-expander defmacro defpackage defparameter defsetf defun
-     defvar destructuring-bind digitp disassemble do do* dolist dotimes
-     downcase ecase elt eq eql equal equalp error eval evenp every exp export
-     expt fboundp fdefinition fifth find-package find-symbol first fixnum flet
-     float floatp floor fmakunbound foreach fourth funcall function functionp
-     gensym get get-internal-run-time get-setf-expansion getf gethash go
-     hash-copy hash-iterator hash-keys hash-table hash-table-p hash-values
-     identity if ignore import in-package incf integer integerp intern it
-     iterator-next keywordp labels lambda lambda-list-keywords last length let
-     let* letterp list list* listp load locally log macroexpand macroexpand-1
-     macrolet make-array make-hash make-list make-package make-regexp
-     make-symbol make-thread make-vector makunbound mapc mapcar max member min
-     minusp mod most-negative-fixnum most-positive-fixnum multiple-value-bind
+     &allow-other-keys &aux &body &key &optional &rest &whole &environment *
+     *error-output* *package* *read-table* *standard-input* *standard-output*
+     *trace-output* + - / /= 1+ 1- < <= = > >= abs acos adjoin aif and append
+     apply aref asin assert atan atom block boolean boundp caaaar caaadr caaar
+     caadar caaddr caadr caar cadaar cadadr cadar caddar cadddr caddr cadr car
+     case catch cdaaar cdaadr cdaar cdadar cdaddr cdadr cdar cddaar cddadr
+     cddar cdddar cddddr cdddr cddr cdr ceiling char character char-code
+     char-equal char-greaterp char-lessp char-name char-not-equal
+     char-not-greaterp char-not-lessp char/= char< char<= char= char> char>=
+     charp clear-timeout code-char compile compiler-macro-function complement
+     cond cons consp constantly copy-list copy-seq copy-tree cos
+     current-thread debug decf declare defconstant defglobal
+     define-compiler-macro define-modify-macro define-setf-expander defmacro
+     defpackage defparameter defsetf defun defvar destructuring-bind digitp
+     disassemble do do* dolist dotimes downcase ecase elt eq eql equal equalp
+     error eval evenp every exp export expt fboundp fdefinition fifth
+     find-package find-symbol first fixnum flet float floatp floor fmakunbound
+     foreach fourth funcall function functionp gensym get
+     get-internal-run-time get-setf-expansion getf gethash go hash-copy
+     hash-iterator hash-keys hash-table hash-table-p hash-values identity if
+     ignore import in-package incf integer integerp intern it iterator-next
+     keywordp labels lambda lambda-list-keywords last length let let* letterp
+     list list* listp load locally log macroexpand macroexpand-1 macrolet
+     make-array make-hash make-list make-package make-regexp make-symbol
+     make-thread make-vector makunbound mapc mapcar max member min minusp mod
+     most-negative-fixnum most-positive-fixnum multiple-value-bind
      multiple-value-call multiple-value-list multiple-value-prog1
      multiple-value-setq name-char nconc nil not notany notevery nreconc
      nreverse nth nthcdr null number-fixed number-string number numberp oddp
@@ -72,25 +73,6 @@
 
 (defun assert (test . arguments)
   (unless test (apply #'error arguments)))
-
-(defun macroexpand-1 (form)
-  (cond
-    ((atom form)
-     (or (%:find-symbol-macrolet-in-compiler-env form) form))
-    ((and (eq 'progn (car form))
-          (null (cdr form)))
-     nil)
-    (t
-     (aif (or (%:find-macrolet-in-compiler-env (car form))
-              (%macro (car form)))
-          (funcall it form)
-          form))))
-
-(defun macroexpand (form)
-  (let ((result (macroexpand-1 form)))
-    (if (eq result form)
-        result
-        (macroexpand result))))
 
 (defmacro defpackage (name &rest options)
   (let ((nicknames nil)
@@ -318,7 +300,7 @@
                         (values nil form)
                         (dig exp))))))))
 
-(defun get-setf-expansion (form)
+(defun get-setf-expansion (form &optional (*compiler-env* *compiler-env*))
   (cond
     ((symbolp form)
      ;; could be symbol macro.
