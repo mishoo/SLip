@@ -83,8 +83,7 @@
     (t
      (aif (or (%:find-macrolet-in-compiler-env (car form))
               (%macro (car form)))
-          (let ((%:*whole-form* form))
-            (apply it (cdr form)))
+          (funcall it form)
           form))))
 
 (defun macroexpand (form)

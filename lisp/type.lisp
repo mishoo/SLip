@@ -189,9 +189,10 @@
            ;; function object.
            (%:maybe-xref-info name :type)
            `(setf (gethash ',name *ext-types*)
-                  ,(%:macro-lambda name (cons '$obj lambda-list)
-                                   `((typep $obj ,typespec))
-                                   :default-value '*)))))
+                  (%:%fn ,name $args
+                         ,(%:%fn-destruct nil (cons '$obj lambda-list) '$args
+                                          `((typep $obj ,typespec))
+                                          :default-value ''*))))))
      ',name))
 
 (deftype fixnum ()
