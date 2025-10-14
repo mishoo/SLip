@@ -1706,7 +1706,8 @@
      (comp-funcall (f args env val? more?)
        (if (or (safe-atom-p f)
                (and (consp f)
-                    (%memq (car f) *lambda-syms*))
+                    (or (%memq (car f) *lambda-syms*)
+                        (eq (car f) 'function)))
                (let rec ((args args))
                  (if (not args)
                      t
@@ -1718,7 +1719,8 @@
      (comp-apply (f args env val? more?)
        (if (or (safe-atom-p f)
                (and (consp f)
-                    (%memq (car f) *lambda-syms*))
+                    (or (%memq (car f) *lambda-syms*)
+                        (eq (car f) 'function)))
                (let rec ((args args))
                  (if (not args)
                      t
