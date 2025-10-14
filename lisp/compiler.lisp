@@ -1221,6 +1221,8 @@
             (cons (car forms) result)
             rest)))))
 
+(defglobal *lambda-syms* '(lambda λ %fn))
+
 (labels
     ((assert (p msg)
        (if p p (error/wp msg)))
@@ -1389,7 +1391,7 @@
                (when val?
                  (cond
                    ((when (and (consp sym)
-                               (%memq (car sym) '(lambda λ)))
+                               (%memq (car sym) *lambda-syms*))
                       (comp sym env t more?)))
                    (t
                     (assert (symbolp sym) "FUNCTION requires a symbol")
@@ -1704,7 +1706,7 @@
      (comp-funcall (f args env val? more?)
        (if (or (safe-atom-p f)
                (and (consp f)
-                    (%memq (car f) '(lambda λ %fn)))
+                    (%memq (car f) *lambda-syms*))
                (let rec ((args args))
                  (if (not args)
                      t
@@ -1716,7 +1718,7 @@
      (comp-apply (f args env val? more?)
        (if (or (safe-atom-p f)
                (and (consp f)
-                    (%memq (car f) '(lambda λ %fn)))
+                    (%memq (car f) *lambda-syms*))
                (let rec ((args args))
                  (if (not args)
                      t
@@ -1770,10 +1772,26 @@
               (error/wp (strcat f " is not a function")))
             (mkret (gen "FGVAR" (unknown-function (cadr f)))))
            ((and (consp f)
-                 (%memq (car f) '(lambda λ %fn))
-                 (not (cadr f))
-                 (not args))
-            (comp-decl-seq (cddr f) env val? more?))
+                 (%memq (car f) *lambda-syms*))
+            (cond
+              ((and (not (cadr f)) (not args))
+               (comp-decl-seq (cddr f) env val? more?))
+              (t
+               ;; This is the case for (apply (lambda ...) ...), or
+               ;; (funcall (lambda ...) ...), or ((lambda ...) ...).
+               ;; We inline the function, instead of consing a closure and
+               ;; then call it. Of course, it would be nice if we would also
+               ;; do compile-time argument matching and perhaps avoid the
+               ;; XARGS overhead, but oh well.. good enough for now.
+               (%seq (comp-list args env)
+                     ;; this sets the machine n_args value, which is required
+                     ;; by the function header (either ARGS, ARG_ or XARGS).
+                     (gen "NARGS" (if apply (- (length args)) (length args)))
+                     (let ((name (when (eq (%pop f) '%fn)
+                                   (%pop f)))
+                           (args (%pop f))
+                           (body f))
+                       (comp-inner-lambda name args body env val? more?))))))
            (t (mkret (comp f env t t))))))
 
      (gen-simple-args (args n names)
@@ -1800,17 +1818,21 @@
        (with-seq-output <<
          (with-declarations body
            (<< (gen-simple-args args 0 nil))
-           (let ((args (make-true-list args)))
+           (let ((args (make-true-list args))
+                 (specials 0))
              (foreach-index args
                             (lambda (name index)
                               (when (or (%specialp name)
                                         (%memq name locally-special))
+                                (incf specials)
                                 (<< (gen "BIND" name index)))))
              (cond
                (args
                 (setq env (extenv env :lex (map1-vector #'maybe-special args)))
                 (declare-locally-special :except args)
-                (<< (with-env (comp-lambda-body name body env val? more?))))
+                (<< (with-env (comp-lambda-body name body env val? more?)))
+                (when more?
+                  (<< (gen "UNFR" 1 specials))))
                (t
                 (declare-locally-special)
                 (<< (with-env (comp-lambda-body name body env val? more?)))))))))
@@ -1820,7 +1842,8 @@
                &key required optional rest key has-key aux aok names
                &aux
                (index 0)
-               (envcell (vector)))
+               (envcell (vector))
+               (specials 0))
        (with-declarations body
          (with-seq-output <<
            (setq env (extenv env :lex envcell))
@@ -1828,6 +1851,7 @@
                       (vector-push envcell (maybe-special name))
                       (when (or (%specialp name)
                                 (%memq name locally-special))
+                        (incf specials)
                         (<< (gen "BIND" name index)))
                       (incf index))
                     (newdef (name defval supplied-p)
@@ -1867,7 +1891,9 @@
                                 (gen "VAR")))
                           (newarg name))))
              (declare-locally-special :except names)
-             (<< (with-env (comp-lambda-body name body env val? more?)))))))
+             (<< (with-env (comp-lambda-body name body env val? more?)))
+             (when more?
+               (<< (gen "UNFR" 1 specials)))))))
 
      (comp-inner-lambda (name args body env val? more?)
        (let* ((parsed (parse-lambda-list args))
@@ -2127,7 +2153,7 @@
 
      (compile (exp)
        (assert (and (consp exp)
-                    (%memq (car exp) '(%fn lambda λ)))
+                    (%memq (car exp) *lambda-syms*))
                "Expecting (LAMBDA (...) ...) in COMPILE")
        (let ((*macroexpand-cache* (make-hash)))
          (%eval-opcode (comp exp (make-environment) t nil))))
