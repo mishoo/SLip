@@ -1783,8 +1783,6 @@
           (when (%memq args names)
             (error/wp (strcat "Duplicate function argument " args)))
           (gen "ARG_" n))
-         ((lambda-keyword-p (car args))
-          (throw '$xargs '$xargs))
          ((%memq (car args) names)
           (error/wp (strcat "Duplicate function argument " (car args))))
          (t
@@ -1798,21 +1796,31 @@
              (list lst)
              (cons (car lst) (make-true-list (cdr lst))))))
 
+     (comp-simple-lambda (name args body env val? more?)
+       (with-seq-output <<
+         (with-declarations body
+           (<< (gen-simple-args args 0 nil))
+           (let ((args (make-true-list args)))
+             (foreach-index args
+                            (lambda (name index)
+                              (when (or (%specialp name)
+                                        (%memq name locally-special))
+                                (<< (gen "BIND" name index)))))
+             (cond
+               (args
+                (setq env (extenv env :lex (map1-vector #'maybe-special args)))
+                (declare-locally-special :except args)
+                (<< (with-env (comp-lambda-body name body env val? more?))))
+               (t
+                (declare-locally-special)
+                (<< (with-env (comp-lambda-body name body env val? more?)))))))))
+
      (comp-extended-lambda
-         (name body env
+         (name body env val? more?
                &key required optional rest key has-key aux aok names
                &aux
                (index 0)
                (envcell (vector)))
-       (unless (or optional key has-key aux aok)
-         ;; this should still be somewhat more efficient
-         (return-from comp-extended-lambda
-           (comp-lambda-args-and-body name (cond
-                                             ((and required rest)
-                                              `(,@required . ,rest))
-                                             (required)
-                                             (rest))
-                                      body env)))
        (with-declarations body
          (with-seq-output <<
            (setq env (extenv env :lex envcell))
@@ -1859,40 +1867,34 @@
                                 (gen "VAR")))
                           (newarg name))))
              (declare-locally-special :except names)
-             (<< (with-env (comp-lambda-body name body env)))))))
+             (<< (with-env (comp-lambda-body name body env val? more?)))))))
+
+     (comp-inner-lambda (name args body env val? more?)
+       (let* ((parsed (parse-lambda-list args))
+              (required (getf parsed :required))
+              (rest (getf parsed :rest)))
+         (cond
+           ((or (getf parsed :optional)
+                (getf parsed :key)
+                (getf parsed :has-key)
+                (getf parsed :aok)
+                (getf parsed :aux))
+            (apply #'comp-extended-lambda name body env val? more? parsed))
+           (t
+            (comp-simple-lambda name (cond
+                                       ((and required rest)
+                                        `(,@required . ,rest))
+                                       (required)
+                                       (rest))
+                                body env val? more?)))))
 
      (comp-lambda (name args body env)
-       (gen "FN"
-            (let ((code (catch '$xargs
-                          (comp-lambda-args-and-body name args body env))))
-              (if (eq code '$xargs)
-                  (apply #'comp-extended-lambda name body env (parse-lambda-list args))
-                  code))
-            name))
+       (gen "FN" (comp-inner-lambda name args body env t nil) name))
 
-     (comp-lambda-args-and-body (name args body env)
-       (with-seq-output <<
-         (with-declarations body
-           (<< (gen-simple-args args 0 nil))
-           (let ((args (make-true-list args)))
-             (foreach-index args
-                            (lambda (name index)
-                              (when (or (%specialp name)
-                                        (%memq name locally-special))
-                                (<< (gen "BIND" name index)))))
-             (cond
-               (args
-                (setq env (extenv env :lex (map1-vector #'maybe-special args)))
-                (declare-locally-special :except args)
-                (<< (with-env (comp-lambda-body name body env))))
-               (t
-                (declare-locally-special)
-                (<< (with-env (comp-lambda-body name body env)))))))))
-
-     (comp-lambda-body (name body env)
+     (comp-lambda-body (name body env val? more?)
        (if name
-           (comp-block name body env t nil)
-           (comp-seq body env t nil)))
+           (comp-block name body env val? more?)
+           (comp-seq body env val? more?)))
 
      (get-bindings (bindings vars?)
        (let (names vals)

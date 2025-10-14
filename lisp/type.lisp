@@ -207,7 +207,7 @@
   (cond
     ((eq size '*)
      '(integer 0 *))
-    ((integerp size)
+    ((and (integerp size) (plusp size))
      `(integer 0 ,(1- (expt 2 size))))
     (t (error "UNSIGNED-BYTE: unsupported SIZE argument ~S" size))))
 
