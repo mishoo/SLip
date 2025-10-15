@@ -114,6 +114,7 @@ export const OP = {
     PLUSP: 93,
     MINUSP: 94,
     APPLY: 95,
+    NARGS: 96,
 };
 
 const OP_LEN = [
@@ -213,6 +214,7 @@ const OP_LEN = [
     0 /* PLUSP */,
     0 /* MINUSP */,
     1 /* APPLY */,
+    1 /* NARGS */,
 ];
 
 export function want_bound(name, val) {
@@ -1695,6 +1697,19 @@ let OP_RUN = [
         m.env = closure.env;
         m.pc = 0;
         m.f = closure;
+    },
+    /*OP.NARGS*/ (m) => {
+        let count = m.code[m.pc++];
+        if (count < 0) {
+            count = -count - 1;
+            let arg = m.pop();
+            while (arg !== false) {
+                m.push(LispCons.car(arg));
+                arg = arg.cdr;
+                count++;
+            }
+        }
+        m.n_args = count;
     },
 ];
 

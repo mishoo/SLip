@@ -342,7 +342,7 @@ Ymacs_Buffer.newCommands({
             try {
                 debug = MACHINE().eval_string(
                     find_package(this),
-                    "(%:%get-symbol-prop '" + sym.value + " \"XREF\")"
+                    "(%:%get-symbol-xref '" + sym.value + ")"
                 );
             } catch(ex) {};
             if (debug) debug = [...debug];

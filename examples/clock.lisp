@@ -91,7 +91,7 @@
   (save-excursion
    (set-color "#abba")
    (left (* iii 20))
-   (rect-spiral 350))
+   (rect-spiral (+ 350 (* 150 (sin iii)))))
   (left (* 10 (cos iii)))
   (clock (+ 160 (* 30 (sin (incf iii 0.05))))))
 

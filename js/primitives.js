@@ -123,7 +123,7 @@ function defp(name, seff, func) {
         writable: false,
     });
     sym.primitive = func;
-    sym.setv("primitive-side-effects", seff);
+    sym.setv(LispSymbol.PROP_SIDE_EFFECTS, seff);
     sym.function = new LispClosure([ OP.PRIM, sym, -1, OP.RET ], sym);
     ALL_PRIMITIVES = new LispCons(sym, ALL_PRIMITIVES);
 
@@ -1786,7 +1786,7 @@ defp("%prim-side-effects", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return sym.getv("primitive-side-effects");
+    return sym.getv(LispSymbol.PROP_SIDE_EFFECTS);
 });
 
 defp("%macro!", true, function(m, nargs){
@@ -1794,7 +1794,7 @@ defp("%macro!", true, function(m, nargs){
     var func = m.pop(), sym = m.pop();
     checktype(func, LispClosure);
     checktype(sym, LispSymbol);
-    sym.setv("macro", func);
+    sym.setv(LispSymbol.PROP_MACRO, func);
     sym.function = false;
     return sym;
 });
@@ -1806,8 +1806,8 @@ defp("%special!", true, function(m, nargs){
     while (nargs-- > 0) {
         var name = m.pop();
         checktype(name, LispSymbol);
-        name.setv("special", true);
-        name.setv("global", true);
+        name.setv(LispSymbol.PROP_SPECIAL, true);
+        name.setv(LispSymbol.PROP_GLOBAL, true);
     }
     return false;
 });
@@ -1817,7 +1817,7 @@ defp("%global!", true, function(m, nargs){
     while (nargs-- > 0) {
         var name = m.pop();
         checktype(name, LispSymbol);
-        name.setv("global", true);
+        name.setv(LispSymbol.PROP_GLOBAL, true);
     }
     return false;
 });
@@ -2166,28 +2166,35 @@ defp("set-symbol-function!", true, function(m, nargs){
     var func = m.pop(), sym = m.pop();
     checktype(sym, LispSymbol);
     checktype(func, LispClosure);
-    sym.setv("macro", false);
+    sym.setv(LispSymbol.PROP_MACRO, false);
     return sym.function = func;
 });
 
 defp("%set-symbol-prop", true, function(m, nargs){
     checknargs(nargs, 3, 3);
-    var val = m.pop(), key = as_string(m.pop()), sym = m.pop();
+    var val = m.pop(), key = m.pop(), sym = m.pop();
     if (sym === false) sym = S_NIL;
     else if (sym === true) sym = S_T;
-    checktype(key, LispString);
     checktype(sym, LispSymbol);
     return sym.setv(key, val);
 });
 
 defp("%get-symbol-prop", false, function(m, nargs){
     checknargs(nargs, 2, 2);
-    var key = as_string(m.pop()), sym = m.pop();
+    var key = m.pop(), sym = m.pop();
     if (sym === false) sym = S_NIL;
     else if (sym === true) sym = S_T;
-    checktype(key, LispString);
     checktype(sym, LispSymbol);
     return sym.getv(key);
+});
+
+defp("%get-symbol-xref", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var sym = m.pop();
+    if (sym === false) sym = S_NIL;
+    else if (sym === true) sym = S_T;
+    checktype(sym, LispSymbol);
+    return sym.getv(LispSymbol.PROP_XREF);
 });
 
 defp("symbol-plist", false, function(m, nargs){
@@ -2398,8 +2405,8 @@ function grok_xref_info(xref, filename) {
     xref.forEach(function(data){
         let sym = data[0], type = data[1], pos = data[2];
         if (sym instanceof LispSymbol) {
-            let a = sym.getv("XREF");
-            if (a === false) a = sym.setv("XREF", []);
+            let a = sym.getv(LispSymbol.PROP_XREF);
+            if (a === false) a = sym.setv(LispSymbol.PROP_XREF, []);
             // let idx = a.findIndex(def => def[0] === type);
             // if (idx >= 0) {
             //     a[idx] = [type, filename, pos];
@@ -2430,7 +2437,7 @@ defp("%machine.stack", false, function(m, nargs){
     return [...m.stack.data];
 });
 
-defp("%eval-bytecode", true, function(m, nargs){
+defp("%eval-opcode", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var code = m.pop();
     checktype(code, LispVector);
@@ -2439,12 +2446,31 @@ defp("%eval-bytecode", true, function(m, nargs){
     return m._callnext(f, false);
 });
 
+defp("%assemble-opcode", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var code = m.pop();
+    checktype(code, LispVector);
+    return LispMachine.assemble(code);
+});
+
+defp("%eval-code", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let code = m.pop();
+    checktype(code, LispVector);
+    code = [ ...code, ...LispMachine.assemble([
+        [ "NIL" ],
+        [ "RET" ],
+    ])];
+    let f = new LispClosure(code, false, new LispCons([], false));
+    return m._callnext(f, false);
+});
+
 // The following is called only in COMPILE-STRING (that is, at
 // compile time).  Its purpose is to evaluate the given code
 // into the compiler environment, and return the assembled
 // code.  COMPILE-STRING guarantees that the code passed here
 // doesn't leave a return value on the stack.
-defp("%exec-code", true, function(m, nargs){
+defp("%assemble-and-exec-opcode", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var code = m.pop();
     checktype(code, LispVector);

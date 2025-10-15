@@ -37,7 +37,7 @@
              f)
             ((not (symbolp (car f)))
              (all-mexp f))
-            ((setq m (%get-symbol-prop (car f) "MEXP"))
+            ((setq m (%get-symbol-prop (car f) :MEXP))
              (funcall m f))
             ((not flag)
              (funcall-mexp f))
@@ -224,7 +224,7 @@
            (symbol-macrolet       symbol-macrolet-mexp)
            (multiple-value-bind   mvb-mexp))
          (lambda (x)
-           (%set-symbol-prop (car x) "MEXP" (cadr x))))
+           (%set-symbol-prop (car x) :MEXP (cadr x))))
 
 (defun macroexpand-all (f)
   (let ((%:*compiler-env* (%:make-compiler-env)))
