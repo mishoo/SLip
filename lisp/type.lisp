@@ -146,7 +146,8 @@
                    (t
                     (let ((pred (gethash (car tspec) *ext-types*)))
                       (if (and pred (symbolp pred))
-                          `(,pred ,$thing ,@(cdr tspec))
+                          `(,pred ,$thing ,@(mapcar (lambda (x) `',x)
+                                                    (cdr tspec)))
                           `(%typep ,$thing ',tspec))))))))))
       (if (and (> count 1)
                (not (%:safe-atom-p object)))
@@ -160,6 +161,8 @@
            (eq (car typespec) 'quote))
       (expand (cadr typespec) object)
       form))
+
+(defglobal *complex-type-cache* (make-hash-table :test #'equal))
 
 (defmacro deftype (name lambda-list &rest forms)
   (assert (symbolp name)
@@ -176,23 +179,22 @@
              `(defpredicate ,name (,obj)
                 ,(expand typespec obj))))
           (t
-           ;; Parametrized type: this case is completely unoptimized and will
-           ;; be slow. First, the lambda-list will always be parsed with
-           ;; destructuring-bind, thanks to the default value '* :( that's
-           ;; much slower than ordinary lambda lists. Second, the typespec
-           ;; will be expanded every time TYPEP is called. We could do some
-           ;; caching based on argument values (SBCL seems to do that), but
-           ;; that would require a hash table with :test EQUAL, which we lack
-           ;; at the moment.
-           ;;
-           ;; TODO: at least use DEFPREDICATE to intern a symbol, rather than
-           ;; function object.
-           (%:maybe-xref-info name :type)
-           `(setf (gethash ',name *ext-types*)
-                  (%:%fn ,name $args
-                         ,(%:%fn-destruct nil (cons '$obj lambda-list) '$args
-                                          `((typep $obj ,typespec))
-                                          :default-value ''*))))))
+           ;; Parametrized type; expansion is cached by name and arguments in
+           ;; *complex-type-cache*. This will still not be as performant as
+           ;; the built-in types, but oh well.. good enough, I hope.
+           (let ((obj (make-symbol "OBJ"))
+                 (args (make-symbol "ARGS"))
+                 (exp (make-symbol "EXP")))
+             `(defpredicate ,name (,obj &rest ,args)
+                (funcall
+                 (or (gethash (cons ',name ,args) *complex-type-cache*)
+                     (setf (gethash (cons ',name ,args) *complex-type-cache*)
+                           (let ((,exp ,(%:%fn-destruct nil lambda-list args
+                                                        `(,typespec)
+                                                        :default-value ''*)))
+                             (lambda (,obj)
+                               (typep ,obj ,exp)))))
+                 ,obj))))))
      ',name))
 
 (deftype fixnum ()
@@ -201,8 +203,6 @@
 (deftype float ()
   `(and number (not integer)))
 
-;; XXX: check (disassemble (gethash 'unsigned-byte *ext-types*)) - it's
-;; horrible. We should optimize and cache the expansion.
 (deftype unsigned-byte (&optional size)
   (cond
     ((eq size '*)
