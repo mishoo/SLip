@@ -37,6 +37,9 @@
 
 (defglobal *ext-types* *built-in-types*)
 
+(defglobal *complex-types* (make-hash-table :test #'equal))
+(defglobal *complex-type-preds* (make-hash-table :test #'equal))
+
 (defmacro defpredicate (name args &body body)
   ;; This will make life a little harder during development, but we really
   ;; don't want to change built-in type defs. We also don't want to throw an
@@ -50,6 +53,17 @@
          (setf (fdefinition ',intname) (%:%fn ,name ,args ,@body))
          (setf (gethash ',name *ext-types*) ',intname)
          ',name))))
+
+(defmacro defcomplex (name lambda-list form)
+  (let ((args (make-symbol "ARGS"))
+        (exp (make-symbol "EXP")))
+    `(setf (gethash ',name *complex-types*)
+           (lambda (,args)
+             (or (gethash (cons ',name ,args) *complex-types*)
+                 (setf (gethash (cons ',name ,args) *complex-types*)
+                       ,(%:%fn-destruct nil lambda-list args
+                                        `(,form)
+                                        :default-value ''*)))))))
 
 (defun def-val-predicate (val predicate)
   (setf (gethash val *ext-types*) predicate))
@@ -65,8 +79,8 @@
 
 (defpredicate integer (obj &optional (min '*) (max '*))
   (and (integerp obj)
-       (or (eq min '*) (>= obj min))
-       (or (eq max '*) (<= obj max))))
+       (if (eq min '*) t (>= obj min))
+       (if (eq max '*) t (<= obj max))))
 
 (defpredicate or (obj &rest typespecs)
   (do ((ts typespecs (cdr ts)))
@@ -123,10 +137,12 @@
                 ((not tspec)
                  nil)
                 ((symbolp tspec)
-                 (let ((pred (gethash tspec *ext-types*)))
-                   (if (and pred (symbolp pred))
-                       `(,pred ,$thing)
-                       `(%typep ,$thing ',tspec))))
+                 (aif (gethash tspec *complex-types*)
+                      (expand (funcall it nil))
+                      (let ((pred (gethash tspec *ext-types*)))
+                        (if (and pred (symbolp pred))
+                            `(,pred ,$thing)
+                            `(%typep ,$thing ',tspec)))))
                 ((atom tspec)
                  (error "Unexpected atom in type spec: ~S" tspec))
                 (t
@@ -144,11 +160,13 @@
                    ((member)
                     `(member ,$thing ',(cdr tspec)))
                    (t
-                    (let ((pred (gethash (car tspec) *ext-types*)))
-                      (if (and pred (symbolp pred))
-                          `(,pred ,$thing ,@(mapcar (lambda (x) `',x)
-                                                    (cdr tspec)))
-                          `(%typep ,$thing ',tspec))))))))))
+                    (aif (gethash (car tspec) *complex-types*)
+                         (expand (funcall it (cdr tspec)))
+                         (let ((pred (gethash (car tspec) *ext-types*)))
+                           (if (and pred (symbolp pred))
+                               `(,pred ,$thing ,@(mapcar (lambda (x) `',x)
+                                                         (cdr tspec)))
+                               `(%typep ,$thing ',tspec)))))))))))
       (if (and (> count 1)
                (not (%:safe-atom-p object)))
           `(let (($thing ,object))
@@ -161,8 +179,6 @@
            (eq (car typespec) 'quote))
       (expand (cadr typespec) object)
       form))
-
-(defglobal *complex-type-cache* (make-hash-table :test #'equal))
 
 (defmacro deftype (name lambda-list &rest forms)
   (assert (symbolp name)
@@ -180,21 +196,23 @@
                 ,(expand typespec obj))))
           (t
            ;; Parametrized type; expansion is cached by name and arguments in
-           ;; *complex-type-cache*. This will still not be as performant as
-           ;; the built-in types, but oh well.. good enough, I hope.
+           ;; *complex-types*, and the predicate in *complex-type-preds*. The
+           ;; predicates should be needed only when the typespec is not fully
+           ;; known at compile-time, e.g. (typep foo `(unsigned-byte ,size));
+           ;; otherwise the expansion will be inlined via `expand' (above).
            (let ((obj (make-symbol "OBJ"))
                  (args (make-symbol "ARGS"))
                  (exp (make-symbol "EXP")))
-             `(defpredicate ,name (,obj &rest ,args)
-                (funcall
-                 (or (gethash (cons ',name ,args) *complex-type-cache*)
-                     (setf (gethash (cons ',name ,args) *complex-type-cache*)
-                           (let ((,exp ,(%:%fn-destruct nil lambda-list args
-                                                        `(,typespec)
-                                                        :default-value ''*)))
-                             (lambda (,obj)
-                               (typep ,obj ,exp)))))
-                 ,obj))))))
+             `(progn
+                (defcomplex ,name ,lambda-list ,typespec)
+                (defpredicate ,name (,obj &rest ,args)
+                  (funcall
+                   (or (gethash (cons ',name ,args) *complex-type-preds*)
+                       (setf (gethash (cons ',name ,args) *complex-type-preds*)
+                             (let ((,exp (funcall (gethash ',name *complex-types*) ,args)))
+                               (compile `(lambda (,',obj)
+                                           ,(expand ,exp ',obj))))))
+                   ,obj)))))))
      ',name))
 
 (deftype fixnum ()
