@@ -12,20 +12,6 @@
 (in-package :%)
 " ;; hack for Ymacs to get the right package
 
-;; (%global! '*v2-macros*)
-;; (if (not (boundp '*v2-macros*))
-;;     (setq *v2-macros* nil))
-
-;; (set-symbol-function! 'v2-mark-macro
-;;                       (lambda (fn)
-;;                         (console.log fn)
-;;                         (setq *v2-macros* (cons fn *v2-macros*))
-;;                         fn))
-
-;; (set-symbol-function! 'v2-macro-p
-;;                       (lambda (fn)
-;;                         (%memq fn *v2-macros*)))
-
 (setq %::*package* (find-package "%"))
 
 (defmacro when (pred . body)
@@ -962,17 +948,14 @@
 (defmacro destructuring-bind (args values . body)
   (%fn-destruct nil args values body))
 
-(defun macro-lambda (name lambda-list body &key default-value)
+(defun macro-lambda (name lambda-list body)
   (let ((form (gensym "FORM")))
-    (if (and (not default-value)
-             (ordinary-lambda-list-p lambda-list))
+    (if (ordinary-lambda-list-p lambda-list)
         `(%::%fn ,name (,form)
                  (apply (lambda ,lambda-list ,@body)
                         (cdr ,form)))
         `(%::%fn ,name (,form)
-                 ,(%fn-destruct t lambda-list form body
-                                :default-value (if default-value
-                                                   `',default-value))))))
+                 ,(%fn-destruct t lambda-list form body)))))
 
 (defmacro defmacro (name lambda-list . body)
   (when (%primitivep name)
