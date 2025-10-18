@@ -33,7 +33,8 @@
    'input-stream   '%input-stream-p
    'output-stream  '%output-stream-p
    'string         'stringp
-   'vector         'vectorp))
+   'vector         'vectorp
+   'regexp         'regexpp))
 
 (defglobal *ext-types* *built-in-types*)
 
@@ -51,19 +52,19 @@
                            (symbol-package name))))
       `(progn
          (setf (fdefinition ',intname) (%:%fn ,name ,args ,@body))
-         (setf (gethash ',name *ext-types*) ',intname)
-         ',name))))
+         (setf (gethash ',name *ext-types*) ',intname)))))
 
 (defmacro defcomplex (name lambda-list form)
   (let ((args (make-symbol "ARGS"))
         (exp (make-symbol "EXP")))
-    `(setf (gethash ',name *complex-types*)
-           (lambda (,args)
-             (or (gethash (cons ',name ,args) *complex-types*)
-                 (setf (gethash (cons ',name ,args) *complex-types*)
-                       ,(%:%fn-destruct nil lambda-list args
-                                        `(,form)
-                                        :default-value ''*)))))))
+    (unless (gethash name *built-in-types*)
+      `(setf (gethash ',name *complex-types*)
+             (lambda (,args)
+               (or (gethash (cons ',name ,args) *complex-types*)
+                   (setf (gethash (cons ',name ,args) *complex-types*)
+                         ,(%:%fn-destruct nil lambda-list args
+                                          `(,form)
+                                          :default-value ''*))))))))
 
 (defun def-val-predicate (val predicate)
   (setf (gethash val *ext-types*) predicate))
@@ -105,11 +106,6 @@
 
 (defpredicate eql (obj value)
   (eql obj value))
-
-(defpredicate mod (obj n)
-  (and (integerp obj)
-       (>= obj 0)
-       (< obj n)))
 
 (defun %typep (object typespec)
   (cond
@@ -192,8 +188,13 @@
            ;; this is constant and we can evaluate it right away
            (let ((typespec (eval typespec))
                  (obj (make-symbol "OBJ")))
-             `(defpredicate ,name (,obj)
-                ,(expand typespec obj))))
+             `(progn
+                ;; still, making it available through `defcomplex' makes it
+                ;; eligible for further expansion and inlining at compile time,
+                ;; which should be a win.
+                (defcomplex ,name nil ',typespec)
+                (defpredicate ,name (,obj)
+                  ,(expand typespec obj)))))
           (t
            ;; Parametrized type; expansion is cached by name and arguments in
            ;; *complex-types*, and the predicate in *complex-type-preds*. The
@@ -214,6 +215,9 @@
                                            ,(expand ,exp ',obj))))))
                    ,obj)))))))
      ',name))
+
+(deftype mod (n)
+  `(integer 0 ,(1- n)))
 
 (deftype fixnum ()
   `(integer ,most-negative-fixnum ,most-positive-fixnum))
