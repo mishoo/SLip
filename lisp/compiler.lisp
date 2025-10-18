@@ -342,11 +342,12 @@
 
 ;;;; parser/compiler
 
+(defvar in-qq)
+
 (defun lisp-reader (input eof)
   (let ((input (if (stringp input)
                    (%make-text-memory-input-stream input)
-                   input))
-        (in-qq 0))
+                   input)))
     (labels
         ((peek ()
            (%stream-peek input))
@@ -495,23 +496,25 @@
            (skip #\`)
            (skip-ws)
            (if (%memq (peek) '(#\( #\` #\'))
-               (prog2
-                   (incf in-qq)
-                   (list 'quasiquote (read-token))
-                 (decf in-qq))
-               `(quote ,(read-token))))
+               (let* ((qq (list nil))
+                      (in-qq (cons qq in-qq))
+                      (token (read-token)))
+                 (if (car qq)
+                     (list 'quasiquote token)
+                     (list 'quote token)))
+               (list 'quote (read-token))))
 
          (read-comma ()
-           (when (zerop in-qq) (croak "Comma outside quasiquote"))
+           (unless in-qq (croak "Comma outside quasiquote"))
            (skip #\,)
            (skip-ws)
-           (prog2
-               (decf in-qq)
-               (if (eq (peek) #\@)
-                   (progn (next)
-                          (list 'qq-splice (read-token)))
-                   (list 'qq-unquote (read-token)))
-             (incf in-qq)))
+           (let ((qq (car in-qq))
+                 (in-qq (cdr in-qq)))
+             (%rplaca qq t)
+             (if (eq (peek) #\@)
+                 (progn (next)
+                        (list 'qq-splice (read-token)))
+                 (list 'qq-unquote (read-token)))))
 
          (read-list ()
            (let ((ret nil)
@@ -561,7 +564,8 @@
 
       (lambda (what)
         (case what
-          (next (read-toplevel))
+          (next (let ((in-qq nil))
+                  (read-toplevel)))
           (pos (%stream-pos input))
           (col (%stream-col input))
           (line (%stream-line input)))))))
