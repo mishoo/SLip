@@ -9,6 +9,7 @@ import {
     LispMutex,
     LispChar,
     LispClosure,
+    LispStruct,
     LispStdInstance,
 } from "./types.js";
 import {
@@ -46,7 +47,6 @@ const S_CHARACTER           = LispSymbol.get("CHARACTER");
 const S_HASH_TABLE          = LispSymbol.get("HASH-TABLE");
 const S_REGEXP              = LispSymbol.get("REGEXP");
 const S_FUNCTION            = LispSymbol.get("FUNCTION");
-const S_STRUCT_TAG          = LispSymbol.get("%STRUCT", LispPackage.get("SL-STRUCT"));
 const S_STRUCTURE           = LispSymbol.get("STRUCTURE");
 const S_VECTOR              = LispSymbol.get("VECTOR");
 const S_PACKAGE             = LispSymbol.get("PACKAGE");
@@ -1261,15 +1261,8 @@ defp("%type-of", false, function(m, nargs){
     if (LispHash.is(x)) return S_HASH_TABLE;
     if (LispRegexp.is(x)) return S_REGEXP;
     if (LispClosure.is(x)) return S_FUNCTION;
-    if (LispVector.is(x)) {
-        // XXX: define built-in type LispStruct for structures
-        switch (x[0]) {
-          case S_STRUCT_TAG:
-            return S_STRUCTURE;
-          default:
-            return S_VECTOR;
-        }
-    }
+    if (LispVector.is(x)) return S_VECTOR;
+    if (LispStruct.is(x)) return S_STRUCTURE;
     if (LispTextInputStream.is(x)) return S_TEXT_INPUT_STREAM;
     if (LispInputStream.is(x)) return S_INPUT_STREAM;
     if (LispTextOutputStream.is(x)) return S_TEXT_OUTPUT_STREAM;
@@ -1691,6 +1684,53 @@ defp("%ls-webdav-save-all", true, function(m, nargs){
 });
 
 /* -----[ /local storage ]----- */
+
+/* -----[ struct ]----- */
+
+defp("%struct", false, function(m, nargs){
+    checknargs(nargs, 1);
+    let data = [];
+    while (--nargs > 0) data[nargs - 1] = m.pop();
+    let struct = m.pop();
+    if (struct !== false) checktype(struct, LispStruct);
+    return new LispStruct(struct, data);
+});
+
+defp("%struct-vector", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispStruct).data;
+});
+
+defp("%struct-struct", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispStruct).struct;
+});
+
+defp("%struct-ref", false, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let index = m.pop_number();
+    let struct = checktype(m.pop(), LispStruct);
+    return struct.data[index];
+});
+
+defp("%struct-set", true, function(m, nargs){
+    checknargs(nargs, 3, 3);
+    let value = m.pop();
+    let index = m.pop_number();
+    let struct = checktype(m.pop(), LispStruct);
+    return struct.data[index] = value;
+});
+
+defp("%structp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return LispStruct.is(m.pop());
+});
+
+defp("copy-structure", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let struct = checktype(m.pop(), LispStruct);
+    return new LispStruct(struct.struct, [ ...struct.data ]);
+});
 
 /* -----[ object allocation utils ]----- */
 

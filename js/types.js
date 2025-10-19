@@ -204,6 +204,15 @@ export class LispHashEqual extends LispHash {
     }
 }
 
+export class LispStruct {
+    static type = "struct";
+    static is(x) { return x instanceof LispStruct }
+    constructor(struct, data) {
+        this.struct = struct === false ? this : struct;
+        this.data = data;
+    }
+}
+
 export class LispStdInstance {
     static type = "std-instance";
     static is(x) { return x instanceof LispStdInstance }
