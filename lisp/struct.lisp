@@ -8,7 +8,6 @@
 (in-package :sl-struct)
 
 (defconstant *structures* (make-hash-table))
-(defconstant *stag* '%struct)
 
 (defun substructp (name struct)
   (let ((sub (structure-include struct)))
@@ -18,13 +17,12 @@
           (substructp name sub)))))
 
 (defun structurep (thing &optional name)
-  (and (vectorp thing)
-       (eq *stag* (svref thing 0))
-       (if name
-           (let ((x (svref thing 1)))
-             (or (eq x name)
-                 (substructp name (find-structure x))))
-           t)))
+  (if (%structp thing)
+      (if name
+          (let ((x (%struct-ref (%struct-struct thing) 0)))
+            (or (eq x name)
+                (substructp name (find-structure x))))
+          t)))
 
 (defun assert-struct (thing &optional name)
   (unless (structurep thing name)
@@ -37,12 +35,14 @@
       (when errorp
         (error "No such structure ~S." name))))
 
+(defun structure-of (x)
+  (assert-struct x)
+  (%struct-struct x))
+
 (defun (setf find-structure) (struct name)
   (setf (gethash name *structures*) struct))
 
-(defun copy-structure (structure)
-  (assert-struct structure)
-  (copy-seq structure))
+(defglobal *structure* nil)
 
 (defun make-structure (name &key slots include print-object print-function)
   (when (find-structure name nil)
@@ -50,35 +50,36 @@
   (when include
     (setf include (find-structure include)))
   (setf (find-structure name)
-        (vector *stag* 'structure name slots include print-object print-function)))
+        (%struct *structure* name slots include print-object print-function)))
 
-(make-structure
- 'structure
- :slots '((:name name :read-only t :type symbol)
-          (:name slots :read-only t :type list)
-          (:name include :read-only t :type symbol)
-          (:name print-object :read-only t :type function)
-          (:name print-function :read-only t :type function)))
+(setf *structure*
+      (make-structure
+       'structure
+       :slots '((:name name :read-only t :type symbol)
+                (:name slots :read-only t :type list)
+                (:name include :read-only t :type symbol)
+                (:name print-object :read-only t :type function)
+                (:name print-function :read-only t :type function))))
 
 (defun structure-name (struct)
   (assert-struct struct 'structure)
-  (svref struct 2))
+  (%struct-ref struct 0))
 
 (defun structure-slots (struct)
   (assert-struct struct 'structure)
-  (svref struct 3))
+  (%struct-ref struct 1))
 
 (defun structure-include (struct)
   (assert-struct struct 'structure)
-  (svref struct 4))
+  (%struct-ref struct 2))
 
 (defun structure-print-object (struct)
   (assert-struct struct 'structure)
-  (svref struct 5))
+  (%struct-ref struct 3))
 
 (defun structure-print-function (struct)
   (assert-struct struct 'structure)
-  (svref struct 6))
+  (%struct-ref struct 4))
 
 (defun parse-slot (args)
   (when (atom args)
@@ -185,30 +186,31 @@
            (slots (append (when include
                             (structure-slots include))
                           (mapcar #'parse-slot slot-description)))
-           (index 0))
+           (index 0)
+           (the-struct (gensym)))
       (labels
           ((accessor (slot-name)
              (intern (strcat conc-name slot-name)))
            (make-slot (slot)
-             (let ((idx (1+ (incf index)))
+             (let ((idx (prog1 index (incf index)))
                    (name (accessor (getf slot :name))))
                `(progn
                   (defun ,name (obj)
                     (assert-struct obj ',struct-name)
-                    (svref obj ,idx))
+                    (%struct-ref obj ,idx))
                   ,@(unless (getf slot :read-only)
                       `((defun (setf ,name) (value obj)
                           (assert-struct obj ',struct-name)
-                          (setf (svref obj ,idx) value))))))))
-        `(progn
-           (make-structure ',struct-name
-                           :slots ',slots
-                           ,@(when include
-                               `(:include ',(structure-name include)))
-                           ,@(when print-object
-                               `(:print-object ',print-object))
-                           ,@(when print-function
-                               `(:print-function ',print-function)))
+                          (%struct-set obj ,idx value))))))))
+        `(let ((,the-struct
+                (make-structure ',struct-name
+                                :slots ',slots
+                                ,@(when include
+                                    `(:include ',(structure-name include)))
+                                ,@(when print-object
+                                    `(:print-object ',print-object))
+                                ,@(when print-function
+                                    `(:print-function ',print-function)))))
            (sl-type:defpredicate ,struct-name (obj)
              (structurep obj ',struct-name))
            ,@(mapcar #'make-slot slots)
@@ -218,7 +220,7 @@
            ,@(when copier
                `((defun ,copier (obj)
                    (assert-struct obj ',struct-name)
-                   (copy-seq obj))))
+                   (copy-structure obj))))
            ,@(when constructor
                (cond
                  (constructor-arglist
@@ -226,15 +228,15 @@
                          (ctor-args (getf parsed :names))
                          (constructor-arglist (insert-defaults parsed slots)))
                     `((defun ,constructor ,constructor-arglist
-                        (vector *stag* ',struct-name
-                                ,@(mapcar (lambda (slot)
-                                            (let ((name (getf slot :name)))
-                                              (cond
-                                                ((member name ctor-args)
-                                                 name)
-                                                (t
-                                                 (getf slot :initform)))))
-                                          slots))))))
+                        (%struct ,the-struct
+                                 ,@(mapcar (lambda (slot)
+                                             (let ((name (getf slot :name)))
+                                               (cond
+                                                 ((member name ctor-args)
+                                                  name)
+                                                 (t
+                                                  (getf slot :initform)))))
+                                           slots))))))
                  (t
                   `((defun ,constructor
                            (&key ,@(mapcar (lambda (slot)
@@ -245,10 +247,10 @@
                                                   `(,name ,initform))
                                                  (t name))))
                                            slots))
-                      (vector *stag* ',struct-name
-                              ,@(mapcar (lambda (slot) (getf slot :name)) slots)))))))
+                      (%struct ,the-struct
+                               ,@(mapcar (lambda (slot) (getf slot :name)) slots)))))))
            ',struct-name)))))
 
 (defun sl-type:type-of-structure (x)
   ;; we already know it's a struct at this point.
-  (svref x 1))
+  (structure-name (%struct-struct x)))

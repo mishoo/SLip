@@ -1376,8 +1376,8 @@
 (defconstant <cons>                  (defclass cons (list) ()))
 (defconstant <vector>                (defclass vector (array sequence) ()))
 (defconstant <string>                (defclass string (t) ()))
-(defconstant <structure-object>      (defclass structure-object (t) ()))
 (defconstant <structure-class>       (defclass structure-class (standard-class) ()))
+(defconstant <structure-object>      (defclass structure-object (t) ()))
 
 ;; N.B. This version of built-in-class-of is straightforward but very slow.
 (defun built-in-class-of (x)
@@ -1389,7 +1389,8 @@
     ((consp x)                                        <cons>)
     ((charp x)                                        <character>)
     ((stringp x)                                      <string>)
-    ((sl-struct::structurep x)                        <structure-class>)
+    ((sl-struct::structurep x 'sl-struct::structure)  <structure-class>)
+    ((sl-struct::structurep x)                        <structure-object>)
     ((vectorp x)                                      <vector>)
     ((functionp x)                                    <function>)
     ((regexpp x)                                      <regexp>)

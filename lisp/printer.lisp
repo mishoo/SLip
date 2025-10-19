@@ -7,7 +7,8 @@
           sl-struct::structure-name
           sl-struct::structure-slots
           sl-struct::structure-print-object
-          sl-struct::structure-print-function))
+          sl-struct::structure-print-function
+          sl-struct::structure-of))
 
 (defmacro def-print ((type &optional (name type)) &body body)
   `(defmethod print-object ((,name ,type) (out output-stream))
@@ -91,11 +92,11 @@
                              (<< " ")
                              (print-object (intern (strcat (getf slot :name)) "KEYWORD") out)
                              (<< " ")
-                             (print-object (svref obj (+ index 2)) out)))
+                             (print-object (%struct-ref obj index) out)))
       (<< ")"))))
 
 (def-print (structure-object structure)
-  (let* ((def (find-structure (svref structure 1)))
+  (let* ((def (structure-of structure))
          (print-object (structure-print-object def))
          (print-function (structure-print-function def)))
     (cond
@@ -107,7 +108,7 @@
        (default-print-structure structure def out)))))
 
 (def-print (structure-class structure)
-  (<< "#<STRUCTURE " (sl-struct::structure-name structure) ">"))
+  (<< "#<STRUCTURE " (sl-struct::structure-name (structure-of structure)) ">"))
 
 (def-print (vector)
   (when *print-pretty*

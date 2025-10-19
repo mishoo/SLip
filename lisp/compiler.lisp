@@ -12,20 +12,6 @@
 (in-package :%)
 " ;; hack for Ymacs to get the right package
 
-;; (%global! '*v2-macros*)
-;; (if (not (boundp '*v2-macros*))
-;;     (setq *v2-macros* nil))
-
-;; (set-symbol-function! 'v2-mark-macro
-;;                       (lambda (fn)
-;;                         (console.log fn)
-;;                         (setq *v2-macros* (cons fn *v2-macros*))
-;;                         fn))
-
-;; (set-symbol-function! 'v2-macro-p
-;;                       (lambda (fn)
-;;                         (%memq fn *v2-macros*)))
-
 (setq %::*package* (find-package "%"))
 
 (defmacro when (pred . body)
@@ -356,11 +342,12 @@
 
 ;;;; parser/compiler
 
+(defvar in-qq)
+
 (defun lisp-reader (input eof)
   (let ((input (if (stringp input)
                    (%make-text-memory-input-stream input)
-                   input))
-        (in-qq 0))
+                   input)))
     (labels
         ((peek ()
            (%stream-peek input))
@@ -509,46 +496,44 @@
            (skip #\`)
            (skip-ws)
            (if (%memq (peek) '(#\( #\` #\'))
-               (prog2
-                   (incf in-qq)
-                   (list 'quasiquote (read-token))
-                 (decf in-qq))
-               `(quote ,(read-token))))
+               (let* ((qq (list nil))
+                      (in-qq (cons qq in-qq))
+                      (token (read-token)))
+                 (if (car qq)
+                     (list 'quasiquote token)
+                     (list 'quote token)))
+               (list 'quote (read-token))))
 
          (read-comma ()
-           (when (zerop in-qq) (croak "Comma outside quasiquote"))
+           (unless in-qq (croak "Comma outside quasiquote"))
            (skip #\,)
            (skip-ws)
-           (prog2
-               (decf in-qq)
-               (if (eq (peek) #\@)
-                   (progn (next)
-                          (list 'qq-splice (read-token)))
-                   (list 'qq-unquote (read-token)))
-             (incf in-qq)))
+           (let ((qq (car in-qq))
+                 (in-qq (cdr in-qq)))
+             (%rplaca qq t)
+             (if (eq (peek) #\@)
+                 (progn (next)
+                        (list 'qq-splice (read-token)))
+                 (list 'qq-unquote (read-token)))))
 
          (read-list ()
-           (let ((ret nil)
-                 (p nil))
-             (labels ((rec ()
-                        (skip-ws)
-                        (case (peek)
-                          (#\) ret)
-                          (#\; (skip-comment) (rec))
-                          (#\. (next)
-                               (%rplacd p (read-token))
-                               (skip-ws)
-                               ret)
-                          ((nil) (croak "Unterminated list"))
-                          (otherwise (let ((cell (cons (read-token) nil)))
-                                       (setq p (if ret
-                                                   (%rplacd p cell)
-                                                   (setq ret cell))))
-                                     (rec)))))
-               (prog2
-                   (skip #\()
-                   (rec)
-                 (skip #\))))))
+           (let* ((ret (list nil))
+                  (p ret))
+             (skip #\()
+             (let rec ()
+               (skip-ws)
+               (case (peek)
+                 (#\) (next) (cdr ret))
+                 (#\; (skip-comment) (rec))
+                 (#\. (next)
+                      (%rplacd p (read-token))
+                      (skip-ws)
+                      (skip #\))
+                      (cdr ret))
+                 ((nil) (croak "Unterminated list"))
+                 (otherwise
+                  (setq p (%rplacd p (cons (read-token) nil)))
+                  (rec))))))
 
          (read-token ()
            (skip-ws)
@@ -575,7 +560,8 @@
 
       (lambda (what)
         (case what
-          (next (read-toplevel))
+          (next (let ((in-qq nil))
+                  (read-toplevel)))
           (pos (%stream-pos input))
           (col (%stream-col input))
           (line (%stream-line input)))))))
@@ -962,17 +948,14 @@
 (defmacro destructuring-bind (args values . body)
   (%fn-destruct nil args values body))
 
-(defun macro-lambda (name lambda-list body &key default-value)
+(defun macro-lambda (name lambda-list body)
   (let ((form (gensym "FORM")))
-    (if (and (not default-value)
-             (ordinary-lambda-list-p lambda-list))
+    (if (ordinary-lambda-list-p lambda-list)
         `(%::%fn ,name (,form)
                  (apply (lambda ,lambda-list ,@body)
                         (cdr ,form)))
         `(%::%fn ,name (,form)
-                 ,(%fn-destruct t lambda-list form body
-                                :default-value (if default-value
-                                                   `',default-value))))))
+                 ,(%fn-destruct t lambda-list form body)))))
 
 (defmacro defmacro (name lambda-list . body)
   (when (%primitivep name)
