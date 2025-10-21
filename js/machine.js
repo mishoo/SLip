@@ -116,7 +116,7 @@ export const OP = {
     APPLY: 95,
     NARGS: 96,
     BAND: 97,
-    BOR: 98,
+    BIOR: 98,
     BXOR: 99,
     BASH: 100,
     BCNT: 101,
@@ -221,7 +221,7 @@ const OP_LEN = [
     1 /* APPLY */,
     1 /* NARGS */,
     0 /* BAND */,
-    0 /* BOR */,
+    0 /* BIOR */,
     0 /* BXOR */,
     0 /* BASH */,
     0 /* BCNT */,
@@ -1732,7 +1732,7 @@ let OP_RUN = [
         let num1 = m.pop_integer();
         m.push(num1 & num2);
     },
-    /*OP.BOR*/ (m) => {
+    /*OP.BIOR*/ (m) => {
         let num2 = m.pop_integer();
         let num1 = m.pop_integer();
         m.push(num1 | num2);

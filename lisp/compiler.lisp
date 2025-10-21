@@ -495,7 +495,7 @@
          (read-quasiquote ()
            (skip #\`)
            (skip-ws)
-           (if (%memq (peek) '(#\( #\` #\'))
+           (if (%memq (peek) '(#\( #\` #\' #\,))
                (let* ((qq (list nil))
                       (in-qq (cons qq in-qq))
                       (token (read-token)))

@@ -12,12 +12,13 @@
 (defun byte (size position)
   (cons size position))
 
-(define-compiler-macro byte (&whole form size position)
+(define-compiler-macro byte (size position)
   (cond
     ((and (integerp size)
           (integerp position))
      `'(,size . ,position))
-    (t form)))
+    (t
+     `(cons ,size ,position))))
 
 (defun byte-size (byte)
   (car byte))
@@ -35,7 +36,7 @@
   `(%:%op BAND ,b1 ,b2))
 
 (define-compiler-macro op-ior (b1 b2)
-  `(%:%op BOR ,b1 ,b2))
+  `(%:%op BIOR ,b1 ,b2))
 
 (define-compiler-macro op-xor (b1 b2)
   `(%:%op BXOR ,b1 ,b2))
@@ -53,19 +54,16 @@
     (setq ret (op-and ret (car p)))))
 
 (define-compiler-macro logand (&rest integers)
-  (let ((len (length integers)))
-    (cond
-      ((zerop len) -1)
-      ((= len 1) (car integers))
-      ((>= len 2)
-       (cond
-         ((and (integerp (car integers))
-               (integerp (cadr integers)))
-          `(logand ,(op-and (car integers) (cadr integers))
-                   ,@(cddr integers)))
-         (t
-          `(logand (op-and ,(car integers) ,(cadr integers))
-                   ,@(cddr integers))))))))
+  (cond
+    ((null integers) -1)
+    ((null (cdr integers)) (car integers))
+    ((and (integerp (car integers))
+          (integerp (cadr integers)))
+     `(logand ,(op-and (car integers) (cadr integers))
+              ,@(cddr integers)))
+    (t
+     `(logand (op-and ,(car integers) ,(cadr integers))
+              ,@(cddr integers)))))
 
 (defun logior (&rest integers)
   (do ((ret 0)
@@ -74,19 +72,16 @@
     (setq ret (op-ior ret (car p)))))
 
 (define-compiler-macro logior (&rest integers)
-  (let ((len (length integers)))
-    (cond
-      ((zerop len) -1)
-      ((= len 1) (car integers))
-      ((>= len 2)
-       (cond
-         ((and (integerp (car integers))
-               (integerp (cadr integers)))
-          `(logior ,(op-ior (car integers) (cadr integers))
-                   ,@(cddr integers)))
-         (t
-          `(logior (op-ior ,(car integers) ,(cadr integers))
-                   ,@(cddr integers))))))))
+  (cond
+    ((null integers) 0)
+    ((null (cdr integers)) (car integers))
+    ((and (integerp (car integers))
+          (integerp (cadr integers)))
+     `(logior ,(op-ior (car integers) (cadr integers))
+              ,@(cddr integers)))
+    (t
+     `(logior (op-ior ,(car integers) ,(cadr integers))
+              ,@(cddr integers)))))
 
 (defun logxor (&rest integers)
   (do ((ret 0)
@@ -97,17 +92,15 @@
 (define-compiler-macro logxor (&rest integers)
   (let ((len (length integers)))
     (cond
-      ((zerop len) -1)
-      ((= len 1) (car integers))
-      ((>= len 2)
-       (cond
-         ((and (integerp (car integers))
-               (integerp (cadr integers)))
-          `(logxor ,(op-xor (car integers) (cadr integers))
-                   ,@(cddr integers)))
-         (t
-          `(logxor (op-xor ,(car integers) ,(cadr integers))
-                   ,@(cddr integers))))))))
+      ((null integers) 0)
+      ((null (cdr integers)) (car integers))
+      ((and (integerp (car integers))
+            (integerp (cadr integers)))
+       `(logxor ,(op-xor (car integers) (cadr integers))
+                ,@(cddr integers)))
+      (t
+       `(logxor (op-xor ,(car integers) ,(cadr integers))
+                ,@(cddr integers))))))
 
 (defun logtest (integer1 integer2)
   (/= 0 (op-and integer1 integer2)))
@@ -141,7 +134,8 @@
 
 (define-compiler-macro ldb (&whole form bytespec integer)
   (cond
-    ((and (eq 'byte (car bytespec))
+    ((and (consp bytespec)
+          (eq 'byte (car bytespec))
           (integerp (cadr bytespec))
           (integerp (caddr bytespec)))
      (let* ((size (cadr bytespec))
@@ -160,13 +154,38 @@
 
 (define-compiler-macro dpb (&whole form newbyte bytespec integer)
   (cond
-    ((and (eq 'byte (car bytespec))
+    ((and (consp bytespec)
+          (eq 'byte (car bytespec))
           (integerp (cadr bytespec))
           (integerp (caddr bytespec)))
      (let* ((size (cadr bytespec))
             (pos (caddr bytespec))
             (mask (1- (ash 1 size)))
             (tmask (ash mask pos)))
-       `(logior (logxor ,tmask (logior ,integer ,tmask))
-                (ash (logand ,newbyte ,mask) ,pos))))
+       (cond
+         ((integerp newbyte)
+          `(logior (logxor ,tmask (logior ,integer ,tmask))
+                   ,(ash (logand newbyte mask) pos)))
+         (t
+          `(logior (logxor ,tmask (logior ,integer ,tmask))
+                   (ash (logand ,newbyte ,mask) ,pos))))))
     (t form)))
+
+;; this is taken straight from the spec.
+;; https://novaspec.org/cl/f_define-setf-expander
+(define-setf-expander ldb (bytespec int)
+  (multiple-value-bind (temps vals stores store-form access-form)
+                       (get-setf-expansion int)   ;Get setf expansion for int.
+    (let ((btemp (gensym))     ;Temp var for byte specifier.
+          (store (gensym))     ;Temp var for byte to store.
+          (stemp (first stores))) ;Temp var for int to store.
+      (if (cdr stores) (error "Can't expand this."))
+      ;;; Return the setf expansion for LDB as five values.
+      (values (cons btemp temps)       ;Temporary variables.
+              (cons bytespec vals)     ;Value forms.
+              (list store)             ;Store variables.
+              `(let ((,stemp (dpb ,store ,btemp ,access-form)))
+                 ,store-form
+                 ,store)               ;Storing form.
+              `(ldb ,btemp ,access-form) ;Accessing form.
+              ))))
