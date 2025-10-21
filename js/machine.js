@@ -115,6 +115,11 @@ export const OP = {
     MINUSP: 94,
     APPLY: 95,
     NARGS: 96,
+    BAND: 97,
+    BOR: 98,
+    BXOR: 99,
+    BASH: 100,
+    BCNT: 101,
 };
 
 const OP_LEN = [
@@ -215,6 +220,11 @@ const OP_LEN = [
     0 /* MINUSP */,
     1 /* APPLY */,
     1 /* NARGS */,
+    0 /* BAND */,
+    0 /* BOR */,
+    0 /* BXOR */,
+    0 /* BASH */,
+    0 /* BCNT */,
 ];
 
 export function want_bound(name, val) {
@@ -1016,6 +1026,12 @@ export class LispMachine {
         return error("Number expected, got " + dump(n), n);
     }
 
+    pop_integer() {
+        var n = this.pop();
+        if (Number.isInteger(n)) return n;
+        return error("Integer expected, got " + dump(n), n);
+    }
+
     mkret(pc) {
         return new LispRet(this, pc);
     }
@@ -1710,6 +1726,33 @@ let OP_RUN = [
             }
         }
         m.n_args = count;
+    },
+    /*OP.BAND*/ (m) => {
+        let num2 = m.pop_integer();
+        let num1 = m.pop_integer();
+        m.push(num1 & num2);
+    },
+    /*OP.BOR*/ (m) => {
+        let num2 = m.pop_integer();
+        let num1 = m.pop_integer();
+        m.push(num1 | num2);
+    },
+    /*OP.BXOR*/ (m) => {
+        let num2 = m.pop_integer();
+        let num1 = m.pop_integer();
+        m.push(num1 ^ num2);
+    },
+    /*OP.BASH*/ (m) => {
+        let num2 = m.pop_integer();
+        let num1 = m.pop_integer();
+        m.push(num2 < 0 ? (num1 >> -num2) :
+               num2 > 0 ? (num1 << num2) :
+               num1);
+    },
+    /*OP.BCNT*/ (m) => {
+        let num = m.pop_integer(), count = 0;
+        while (num) num &= num - 1, ++count;
+        m.push(count);
     },
 ];
 

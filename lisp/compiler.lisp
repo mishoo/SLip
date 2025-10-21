@@ -2307,6 +2307,7 @@
 
 (defconstant *core-files*
   '("lisp/init.lisp"
+    "lisp/byte.lisp"
     "lisp/hash.lisp"
     "lisp/type.lisp"
     "lisp/macroexpand.lisp"
