@@ -9,20 +9,17 @@
 
 (defconstant *structures* (make-hash-table))
 
-(defun substructp (name struct)
-  (let ((sub (structure-include struct)))
-    (when sub
-      (if (eq name (structure-name sub))
-          t
-          (substructp name sub)))))
+(defun substructp (tgt struct)
+  (if (member tgt (structure-include struct)) t nil))
 
 (defun structurep (thing &optional name)
-  (if (%structp thing)
-      (if name
-          (let ((x (%struct-ref (%struct-struct thing) 0)))
-            (or (eq x name)
-                (substructp name (find-structure x))))
-          t)))
+  (cond
+    ((not name) (%structp thing))
+    ((%structp thing)
+     (let ((ctor (%struct-struct thing))
+           (tgt (find-structure name)))
+       (or (eq ctor tgt)
+           (substructp tgt ctor))))))
 
 (defun assert-struct (thing &optional name)
   (unless (structurep thing name)
@@ -48,7 +45,8 @@
   (when (find-structure name nil)
     (warn "Redefining structure ~S." name))
   (when include
-    (setf include (find-structure include)))
+    (setf include (find-structure include))
+    (setf include (cons include (structure-include include))))
   (setf (find-structure name)
         (%struct *structure* name slots include print-object print-function)))
 

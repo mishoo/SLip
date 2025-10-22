@@ -495,7 +495,7 @@
          (read-quasiquote ()
            (skip #\`)
            (skip-ws)
-           (if (%memq (peek) '(#\( #\` #\'))
+           (if (%memq (peek) '(#\( #\` #\' #\,))
                (let* ((qq (list nil))
                       (in-qq (cons qq in-qq))
                       (token (read-token)))
@@ -537,6 +537,10 @@
 
          (read-token ()
            (skip-ws)
+           (aif (and *read-table*
+                     (gethash (peek) *read-table*))
+                (return-from read-token
+                  (funcall it input (next) #'the-reader)))
            (case (peek)
              (#\; (skip-comment) (read-token))
              (#\" (read-string))
@@ -556,15 +560,17 @@
                         (fwd))))
              (fwd)
              (cons (%stream-line input)
-                   (read-token)))))
+                   (read-token))))
 
-      (lambda (what)
-        (case what
-          (next (let ((in-qq nil))
-                  (read-toplevel)))
-          (pos (%stream-pos input))
-          (col (%stream-col input))
-          (line (%stream-line input)))))))
+         (the-reader (what)
+           (case what
+             (next (let ((in-qq nil))
+                     (read-toplevel)))
+             (pos (%stream-pos input))
+             (col (%stream-col input))
+             (line (%stream-line input)))))
+
+      #'the-reader)))
 
 (defmacro with-seq-output (out . body)
   (let ((seq (gensym)))
@@ -1087,6 +1093,11 @@
     `(%op MINUSP ,(reduce-form val))))
 
 (define-compiler-macro identity (x) x)
+
+(define-compiler-macro zerop (value)
+  (cond
+    ((eq value 0) t)
+    (t `(= 0 ,value))))
 
 (define-compiler-macro eq (&whole form a b)
   (cond
@@ -2307,6 +2318,7 @@
 
 (defconstant *core-files*
   '("lisp/init.lisp"
+    "lisp/byte.lisp"
     "lisp/hash.lisp"
     "lisp/type.lisp"
     "lisp/macroexpand.lisp"

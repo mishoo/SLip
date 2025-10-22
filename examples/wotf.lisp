@@ -3,10 +3,12 @@
 
 (in-package :wotf)
 
+(defun call-with-current-continuation (func)
+  (funcall func (%::c/c)))
+
 (defmacro with-cc (name &rest body)
-  `((lambda (,name)
-      ,@body)
-    (%::c/c)))
+  `(call-with-current-continuation
+    (lambda (,name) ,@body)))
 
 (defglobal *amb-fail* (lambda (arg)
                         (console.print "TOTAL FAILURE")))
