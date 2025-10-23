@@ -79,6 +79,14 @@ export class LispChar {
         return "#\\" + (LispChar.#NAMES_TO.get(ch) || ch);
     }
 
+    toUpperCase() {
+        return LispChar.get(this.value.toUpperCase());
+    }
+
+    toLowerCase() {
+        return LispChar.get(this.value.toLowerCase());
+    }
+
     serialize() {
         var ch = LispChar.sanitize(JSON.stringify(this.value));
         return "c(" + ch + ")";

@@ -20,18 +20,18 @@
      apply aref asin assert atan atom block boolean boundp caaaar caaadr caaar
      caadar caaddr caadr caar cadaar cadadr cadar caddar cadddr caddr cadr car
      case catch cdaaar cdaadr cdaar cdadar cdaddr cdadr cdar cddaar cddadr
-     cddar cdddar cddddr cdddr cddr cdr ceiling char character char-code
-     char-equal char-greaterp char-lessp char-name char-not-equal
+     cddar cdddar cddddr cdddr cddr cdr ceiling char character characterp
+     char-code char-equal char-greaterp char-lessp char-name char-not-equal
      char-not-greaterp char-not-lessp char/= char< char<= char= char> char>=
-     charp clear-timeout code-char compile compiler-macro-function complement
-     cond cons consp constantly copy-list copy-seq copy-tree cos
-     current-thread debug decf declare defconstant defglobal
-     define-compiler-macro define-modify-macro define-setf-expander defmacro
-     defpackage defparameter defsetf defun defvar destructuring-bind digitp
-     disassemble do do* dolist dotimes downcase ecase elt eq eql equal equalp
-     error eval evenp every exp export expt fboundp fdefinition fifth
-     find-package find-symbol first fixnum flet float floatp floor fmakunbound
-     foreach fourth funcall function functionp gensym get
+     char-upcase char-downcase charp clear-timeout code-char compile
+     compiler-macro-function complement cond cons consp constantly copy-list
+     copy-seq copy-tree cos current-thread debug decf declare defconstant
+     defglobal define-compiler-macro define-modify-macro define-setf-expander
+     defmacro defpackage defparameter defsetf defun defvar destructuring-bind
+     digitp digit-char-p disassemble do do* dolist dotimes downcase ecase elt
+     eq eql equal equalp error eval evenp every exp export expt fboundp
+     fdefinition fifth find-package find-symbol first fixnum flet float floatp
+     floor fmakunbound foreach fourth funcall function functionp gensym get
      get-internal-run-time get-setf-expansion getf gethash go hash-copy
      hash-iterator hash-keys hash-table hash-table-p hash-values identity if
      ignore import in-package incf integer integerp intern it iterator-next
@@ -1046,3 +1046,11 @@
                  ,oldvalue))))))))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
+
+(defmacro with-backtrace (() &rest body)
+  `(handler-bind ((error (lambda (error)
+                           (format *standard-output* "~S~%" error)
+                           (format *standard-output* "~S~%" (%:%backtrace)))))
+     ,@body))
+
+(export 'with-backtrace)

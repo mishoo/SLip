@@ -1,6 +1,6 @@
 (in-package :sl)
 
-(export '(peek-char read-char read-line write-string write-line
+(export '(peek-char read-char read-line write-char write-string write-line
           peek-byte read-byte
           read-sequence write-sequence
           with-input-from-string file-position
@@ -73,6 +73,11 @@
             (error 'end-of-file :stream input-stream)
             (values eof-value t))
         (values line eof))))
+
+(defun write-char (char &optional (output-stream *standard-output*))
+  (check-type char char)
+  (check-type output-stream text-output-stream)
+  (%stream-put output-stream char))
 
 (defun write-string (string &optional (output-stream *standard-output*)
                             &key (start 0) end)

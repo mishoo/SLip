@@ -953,6 +953,16 @@ defp("string-upcase", false, function(m, nargs){
     return checktype(as_string(m.pop()), LispString).toUpperCase();
 });
 
+defp("char-downcase", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispChar).toLowerCase();
+});
+
+defp("char-upcase", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispChar).toUpperCase();
+});
+
 defp("string-capitalize", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return checktype(as_string(m.pop()), LispString).replace(/\w+/gu, str =>
@@ -1131,17 +1141,34 @@ defp("stringp", false, function(m, nargs){
     return LispString.is(m.pop());
 });
 
+// XXX: rename in code to characterp, then remove.
 defp("charp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return LispChar.is(m.pop());
 });
 
+defp("characterp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return LispChar.is(m.pop());
+});
+
+// XXX: rename in code to digit-char-p, then remove.
 defp("digitp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var ch = m.pop();
     checktype(ch, LispChar);
     ch = ch.value.charCodeAt(0);
     return ch >= 48 && ch <= 57;
+});
+
+defp("digit-char-p", false, function(m, nargs){
+    checknargs(nargs, 1, 2);
+    let radix = nargs > 1 ? m.pop() : 10;
+    let ch = m.pop();
+    checktype(ch, LispChar);
+    checktype(radix, LispNumber);
+    let val = parseInt(ch.value, radix);
+    return isNaN(val) ? false : val;
 });
 
 defp("whitespacep", false, function(m, nargs){

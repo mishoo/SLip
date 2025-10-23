@@ -1,8 +1,8 @@
 (in-package :sl)
 
-(export '(ash byte byte-size byte-position ldb dpb logand logandc1 logandc2
-          logeqv logior lognand lognor lognot logorc1 logorc2 logxor logtest
-          logcount))
+(export '(ash byte byte-size byte-position ldb ldb-test dpb logand logandc1
+          logandc2 logeqv logior lognand lognor lognot logorc1 logorc2 logxor
+          logtest logcount))
 
 (defpackage :sl-byte
   (:use :sl :%))
@@ -142,6 +142,24 @@
             (pos (caddr bytespec))
             (mask (1- (ash 1 size))))
        `(ash (logand ,integer ,(ash mask pos)) ,(- pos))))
+    (t form)))
+
+(defun ldb-test (bytespec integer)
+  (let* ((size (byte-size bytespec))
+         (pos (byte-position bytespec))
+         (mask (1- (ash 1 size))))
+    (/= 0 (logand integer (ash mask pos)))))
+
+(define-compiler-macro ldb-test (&whole form bytespec integer)
+  (cond
+    ((and (consp bytespec)
+          (eq 'byte (car bytespec))
+          (integerp (cadr bytespec))
+          (integerp (caddr bytespec)))
+     (let* ((size (cadr bytespec))
+            (pos (caddr bytespec))
+            (mask (1- (ash 1 size))))
+       `(/= 0 (logand ,integer ,(ash mask pos)))))
     (t form)))
 
 (defun dpb (newbyte bytespec integer)

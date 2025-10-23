@@ -3,6 +3,7 @@
 //----------------------------
 
 import { LispCons } from "../js/list.js";
+import { LispSymbol } from "../js/types.js";
 import { Ymacs, Ymacs_Keymap, Ymacs_Buffer,
          Ymacs_Interactive, Ymacs_Tokenizer,
          Ymacs_Lang_Lisp,
@@ -251,7 +252,8 @@ function find_package(buffer, start) {
     if (pak) try {
         var exp = MACHINE().read(false, pak)[0];
         pak = exp.cdr.car;
-        return MACHINE().eval(pak);
+        if (typeof pak === "string") return pak;
+        if (LispSymbol.is(pak)) return pak.name;
     } catch(ex) {};
     return false;
 };
@@ -706,7 +708,7 @@ Ymacs_Buffer.newMode("sl_mode", function(){
         var ret = [ "SL" ];
         var pak = find_in_package(this, this.point());
         if (pak) {
-            pak = pak.replace(/^\(in-/, "(%::find-").replace(/\)/, ")"); // that's a pervert hack
+            pak = pak.replace(/^\(in-package\s*/, "(%::find-package '"); // that's a pervert hack
             try {
                 pak = MACHINE().eval_string(false, pak);
             } catch(ex) {

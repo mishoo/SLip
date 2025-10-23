@@ -422,7 +422,7 @@
            (let ((str (upcase (read-symbol-name))))
              (when (zerop (length str))
                (croak (strcat "Bad character (or reader bug) in read-symbol: " (peek))))
-             (aif (and (regexp-test #/^-?[0-9]*\.?[0-9]*$/ str)
+             (aif (and (regexp-test #/^[+-]?[0-9]*\.?[0-9]*$/ str)
                        (parse-number str))
                   it
                   (aif (regexp-exec #/^(.*?)(::?)(.*)$/ str)
@@ -537,20 +537,23 @@
 
          (read-token ()
            (skip-ws)
-           (aif (and *read-table*
-                     (gethash (peek) *read-table*))
-                (return-from read-token
-                  (funcall it input (next) #'the-reader)))
-           (case (peek)
-             (#\; (skip-comment) (read-token))
-             (#\" (read-string))
-             (#\( (read-list))
-             (#\# (read-sharp))
-             (#\` (read-quasiquote))
-             (#\, (read-comma))
-             ((#\' #\’) (next) (read-quote))
-             ((nil) eof)
-             (otherwise (read-symbol))))
+           (let ((reader (and *read-table* (gethash (peek) *read-table*))))
+             (cond
+               (reader
+                (let ((tok (multiple-value-list
+                            (funcall reader input (next) #'the-reader))))
+                  (if tok (car tok) (read-token))))
+               (t
+                (case (peek)
+                  (#\; (skip-comment) (read-token))
+                  (#\" (read-string))
+                  (#\( (read-list))
+                  (#\# (read-sharp))
+                  (#\` (read-quasiquote))
+                  (#\, (read-comma))
+                  ((#\' #\’) (next) (read-quote))
+                  ((nil) eof)
+                  (otherwise (read-symbol)))))))
 
          (read-toplevel ()
            (labels ((fwd ()
@@ -586,7 +589,7 @@
          (progn ,@body)
        (%no-interrupts old))))
 
-(defmacro return (val)
+(defmacro return (&optional val)
   `(return-from nil ,val))
 
 (defun lambda-keyword-p (sym)
