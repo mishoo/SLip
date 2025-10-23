@@ -997,7 +997,10 @@
     ((reduce-form (form)
        (aif (and (consp form)
                  (compiler-macro-function (car form)))
-            (funcall it form)
+            (let ((exp (funcall it form)))
+              (if (eq exp form)
+                  exp
+                  (reduce-form exp)))
             form))
 
      (reduce-sum (nums)
@@ -1017,7 +1020,9 @@
             ((= -1 (cadr nums))
              `(%:%op DEC ,(car nums)))
             ((minusp (cadr nums))
-             `(%:%op SUB ,(car nums) ,(- (cadr nums))))))
+             `(%:%op SUB ,(car nums) ,(- (cadr nums))))
+            (t
+             `(%:%op ADD ,(car nums) ,(cadr nums)))))
          (t
           `(%:%op ADD ,(car nums) ,(cadr nums)))))
 

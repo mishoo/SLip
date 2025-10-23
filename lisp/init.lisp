@@ -1047,7 +1047,7 @@
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
 
-(defmacro with-backtrace (() &rest body)
+(defmacro with-backtrace (&rest body)
   `(handler-bind ((error (lambda (error)
                            (format *standard-output* "~S~%" error)
                            (format *standard-output* "~S~%" (%:%backtrace)))))
