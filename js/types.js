@@ -212,6 +212,65 @@ export class LispHashEqual extends LispHash {
     }
 }
 
+export function forEach(seq, func) {
+    if (LispCons.is(seq)) return LispCons.forEach(seq, func);
+    if (Array.isArray(seq)) return seq.forEach(seq, func);
+    throw new LispPrimitiveError("Unknown sequence in primitive forEach");
+}
+
+export class LispArray extends Array {
+    static is(x) { return x instanceof LispArray }
+
+    #dimensions;
+    #element_type;
+    #initial_element;
+
+    constructor({
+        dimensions,
+        element_type = true,
+        initial_element = false,
+        initial_content = false,
+    }) {
+        super(dimensions.reduce((p, v) => p * v, 1));
+        this.#dimensions = dimensions;
+        this.#element_type = element_type;
+        this.#initial_element = initial_element;
+        if (initial_content) {
+            let grok = (content, subscripts) =>
+                (subscripts.length === this.#dimensions.length
+                 ? this.set(subscripts, content) // XXX: this can be optimized to compute less indices.
+                 : forEach(content, (content, i) => grok(content, [...subscripts, i])));
+            grok(initial_content, []);
+        } else {
+            this.fill(initial_element);
+        }
+    }
+
+    dimensions() { return this.#dimensions }
+    element_type() { return this.#element_type }
+    initial_element() { return this.#initial_element }
+    index(subscripts) {
+        let index = 0, n = subscripts.length;
+        for (let i = 0; i < n; ++i) {
+            let p = subscripts[i];
+            for (let j = i + 1; j < n; ++j) {
+                p *= this.#dimensions[j];
+            }
+            index += p;
+        }
+        if (index < 0 || index >= this.length) {
+            throw new LispPrimitiveError(`Computed array index ${index} out of bounds (subscripts: ${subscripts.join(",")}, dimensions: ${this.#dimensions.join(",")})`);
+        }
+        return index;
+    }
+    get(subscripts) {
+        return this[this.index(subscripts)];
+    }
+    set(subscripts, value) {
+        return this[this.index(subscripts)] = value;
+    }
+}
+
 export class LispStruct {
     static type = "struct";
     static is(x) { return x instanceof LispStruct }

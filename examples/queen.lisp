@@ -1527,8 +1527,6 @@ by STRING-DESIGNATOR being its first argument."
   (with-input-from-string (in pgn)
     (parse-pgn in)))
 
-%:EOF
-
 ;;;; FILE: eval.lisp
 
 (defconstant +MATK+ 10000)
@@ -1548,8 +1546,7 @@ by STRING-DESIGNATOR being its first argument."
      ;; (declaim (type (simple-array (integer -100 100) (8 8)) ,name))
      (defparameter ,name
        (make-array '(8 8) :element-type '(integer -100 100)
-                          :initial-contents
-                          (reverse ',value)))))
+                   :initial-contents ',(reverse value)))))
 
 (defscore *p-scores*
   ( 0   0   0   0   0   0   0   0)
@@ -1772,7 +1769,7 @@ by STRING-DESIGNATOR being its first argument."
                   (- (static-value game))))
              ((zerop depth)
               ;; somehow SBCL doesn't figure out that QUIES returns a SCORE
-              (the score (- (quies game α β moves pline) depth)))
+              (- (quies game α β moves pline) depth))
              (t
               (let ((score 0))
                 (declare (type score score))

@@ -9,6 +9,7 @@ import {
     LispMutex,
     LispChar,
     LispClosure,
+    LispArray,
     LispStruct,
     LispStdInstance,
 } from "./types.js";
@@ -63,7 +64,7 @@ const LispList = {
 };
 
 const LispVector = {
-    is: Array.isArray,
+    is(x) { return LispArray.is(x) ? x.dimensions().length === 1 : Array.isArray(x) },
     type: "array"
 };
 
@@ -812,6 +813,47 @@ defp("svref", false, function(m, nargs){
     }
     checktype(vector, LispVector);
     return index >= 0 && index < vector.length ? vector[index] : false;
+});
+
+defp("%make-array", false, function(m, nargs){
+    checknargs(nargs, 1, 4);
+    let content = nargs > 3 ? m.pop() : false;
+    let initel = nargs > 2 ? m.pop() : false;
+    let eltype = nargs > 1 ? m.pop() : false;
+    let dimensions = m.pop();
+    if (LispInteger.is(dimensions)) {
+        dimensions = [ dimensions ];
+    } else if (LispList.is(dimensions)) {
+        dimensions = LispCons.toArray(dimensions);
+    } else if (!LispVector.is(dimensions)) {
+        error(`Invalid array dimensions: ${LispMachine.dump(dimensions)}`);
+    }
+    return new LispArray({
+        dimensions: dimensions,
+        element_type: eltype,
+        initial_element: initel,
+        initial_content: content,
+    });
+});
+
+defp("%arrayp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let v = m.pop();
+    return LispArray.is(v);
+});
+
+defp("%array-ref", false, function(m, nargs){
+    checknargs(nargs, 1);
+    let subscripts = m.pop_frame(nargs - 1);
+    return checktype(m.pop(), LispArray).get(subscripts);
+});
+
+defp("%array-set", true, function(m, nargs){
+    checknargs(nargs, 2);
+    let subscripts = m.pop_frame(nargs - 2);
+    let array = checktype(m.pop(), LispArray);
+    let value = m.pop();
+    return array.set(subscripts, value);
 });
 
 function schar(m, nargs){

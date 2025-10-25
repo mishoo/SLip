@@ -1,10 +1,9 @@
 (in-package :sl)
 
 (export '(peek-char read-char read-line write-char write-string write-line
-          peek-byte read-byte
-          read-sequence write-sequence
-          with-input-from-string file-position
-          stream-error stream-error-stream end-of-file))
+          peek-byte read-byte read-sequence write-sequence
+          with-input-from-string file-position finish-output stream-error
+          stream-error-stream end-of-file))
 
 (defpackage :sl-stream
   (:use :sl :%)
@@ -107,3 +106,7 @@
 
 (defun open-url (url &optional binary)
   (%:%http-input-stream url binary))
+
+(defun finish-output (&optional (output-stream *standard-output*))
+  ;; XXX: implement this.
+  )
