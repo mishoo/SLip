@@ -38,8 +38,8 @@
      keywordp labels lambda lambda-list-keywords last length let let* letterp
      list list* listp load locally log macroexpand macroexpand-1 macrolet
      make-array make-hash make-list make-package make-regexp make-symbol
-     make-thread make-vector makunbound mapc mapcar max member min minusp mod
-     most-negative-fixnum most-positive-fixnum multiple-value-bind
+     make-thread make-vector makunbound mapc mapcar maplist max member min
+     minusp mod most-negative-fixnum most-positive-fixnum multiple-value-bind
      multiple-value-call multiple-value-list multiple-value-prog1
      multiple-value-setq name-char nconc nil not notany notevery nreconc
      nreverse nth nthcdr null number-fixed number-string number numberp oddp
@@ -130,6 +130,37 @@
      `(map1 ,func ,@lists))
     ((null (cddr lists))
      `(map2 ,func ,@lists))
+    (form)))
+
+(defun maplist1 (func lst)
+  (let rec ((ret nil) (lst lst))
+    (if lst
+        (rec (cons (funcall func lst) ret)
+             (cdr lst))
+        (nreverse ret))))
+
+(defun maplist2 (func lst1 lst2)
+  (let rec ((ret nil) (lst1 lst1) (lst2 lst2))
+    (if (and lst1 lst2)
+        (rec (cons (funcall func lst1 lst2) ret)
+             (cdr lst1) (cdr lst2))
+        (nreverse ret))))
+
+(defun maplist (f . lists)
+  (let rec (ret (tails lists))
+    (if (finished tails)
+        (nreverse ret)
+        (rec (cons (apply f tails) ret)
+             (map1 #'cdr tails)))))
+
+(define-compiler-macro maplist (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPLIST"))
+    ((null (cdr lists))
+     `(maplist1 ,func ,@lists))
+    ((null (cddr lists))
+     `(maplist2 ,func ,@lists))
     (form)))
 
 ;; every returns false as soon as any invocation of predicate
