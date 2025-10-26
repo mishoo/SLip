@@ -1,7 +1,8 @@
 (in-package :sl)
 
 (export '(type-of typep deftype typecase etypecase
-          fixnum float input-stream output-stream satisfies mod))
+          fixnum float input-stream output-stream satisfies mod
+          string-designator))
 
 (defpackage :sl-type
   (:use :sl :%)
@@ -22,7 +23,6 @@
   (%:make-hash
    'null           'null
    'atom           'atom
-   'cons           'consp
    'list           'listp
    'symbol         'symbolp
    'number         'numberp
@@ -75,9 +75,6 @@
 (defpredicate t (obj) (declare (ignore obj)) t)
 (defpredicate nil (obj) (declare (ignore obj)) nil)
 
-(defpredicate boolean (obj)
-  (if (null obj) t (eq obj t)))
-
 (defpredicate integer (obj &optional (min '*) (max '*))
   (and (integerp obj)
        (if (eq min '*) t (>= obj min))
@@ -106,6 +103,11 @@
 
 (defpredicate eql (obj value)
   (eql obj value))
+
+(defpredicate %cons (obj &optional (left '*) (right '*))
+  (and (consp obj)
+       (if (eq left '*) t (typep (car obj) left))
+       (if (eq right '*) t (typep (cdr obj) right))))
 
 (defun %typep (object typespec)
   (cond
@@ -144,9 +146,21 @@
                 (t
                  (case (car tspec)
                    ((and)
-                    `(and ,@(mapcar #'expand (cdr tspec))))
+                    (cond
+                      ((null (cdr tspec)) 'nil)
+                      ((null (cddr tspec))
+                       (expand (cadr tspec)))
+                      (t
+                       `(when ,(expand (cadr tspec))
+                          ,(expand `(and ,@(cddr tspec)))))))
                    ((or)
-                    `(or ,@(mapcar #'expand (cdr tspec))))
+                    (cond
+                      ((null (cdr tspec)) 't)
+                      ((null (cddr tspec))
+                       (expand (cadr tspec)))
+                      (t
+                       `(if ,(expand (cadr tspec)) 't
+                            ,(expand `(or ,@(cddr tspec)))))))
                    ((not)
                     `(not ,(expand (cadr tspec))))
                    ((eql)
@@ -171,10 +185,14 @@
              ,code)))))
 
 (define-compiler-macro typep (&whole form object typespec)
-  (if (and (consp typespec)
-           (eq (car typespec) 'quote))
-      (expand (cadr typespec) object)
-      form))
+  (cond
+    ((eq typespec t) 't)
+    ((eq typespec nil) 'nil)
+    ((and (consp typespec)
+          (eq (car typespec) 'quote))
+     (expand (cadr typespec) object))
+    (t
+     form)))
 
 (defmacro deftype (name lambda-list &rest forms)
   (assert (symbolp name)
@@ -216,6 +234,9 @@
                    ,obj)))))))
      ',name))
 
+(deftype boolean ()
+  `(or (eql t) (eql nil)))
+
 (deftype mod (n)
   `(integer 0 ,(1- n)))
 
@@ -232,6 +253,17 @@
     ((and (integerp size) (plusp size))
      `(integer 0 ,(1- (expt 2 size))))
     (t (error "UNSIGNED-BYTE: unsupported SIZE argument ~S" size))))
+
+(deftype string-designator ()
+  `(or string symbol char))
+
+(deftype cons (&optional left right)
+  (cond
+    ((and (eq left '*)
+          (eq right '*))
+     '(satisfies consp))
+    (t
+     `(%cons ,left ,right))))
 
 (defun type-of (x)
   (let ((type (%:%type-of x)))
