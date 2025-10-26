@@ -200,6 +200,8 @@
                       `((defun (setf ,name) (value obj)
                           (assert-struct obj ',struct-name)
                           (%struct-set obj ,idx value))))))))
+        (unless predicate
+          (setf predicate (make-symbol (strcat struct-name "-P"))))
         `(let ((,the-struct
                 (make-structure ',struct-name
                                 :slots ',slots
@@ -209,12 +211,11 @@
                                     `(:print-object ',print-object))
                                 ,@(when print-function
                                     `(:print-function ',print-function)))))
-           (sl-type:defpredicate ,struct-name (obj)
+           (defun ,predicate (obj)
              (structurep obj ',struct-name))
+           (deftype ,struct-name ()
+             '(satisfies ,predicate))
            ,@(mapcar #'make-slot slots)
-           ,@(when predicate
-               `((defun ,predicate (obj)
-                   (structurep obj ',struct-name))))
            ,@(when copier
                `((defun ,copier (obj)
                    (assert-struct obj ',struct-name)

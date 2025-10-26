@@ -1390,6 +1390,7 @@
     ((sl-struct::structurep x 'sl-struct::structure)  <structure-class>)
     ((sl-struct::structurep x)                        <structure-object>)
     ((vectorp x)                                      <vector>)
+    ((arrayp x)                                       <array>)
     ((functionp x)                                    <function>)
     ((regexpp x)                                      <regexp>)
     ((hash-table-p x)                                 <hash-table>)

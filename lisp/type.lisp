@@ -21,13 +21,13 @@
 ;; where `integer' is the predicate for integer (defined with defpredicate below).
 (defglobal *built-in-types*
   (%:make-hash
-   'null           'null
    'atom           'atom
    'list           'listp
    'symbol         'symbolp
    'number         'numberp
    'function       'functionp
    'char           'charp
+   'character      'charp
    'hash-table     'hash-table-p
    'package        'packagep
    'input-stream   '%input-stream-p
@@ -234,6 +234,9 @@
                    ,obj)))))))
      ',name))
 
+(deftype null ()
+  `(eql nil))
+
 (deftype boolean ()
   `(or (eql t) (eql nil)))
 
@@ -255,7 +258,7 @@
     (t (error "UNSIGNED-BYTE: unsupported SIZE argument ~S" size))))
 
 (deftype string-designator ()
-  `(or string symbol char))
+  `(or string symbol character))
 
 (deftype cons (&optional left right)
   (cond
