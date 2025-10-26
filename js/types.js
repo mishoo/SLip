@@ -214,7 +214,8 @@ export class LispHashEqual extends LispHash {
 
 export function forEach(seq, func) {
     if (LispCons.is(seq)) return LispCons.forEach(seq, func);
-    if (Array.isArray(seq)) return seq.forEach(seq, func);
+    if (Array.isArray(seq)) return seq.forEach(func);
+    if (typeof seq === "string") return [...seq].map(LispChar.get).forEach(func);
     throw new LispPrimitiveError("Unknown sequence in primitive forEach");
 }
 
@@ -253,6 +254,9 @@ export class LispArray extends Array {
         let index = 0, n = subscripts.length;
         for (let i = 0; i < n; ++i) {
             let p = subscripts[i];
+            if (p < 0 || p >= this.#dimensions[i]) {
+                throw new LispPrimitiveError(`Array index ${p} out of bounds for dimension ${i} (should be 0..${this.#dimensions[i] - 1})`);
+            }
             for (let j = i + 1; j < n; ++j) {
                 p *= this.#dimensions[j];
             }

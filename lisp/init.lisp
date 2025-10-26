@@ -895,12 +895,10 @@
                                           &allow-other-keys)
   (cond
     ((or element-type
-         (and (consp dimensions)
-              (cdr dimensions)))
+         (consp dimensions))
      form)
     (t
-     `(make-vector ,(if (consp dimensions) (car dimensions) dimensions)
-                   ,initial-element ,initial-contents))))
+     `(make-vector ,dimensions ,initial-element ,initial-contents))))
 
 (defun aref (array &rest subscripts)
   (cond
