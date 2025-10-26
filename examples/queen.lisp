@@ -1545,8 +1545,7 @@ by STRING-DESIGNATOR being its first argument."
   `(progn
      ;; (declaim (type (simple-array (integer -100 100) (8 8)) ,name))
      (defparameter ,name
-       (make-array '(8 8) :element-type '(integer -100 100)
-                   :initial-contents ',(reverse value)))
+       (make-array 64 :initial-contents (apply #'append ',(reverse value))))
      nil))
 
 (defscore *p-scores*
@@ -1639,14 +1638,15 @@ by STRING-DESIGNATOR being its first argument."
     (setf row (- 7 row)
           col (- 7 col)))
   (ecase (piece piece)
-    (#.+PAWN+   (+ +MATP+ (aref *p-scores* row col)))
-    (#.+KNIGHT+ (+ +MATN+ (aref *n-scores* row col)))
-    (#.+BISHOP+ (+ +MATB+ (aref *b-scores* row col)))
-    (#.+ROOK+   (+ +MATR+ (aref *r-scores* row col)))
-    (#.+QUEEN+  (+ +MATQ+ (aref *q-scores* row col)))
+    (#.+PAWN+   (+ +MATP+ (aref *p-scores* (+ (ash row 3) col))))
+    (#.+KNIGHT+ (+ +MATN+ (aref *n-scores* (+ (ash row 3) col))))
+    (#.+BISHOP+ (+ +MATB+ (aref *b-scores* (+ (ash row 3) col))))
+    (#.+ROOK+   (+ +MATR+ (aref *r-scores* (+ (ash row 3) col))))
+    (#.+QUEEN+  (+ +MATQ+ (aref *q-scores* (+ (ash row 3) col))))
     (#.+KING+   (+ +MATK+ (aref (if ending
                                     *k-scores-ending*
-                                    *k-scores-opening*) row col)))))
+                                    *k-scores-opening*)
+                                (+ (ash row 3) col))))))
 
 ;; (declaim (type (function () score) static-value))
 (defun static-value (game)
@@ -1829,18 +1829,22 @@ by STRING-DESIGNATOR being its first argument."
          (score (pvs game depth -32000 +32000 line)))
     (values (car line) score)))
 
-(defun dump-line (game moves)
+(defun dump-line (game moves &optional newlines)
   (with-output-to-string (out)
     (labels ((rec (moves first)
                (when moves
                  (let ((move (car moves)))
                    (when (or first (move-white? move))
-                     (unless first
+                     (unless (or first newlines)
                        (write-char #\SPACE out))
-                     (format out "~D." (game-fullmove game)))
+                     (format out
+                             (if newlines "~3D." "~D.")
+                             (game-fullmove game)))
                    (when (and first (move-black? move))
                      (format out ".."))
                    (format out " ~A" (game-san game move))
+                   (when (and newlines (move-black? move))
+                     (write-char #\Newline out))
                    (with-move (game move)
                      (rec (cdr moves) nil))))))
       (rec moves t))))
