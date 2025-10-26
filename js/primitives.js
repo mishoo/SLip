@@ -759,6 +759,13 @@ defp("as-list", false, function(m, nargs){
 });
 
 defp("vector-push", true, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let vector = checktype(m.pop(), LispVector);
+    let value = m.pop();
+    return vector.push(value) - 1;
+});
+
+defp("%vector-push", true, function(m, nargs){
     checknargs(nargs, 2);
     var a = m.pop_frame(nargs - 1);
     var vector = m.pop();
@@ -839,7 +846,7 @@ defp("%make-array", false, function(m, nargs){
 defp("%arrayp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     let v = m.pop();
-    return LispArray.is(v);
+    return LispArray.is(v) || Array.isArray(v);
 });
 
 defp("%array-ref", false, function(m, nargs){
@@ -854,6 +861,72 @@ defp("%array-set", true, function(m, nargs){
     let array = checktype(m.pop(), LispArray);
     let value = m.pop();
     return array.set(subscripts, value);
+});
+
+defp("array-dimensions", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let array = m.pop();
+    if (LispArray.is(array)) return LispCons.fromArray(array.dimensions());
+    if (Array.isArray(array)) return new LispCons(array.length, false);
+    error(`ARRAY-DIMENSIONS: argument is not an array`);
+});
+
+defp("fill-pointer", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let array = checktype(m.pop(), LispVector);
+    return array.length;
+});
+
+defp("%set-fill-pointer", false, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let array = checktype(m.pop(), LispVector);
+    let pos = m.pop_integer();
+    if (pos < 0 || pos >= array.length) {
+        error(`%SET-FILL-POINTER: bad fill pointer ${pos} (should be 0..${array.length})`);
+    }
+    return array.length = pos;
+});
+
+defp("array-dimension", false, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let axis = m.pop_integer();
+    let array = m.pop();
+    let dimensions;
+    if (LispArray.is(array)) {
+        dimensions = array.dimensions();
+    } else if (Array.isArray(array)) {
+        dimensions = [ array.length ];
+    } else {
+        error(`ARRAY-DIMENSION: argument is not an array`);
+    }
+    if (axis < 0 || axis >= dimensions.length) {
+        error(`ARRAY-DIMENSION: axis out of bounds`);
+    }
+    return dimensions[axis];
+});
+
+defp("array-rank", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let array = m.pop();
+    if (LispArray.is(array)) {
+        return array.dimensions().length;
+    } else if (Array.isArray(array)) {
+        return 1;
+    } else {
+        error(`ARRAY-RANK: argument is not an array`);
+    }
+});
+
+defp("array-element-type", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let array = m.pop();
+    if (LispArray.is(array)) {
+        return array.element_type();
+    } else if (Array.isArray(array)) {
+        return true;
+    } else {
+        error(`ARRAY-RANK: argument is not an array`);
+    }
 });
 
 function schar(m, nargs){

@@ -119,7 +119,7 @@
 
 (defun maybe-xref-info (name type)
   (when *xref-info*
-    (vector-push *xref-info*
+    (%vector-push *xref-info*
                  (vector name type *current-pos*))))
 
 (defmacro quasiquote (thing)
@@ -224,7 +224,7 @@
   (let ((ret (vector)))
     (let rec ((lst lst))
       (if lst (progn
-                (vector-push ret (funcall func (%pop lst)))
+                (%vector-push ret (funcall func (%pop lst)))
                 (rec lst))
           ret))))
 
@@ -1852,7 +1852,7 @@
          (with-seq-output <<
            (setq env (extenv env :lex envcell))
            (labels ((newarg (name)
-                      (vector-push envcell (maybe-special name))
+                      (%vector-push envcell (maybe-special name))
                       (when (or (%specialp name)
                                 (%memq name locally-special))
                         (incf specials)
@@ -2114,7 +2114,7 @@
                               (incf specials)
                               (gen "BIND" name index)))
                         (incf index)
-                        (vector-push envcell (maybe-special name)))
+                        (%vector-push envcell (maybe-special name)))
                       names vals)
                 (declare-locally-special :except names)
                 (cond
@@ -2326,6 +2326,7 @@
 
 (defconstant *core-files*
   '("lisp/init.lisp"
+    "lisp/array.lisp"
     "lisp/byte.lisp"
     "lisp/hash.lisp"
     "lisp/type.lisp"

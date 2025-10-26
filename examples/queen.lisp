@@ -1546,7 +1546,8 @@ by STRING-DESIGNATOR being its first argument."
      ;; (declaim (type (simple-array (integer -100 100) (8 8)) ,name))
      (defparameter ,name
        (make-array '(8 8) :element-type '(integer -100 100)
-                   :initial-contents ',(reverse value)))))
+                   :initial-contents ',(reverse value)))
+     nil))
 
 (defscore *p-scores*
   ( 0   0   0   0   0   0   0   0)

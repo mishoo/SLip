@@ -480,8 +480,12 @@
         (%pp-object object))))
 
 (defun<< %pp-array (array)
-  (<< "#")
-  (%pp-list (%:as-list array)))
+  (cond
+    ((zerop (length array))
+     (<< "#()"))
+    (t
+     (<< "#")
+     (%pp-list (%:as-list array)))))
 
 (defmethod pprint-object ((object vector) (output output-stream))
   (if (eq *pp-stream* output)
