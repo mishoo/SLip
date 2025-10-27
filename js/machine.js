@@ -1190,7 +1190,7 @@ function error(msg) {
     throw new LispPrimitiveError(msg);
 }
 
-function find_key_arg(item, array, start, end = array.length) {
+function find_key_arg(item, array, start, end) {
     for (let i = start; i < end; i += 2) {
         if (eq(item, array[i])) return i;
     }

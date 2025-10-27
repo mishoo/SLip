@@ -32,6 +32,7 @@
       (when errorp
         (error "No such structure ~S." name))))
 
+(declaim (inline structure-of))
 (defun structure-of (x)
   (assert-struct x)
   (%struct-struct x))
@@ -193,11 +194,13 @@
              (let ((idx (prog1 index (incf index)))
                    (name (accessor (getf slot :name))))
                `(progn
+                  (declaim (inline ,name))
                   (defun ,name (obj)
                     (assert-struct obj ',struct-name)
                     (%struct-ref obj ,idx))
                   ,@(unless (getf slot :read-only)
-                      `((defun (setf ,name) (value obj)
+                      `((declaim (inline (setf ,name)))
+                        (defun (setf ,name) (value obj)
                           (assert-struct obj ',struct-name)
                           (%struct-set obj ,idx value))))))))
         (unless predicate
@@ -217,7 +220,8 @@
              '(satisfies ,predicate))
            ,@(mapcar #'make-slot slots)
            ,@(when copier
-               `((defun ,copier (obj)
+               `((declaim (inline ,copier))
+                 (defun ,copier (obj)
                    (assert-struct obj ',struct-name)
                    (copy-structure obj))))
            ,@(when constructor

@@ -9,6 +9,10 @@
 
 (in-package :sl-byte)
 
+(declaim (inline byte byte-size byte-position
+                 logand logior logxor logtest logcount
+                 ash ldb ldb-test dpb))
+
 (defun byte (size position)
   (cons size position))
 

@@ -111,16 +111,36 @@
            (opt-cons x)))))
    #'qq))
 
+(defun declaim-inline (names)
+  (foreach names
+    (lambda (name)
+      (multiple-value-bind (setter name) (%:maybe-setter name)
+        (%set-symbol-prop (or setter name) :inline t)))))
+
+(defmacro declaim (&rest declarations)
+  (foreach declarations
+    (lambda (decl)
+      (case (car decl)
+        ((inline) (declaim-inline (cdr decl)))))))
+
 (defmacro defun (name args . body)
   (multiple-value-bind (setter name) (%:maybe-setter name)
     (maybe-xref-info name (if setter 'setf 'defun))
-    `(set-symbol-function! ',(or setter name)
-                           (%fn ,name ,args ,@body))))
+    (let ((parsed-args (parse-lambda-list args)))
+      (%set-symbol-prop (or setter name) :lambda-list parsed-args)
+      (%set-symbol-prop (or setter name) :lambda-body body)
+      `(progn
+         ,@(when (%get-symbol-prop (or setter name) :inline)
+             `((%set-symbol-prop ',(or setter name) :inline t)
+               (%set-symbol-prop ',(or setter name) :lambda-list ',parsed-args)
+               (%set-symbol-prop ',(or setter name) :lambda-body ',body)))
+         (set-symbol-function! ',(or setter name)
+                               (%fn ,name ,args ,@body))))))
 
 (defun maybe-xref-info (name type)
   (when *xref-info*
     (%vector-push *xref-info*
-                 (vector name type *current-pos*))))
+                  (vector name type *current-pos*))))
 
 (defmacro quasiquote (thing)
   (qq thing))
@@ -741,6 +761,65 @@
             :aok allow-other-keys
             :names all))))
 
+(defun inline-call (lambda-list values body)
+  (let ((required (getf lambda-list :required))
+        (optional (getf lambda-list :optional))
+        (rest (getf lambda-list :rest))
+        (key (getf lambda-list :key))
+        (aok (getf lambda-list :aok))
+        (aux (getf lambda-list :aux))
+        (parallel t)
+        (bindings nil))
+    (foreach required
+      (lambda (varname)
+        (unless values
+          (error (strcat "Missing required argument " varname)))
+        (push (list varname (%pop values)) bindings)))
+    (foreach optional
+      (lambda (argdef)
+        (destructuring-bind (varname &optional default suppname) argdef
+          (when default (setq parallel nil))
+          (cond
+            ((null values)
+             (push (list varname default) bindings)
+             (when suppname
+               (push (list suppname nil) bindings)))
+            (t
+             (push (list varname (%pop values)) bindings)
+             (when suppname
+               (push (list suppname t) bindings)))))))
+    ;; XXX: we should do more error-checking here for mispelled key arg names
+    ;; or extraneous arguments.
+    (when rest (push (list rest values) bindings))
+    ;; XXX HORROR: this is *wrong* when both &rest and &key are used, as some
+    ;; values might be evaluated twice. More, &key isn't proper anyway because
+    ;; the order-of-evaluation is not preserved. We should iterate by values,
+    ;; rather than key arguments; and when both &rest and &key are given, we
+    ;; should generate a temporary value for &rest and use GETF to fetch data
+    ;; from it at run-time, rather than trying to do it inline. Tricky stuff!
+    (foreach key
+      (lambda (argdef)
+        (destructuring-bind ((argname varname) &optional default suppname) argdef
+          (when default (setq parallel nil))
+          (let ((val (getf values argname '$not-found)))
+            (cond
+              ((eq val '$not-found)
+               (push (list varname default) bindings)
+               (when suppname
+                 (push (list suppname nil) bindings)))
+              (t
+               (push (list varname val) bindings)
+               (when suppname
+                 (push (list suppname t) bindings))))))))
+    (foreach aux
+      (lambda (argdef)
+        (destructuring-bind (varname &optional value) argdef
+          (when value (setq parallel nil))
+          (push (list varname value) bindings))))
+    (if parallel
+        `(let ,(nreverse bindings) ,@body)
+        `(let* ,(nreverse bindings) ,@body))))
+
 (defun %log (data)
   (console.dir data)
   data)
@@ -1277,7 +1356,14 @@
                 (if (eq :smac (caddr it))
                     (comp (cadddr it) env t t) ;; symbol macro expansion
                     (gen "LVAR" (car it) (cadr it)))
-                (gen "GVAR" (unknown-variable name env)))))
+                (cond
+                  ((when (and (boundp name)
+                              (%get-symbol-prop name :constant))
+                     (let ((val (symbol-value name)))
+                       (when (numberp val)
+                         (gen "CONST" val)))))
+                  (t
+                   (gen "GVAR" (unknown-variable name env)))))))
 
      (gen-set (name env &optional (local (find-var name env)))
        (if (find-special name env)
@@ -1743,7 +1829,16 @@
                                    (unless val? (gen "POP")))))
                     (t (%seq (comp-list args env)
                              the-function
-                             (gen (if apply "APPLY" "CALL") (length args)))))))
+                             (gen (if apply "APPLY" "CALL") (length args))))))
+                (maybe-inline-global (f)
+                  (when (and (not apply)
+                             (%get-symbol-prop f :inline))
+                    (let ((lambda-list (%get-symbol-prop f :lambda-list))
+                          (body (%get-symbol-prop f :lambda-body)))
+                      (when body
+                        (return-from maybe-inline-global
+                          (comp-inline-call lambda-list body args env val? more?)))))
+                  (mkret (gen "FGVAR" (unknown-function f)))))
          (cond
            ((or (numberp f)
                 (stringp f)
@@ -1763,18 +1858,16 @@
                            (gen "PRIM" f (length args))
                            (unless val? (gen "POP"))
                            (unless more? (gen "RET")))))
+                ((or (eq f t) (eq f nil))
+                 (error/wp (strcat f " is not a function")))
                 (t
-                 (when (or (eq f t) (eq f nil))
-                   (error/wp (strcat f " is not a function")))
-                 (mkret (gen "FGVAR" (unknown-function f)))))))
+                 (maybe-inline-global f)))))
            ((and (not local)
                  (consp f)
                  (eq (car f) 'quote)
                  (symbolp (cadr f)))
             ;; (funcall 'stuff ...)
-            (when (or (eq f t) (eq f nil))
-              (error/wp (strcat f " is not a function")))
-            (mkret (gen "FGVAR" (unknown-function (cadr f)))))
+            (maybe-inline-global (cadr f)))
            ((and (consp f)
                  (%memq (car f) *lambda-syms*))
             (cond
@@ -1797,6 +1890,10 @@
                            (body f))
                        (comp-inner-lambda name args body env val? more?))))))
            (t (mkret (comp f env t t))))))
+
+     (comp-inline-call (lambda-list body values env val? more?)
+       (comp (inline-call lambda-list values body)
+             env val? more?))
 
      (gen-simple-args (args n names)
        (cond
@@ -1825,11 +1922,11 @@
            (let ((args (make-true-list args))
                  (specials 0))
              (foreach-index args
-                            (lambda (name index)
-                              (when (or (%specialp name)
-                                        (%memq name locally-special))
-                                (incf specials)
-                                (<< (gen "BIND" name index)))))
+               (lambda (name index)
+                 (when (or (%specialp name)
+                           (%memq name locally-special))
+                   (incf specials)
+                   (<< (gen "BIND" name index)))))
              (cond
                (args
                 (setq env (extenv env :lex (map1-vector #'maybe-special args)))
@@ -1880,20 +1977,20 @@
                       aok))
              (foreach required #'newarg)
              (foreach optional
-                      (lambda (opt)
-                        (newdef (car opt) (cadr opt) (caddr opt))))
+               (lambda (opt)
+                 (newdef (car opt) (cadr opt) (caddr opt))))
              (when rest (newarg rest))
              (foreach key
-                      (lambda (key)
-                        (newdef (cadar key) (cadr key) (caddr key))))
+               (lambda (key)
+                 (newdef (cadar key) (cadr key) (caddr key))))
              (foreach aux
-                      (lambda (aux)
-                        (let ((name (car aux))
-                              (defval (cadr aux)))
-                          (when defval
-                            (<< (with-env (comp defval env t t))
-                                (gen "VAR")))
-                          (newarg name))))
+               (lambda (aux)
+                 (let ((name (car aux))
+                       (defval (cadr aux)))
+                   (when defval
+                     (<< (with-env (comp defval env t t))
+                         (gen "VAR")))
+                   (newarg name))))
              (declare-locally-special :except names)
              (<< (with-env (comp-lambda-body name body env val? more?)))
              (when more?
@@ -2017,11 +2114,11 @@
             (with-declarations body
               (let ((specials 0))
                 (foreach-index names
-                               (lambda (name index)
-                                 (when (or (%specialp name)
-                                           (%memq name locally-special))
-                                   (incf specials)
-                                   (<< (gen "BIND" name index)))))
+                  (lambda (name index)
+                    (when (or (%specialp name)
+                              (%memq name locally-special))
+                      (incf specials)
+                      (<< (gen "BIND" name index)))))
                 (setq env (extenv env :lex (map1-vector #'maybe-special names)))
                 (declare-locally-special :except names)
                 (cond
@@ -2071,11 +2168,11 @@
                 (foreach vals (lambda (val) (<< (comp val env t t))))
                 (<< (gen "LET" (length names)))
                 (foreach-index names
-                               (lambda (name index)
-                                 (when (or (%specialp name)
-                                           (%memq name locally-special))
-                                   (incf specials)
-                                   (<< (gen "BIND" name index)))))
+                  (lambda (name index)
+                    (when (or (%specialp name)
+                              (%memq name locally-special))
+                      (incf specials)
+                      (<< (gen "BIND" name index)))))
                 (setq env (extenv env :lex (map1-vector #'maybe-special names)))
                 (declare-locally-special :except names)
                 (cond
@@ -2231,14 +2328,14 @@
     (multiple-value-prog1
         (funcall thunk)
       (foreach *unknown-functions*
-               (lambda (sym)
-                 (unless (symbol-function sym)
-                   (warn (strcat "Unknown function: " sym)))))
+        (lambda (sym)
+          (unless (symbol-function sym)
+            (warn (strcat "Unknown function: " sym)))))
       (foreach *unknown-variables*
-               (lambda (sym)
-                 (unless (or (%globalp sym)
-                             (%specialp sym))
-                   (warn (strcat "Undefined variable: " sym))))))))
+        (lambda (sym)
+          (unless (or (%globalp sym)
+                      (%specialp sym))
+            (warn (strcat "Undefined variable: " sym))))))))
 
 (defmacro with-undefined-warnings body
   `(%with-undefined-warnings (lambda () ,@body)))

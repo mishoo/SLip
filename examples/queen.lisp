@@ -319,48 +319,48 @@ by STRING-DESIGNATOR being its first argument."
 
 (defparameter *unicode* nil)
 
-;; (declaim (inline piece
-;;                  piece-side
-;;                  index-valid?
-;;                  white
-;;                  board-index
-;;                  field-index
-;;                  index-field
-;;                  index-row
-;;                  index-col
-;;                  is-pawn?
-;;                  is-knight?
-;;                  is-bishop?
-;;                  is-rook?
-;;                  is-queen?
-;;                  is-king?
-;;                  is-black?
-;;                  is-white?
-;;                  same-side?
-;;                  opp-side?
-;;                  board-get
-;;                  board-get-rc
-;;                  board-set
-;;                  board-set-rc
-;;                  make-move
-;;                  move-from
-;;                  move-to
-;;                  move-piece
-;;                  move-white?
-;;                  move-black?
-;;                  move-side
-;;                  move-capture?
-;;                  move-captured-piece
-;;                  move-promote?
-;;                  move-promoted-piece
-;;                  move-set-promoted-piece
-;;                  move-check?
-;;                  move-set-check
-;;                  move-enpa?
-;;                  move-captured-index
-;;                  move-oo?
-;;                  move-ooo?
-;;                  move-castle?))
+(declaim (inline piece
+                 piece-side
+                 index-valid?
+                 white
+                 board-index
+                 field-index
+                 index-field
+                 index-row
+                 index-col
+                 is-pawn?
+                 is-knight?
+                 is-bishop?
+                 is-rook?
+                 is-queen?
+                 is-king?
+                 is-black?
+                 is-white?
+                 same-side?
+                 opp-side?
+                 board-get
+                 board-get-rc
+                 board-set
+                 board-set-rc
+                 make-move
+                 move-from
+                 move-to
+                 move-piece
+                 move-white?
+                 move-black?
+                 move-side
+                 move-capture?
+                 move-captured-piece
+                 move-promote?
+                 move-promoted-piece
+                 move-set-promoted-piece
+                 move-check?
+                 move-set-check
+                 move-enpa?
+                 move-captured-index
+                 move-oo?
+                 move-ooo?
+                 move-castle?))
 
 (deftype piece ()
   '(unsigned-byte 8))
@@ -561,7 +561,8 @@ by STRING-DESIGNATOR being its first argument."
                ,@body)))))
 
 (defun make-board ()
-  (make-array 120 :element-type 'piece :initial-element 0))
+  (make-array 120 ;; :element-type 'piece
+              :initial-element 0))
 
 (defun board-foreach (board fn)
   (declare (optimize speed)
@@ -1979,3 +1980,13 @@ by STRING-DESIGNATOR being its first argument."
                      (incf failed))))
                 (format t "~%~%")))
         (format t "TOTAL: ~A, FAILED: ~A~%" total failed)))))
+
+
+%:EOF
+
+(defparameter pgn (parse-pgn (sl-stream:open-url "https://lichess.org/api/games/user/vlbz?max=1")))
+(defparameter moves (loop for (kind . data) in (getf pgn :moves)
+                          when (eq kind :move) collect data))
+(defparameter g (make-game))
+(reset-from-fen g +fen-start+)
+(time (dump-line g moves t))
