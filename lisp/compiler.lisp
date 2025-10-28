@@ -790,7 +790,7 @@
                (push (list suppname t) bindings)))))))
     ;; XXX: we should do more error-checking here for mispelled key arg names
     ;; or extraneous arguments.
-    (when rest (push (list rest values) bindings))
+    (when rest (push (list rest `(list ,@values)) bindings))
     ;; XXX HORROR: this is *wrong* when both &rest and &key are used, as some
     ;; values might be evaluated twice. More, &key isn't proper anyway because
     ;; the order-of-evaluation is not preserved. We should iterate by values,
