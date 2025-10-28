@@ -761,64 +761,175 @@
             :aok allow-other-keys
             :names all))))
 
-(defun inline-call (lambda-list values body)
+;; INLINE-CALL takes a parsed lambda list (as returned by PARSE-LAMBDA-LIST
+;; above), a list of VALUES to bind arguments to (forms), and a BODY, and
+;; returns a LET form that executes BODY, as if executed by a function with
+;; the given lambda list when called with VALUES. It returns 'DECLINE to
+;; refuse inlining when the call site (VALUES) includes non-constant argument
+;; names. XXX: got hairy and hard to read.
+(defun inline-call (lambda-list values &optional body)
+  (when (eq 'lambda (car lambda-list))
+    (setq body (cddr lambda-list))
+    (setq lambda-list (parse-lambda-list (cadr lambda-list))))
   (let ((required (getf lambda-list :required))
         (optional (getf lambda-list :optional))
         (rest (getf lambda-list :rest))
         (key (getf lambda-list :key))
         (aok (getf lambda-list :aok))
         (aux (getf lambda-list :aux))
-        (parallel t)
-        (bindings nil))
+        (parallel nil)
+        (sequential nil)
+        (resolved nil)
+        (call-aok nil))
+
+    ;; All non-trivial (non-SAFE-ATOM-P) forms from VALUES must end up in
+    ;; PARALLEL, in the same order, so that they are evaluated in the same
+    ;; lexical env as the caller.
+
+    ;; Required arguments are the cutest.
     (foreach required
       (lambda (varname)
         (unless values
-          (error (strcat "Missing required argument " varname)))
-        (push (list varname (%pop values)) bindings)))
+          (error/wp (strcat "Missing required argument " varname)))
+        (push (list varname (%pop values)) parallel)))
+
+    ;; Optionals will be pushed to SEQUENTIAL (that's using a LET*) because
+    ;; the default init forms may refer to previous arguments. For non-trivial
+    ;; values we invent a TEMP sym that will still go to PARALLEL, so we don't
+    ;; break our contract.
     (foreach optional
       (lambda (argdef)
         (destructuring-bind (varname &optional default suppname) argdef
-          (when default (setq parallel nil))
           (cond
             ((null values)
-             (push (list varname default) bindings)
+             (push (list varname default) sequential)
              (when suppname
-               (push (list suppname nil) bindings)))
+               (push (list suppname nil) sequential)))
+
+            ((%:safe-atom-p (car values))
+             ;; When I grow up, I'll write a smart compiler that will not
+             ;; need SAFE-ATOM-P to produce decent code. But for now, let's
+             ;; manually optimize a bit for our stupid compiler...
+             (push (list varname (%pop values)) sequential)
+             (when suppname
+               (push (list suppname t) sequential)))
+
             (t
-             (push (list varname (%pop values)) bindings)
-             (when suppname
-               (push (list suppname t) bindings)))))))
-    ;; XXX: we should do more error-checking here for mispelled key arg names
-    ;; or extraneous arguments.
-    (when rest (push (list rest `(list ,@values)) bindings))
-    ;; XXX HORROR: this is *wrong* when both &rest and &key are used, as some
-    ;; values might be evaluated twice. More, &key isn't proper anyway because
-    ;; the order-of-evaluation is not preserved. We should iterate by values,
-    ;; rather than key arguments; and when both &rest and &key are given, we
-    ;; should generate a temporary value for &rest and use GETF to fetch data
-    ;; from it at run-time, rather than trying to do it inline. Tricky stuff!
-    (foreach key
-      (lambda (argdef)
-        (destructuring-bind ((argname varname) &optional default suppname) argdef
-          (when default (setq parallel nil))
-          (let ((val (getf values argname '$not-found)))
-            (cond
-              ((eq val '$not-found)
-               (push (list varname default) bindings)
+             (let ((temp (gensym)))
+               (push (list temp (%pop values)) parallel)
+               (push (list varname temp) sequential)
                (when suppname
-                 (push (list suppname nil) bindings)))
-              (t
-               (push (list varname val) bindings)
-               (when suppname
-                 (push (list suppname t) bindings))))))))
+                 (push (list suppname t) sequential))))))))
+
+    ;; If &REST arg is present in the lambda list, we now add all remaining
+    ;; values to PARALLEL. Evaluation of the arguments is done, we can no
+    ;; longer refer to any non-trivial form from VALUES.
+    (when rest
+      (push (list rest `(list ,@values)) parallel))
+
+    ;; And &KEY is the fun, hair-pulling part. We'll walk over VALUES, in
+    ;; order (it should be a proper plist, so we check for that upfront). If
+    ;; REST was not used, then for each known argument we bind a temporary var
+    ;; in PARALLEL, and in SEQUENTIAL bind it to the proper name (tho' we can
+    ;; make an exception for trivial forms and just re-use them in SEQUENTIAL).
+    ;; If REST *was* used, then we can no longer inline any non-trivial form
+    ;; from VALUES, so we emit a NTH form which fetches it from REST. That is
+    ;; unfortunate, but still better than GETF. If we encounter a non-constant
+    ;; argument name in VALUES, abort immediately. I considered handling this
+    ;; case too, but doing it properly will produce such horrible code that
+    ;; we're better off calling the function instead.
+    (when key
+      (labels ((find-key-arg (argname)
+                 (let rec ((key key))
+                   (when key
+                     (if (eq argname (caaar key))
+                         (car key)
+                         (rec (cdr key))))))
+
+               (find-key-value (argname)
+                 (let rec ((v values))
+                   (when v
+                     (if (eq argname (car v))
+                         (cadr v)
+                         (rec (cddr v))))))
+
+               (constant (argname)
+                 (cond
+                   ((keywordp argname) argname)
+                   ((numberp argname) argname)
+                   ((stringp argname) argname)
+                   ((eq argname t) t)
+                   ((eq argname nil) nil)
+                   ((and (consp argname)
+                         (eq 'quote (car argname))
+                         (symbolp (cadr argname)))
+                    (cadr argname))
+                   (t (return-from inline-call 'decline)))))
+
+        (unless (evenp (length values))
+          (error/wp "INLINE-CALL: odd number of &key arguments"))
+
+        (setq call-aok (constant (find-key-value :allow-other-keys)))
+
+        (let rec ((v values)
+                  (index 1))
+          (when v
+            (let* ((argname (constant (car v)))
+                   (argval (cadr v))
+                   (keyarg (find-key-arg argname)))
+              (cond
+                (keyarg
+                 ;; known argument. The internal name is in CADAR.
+                 (cond
+                   ((%:safe-atom-p argval)
+                    (push (list (cadar keyarg) argval)
+                          sequential))
+                   (rest
+                    (push (list (cadar keyarg) `(nth ,index ,rest))
+                          sequential))
+                   (t
+                    (let ((temp (gensym (caar keyarg))))
+                      (push (list temp argval) parallel)
+                      (push (list (cadar keyarg) temp)
+                            sequential))))
+                 (when (caddr keyarg) ;; supplied-p, define as T
+                   (push (list (caddr keyarg) t) sequential))
+                 (push (cadar keyarg) resolved)
+                 (rec (cddr v) (+ index 2)))
+
+                ((or aok call-aok)
+                 (unless (or rest (%:safe-atom-p argval))
+                   ;; should eval for side-effects, invent a name for it
+                   (let ((temp (gensym "EVAL")))
+                     (push (list temp argval) parallel)))
+                 (rec (cddr v) (+ index 2)))
+
+                (t
+                 ;; seems in order to croak here if the argname
+                 ;; isn't known and we don't have AOK.
+                 (error/wp (strcat "INLINE-CALL: unknown keyword argument " argname)))))))
+
+        ;; default values and supplied-p NIL for unsupplied key arguments
+        (let ((remaining
+               (filter key (lambda (keyarg)
+                             (not (%memq (cadar keyarg) resolved))))))
+          (foreach remaining
+            (lambda (keyarg)
+              (push (list (cadar keyarg) (cadr keyarg))
+                    sequential)
+              (when (caddr keyarg) ;; supplied-p, define as NIL
+                (push (list (caddr keyarg) nil)
+                      sequential)))))))
+
+    ;; &AUX list is cute too, just dump them all to SEQUENTIAL.
     (foreach aux
       (lambda (argdef)
         (destructuring-bind (varname &optional value) argdef
-          (when value (setq parallel nil))
-          (push (list varname value) bindings))))
-    (if parallel
-        `(let ,(nreverse bindings) ,@body)
-        `(let* ,(nreverse bindings) ,@body))))
+          (push (list varname value) sequential))))
+
+    `(let ,(nreverse parallel)
+       (let* ,(nreverse sequential)
+         ,@body))))
 
 (defun %log (data)
   (console.dir data)
@@ -1360,7 +1471,8 @@
                   ((when (and (boundp name)
                               (%get-symbol-prop name :constant))
                      (let ((val (symbol-value name)))
-                       (when (numberp val)
+                       (when (or (numberp val)
+                                 (charp val))
                          (gen "CONST" val)))))
                   (t
                    (gen "GVAR" (unknown-variable name env)))))))
@@ -1836,8 +1948,10 @@
                     (let ((lambda-list (%get-symbol-prop f :lambda-list))
                           (body (%get-symbol-prop f :lambda-body)))
                       (when body
-                        (return-from maybe-inline-global
-                          (comp-inline-call lambda-list body args env val? more?)))))
+                        (let ((form (inline-call lambda-list args body)))
+                          (unless (eq form 'decline)
+                            (return-from maybe-inline-global
+                              (comp form env val? more?)))))))
                   (mkret (gen "FGVAR" (unknown-function f)))))
          (cond
            ((or (numberp f)
@@ -1890,10 +2004,6 @@
                            (body f))
                        (comp-inner-lambda name args body env val? more?))))))
            (t (mkret (comp f env t t))))))
-
-     (comp-inline-call (lambda-list body values env val? more?)
-       (comp (inline-call lambda-list values body)
-             env val? more?))
 
      (gen-simple-args (args n names)
        (cond
