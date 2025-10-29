@@ -987,7 +987,25 @@ function serialize_const(val, cache, refd) {
             let q = maybe_cached(val);
             if (q) return q;
             if (just_cached(val)) {
-                return "L(()=>[" + LispCons.toArray(val).map(dump).join(",") + "])";
+                // We can't use LispCons.toArray here, as it's
+                // possibly circular.
+                let out = "L(()=>[";
+                while (val !== false) {
+                    out += dump(val.car);
+                    if (val.cdr === false) break;
+                    let q = maybe_cached(val.cdr);
+                    if (q) {
+                        out += ",DOT," + q;
+                        break;
+                    } else if (!LispCons.is(val.cdr)) {
+                        out += ",DOT," + dump(val.cdr);
+                        break;
+                    } else {
+                        val = val.cdr;
+                        out += ",";
+                    }
+                }
+                return out + "])";
             } else {
                 return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
             }
