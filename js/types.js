@@ -86,11 +86,6 @@ export class LispChar {
     toLowerCase() {
         return LispChar.get(this.value.toLowerCase());
     }
-
-    serialize() {
-        var ch = LispChar.sanitize(JSON.stringify(this.value));
-        return "c(" + ch + ")";
-    }
 }
 
 export class LispClosure {
@@ -319,9 +314,6 @@ export class LispPackage {
         this.uses = [];
     }
     toString() { return "#<PACKAGE " + this.name + ">" }
-    serialize(cache) {
-        return cache(this, () => "p(" + JSON.stringify(this.name) + ")");
-    }
     intern(name, sym) {
         if (sym) {
             if (!sym.pak) sym.pak = this;
@@ -433,14 +425,6 @@ export class LispSymbol {
             this.primitive = false;
             this.function = false;
         }
-    }
-    serialize(cache) {
-        return cache(this, () => (
-            "s(" +
-                JSON.stringify(this.name) +
-                (this.pak ? ("," + this.pak.serialize(cache)) : "") +
-                ")"
-        ));
     }
     setv(key, val) {
         return this.vlist.set(key, val), val;

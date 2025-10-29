@@ -888,55 +888,111 @@ export function disassemble(code) {
     return disassemble(code, 0);
 }
 
-function serialize_const(val, cache) {
-    function maybe_cached(val, dump) {
-        if (cache) {
-            if (cache.has(val)) {
-                return `$(${cache.get(val)})`;
-            }
-            // we have to get our own index (cache.size()) *after*
-            // serializing the content, so call dump() first.
-            let code = dump();
-            cache.set(val, cache.size());
-            return code;
-        } else {
-            return dump();
+function dig_references(data) {
+    let seen = new Map();
+    let refd = new Map();
+    function mark(obj) {
+        let saved = seen.get(obj);
+        if (!saved) {
+            seen.set(obj, { count: 1 });
+            return true;
         }
+        if (++saved.count === 2) {
+            refd.set(obj, {});
+        }
+        return false;
+    }
+    data.forEach(function dig(val){
+        if (val instanceof LispSymbol) {
+            mark(val);
+        }
+        else if (val instanceof LispPackage) {
+            mark(val);
+        }
+        else if (val instanceof LispChar) {
+            mark(val);
+        }
+        else if (val instanceof RegExp) {
+            mark(val);
+        }
+        else if (val instanceof LispCons) {
+            if (mark(val)) {
+                dig(val.car);
+                dig(val.cdr);
+            }
+        }
+        else if (val instanceof Array) {
+            if (mark(val)) {
+                val.forEach(el => dig(el));
+            }
+        }
+    });
+    return refd;
+}
+
+function serialize_const(val, cache, refd) {
+    function should_cache(val) {
+        return refd ?? refd.has(val);
+    }
+    function maybe_cached(val) {
+        return cache?.has(val) ? `$(${cache.get(val)})` : null;
     }
     return function dump(val) {
         if (val === false) return "!1";
         if (val === true) return "!0";
-        if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar)
-            return val.serialize(maybe_cached);
-        if (val instanceof RegExp) return val.toString();
-        if (val instanceof LispCons) return maybe_cached(val, () =>
-            "l([" + LispCons.toArray(val).map(dump).join(",") + "])"
-        );
-        if (val instanceof Array) return maybe_cached(val, () =>
-            "a([" + val.map(dump).join(",") + "])"
-        );
-        if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
+        if (val instanceof LispSymbol) {
+            if (val.pak) {
+                return `s(${JSON.stringify(val.name)},${JSON.stringify(val.pak.name)})`;
+            } else {
+                return `s(${JSON.stringify(val.name)})`;
+            }
+        }
+        if (val instanceof LispPackage) {
+            return `p(${JSON.stringify(val.name)})`;
+        }
+        if (val instanceof LispChar) {
+            return `c(${LispChar.sanitize(JSON.stringify(val.value))})`;
+        }
+        if (val instanceof RegExp) {
+            return val.toString();
+        }
+        if (val instanceof LispCons) {
+            return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
+        }
+        if (val instanceof Array) {
+            return "[" + val.map(dump).join(",") + "]";
+        }
+        if (typeof val == "string") {
+            return LispChar.sanitize(JSON.stringify(val));
+        }
         if (val + "" == "[object Object]") {
             console.error("Unsupported value in bytecode serialization", val);
             error("Unsupported value in bytecode serialization");
         }
-        return val + "";
+        return val + ""; // XXX: I do not like this.
     }(val);
 }
 
 function serialize(code, strip, cache) {
-    code = code.map(x => serialize_const(x, cache)).join(",");
+    cache = null;
+    let refd = cache ?? dig_references(code);
+    code = code.map(x => serialize_const(x, cache, refd)).join(",");
     return strip ? code : "[" + code + "]";
 }
 
 export function unserialize(code) {
     var names = [], values = [], cache = [];
     names.push("s"); values.push(function(name, pak){
-        if (arguments.length === 1 && typeof name == "number") {
-            return cache[name];
+        if (pak != null) {
+            pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
+            return LispSymbol.get(name, pak);
+        } else {
+            return new LispSymbol(name);
         }
+    });
+    names.push("S"); values.push(function(name, pak){
         let sym;
-        if (pak) {
+        if (pak != null) {
             pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
             sym = LispSymbol.get(name, pak);
         } else {
@@ -946,31 +1002,58 @@ export function unserialize(code) {
         return sym;
     });
     names.push("p"); values.push(function(name){
-        if (typeof name === "number") {
-            return cache[name];
-        }
+        return LispPackage.get(name);
+    });
+    names.push("P"); values.push(function(name){
         let pak = LispPackage.get(name);
         cache.push(pak);
         return pak;
     });
-    names.push("l"); values.push(function(args){
-        let list = LispCons.fromArray(args);
-        cache.push(list);
-        return list;
+    names.push("l"); values.push(function(...arg){
+        return LispCons.fromArray(arg);
+    });
+    names.push("L"); values.push(function(arg){
+        if (arg instanceof Function) {
+            let cons = new LispCons();
+            cache.push(cons);
+            let list = LispCons.fromArray(arg());
+            cons.car = list.car;
+            cons.cdr = list.cdr;
+            return cons;
+        } else {
+            let list = LispCons.fromArray(arg);
+            cache.push(list);
+            return list;
+        }
+    });
+    names.push("a"); values.push(function(arg){
+        return arg;
+    });
+    names.push("A"); values.push(function(arg){
+        if (arg instanceof Function) {
+            let array = [];
+            cache.push(array);
+            array.splice(0, 0, ...arg());
+            return array;
+        } else {
+            cache.push(arg);
+            return arg;
+        }
     });
     names.push("c"); values.push(function(char){
         return LispChar.get(char);
     });
-    names.push("a"); values.push(function(array){
-        cache.push(array);
-        return array;
+    names.push("C"); values.push(function(char){
+        let ch = LispChar.get(char);
+        cache.push(ch);
+        return ch;
     });
     names.push("$"); values.push(function(index){
         return cache[index];
     });
     names.push("DOT"); values.push(LispCons.DOT);
     var func = new Function("return function(" + names.join(",") + "){return [" + code + "]}")();
-    code = func.apply(null, values);
+    code = func(...values);
     return code;
 }
 
