@@ -115,7 +115,7 @@
   (foreach names
     (lambda (name)
       (multiple-value-bind (setter name) (%:maybe-setter name)
-        (%set-symbol-prop (or setter name) :inline t)))))
+        (%set-symbol-prop (or setter name) :inline-request t)))))
 
 (defmacro declaim (&rest declarations)
   (foreach declarations
@@ -125,17 +125,24 @@
 
 (defmacro defun (name args . body)
   (multiple-value-bind (setter name) (%:maybe-setter name)
-    (maybe-xref-info name (if setter 'setf 'defun))
-    (let ((parsed-args (parse-lambda-list args)))
-      (%set-symbol-prop (or setter name) :lambda-list parsed-args)
-      (%set-symbol-prop (or setter name) :lambda-body body)
-      `(progn
-         ,@(when (%get-symbol-prop (or setter name) :inline)
-             `((%set-symbol-prop ',(or setter name) :inline t)
-               (%set-symbol-prop ',(or setter name) :lambda-list ',parsed-args)
-               (%set-symbol-prop ',(or setter name) :lambda-body ',body)))
-         (set-symbol-function! ',(or setter name)
-                               (%fn ,name ,args ,@body))))))
+    (let ((target (or setter name)))
+      (maybe-xref-info name (if setter 'setf 'defun))
+      (let ((parsed-args (parse-lambda-list args)))
+        (when (%get-symbol-prop target :inline-request)
+          (cond
+            ((null-lexenv-p)
+             (%set-symbol-prop target :inline t))
+            (t
+             (warn (strcat "Cannot inline function " target " (non-null lexenv)")))))
+        (%set-symbol-prop target :lambda-list parsed-args)
+        (%set-symbol-prop target :lambda-body body)
+        `(progn
+           ,@(when (%get-symbol-prop target :inline)
+               `((%set-symbol-prop ',target :inline t)
+                 (%set-symbol-prop ',target :lambda-list ',parsed-args)
+                 (%set-symbol-prop ',target :lambda-body ',body)))
+           (set-symbol-function! ',target
+                                 (%fn ,name ,args ,@body)))))))
 
 (defun maybe-xref-info (name type)
   (when *xref-info*
@@ -768,9 +775,13 @@
 ;; refuse inlining when the call site (VALUES) includes non-constant argument
 ;; names. XXX: got hairy and hard to read.
 (defun inline-call (lambda-list values &optional body)
-  (when (eq 'lambda (car lambda-list))
-    (setq body (cddr lambda-list))
-    (setq lambda-list (parse-lambda-list (cadr lambda-list))))
+  (cond
+    ((symbolp lambda-list)
+     (setq body (%get-symbol-prop lambda-list :lambda-body))
+     (setq lambda-list (%get-symbol-prop lambda-list :lambda-list)))
+    ((eq 'lambda (car lambda-list))
+     (setq body (cddr lambda-list))
+     (setq lambda-list (parse-lambda-list (cadr lambda-list)))))
   (let ((required (getf lambda-list :required))
         (optional (getf lambda-list :optional))
         (rest (getf lambda-list :rest))
@@ -960,6 +971,9 @@
 ;;                  (or (position v i (1- (length v)))
 ;;                      (frame (cdr env) (if skip i (1+ i))))))))
 ;;     (frame env 0)))
+
+(defun null-lexenv-p (&optional (env *compiler-env*))
+  (not (and env (gethash :lex env))))
 
 (defun find-in-compiler-env (name type env)
   (%:%find-in-env name type env))
