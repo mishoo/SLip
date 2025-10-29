@@ -889,13 +889,32 @@ export function disassemble(code) {
 }
 
 function serialize_const(val, cache) {
+    function maybe_cached(val, dump) {
+        if (cache) {
+            if (cache.has(val)) {
+                return `$(${cache.get(val)})`;
+            }
+            // we have to get our own index (cache.size()) *after*
+            // serializing the content, so call dump() first.
+            let code = dump();
+            cache.set(val, cache.size());
+            return code;
+        } else {
+            return dump();
+        }
+    }
     return function dump(val) {
         if (val === false) return "!1";
         if (val === true) return "!0";
-        if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar) return val.serialize(cache);
+        if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar)
+            return val.serialize(maybe_cached);
         if (val instanceof RegExp) return val.toString();
-        if (val instanceof LispCons) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
-        if (val instanceof Array) return "[" + val.map(dump).join(",") + "]";
+        if (val instanceof LispCons) return maybe_cached(val, () =>
+            "l([" + LispCons.toArray(val).map(dump).join(",") + "])"
+        );
+        if (val instanceof Array) return maybe_cached(val, () =>
+            "a([" + val.map(dump).join(",") + "])"
+        );
         if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
         if (val + "" == "[object Object]") {
             console.error("Unsupported value in bytecode serialization", val);
@@ -913,10 +932,10 @@ function serialize(code, strip, cache) {
 export function unserialize(code) {
     var names = [], values = [], cache = [];
     names.push("s"); values.push(function(name, pak){
-        let sym;
         if (arguments.length === 1 && typeof name == "number") {
             return cache[name];
         }
+        let sym;
         if (pak) {
             pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
             sym = LispSymbol.get(name, pak);
@@ -934,11 +953,20 @@ export function unserialize(code) {
         cache.push(pak);
         return pak;
     });
-    names.push("l"); values.push(function(...args){
-        return LispCons.fromArray(args);
+    names.push("l"); values.push(function(args){
+        let list = LispCons.fromArray(args);
+        cache.push(list);
+        return list;
     });
     names.push("c"); values.push(function(char){
         return LispChar.get(char);
+    });
+    names.push("a"); values.push(function(array){
+        cache.push(array);
+        return array;
+    });
+    names.push("$"); values.push(function(index){
+        return cache[index];
     });
     names.push("DOT"); values.push(LispCons.DOT);
     var func = new Function("return function(" + names.join(",") + "){return [" + code + "]}")();

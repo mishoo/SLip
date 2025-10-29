@@ -320,12 +320,7 @@ export class LispPackage {
     }
     toString() { return "#<PACKAGE " + this.name + ">" }
     serialize(cache) {
-        if (cache) {
-            let id = cache.get(this);
-            if (id != null) return `p(${id})`;
-            cache.set(this, cache.size());
-        }
-        return "p(" + JSON.stringify(this.name) + ")";
+        return cache(this, () => "p(" + JSON.stringify(this.name) + ")");
     }
     intern(name, sym) {
         if (sym) {
@@ -440,19 +435,12 @@ export class LispSymbol {
         }
     }
     serialize(cache) {
-        if (cache) {
-            let id = cache.get(this);
-            if (id != null) return `s(${id})`;
-        }
-        let code = "s(" +
-            JSON.stringify(this.name) +
-            (this.pak ? ("," + this.pak.serialize(cache)) : "") +
-            ")";
-        // note: pak.serialize will cache package as well; order is
-        // important, we have to put ourselves in the cache *after*
-        // the package.
-        if (cache) cache.set(this, cache.size());
-        return code;
+        return cache(this, () => (
+            "s(" +
+                JSON.stringify(this.name) +
+                (this.pak ? ("," + this.pak.serialize(cache)) : "") +
+                ")"
+        ));
     }
     setv(key, val) {
         return this.vlist.set(key, val), val;
