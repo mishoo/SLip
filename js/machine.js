@@ -904,7 +904,11 @@ function dig_references(data) {
     }
     data.forEach(function dig(val){
         if (val instanceof LispSymbol) {
-            mark(val);
+            if (mark(val)) {
+                if (val.pak) {
+                    mark(val.pak);
+                }
+            }
         }
         else if (val instanceof LispPackage) {
             mark(val);
@@ -937,27 +941,56 @@ function serialize_const(val, cache, refd) {
     function maybe_cached(val) {
         return cache?.has(val) ? `$(${cache.get(val)})` : null;
     }
+    function just_cached(val) {
+        if (should_cache(val)) {
+            cache.set(val, cache.size());
+            return true;
+        }
+        return false;
+    }
     return function dump(val) {
         if (val === false) return "!1";
         if (val === true) return "!0";
         if (val instanceof LispSymbol) {
+            let q = maybe_cached(val);
+            if (q) return q;
             if (val.pak) {
-                return `s(${JSON.stringify(val.name)},${JSON.stringify(val.pak.name)})`;
+                let pak = dump(val.pak);
+                q = just_cached(val) ? 'S' : 's';
+                return q + `(${JSON.stringify(val.name)},${pak})`;
             } else {
-                return `s(${JSON.stringify(val.name)})`;
+                q = just_cached(val) ? 'S' : 's';
+                return q + `(${JSON.stringify(val.name)})`;
             }
         }
         if (val instanceof LispPackage) {
-            return `p(${JSON.stringify(val.name)})`;
+            let q = maybe_cached(val);
+            if (q) return q;
+            q = just_cached(val) ? 'P' : 'p';
+            return q + `(${JSON.stringify(val.name)})`;
         }
         if (val instanceof LispChar) {
+            // for characters it doesn't make much sense, we're better
+            // off not caching the objects (we do it on another level,
+            // anyway - LispChar.get(ch) - so they do end up EQ)
+            //
+            // let q = maybe_cached(val);
+            // if (q) return q;
+            // q = did_cache(val) ? 'C' : 'c';
+            // return q + `(${LispChar.sanitize(JSON.stringify(val.value))})`;
             return `c(${LispChar.sanitize(JSON.stringify(val.value))})`;
         }
         if (val instanceof RegExp) {
             return val.toString();
         }
         if (val instanceof LispCons) {
-            return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
+            let q = maybe_cached(val);
+            if (q) return q;
+            if (just_cached(val)) {
+                return "L(()=>[" + LispCons.toArray(val).map(dump).join(",") + "])";
+            } else {
+                return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
+            }
         }
         if (val instanceof Array) {
             return "[" + val.map(dump).join(",") + "]";
@@ -974,7 +1007,6 @@ function serialize_const(val, cache, refd) {
 }
 
 function serialize(code, strip, cache) {
-    cache = null;
     let refd = cache ?? dig_references(code);
     code = code.map(x => serialize_const(x, cache, refd)).join(",");
     return strip ? code : "[" + code + "]";
@@ -1012,33 +1044,24 @@ export function unserialize(code) {
     names.push("l"); values.push(function(...arg){
         return LispCons.fromArray(arg);
     });
-    names.push("L"); values.push(function(arg){
-        if (arg instanceof Function) {
-            let cons = new LispCons();
-            cache.push(cons);
-            let list = LispCons.fromArray(arg());
-            cons.car = list.car;
-            cons.cdr = list.cdr;
-            return cons;
-        } else {
-            let list = LispCons.fromArray(arg);
-            cache.push(list);
-            return list;
-        }
+    names.push("L"); values.push(function (arg) {
+        let cons = new LispCons();
+        cache.push(cons);
+        let list = LispCons.fromArray(arg());
+        cons.car = list.car;
+        cons.cdr = list.cdr;
+        return cons;
     });
+    // XXX: this looks stupid for now, but I'll use it someday for
+    // multi-dimensional arrays or typed vectors.
     names.push("a"); values.push(function(arg){
         return arg;
     });
     names.push("A"); values.push(function(arg){
-        if (arg instanceof Function) {
-            let array = [];
-            cache.push(array);
-            array.splice(0, 0, ...arg());
-            return array;
-        } else {
-            cache.push(arg);
-            return arg;
-        }
+        let array = [];
+        cache.push(array);
+        array.splice(0, 0, ...arg());
+        return array;
     });
     names.push("c"); values.push(function(char){
         return LispChar.get(char);

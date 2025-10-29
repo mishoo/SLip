@@ -2566,6 +2566,20 @@
 
 ;;;
 
+(defconstant *id-test-list* '(foo bar))
+(defun test-serialization-identity ()
+  (eq '#.*id-test-list* '#.*id-test-list*))
+
+(defun test-serialization-identity2 ()
+  (eq *id-test-list* *id-test-list*))
+
+;; XXX: NOT WORKING YET.
+;;
+;; (defparameter *id-test-circular* (list 'a))
+;; (%rplacd *id-test-circular* *id-test-circular*)
+;; (defun test-serialization-circular ()
+;;   (eq '#.*id-test-circular* '#.*id-test-circular*))
+
 EOF
 
 (let ((*current-file* "compiler.lisp"))
