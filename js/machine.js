@@ -1367,13 +1367,6 @@ function error(msg) {
     throw new LispPrimitiveError(msg);
 }
 
-function find_key_arg(item, array, start, end) {
-    for (let i = start; i < end; i += 2) {
-        if (eq(item, array[i])) return i;
-    }
-    return false;
-}
-
 let OP_RUN = [
     /*OP.NOP*/ () => {},
     /*OP.LVAR*/ (m) => {
@@ -1728,10 +1721,10 @@ let OP_RUN = [
         let min = required;
         let max = rest || key || allow_other_keys ? false : required + optional;
         if (n < required) {
-            error(`Expecting at least ${min} arguments`);
+            error(`XARGS: Expecting at least ${min} arguments`);
         }
         if (max !== false && n > max) {
-            error(`Expecting at most ${max} arguments`);
+            error(`XARGS: Expecting at most ${max} arguments`);
         }
         let frame = new Array(frame_len).fill(false);
         let stack = m.stack.pop_frame(n);
@@ -1749,32 +1742,32 @@ let OP_RUN = [
                 frame[index++] = LispCons.fromArray(stack, i);
             }
             if (kl) {
-                if ((n - i) % 2) {
-                    error("Uneven number of &key arguments");
+                if ((n - i) & 1) {
+                    error("XARGS: Uneven number of &key arguments");
                 }
-                if (!allow_other_keys) {
-                    let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, n);
-                    if (pos !== false) {
-                        allow_other_keys = stack[pos + 1];
-                    }
-                }
-                for (let k = 0; k < kl; k++, index += 2) {
-                    let pos = find_key_arg(key[k], stack, i, n);
-                    if (pos !== false) {
-                        frame[index] = true; // argument-passed-p
-                        frame[index + 1] = stack[pos + 1];
-                        stack[pos] = undefined;
-                        if (pos == i) i += 2;
-                    }
-                }
-                if (!allow_other_keys) {
-                    while (i < n) {
-                        let arg = stack[i];
-                        if (arg !== undefined && arg !== S_ALLOW_OTHER_KEYS && !key.includes(arg)) {
-                            error(`Unknown keyword argument ${dump(arg)}`);
+                let unknown = false, s_aok_seen = false;
+                for (let s = i; s < n; s += 2) {
+                    let argname = stack[s], argval = stack[s + 1];
+                    if (argname === S_ALLOW_OTHER_KEYS) {
+                        if (!s_aok_seen) {
+                            s_aok_seen = true;
+                            if (allow_other_keys === false) {
+                                allow_other_keys = argval;
+                            }
                         }
-                        i += 2;
                     }
+                    let ki = key.indexOf(argname);
+                    if (ki < 0) {
+                        if (argname !== S_ALLOW_OTHER_KEYS) {
+                            unknown = new LispCons(argname, unknown);
+                        }
+                    } else if (!frame[index + (ki << 1)]) {
+                        frame[index + (ki << 1)] = true;
+                        frame[index + (ki << 1) + 1] = argval;
+                    }
+                }
+                if (allow_other_keys === false && unknown !== false) {
+                    error(`XARGS: Unknown keyword arguments: ${LispCons.toArray(unknown).map(dump).join(", ")}`);
                 }
             }
         }
