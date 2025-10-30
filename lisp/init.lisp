@@ -802,6 +802,9 @@
 (defun nth (n list)
   (car (nthcdr n list)))
 
+(define-compiler-macro nth (n list)
+  `(car (nthcdr ,n ,list)))
+
 (defun (setf nth) (value n list)
   (setf (car (nthcdr n list)) value))
 
