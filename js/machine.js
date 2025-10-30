@@ -773,7 +773,7 @@ function indent(level) {
     return repeat_string(' ', level * INDENT_LEVEL);
 }
 
-function dump(thing) {
+function dump(thing, dumped = new Map()) {
     let cache = new Map();
     (function walk(thing){
         if (thing instanceof LispCons) {
@@ -781,7 +781,8 @@ function dump(thing) {
                 cache.set(thing, cache.get(thing) + 1);
             } else {
                 cache.set(thing, 1);
-                LispCons.forEach(thing, walk);
+                walk(thing.car);
+                walk(thing.cdr);
             }
         }
         else if (Array.isArray(thing)) {
@@ -793,7 +794,7 @@ function dump(thing) {
             }
         }
     })(thing);
-    let dumped = new Map(), ref = 0;
+    let ref = dumped.size;
     return function idump(thing) {
         if (thing === false) return "NIL";
         if (thing === true) return "T";
@@ -821,6 +822,10 @@ function dump(thing) {
                 else first = false;
                 ret += idump(LispCons.car(thing));
                 thing = LispCons.cdr(thing);
+                if (dumped.has(thing)) {
+                    ret += " . #" + dumped.get(thing);
+                    break;
+                }
                 if (!LispCons.isList(thing)) {
                     ret += " . " + idump(thing);
                     break;
@@ -839,6 +844,7 @@ const OP_REV = Object.keys(OP);
 
 export function disassemble(code) {
     let lab = 0;
+    let dump_cache = new Map();
     function disassemble(code, level) {
         let labels = Object.create(null);
         for (let i = 0; i < code.length;) {
@@ -864,7 +870,7 @@ export function disassemble(code) {
                 data = "\n" + disassemble(code[i], level + 1);
                 break;
               case OP.CONST:
-                data = dump(code[i]);
+                data = dump(code[i], dump_cache);
                 break;
               default:
                 if (op_has_label(op)) {
@@ -903,10 +909,13 @@ function dig_references(data) {
         return false;
     }
     data.forEach(function dig(val){
-        if (val instanceof LispSymbol) {
+        if (typeof val === "string") {
+            mark(val);
+        }
+        else if (val instanceof LispSymbol) {
             if (mark(val)) {
                 if (val.pak) {
-                    mark(val.pak);
+                    dig(val.pak);
                 }
             }
         }
@@ -936,7 +945,7 @@ function dig_references(data) {
 
 function serialize_const(val, cache, refd) {
     function should_cache(val) {
-        return refd ?? refd.has(val);
+        return refd && refd.has(val);
     }
     function maybe_cached(val) {
         return cache?.has(val) ? `$(${cache.get(val)})` : null;
@@ -1011,10 +1020,22 @@ function serialize_const(val, cache, refd) {
             }
         }
         if (val instanceof Array) {
-            return "[" + val.map(dump).join(",") + "]";
+            let q = maybe_cached(val);
+            if (q) return q;
+            if (just_cached(val)) {
+                return "A(()=>[" + val.map(dump).join(",") + "])";
+            } else {
+                return "[" + val.map(dump).join(",") + "]";
+            }
         }
-        if (typeof val == "string") {
-            return LispChar.sanitize(JSON.stringify(val));
+        if (typeof val === "string") {
+            let q = maybe_cached(val);
+            if (q) return q;
+            if (just_cached(val)) {
+                return `V(${LispChar.sanitize(JSON.stringify(val))})`;
+            } else {
+                return LispChar.sanitize(JSON.stringify(val));
+            }
         }
         if (val + "" == "[object Object]") {
             console.error("Unsupported value in bytecode serialization", val);
@@ -1025,7 +1046,7 @@ function serialize_const(val, cache, refd) {
 }
 
 function serialize(code, strip, cache) {
-    let refd = cache ?? dig_references(code);
+    let refd = cache && dig_references(code);
     code = code.map(x => serialize_const(x, cache, refd)).join(",");
     return strip ? code : "[" + code + "]";
 }
@@ -1091,6 +1112,10 @@ export function unserialize(code) {
     });
     names.push("$"); values.push(function(index){
         return cache[index];
+    });
+    names.push("V"); values.push(function(value){
+        cache.push(value);
+        return value;
     });
     names.push("DOT"); values.push(LispCons.DOT);
     var func = new Function("return function(" + names.join(",") + "){return [" + code + "]}")();

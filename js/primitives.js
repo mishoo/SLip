@@ -982,7 +982,7 @@ defp("%seq-cat", true, function(m, nargs){
                 seq.push.apply(seq, LispCons.toArray(x));
             }
             else if (LispVector.is(x)) {
-                seq.push.apply(seq, x);
+                seq.push(...x);
             }
             else seq.push(x);
         }

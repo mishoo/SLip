@@ -2386,9 +2386,7 @@
      (compile-string (str &optional (filename *current-file*))
        (let ((*current-file* filename)
              (reader (lisp-reader str 'EOF))
-             (serialize-cache (make-hash))
-             (out (%make-text-memory-output-stream))
-             (is-first t)
+             (all-code (vector))
              (link-addr 0)
              (*xref-info* (vector))
              (env (make-environment))
@@ -2403,10 +2401,7 @@
                         (setq code (copy-seq code))
                         (%relocate-code code link-addr)
                         (setq link-addr (+ link-addr (length code)))
-                        (if is-first
-                            (setq is-first nil)
-                            (%stream-put out #\,))
-                        (%stream-put out (%serialize-code code serialize-cache) #\Newline))))
+                        (%seq-cat all-code (list code)))))
                   (rec ()
                     (let* ((token (funcall reader 'next))
                            (form (cdr token)))
@@ -2422,7 +2417,7 @@
              (when (and *current-file* (plusp (length xref)))
                (comp1 `(%grok-xref-info ,*current-file* ,xref))))
            (unwind-protect
-               (%get-output-stream-string out)
+               (%serialize-code all-code (make-hash))
              (foreach (nreverse delayed) #'%eval-code))))))
 
   (set-symbol-function! 'compile #'compile)
@@ -2577,6 +2572,15 @@
 (%rplacd *id-test-circular* *id-test-circular*)
 (defun test-serialization-circular ()
   (eq '#.*id-test-circular* '#.*id-test-circular*))
+
+(defconstant *id-test-array* #(1 2 3))
+(defun test-serialization-array ()
+  (eq '#.*id-test-array* '#.*id-test-array*))
+
+(defparameter *id-test-array-circular* (vector 'a 'self))
+(vector-set *id-test-array-circular* *id-test-array-circular* 1)
+(defun test-serialization-array-circular ()
+  (eq '#.*id-test-array-circular* '#.*id-test-array-circular*))
 
 EOF
 
