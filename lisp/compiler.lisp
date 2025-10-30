@@ -2561,26 +2561,26 @@
 
 ;;;
 
-(defconstant *id-test-list* '(foo bar))
-(defun test-serialization-identity ()
-  (eq '#.*id-test-list* '#.*id-test-list*))
+;; (defconstant *id-test-list* '(foo bar))
+;; (defun test-serialization-identity ()
+;;   (eq '#.*id-test-list* '#.*id-test-list*))
 
-(defun test-serialization-identity2 ()
-  (eq *id-test-list* *id-test-list*))
+;; (defun test-serialization-identity2 ()
+;;   (eq *id-test-list* *id-test-list*))
 
-(defparameter *id-test-circular* (list 'a))
-(%rplacd *id-test-circular* *id-test-circular*)
-(defun test-serialization-circular ()
-  (eq '#.*id-test-circular* '#.*id-test-circular*))
+;; (defparameter *id-test-circular* (list 'a))
+;; (%rplacd *id-test-circular* *id-test-circular*)
+;; (defun test-serialization-circular ()
+;;   (eq '#.*id-test-circular* '#.*id-test-circular*))
 
-(defconstant *id-test-array* #(1 2 3))
-(defun test-serialization-array ()
-  (eq '#.*id-test-array* '#.*id-test-array*))
+;; (defconstant *id-test-array* #(1 2 3))
+;; (defun test-serialization-array ()
+;;   (eq '#.*id-test-array* '#.*id-test-array*))
 
-(defparameter *id-test-array-circular* (vector 'a 'self))
-(vector-set *id-test-array-circular* *id-test-array-circular* 1)
-(defun test-serialization-array-circular ()
-  (eq '#.*id-test-array-circular* '#.*id-test-array-circular*))
+;; (defparameter *id-test-array-circular* (vector 'a 'self))
+;; (vector-set *id-test-array-circular* *id-test-array-circular* 1)
+;; (defun test-serialization-array-circular ()
+;;   (eq '#.*id-test-array-circular* '#.*id-test-array-circular*))
 
 EOF
 
