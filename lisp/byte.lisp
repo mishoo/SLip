@@ -132,9 +132,8 @@
 
 (defun ldb (bytespec integer)
   (let* ((size (byte-size bytespec))
-         (pos (byte-position bytespec))
-         (mask (1- (ash 1 size))))
-    (ash (logand integer (ash mask pos)) (- pos))))
+         (pos (byte-position bytespec)))
+    (logand (ash integer (- pos)) (1- (ash 1 size)))))
 
 (define-compiler-macro ldb (&whole form bytespec integer)
   (cond
@@ -143,9 +142,8 @@
           (integerp (cadr bytespec))
           (integerp (caddr bytespec)))
      (let* ((size (cadr bytespec))
-            (pos (caddr bytespec))
-            (mask (1- (ash 1 size))))
-       `(ash (logand ,integer ,(ash mask pos)) ,(- pos))))
+            (pos (caddr bytespec)))
+       `(logand (ash ,integer ,(- pos)) ,(1- (ash 1 size)))))
     (t form)))
 
 (defun ldb-test (bytespec integer)
