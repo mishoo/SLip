@@ -115,7 +115,9 @@
   (foreach names
     (lambda (name)
       (multiple-value-bind (setter name) (%:maybe-setter name)
-        (%set-symbol-prop (or setter name) :inline-request t)))))
+        ;; XXX: disabled. Not safe for now.
+        ;; (%set-symbol-prop (or setter name) :inline-request t)
+        ))))
 
 (defmacro declaim (&rest declarations)
   (foreach declarations
@@ -773,7 +775,13 @@
 ;; returns a LET form that executes BODY, as if executed by a function with
 ;; the given lambda list when called with VALUES. It returns 'DECLINE to
 ;; refuse inlining when the call site (VALUES) includes non-constant argument
-;; names. XXX: got hairy and hard to read.
+;; names.
+;;
+;; XXX: disabled, for now (see declaim-inline earlier). It isn't sound, since
+;; free variables in body might become clobbered by the current lexical
+;; environment. Can't do proper analysis here, we'd have to call this after
+;; the body has been transformed to some IR (to be defined) which clearly
+;; marks references to local vs. free variables.
 (defun inline-call (lambda-list values &optional body)
   (cond
     ((symbolp lambda-list)
@@ -793,21 +801,12 @@
         (resolved nil)
         (call-aok nil))
 
-    ;; All non-trivial (non-SAFE-ATOM-P) forms from VALUES must end up in
-    ;; PARALLEL, in the same order, so that they are evaluated in the same
-    ;; lexical env as the caller.
-
-    ;; Required arguments are the cutest.
     (foreach required
       (lambda (varname)
         (unless values
           (error/wp (strcat "Missing required argument " varname)))
         (push (list varname (%pop values)) parallel)))
 
-    ;; Optionals will be pushed to SEQUENTIAL (that's using a LET*) because
-    ;; the default init forms may refer to previous arguments. For non-trivial
-    ;; values we invent a TEMP sym that will still go to PARALLEL, so we don't
-    ;; break our contract.
     (foreach optional
       (lambda (argdef)
         (destructuring-bind (varname &optional default suppname) argdef
@@ -816,15 +815,6 @@
              (push (list varname default) sequential)
              (when suppname
                (push (list suppname nil) sequential)))
-
-            ((%:safe-atom-p (car values))
-             ;; When I grow up, I'll write a smart compiler that will not
-             ;; need SAFE-ATOM-P to produce decent code. But for now, let's
-             ;; manually optimize a bit for our stupid compiler...
-             (push (list varname (%pop values)) sequential)
-             (when suppname
-               (push (list suppname t) sequential)))
-
             (t
              (let ((temp (gensym)))
                (push (list temp (%pop values)) parallel)
@@ -832,23 +822,9 @@
                (when suppname
                  (push (list suppname t) sequential))))))))
 
-    ;; If &REST arg is present in the lambda list, we now add all remaining
-    ;; values to PARALLEL. Evaluation of the arguments is done, we can no
-    ;; longer refer to any non-trivial form from VALUES.
     (when rest
       (push (list rest `(list ,@values)) parallel))
 
-    ;; And &KEY is the fun, hair-pulling part. We'll walk over VALUES, in
-    ;; order (it should be a proper plist, so we check for that upfront). If
-    ;; REST was not used, then for each known argument we bind a temporary var
-    ;; in PARALLEL, and in SEQUENTIAL bind it to the proper name (tho' we can
-    ;; make an exception for trivial forms and just re-use them in SEQUENTIAL).
-    ;; If REST *was* used, then we can no longer inline any non-trivial form
-    ;; from VALUES, so we emit a NTH form which fetches it from REST. That is
-    ;; unfortunate, but still better than GETF. If we encounter a non-constant
-    ;; argument name in VALUES, abort immediately. I considered handling this
-    ;; case too, but doing it properly will produce such horrible code that
-    ;; we're better off calling the function instead.
     (when key
       (labels ((find-key-arg (argname)
                  (let rec ((key key))
@@ -865,17 +841,9 @@
                          (rec (cddr v))))))
 
                (constant (argname)
-                 (cond
-                   ((keywordp argname) argname)
-                   ((numberp argname) argname)
-                   ((stringp argname) argname)
-                   ((eq argname t) t)
-                   ((eq argname nil) nil)
-                   ((and (consp argname)
-                         (eq 'quote (car argname))
-                         (symbolp (cadr argname)))
-                    (cadr argname))
-                   (t (return-from inline-call 'decline)))))
+                 (multiple-value-bind (const? value) (constant-value argname)
+                   (if const? value
+                       (return-from inline-call 'decline)))))
 
         (unless (evenp (length values))
           (error/wp "INLINE-CALL: odd number of &key arguments"))
@@ -892,9 +860,6 @@
                 (keyarg
                  ;; known argument. The internal name is in CADAR.
                  (cond
-                   ((%:safe-atom-p argval)
-                    (push (list (cadar keyarg) argval)
-                          sequential))
                    (rest
                     (push (list (cadar keyarg) `(nth ,index ,rest))
                           sequential))
@@ -1344,16 +1309,41 @@
   `(let ((env (extenv env ,@forms)))
      (with-env ,@body)))
 
+(defun constant-value (form)
+  (cond
+    ((or (eq form t)
+         (eq form nil)
+         (numberp form)
+         (stringp form)
+         (keywordp form)
+         (regexpp form)
+         (charp form)
+         (vectorp form)
+         (functionp form)
+         (%:%std-instance-p form)
+         (%:%structp form))
+     (values t form))
+
+    ((and (consp form)
+          (eq 'quote (car form)))
+     (values t (cadr form)))
+
+    ((symbolp form)
+     (cond
+       ((find-var-in-compiler-env form)
+        ;; XXX: support for local constants to be added when we have Smart
+        ;; Compiler™, if ever.
+        nil)
+       ((%:%get-symbol-prop form :constant)
+        (values t (symbol-value form)))))))
+
 (defun always-true-p (form)
-  (or (eq form t)
-      (numberp form)
-      (stringp form)
-      (regexpp form)
-      (charp form)
-      (vectorp form)
-      (and (consp form)
-           (eq 'quote (car form))
-           (cadr form))))
+  (multiple-value-bind (const? val) (constant-value form)
+    (when const? (not (not val)))))
+
+(defun always-false-p (form)
+  (multiple-value-bind (const? val) (constant-value form)
+    (when const? (not val))))
 
 (defun compiler-macro-function (name &optional (env *compiler-env*))
   (unless (and env (find-in-compiler-env name :func (gethash :lex env)))
@@ -1850,9 +1840,10 @@
 
      (comp-if (pred then else env val? more?)
        (cond
-         ((not pred) (comp else env val? more?))
          ((always-true-p pred)
           (comp then env val? more?))
+         ((always-false-p pred)
+          (comp else env val? more?))
          ((and (consp pred)
                (%memq (car pred) '(not null)))
           (comp-if (cadr pred) else then env val? more?))
@@ -1862,7 +1853,7 @@
                 (ecode (comp else env val? more?)))
             (cond
               ((equal tcode ecode)
-               (%seq (comp pred env nil t) ecode))
+               (comp pred env nil t))
               ((zerop (length tcode))
                (let ((l2 (mklabel)))
                  (%seq pcode
@@ -1900,7 +1891,7 @@
           (cond
             ((always-true-p (car exps))
              (comp (car exps) env val? more?))
-            ((null (car exps))
+            ((always-false-p (car exps))
              (comp-or (cdr exps) env val? more? l1))
             (l1
              (%seq (comp (car exps) env t t)

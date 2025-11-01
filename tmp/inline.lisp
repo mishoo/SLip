@@ -22,3 +22,13 @@
   (test-rest-and-key 1 2 :foo (progn
                                 (format t "FOO EVALUATED~%")
                                 'foo)))
+
+
+(defglobal free-var 2)
+(declaim (inline test))
+(defun test (x) (* free-var x))
+
+(let ((free-var 10))
+  (defun call-test (x)
+    (test x)))
+
