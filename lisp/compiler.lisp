@@ -429,9 +429,11 @@
 
          (read-regexp ()
            (let ((str (read-escaped #\/ #\/ t))
-                 (mods (downcase (read-while (lambda (ch)
-                                               (%memq ch '(#\g #\m #\i #\y)))))))
-             (make-regexp str mods)))
+                 (mods (read-while
+                        (lambda (ch)
+                          (%memq (downcase ch)
+                                 '(#\g #\m #\i #\y #\u))))))
+             (make-regexp str (downcase mods))))
 
          (skip-comment ()
            (read-while (lambda (ch) (not (eq ch #\Newline)))))
@@ -443,9 +445,12 @@
                (letterp ch)
                (digitp ch)
                (%memq ch
+                      ;; XXX: this list should be greatly enlarged.. or better
+                      ;; said, our reader should be greatly rewritten.
                       '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
                         #\@ #\! #\? #\& #\= #\< #\>
-                        #\[ #\] #\{ #\} #\/ #\^ #\#))))))
+                        #\[ #\] #\{ #\} #\/ #\^ #\#
+                        #\« #\» #\❰ #\❱ #\♥ #\▪ #\§))))))
 
          (read-symbol ()
            (let ((str (upcase (read-symbol-name))))
