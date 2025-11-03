@@ -104,6 +104,39 @@
 (defmacro in-package (name)
   `(setq *package* (find-package ',name)))
 
+(defun mapc1 (f list)
+  (let rec ((p list))
+    (if (not p) list
+        (progn
+          (funcall f (%pop p))
+          (rec p)))))
+
+(defun mapc2 (f list1 list2)
+  (let rec ((p list1)
+            (q list2))
+    (if (not (and p q)) list1
+        (progn
+          (funcall f (%pop p) (%pop q))
+          (rec p q)))))
+
+(defun mapc (f . lists)
+  (let ((first (car lists)))
+    (let rec ((lists lists))
+      (if (finished lists) first
+          (progn
+            (apply f (mapcar #'car lists))
+            (rec (mapcar #'cdr lists)))))))
+
+(define-compiler-macro mapc (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPC"))
+    ((null (cdr lists))
+     `(mapc1 ,func ,@lists))
+    ((null (cddr lists))
+     `(mapc2 ,func ,@lists))
+    (form)))
+
 (defun some1 (test list)
   (let rec ((list list))
     (when list
@@ -587,39 +620,6 @@
 
 (defmacro rest (list)
   `(cdr ,list))
-
-(defun mapc1 (f list)
-  (let rec ((p list))
-    (if (not p) list
-        (progn
-          (funcall f (pop p))
-          (rec p)))))
-
-(defun mapc2 (f list1 list2)
-  (let rec ((p list1)
-            (q list2))
-    (if (not (and p q)) list1
-        (progn
-          (funcall f (pop p) (pop q))
-          (rec p q)))))
-
-(defun mapc (f . lists)
-  (let ((first (car lists)))
-    (let rec ((lists lists))
-      (if (finished lists) first
-          (progn
-            (apply f (mapcar #'car lists))
-            (rec (mapcar #'cdr lists)))))))
-
-(define-compiler-macro mapc (&whole form func &rest lists)
-  (cond
-    ((null lists)
-     (error "Missing list argument to MAPC"))
-    ((null (cdr lists))
-     `(mapc1 ,func ,@lists))
-    ((null (cddr lists))
-     `(mapc2 ,func ,@lists))
-    (form)))
 
 ;;; basic looping
 

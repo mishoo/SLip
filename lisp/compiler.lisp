@@ -1662,7 +1662,8 @@
           ;; If the value is not needed, compile arguments for potential side
           ;; effects.
           (comp-seq args env nil t))
-         ((%seq (comp-list args env)
+         (t
+          (%seq (comp-list args env)
                 (gen (strcat opname))
                 (unless more? (gen "RET"))))))
 
