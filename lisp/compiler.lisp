@@ -1287,6 +1287,12 @@
     ((not b) `(not ,a))
     (t form)))
 
+(define-compiler-macro endp (lst)
+  `(not ,lst))
+
+(define-compiler-macro null (lst)
+  `(not ,lst))
+
 (defun make-compiler-env ()
   ;; :lex should match the runtime lexical environment; both
   ;; variables and functions are stored there, but the compiler

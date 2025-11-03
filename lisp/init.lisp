@@ -42,7 +42,7 @@
      maplist max member min minusp mod most-negative-fixnum
      most-positive-fixnum multiple-value-bind multiple-value-call
      multiple-value-list multiple-value-prog1 multiple-value-setq name-char
-     nconc nil not notany notevery nreconc nreverse nth nthcdr null
+     nconc nil not notany notevery nreconc nreverse nth nthcdr null endp
      number-fixed number-string number numberp oddp optimize or otherwise
      package-name package packagep parse-integer parse-number plusp pop prog
      prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote

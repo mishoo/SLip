@@ -314,6 +314,11 @@ defp("not", false, function(m, nargs){
     return m.pop() === false;
 });
 
+defp("endp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return m.pop() === false;
+});
+
 /* -----[ arithmetic ]----- */
 
 defp("+", false, function(m, nargs){
