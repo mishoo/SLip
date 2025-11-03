@@ -406,8 +406,8 @@ defp("mod", false, function(m, nargs){
     [ "asin", Math.asin ],
     [ "cos", Math.cos ],
     [ "acos", Math.acos ],
-    [ "tan", Math.cos ],
-    [ "atan", Math.acos ],
+    [ "tan", Math.tan ],
+    [ "atan", Math.atan ],
     [ "exp", Math.exp ],
     [ "log", Math.log ],
     [ "sqrt", Math.sqrt ]
