@@ -480,25 +480,12 @@
         (%pp-object object))))
 
 (defun<< %pp-array (array)
-  (<< "#(")
-  (let ((n (length array)))
-    (let rec ((i 0))
-      (when (< i n)
-        (unless (zerop i)
-          (<< #\Newline)
-          (indent))
-        (let ((el (svref array i)))
-          (with-indent (%stream-col *pp-stream*)
-            (pprint-object el *pp-stream*)
-            (cond
-              ((and (keywordp el)
-                    (< i (1- n)))
-               (<< " ")
-               (pprint-object (svref array (1+ i)) *pp-stream*)
-               (rec (+ i 2)))
-              (t
-               (rec (+ i 1)))))))))
-  (<< ")"))
+  (cond
+    ((zerop (length array))
+     (<< "#()"))
+    (t
+     (<< "#")
+     (%pp-list (%:as-list array)))))
 
 (defmethod pprint-object ((object vector) (output output-stream))
   (if (eq *pp-stream* output)

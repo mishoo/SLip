@@ -90,7 +90,7 @@
        (go :loop)))))
 
 (defun remove-duplicates (list &key key test test-not from-end)
-  (setf list (if from-end (copy-list list) (reverse list)))
+  (setf list (if from-end (copy-seq list) (reverse list)))
   (%delete-duplicates list (make-subject-test test test-not key t))
   (if from-end list (nreverse list)))
 
@@ -191,7 +191,7 @@
   (update-for-key predicate key)
   (unless destructive
     ;; the frobnicator is destructive
-    (setf list (copy-list list)))
+    (setf list (copy-seq list)))
   (with-list-frobnicator (:replace t)
     :when (and (or (not count)
                    (plusp count))
@@ -210,7 +210,7 @@
   (setf test (make-subject-test test test-not key nil))
   (unless destructive
     ;; the frobnicator is destructive
-    (setf list (copy-list list)))
+    (setf list (copy-seq list)))
   (with-list-frobnicator (:replace t)
     :when (and (or (not count)
                    (plusp count))

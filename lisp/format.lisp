@@ -409,6 +409,16 @@
                       (pop args) output)
         args)))
 
+(def-format #\C ()
+  (cond
+    (colmod?
+     (%stream-put output (substr (%dump (car args)) 2)))
+    (atmod?
+     (%stream-put output (%dump (car args))))
+    (t
+     (%stream-put output (car args))))
+  (cdr args))
+
 ;;; main entry point
 
 (defun exec-format (parsed args stream)

@@ -773,7 +773,7 @@ function indent(level) {
     return repeat_string(' ', level * INDENT_LEVEL);
 }
 
-function dump(thing) {
+function dump(thing, dumped = new Map()) {
     let cache = new Map();
     (function walk(thing){
         if (thing instanceof LispCons) {
@@ -781,7 +781,8 @@ function dump(thing) {
                 cache.set(thing, cache.get(thing) + 1);
             } else {
                 cache.set(thing, 1);
-                LispCons.forEach(thing, walk);
+                walk(thing.car);
+                walk(thing.cdr);
             }
         }
         else if (Array.isArray(thing)) {
@@ -793,7 +794,7 @@ function dump(thing) {
             }
         }
     })(thing);
-    let dumped = new Map(), ref = 0;
+    let ref = dumped.size;
     return function idump(thing) {
         if (thing === false) return "NIL";
         if (thing === true) return "T";
@@ -821,6 +822,10 @@ function dump(thing) {
                 else first = false;
                 ret += idump(LispCons.car(thing));
                 thing = LispCons.cdr(thing);
+                if (dumped.has(thing)) {
+                    ret += " . #" + dumped.get(thing);
+                    break;
+                }
                 if (!LispCons.isList(thing)) {
                     ret += " . " + idump(thing);
                     break;
@@ -839,6 +844,7 @@ const OP_REV = Object.keys(OP);
 
 export function disassemble(code) {
     let lab = 0;
+    let dump_cache = new Map();
     function disassemble(code, level) {
         let labels = Object.create(null);
         for (let i = 0; i < code.length;) {
@@ -864,7 +870,7 @@ export function disassemble(code) {
                 data = "\n" + disassemble(code[i], level + 1);
                 break;
               case OP.CONST:
-                data = dump(code[i]);
+                data = dump(code[i], dump_cache);
                 break;
               default:
                 if (op_has_label(op)) {
@@ -888,36 +894,176 @@ export function disassemble(code) {
     return disassemble(code, 0);
 }
 
-function serialize_const(val, cache) {
+function dig_references(data) {
+    let seen = new Map();
+    let refd = new Map();
+    function mark(obj) {
+        let saved = seen.get(obj);
+        if (!saved) {
+            seen.set(obj, { count: 1 });
+            return true;
+        }
+        if (++saved.count === 2) {
+            refd.set(obj, {});
+        }
+        return false;
+    }
+    data.forEach(function dig(val){
+        if (typeof val === "string") {
+            mark(val);
+        }
+        else if (val instanceof LispSymbol) {
+            if (mark(val)) {
+                if (val.pak) {
+                    dig(val.pak);
+                }
+            }
+        }
+        else if (val instanceof LispPackage) {
+            mark(val);
+        }
+        else if (val instanceof LispChar) {
+            mark(val);
+        }
+        else if (val instanceof RegExp) {
+            mark(val);
+        }
+        else if (val instanceof LispCons) {
+            if (mark(val)) {
+                dig(val.car);
+                dig(val.cdr);
+            }
+        }
+        else if (val instanceof Array) {
+            if (mark(val)) {
+                val.forEach(el => dig(el));
+            }
+        }
+    });
+    return refd;
+}
+
+function serialize_const(val, cache, refd) {
+    function should_cache(val) {
+        return refd && refd.has(val);
+    }
+    function maybe_cached(val) {
+        return cache?.has(val) ? `$(${cache.get(val)})` : null;
+    }
+    function just_cached(val) {
+        if (should_cache(val)) {
+            cache.set(val, cache.size());
+            return true;
+        }
+        return false;
+    }
     return function dump(val) {
         if (val === false) return "!1";
         if (val === true) return "!0";
-        if (val instanceof LispSymbol || val instanceof LispPackage || val instanceof LispChar) return val.serialize(cache);
-        if (val instanceof RegExp) return val.toString();
-        if (val instanceof LispCons) return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
-        if (val instanceof Array) return "[" + val.map(dump).join(",") + "]";
-        if (typeof val == "string") return LispChar.sanitize(JSON.stringify(val));
+        if (val instanceof LispSymbol) {
+            let q = maybe_cached(val);
+            if (q) return q;
+            if (val.pak) {
+                let pak = dump(val.pak);
+                q = just_cached(val) ? 'S' : 's';
+                return q + `(${JSON.stringify(val.name)},${pak})`;
+            } else {
+                q = just_cached(val) ? 'S' : 's';
+                return q + `(${JSON.stringify(val.name)})`;
+            }
+        }
+        if (val instanceof LispPackage) {
+            let q = maybe_cached(val);
+            if (q) return q;
+            q = just_cached(val) ? 'P' : 'p';
+            return q + `(${JSON.stringify(val.name)})`;
+        }
+        if (val instanceof LispChar) {
+            // for characters it doesn't make much sense, we're better
+            // off not caching the objects (we do it on another level,
+            // anyway - LispChar.get(ch) - so they do end up EQ)
+            //
+            // let q = maybe_cached(val);
+            // if (q) return q;
+            // q = did_cache(val) ? 'C' : 'c';
+            // return q + `(${LispChar.sanitize(JSON.stringify(val.value))})`;
+            return `c(${LispChar.sanitize(JSON.stringify(val.value))})`;
+        }
+        if (val instanceof RegExp) {
+            return val.toString();
+        }
+        if (val instanceof LispCons) {
+            let q = maybe_cached(val);
+            if (q) return q;
+            if (just_cached(val)) {
+                // We can't use LispCons.toArray here, as it's
+                // possibly circular.
+                let out = "L(()=>[";
+                while (val !== false) {
+                    out += dump(val.car);
+                    if (val.cdr === false) break;
+                    let q = maybe_cached(val.cdr);
+                    if (q) {
+                        out += ",DOT," + q;
+                        break;
+                    } else if (!LispCons.is(val.cdr)) {
+                        out += ",DOT," + dump(val.cdr);
+                        break;
+                    } else {
+                        val = val.cdr;
+                        out += ",";
+                    }
+                }
+                return out + "])";
+            } else {
+                return "l(" + LispCons.toArray(val).map(dump).join(",") + ")";
+            }
+        }
+        if (val instanceof Array) {
+            let q = maybe_cached(val);
+            if (q) return q;
+            if (just_cached(val)) {
+                return "A(()=>[" + val.map(dump).join(",") + "])";
+            } else {
+                return "[" + val.map(dump).join(",") + "]";
+            }
+        }
+        if (typeof val === "string") {
+            let q = maybe_cached(val);
+            if (q) return q;
+            if (just_cached(val)) {
+                return `V(${LispChar.sanitize(JSON.stringify(val))})`;
+            } else {
+                return LispChar.sanitize(JSON.stringify(val));
+            }
+        }
         if (val + "" == "[object Object]") {
             console.error("Unsupported value in bytecode serialization", val);
             error("Unsupported value in bytecode serialization");
         }
-        return val + "";
+        return val + ""; // XXX: I do not like this.
     }(val);
 }
 
 function serialize(code, strip, cache) {
-    code = code.map(x => serialize_const(x, cache)).join(",");
+    let refd = cache && dig_references(code);
+    code = code.map(x => serialize_const(x, cache, refd)).join(",");
     return strip ? code : "[" + code + "]";
 }
 
 export function unserialize(code) {
     var names = [], values = [], cache = [];
     names.push("s"); values.push(function(name, pak){
-        let sym;
-        if (arguments.length === 1 && typeof name == "number") {
-            return cache[name];
+        if (pak != null) {
+            pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
+            return LispSymbol.get(name, pak);
+        } else {
+            return new LispSymbol(name);
         }
-        if (pak) {
+    });
+    names.push("S"); values.push(function(name, pak){
+        let sym;
+        if (pak != null) {
             pak = pak instanceof LispPackage ? pak : LispPackage.get(pak);
             sym = LispSymbol.get(name, pak);
         } else {
@@ -927,22 +1073,53 @@ export function unserialize(code) {
         return sym;
     });
     names.push("p"); values.push(function(name){
-        if (typeof name === "number") {
-            return cache[name];
-        }
+        return LispPackage.get(name);
+    });
+    names.push("P"); values.push(function(name){
         let pak = LispPackage.get(name);
         cache.push(pak);
         return pak;
     });
-    names.push("l"); values.push(function(...args){
-        return LispCons.fromArray(args);
+    names.push("l"); values.push(function(...arg){
+        return LispCons.fromArray(arg);
+    });
+    names.push("L"); values.push(function (arg) {
+        let cons = new LispCons();
+        cache.push(cons);
+        let list = LispCons.fromArray(arg());
+        cons.car = list.car;
+        cons.cdr = list.cdr;
+        return cons;
+    });
+    // XXX: this looks stupid for now, but I'll use it someday for
+    // multi-dimensional arrays or typed vectors.
+    names.push("a"); values.push(function(arg){
+        return arg;
+    });
+    names.push("A"); values.push(function(arg){
+        let array = [];
+        cache.push(array);
+        array.splice(0, 0, ...arg());
+        return array;
     });
     names.push("c"); values.push(function(char){
         return LispChar.get(char);
     });
+    names.push("C"); values.push(function(char){
+        let ch = LispChar.get(char);
+        cache.push(ch);
+        return ch;
+    });
+    names.push("$"); values.push(function(index){
+        return cache[index];
+    });
+    names.push("V"); values.push(function(value){
+        cache.push(value);
+        return value;
+    });
     names.push("DOT"); values.push(LispCons.DOT);
     var func = new Function("return function(" + names.join(",") + "){return [" + code + "]}")();
-    code = func.apply(null, values);
+    code = func(...values);
     return code;
 }
 
@@ -1188,13 +1365,6 @@ let CC_CODE = assemble([
 
 function error(msg) {
     throw new LispPrimitiveError(msg);
-}
-
-function find_key_arg(item, array, start, end = array.length) {
-    for (let i = start; i < end; i += 2) {
-        if (eq(item, array[i])) return i;
-    }
-    return false;
 }
 
 let OP_RUN = [
@@ -1551,10 +1721,10 @@ let OP_RUN = [
         let min = required;
         let max = rest || key || allow_other_keys ? false : required + optional;
         if (n < required) {
-            error(`Expecting at least ${min} arguments`);
+            error(`XARGS: Expecting at least ${min} arguments`);
         }
         if (max !== false && n > max) {
-            error(`Expecting at most ${max} arguments`);
+            error(`XARGS: Expecting at most ${max} arguments`);
         }
         let frame = new Array(frame_len).fill(false);
         let stack = m.stack.pop_frame(n);
@@ -1572,32 +1742,32 @@ let OP_RUN = [
                 frame[index++] = LispCons.fromArray(stack, i);
             }
             if (kl) {
-                if ((n - i) % 2) {
-                    error("Uneven number of &key arguments");
+                if ((n - i) & 1) {
+                    error("XARGS: Uneven number of &key arguments");
                 }
-                if (!allow_other_keys) {
-                    let pos = find_key_arg(S_ALLOW_OTHER_KEYS, stack, i, n);
-                    if (pos !== false) {
-                        allow_other_keys = stack[pos + 1];
-                    }
-                }
-                for (let k = 0; k < kl; k++, index += 2) {
-                    let pos = find_key_arg(key[k], stack, i, n);
-                    if (pos !== false) {
-                        frame[index] = true; // argument-passed-p
-                        frame[index + 1] = stack[pos + 1];
-                        stack[pos] = undefined;
-                        if (pos == i) i += 2;
-                    }
-                }
-                if (!allow_other_keys) {
-                    while (i < n) {
-                        let arg = stack[i];
-                        if (arg !== undefined && arg !== S_ALLOW_OTHER_KEYS && !key.includes(arg)) {
-                            error(`Unknown keyword argument ${dump(arg)}`);
+                let unknown = false, s_aok_seen = false;
+                for (let s = i; s < n; s += 2) {
+                    let argname = stack[s], argval = stack[s + 1];
+                    if (argname === S_ALLOW_OTHER_KEYS) {
+                        if (!s_aok_seen) {
+                            s_aok_seen = true;
+                            if (allow_other_keys === false) {
+                                allow_other_keys = argval;
+                            }
                         }
-                        i += 2;
                     }
+                    let ki = key.indexOf(argname);
+                    if (ki < 0) {
+                        if (argname !== S_ALLOW_OTHER_KEYS) {
+                            unknown = new LispCons(argname, unknown);
+                        }
+                    } else if (!frame[index + (ki << 1)]) {
+                        frame[index + (ki << 1)] = true;
+                        frame[index + (ki << 1) + 1] = argval;
+                    }
+                }
+                if (allow_other_keys === false && unknown !== false) {
+                    error(`XARGS: Unknown keyword arguments: ${LispCons.toArray(unknown).map(dump).join(", ")}`);
                 }
             }
         }

@@ -89,9 +89,9 @@
 (defun draw-clock-frame ()
   (clear)
   (save-excursion
-   (set-color "#abba")
+   (set-color "#bccb")
    (left (* iii 20))
-   (rect-spiral (+ 350 (* 150 (sin iii)))))
+   (rect-spiral (+ 350 (* 250 (cos iii)))))
   (left (* 10 (cos iii)))
   (clock (+ 160 (* 30 (sin (incf iii 0.05))))))
 

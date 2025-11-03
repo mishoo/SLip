@@ -9,6 +9,7 @@ import {
     LispMutex,
     LispChar,
     LispClosure,
+    LispArray,
     LispStruct,
     LispStdInstance,
 } from "./types.js";
@@ -63,7 +64,7 @@ const LispList = {
 };
 
 const LispVector = {
-    is: Array.isArray,
+    is(x) { return LispArray.is(x) ? x.dimensions().length === 1 : Array.isArray(x) },
     type: "array"
 };
 
@@ -313,6 +314,11 @@ defp("not", false, function(m, nargs){
     return m.pop() === false;
 });
 
+defp("endp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return m.pop() === false;
+});
+
 /* -----[ arithmetic ]----- */
 
 defp("+", false, function(m, nargs){
@@ -400,8 +406,8 @@ defp("mod", false, function(m, nargs){
     [ "asin", Math.asin ],
     [ "cos", Math.cos ],
     [ "acos", Math.acos ],
-    [ "tan", Math.cos ],
-    [ "atan", Math.acos ],
+    [ "tan", Math.tan ],
+    [ "atan", Math.atan ],
     [ "exp", Math.exp ],
     [ "log", Math.log ],
     [ "sqrt", Math.sqrt ]
@@ -758,6 +764,13 @@ defp("as-list", false, function(m, nargs){
 });
 
 defp("vector-push", true, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let vector = checktype(m.pop(), LispVector);
+    let value = m.pop();
+    return vector.push(value) - 1;
+});
+
+defp("%vector-push", true, function(m, nargs){
     checknargs(nargs, 2);
     var a = m.pop_frame(nargs - 1);
     var vector = m.pop();
@@ -814,6 +827,113 @@ defp("svref", false, function(m, nargs){
     return index >= 0 && index < vector.length ? vector[index] : false;
 });
 
+defp("%make-array", false, function(m, nargs){
+    checknargs(nargs, 1, 4);
+    let content = nargs > 3 ? m.pop() : false;
+    let initel = nargs > 2 ? m.pop() : false;
+    let eltype = nargs > 1 ? m.pop() : false;
+    let dimensions = m.pop();
+    if (LispInteger.is(dimensions)) {
+        dimensions = [ dimensions ];
+    } else if (LispList.is(dimensions)) {
+        dimensions = LispCons.toArray(dimensions);
+    } else if (!LispVector.is(dimensions)) {
+        error(`Invalid array dimensions: ${LispMachine.dump(dimensions)}`);
+    }
+    return new LispArray({
+        dimensions: dimensions,
+        element_type: eltype,
+        initial_element: initel,
+        initial_content: content,
+    });
+});
+
+defp("%arrayp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let v = m.pop();
+    return LispArray.is(v) || Array.isArray(v);
+});
+
+defp("%array-ref", false, function(m, nargs){
+    checknargs(nargs, 1);
+    let subscripts = m.pop_frame(nargs - 1);
+    return checktype(m.pop(), LispArray).get(subscripts);
+});
+
+defp("%array-set", true, function(m, nargs){
+    checknargs(nargs, 2);
+    let subscripts = m.pop_frame(nargs - 2);
+    let array = checktype(m.pop(), LispArray);
+    let value = m.pop();
+    return array.set(subscripts, value);
+});
+
+defp("array-dimensions", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let array = m.pop();
+    if (LispArray.is(array)) return LispCons.fromArray(array.dimensions());
+    if (Array.isArray(array)) return new LispCons(array.length, false);
+    error(`ARRAY-DIMENSIONS: argument is not an array`);
+});
+
+defp("fill-pointer", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let array = checktype(m.pop(), LispVector);
+    return array.length;
+});
+
+defp("%set-fill-pointer", false, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let array = checktype(m.pop(), LispVector);
+    let pos = m.pop_integer();
+    if (pos < 0 || pos >= array.length) {
+        error(`%SET-FILL-POINTER: bad fill pointer ${pos} (should be 0..${array.length})`);
+    }
+    return array.length = pos;
+});
+
+defp("array-dimension", false, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    let axis = m.pop_integer();
+    let array = m.pop();
+    let dimensions;
+    if (LispArray.is(array)) {
+        dimensions = array.dimensions();
+    } else if (Array.isArray(array)) {
+        dimensions = [ array.length ];
+    } else {
+        error(`ARRAY-DIMENSION: argument is not an array`);
+    }
+    if (axis < 0 || axis >= dimensions.length) {
+        error(`ARRAY-DIMENSION: axis out of bounds`);
+    }
+    return dimensions[axis];
+});
+
+defp("array-rank", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let array = m.pop();
+    if (LispArray.is(array)) {
+        return array.dimensions().length;
+    } else if (Array.isArray(array)) {
+        return 1;
+    } else {
+        error(`ARRAY-RANK: argument is not an array`);
+    }
+});
+
+defp("array-element-type", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let array = m.pop();
+    if (LispArray.is(array)) {
+        return array.element_type();
+    } else if (Array.isArray(array)) {
+        return true;
+    } else {
+        error(`ARRAY-RANK: argument is not an array`);
+    }
+});
+
 function schar(m, nargs){
     checknargs(nargs, 2, 2);
     let index = m.pop(), string = m.pop();
@@ -867,7 +987,7 @@ defp("%seq-cat", true, function(m, nargs){
                 seq.push.apply(seq, LispCons.toArray(x));
             }
             else if (LispVector.is(x)) {
-                seq.push.apply(seq, x);
+                seq.push(...x);
             }
             else seq.push(x);
         }
@@ -951,6 +1071,16 @@ defp("string-downcase", false, function(m, nargs){
 defp("string-upcase", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return checktype(as_string(m.pop()), LispString).toUpperCase();
+});
+
+defp("char-downcase", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispChar).toLowerCase();
+});
+
+defp("char-upcase", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return checktype(m.pop(), LispChar).toUpperCase();
 });
 
 defp("string-capitalize", false, function(m, nargs){
@@ -1131,17 +1261,34 @@ defp("stringp", false, function(m, nargs){
     return LispString.is(m.pop());
 });
 
+// XXX: rename in code to characterp, then remove.
 defp("charp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     return LispChar.is(m.pop());
 });
 
+defp("characterp", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return LispChar.is(m.pop());
+});
+
+// XXX: rename in code to digit-char-p, then remove.
 defp("digitp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var ch = m.pop();
     checktype(ch, LispChar);
     ch = ch.value.charCodeAt(0);
     return ch >= 48 && ch <= 57;
+});
+
+defp("digit-char-p", false, function(m, nargs){
+    checknargs(nargs, 1, 2);
+    let radix = nargs > 1 ? m.pop() : 10;
+    let ch = m.pop();
+    checktype(ch, LispChar);
+    checktype(radix, LispNumber);
+    let val = parseInt(ch.value, radix);
+    return isNaN(val) ? false : val;
 });
 
 defp("whitespacep", false, function(m, nargs){

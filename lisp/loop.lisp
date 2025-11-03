@@ -48,7 +48,9 @@
   `(setf ,ls (setf (cdr ,ls) (cons ,thing nil))))
 
 (defmacro list-nconc (ls elements)
-  `(setf ,ls (last (setf (cdr ,ls) ,elements))))
+  `(let (($els ,elements))
+     (when $els
+       (setf ,ls (last (setf (cdr ,ls) $els))))))
 
 (defun register-parser (name parser)
   (cond

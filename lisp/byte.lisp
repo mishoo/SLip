@@ -1,13 +1,17 @@
 (in-package :sl)
 
-(export '(ash byte byte-size byte-position ldb dpb logand logandc1 logandc2
-          logeqv logior lognand lognor lognot logorc1 logorc2 logxor logtest
-          logcount))
+(export '(ash byte byte-size byte-position ldb ldb-test dpb logand logandc1
+          logandc2 logeqv logior lognand lognor lognot logorc1 logorc2 logxor
+          logtest logcount))
 
 (defpackage :sl-byte
   (:use :sl :%))
 
 (in-package :sl-byte)
+
+(declaim (inline byte byte-size byte-position
+                 logand logior logxor logtest logcount
+                 ash ldb ldb-test dpb))
 
 (defun byte (size position)
   (cons size position))
@@ -128,9 +132,8 @@
 
 (defun ldb (bytespec integer)
   (let* ((size (byte-size bytespec))
-         (pos (byte-position bytespec))
-         (mask (1- (ash 1 size))))
-    (ash (logand integer (ash mask pos)) (- pos))))
+         (pos (byte-position bytespec)))
+    (logand (ash integer (- pos)) (1- (ash 1 size)))))
 
 (define-compiler-macro ldb (&whole form bytespec integer)
   (cond
@@ -139,9 +142,26 @@
           (integerp (cadr bytespec))
           (integerp (caddr bytespec)))
      (let* ((size (cadr bytespec))
+            (pos (caddr bytespec)))
+       `(logand (ash ,integer ,(- pos)) ,(1- (ash 1 size)))))
+    (t form)))
+
+(defun ldb-test (bytespec integer)
+  (let* ((size (byte-size bytespec))
+         (pos (byte-position bytespec))
+         (mask (1- (ash 1 size))))
+    (/= 0 (logand integer (ash mask pos)))))
+
+(define-compiler-macro ldb-test (&whole form bytespec integer)
+  (cond
+    ((and (consp bytespec)
+          (eq 'byte (car bytespec))
+          (integerp (cadr bytespec))
+          (integerp (caddr bytespec)))
+     (let* ((size (cadr bytespec))
             (pos (caddr bytespec))
             (mask (1- (ash 1 size))))
-       `(ash (logand ,integer ,(ash mask pos)) ,(- pos))))
+       `(/= 0 (logand ,integer ,(ash mask pos)))))
     (t form)))
 
 (defun dpb (newbyte bytespec integer)
@@ -149,7 +169,7 @@
          (pos (byte-position bytespec))
          (mask (1- (ash 1 size)))
          (tmask (ash mask pos)))
-    (logior (logxor tmask (logior integer tmask))
+    (logior (logxor tmask (logior tmask integer))
             (ash (logand newbyte mask) pos))))
 
 (define-compiler-macro dpb (&whole form newbyte bytespec integer)
@@ -164,10 +184,10 @@
             (tmask (ash mask pos)))
        (cond
          ((integerp newbyte)
-          `(logior (logxor ,tmask (logior ,integer ,tmask))
+          `(logior (logxor (logior ,integer ,tmask) ,tmask)
                    ,(ash (logand newbyte mask) pos)))
          (t
-          `(logior (logxor ,tmask (logior ,integer ,tmask))
+          `(logior (logxor (logior ,integer ,tmask) ,tmask)
                    (ash (logand ,newbyte ,mask) ,pos))))))
     (t form)))
 

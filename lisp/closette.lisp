@@ -931,10 +931,8 @@
                                                (%no-next-method $generic)))
                                          (next-method-p ()
                                            (not (null $next-emfun))))
-                                    (apply (%:%fn ,function-name
-                                                  ,(kludge-arglist lambda-list)
-                                                  ,body)
-                                           $args)))))))
+                                    (flet ((,function-name ,(kludge-arglist lambda-list) ,@body))
+                                      (apply #',function-name $args))))))))
 
 (defun canonicalize-specializers (specializers)
   `(list ,@(mapcar #'canonicalize-specializer specializers)))
@@ -960,7 +958,7 @@
             qualifiers
             (extract-lambda-list specialized-lambda-list)
             (extract-specializers specialized-lambda-list)
-            (list* 'progn body))))
+            body)))
 
 ;;; Several tedious functions for analyzing lambda lists
 
@@ -1392,6 +1390,7 @@
     ((sl-struct::structurep x 'sl-struct::structure)  <structure-class>)
     ((sl-struct::structurep x)                        <structure-object>)
     ((vectorp x)                                      <vector>)
+    ((arrayp x)                                       <array>)
     ((functionp x)                                    <function>)
     ((regexpp x)                                      <regexp>)
     ((hash-table-p x)                                 <hash-table>)

@@ -32,6 +32,16 @@
       (when errorp
         (error "No such structure ~S." name))))
 
+(define-compiler-macro find-structure (&whole form name &rest _)
+  (cond
+    ((and (consp name)
+          (eq 'quote (car name))
+          (symbolp (cadr name))
+          (gethash (cadr name) *structures*))
+     `(gethash ,name *structures*))
+    (t form)))
+
+(declaim (inline structure-of))
 (defun structure-of (x)
   (assert-struct x)
   (%struct-struct x))
@@ -184,8 +194,7 @@
            (slots (append (when include
                             (structure-slots include))
                           (mapcar #'parse-slot slot-description)))
-           (index 0)
-           (the-struct (gensym)))
+           (index 0))
       (labels
           ((accessor (slot-name)
              (intern (strcat conc-name slot-name)))
@@ -193,30 +202,35 @@
              (let ((idx (prog1 index (incf index)))
                    (name (accessor (getf slot :name))))
                `(progn
+                  (declaim (inline ,name))
                   (defun ,name (obj)
                     (assert-struct obj ',struct-name)
                     (%struct-ref obj ,idx))
                   ,@(unless (getf slot :read-only)
-                      `((defun (setf ,name) (value obj)
+                      `((declaim (inline (setf ,name)))
+                        (defun (setf ,name) (value obj)
                           (assert-struct obj ',struct-name)
                           (%struct-set obj ,idx value))))))))
-        `(let ((,the-struct
-                (make-structure ',struct-name
-                                :slots ',slots
-                                ,@(when include
-                                    `(:include ',(structure-name include)))
-                                ,@(when print-object
-                                    `(:print-object ',print-object))
-                                ,@(when print-function
-                                    `(:print-function ',print-function)))))
-           (sl-type:defpredicate ,struct-name (obj)
+        (unless predicate
+          (setf predicate (make-symbol (strcat struct-name "-P"))))
+        `(progn
+           (make-structure ',struct-name
+                           :slots ',slots
+                           ,@(when include
+                               `(:include ',(structure-name include)))
+                           ,@(when print-object
+                               `(:print-object ',print-object))
+                           ,@(when print-function
+                               `(:print-function ',print-function)))
+           (declaim (inline ,predicate))
+           (defun ,predicate (obj)
              (structurep obj ',struct-name))
+           (deftype ,struct-name ()
+             '(satisfies ,predicate))
            ,@(mapcar #'make-slot slots)
-           ,@(when predicate
-               `((defun ,predicate (obj)
-                   (structurep obj ',struct-name))))
            ,@(when copier
-               `((defun ,copier (obj)
+               `((declaim (inline ,copier))
+                 (defun ,copier (obj)
                    (assert-struct obj ',struct-name)
                    (copy-structure obj))))
            ,@(when constructor
@@ -225,8 +239,9 @@
                   (let* ((parsed (parse-lambda-list constructor-arglist))
                          (ctor-args (getf parsed :names))
                          (constructor-arglist (insert-defaults parsed slots)))
-                    `((defun ,constructor ,constructor-arglist
-                        (%struct ,the-struct
+                    `((declaim (inline ,constructor))
+                      (defun ,constructor ,constructor-arglist
+                        (%struct (find-structure ',struct-name)
                                  ,@(mapcar (lambda (slot)
                                              (let ((name (getf slot :name)))
                                                (cond
@@ -236,7 +251,8 @@
                                                   (getf slot :initform)))))
                                            slots))))))
                  (t
-                  `((defun ,constructor
+                  `((declaim (inline ,constructor))
+                    (defun ,constructor
                            (&key ,@(mapcar (lambda (slot)
                                              (let ((name (getf slot :name))
                                                    (initform (getf slot :initform)))
@@ -245,7 +261,7 @@
                                                   `(,name ,initform))
                                                  (t name))))
                                            slots))
-                      (%struct ,the-struct
+                      (%struct (find-structure ',struct-name)
                                ,@(mapcar (lambda (slot) (getf slot :name)) slots)))))))
            ',struct-name)))))
 

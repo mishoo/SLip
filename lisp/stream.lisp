@@ -1,10 +1,9 @@
 (in-package :sl)
 
-(export '(peek-char read-char read-line write-string write-line
-          peek-byte read-byte
-          read-sequence write-sequence
-          with-input-from-string file-position
-          stream-error stream-error-stream end-of-file))
+(export '(peek-char read-char read-line write-char write-string write-line
+          peek-byte read-byte read-sequence write-sequence
+          with-input-from-string file-position finish-output stream-error
+          stream-error-stream end-of-file))
 
 (defpackage :sl-stream
   (:use :sl :%)
@@ -74,6 +73,11 @@
             (values eof-value t))
         (values line eof))))
 
+(defun write-char (char &optional (output-stream *standard-output*))
+  (check-type char char)
+  (check-type output-stream text-output-stream)
+  (%stream-put output-stream char))
+
 (defun write-string (string &optional (output-stream *standard-output*)
                             &key (start 0) end)
   (when (eq output-stream t)
@@ -102,3 +106,7 @@
 
 (defun open-url (url &optional binary)
   (%:%http-input-stream url binary))
+
+(defun finish-output (&optional (output-stream *standard-output*))
+  ;; XXX: implement this.
+  )

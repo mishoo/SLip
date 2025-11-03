@@ -20,44 +20,45 @@
      apply aref asin assert atan atom block boolean boundp caaaar caaadr caaar
      caadar caaddr caadr caar cadaar cadadr cadar caddar cadddr caddr cadr car
      case catch cdaaar cdaadr cdaar cdadar cdaddr cdadr cdar cddaar cddadr
-     cddar cdddar cddddr cdddr cddr cdr ceiling char character char-code
-     char-equal char-greaterp char-lessp char-name char-not-equal
+     cddar cdddar cddddr cdddr cddr cdr ceiling char character characterp
+     char-code char-equal char-greaterp char-lessp char-name char-not-equal
      char-not-greaterp char-not-lessp char/= char< char<= char= char> char>=
-     charp clear-timeout code-char compile compiler-macro-function complement
-     cond cons consp constantly copy-list copy-seq copy-tree cos
-     current-thread debug decf declare defconstant defglobal
-     define-compiler-macro define-modify-macro define-setf-expander defmacro
-     defpackage defparameter defsetf defun defvar destructuring-bind digitp
-     disassemble do do* dolist dotimes downcase ecase elt eq eql equal equalp
-     error eval evenp every exp export expt fboundp fdefinition fifth
-     find-package find-symbol first fixnum flet float floatp floor fmakunbound
-     foreach fourth funcall function functionp gensym get
-     get-internal-run-time get-setf-expansion getf gethash go hash-copy
-     hash-iterator hash-keys hash-table hash-table-p hash-values identity if
-     ignore import in-package incf integer integerp intern it iterator-next
-     keywordp labels lambda lambda-list-keywords last length let let* letterp
-     list list* listp load locally log macroexpand macroexpand-1 macrolet
-     make-array make-hash make-list make-package make-regexp make-symbol
-     make-thread make-vector makunbound mapc mapcar max member min minusp mod
-     most-negative-fixnum most-positive-fixnum multiple-value-bind
-     multiple-value-call multiple-value-list multiple-value-prog1
-     multiple-value-setq name-char nconc nil not notany notevery nreconc
-     nreverse nth nthcdr null number-fixed number-string number numberp oddp
-     optimize or otherwise package-name package packagep parse-integer
-     parse-number plusp pop prog prog* prog1 prog2 progn progv psetf psetq
-     push pushnew quasiquote quote quote-regexp random regexp regexp-exec
-     regexp-test regexpp remhash replace-regexp rest return return-from
-     revappend reverse rotatef round rplaca rplacd schar second set-timeout
-     setf setq shadow shiftf sin sleep some space special speed sqrt
-     standard-object string string-capitalize string-downcase string-equal
-     string-greaterp string-lessp string-not-equal string-not-greaterp
-     string-not-lessp string-upcase string/= string< string<= string= string>
-     string>= stringp structure svref sxhash symbol symbol-function
-     symbol-macrolet symbol-name symbol-package symbol-plist symbol-value
-     symbolp t tagbody tan third thread threadp throw type type-of typep
-     unintern unless unsigned-byte unwind-protect upcase use-package values
-     values-list vector vector-pop vector-push vectorp warn when
-     with-output-to-string without-interrupts zerop λ
+     char-upcase char-downcase charp clear-timeout code-char compile
+     compiler-macro-function complement cond cons consp constantly copy-list
+     copy-seq copy-tree cos current-thread debug decf declare declaim inline
+     defconstant defglobal define-compiler-macro define-modify-macro
+     define-setf-expander defmacro defpackage defparameter defsetf defun
+     defvar destructuring-bind digitp digit-char-p disassemble do do* dolist
+     dotimes downcase ecase elt eq eql equal equalp error eval evenp every exp
+     export expt fboundp fdefinition fifth find-package find-symbol first
+     fixnum flet float floatp floor fmakunbound foreach fourth funcall
+     function functionp gensym get get-internal-run-time get-setf-expansion
+     getf gethash go hash-copy hash-iterator hash-keys hash-table hash-table-p
+     hash-values identity if ignore import in-package incf integer integerp
+     intern it iterator-next keywordp labels lambda lambda-list-keywords last
+     length let let* letterp list list* listp load locally log macroexpand
+     macroexpand-1 macrolet make-array make-hash make-list make-package
+     make-regexp make-symbol make-thread make-vector makunbound mapc mapcar
+     maplist max member min minusp mod most-negative-fixnum
+     most-positive-fixnum multiple-value-bind multiple-value-call
+     multiple-value-list multiple-value-prog1 multiple-value-setq name-char
+     nconc nil not notany notevery nreconc nreverse nth nthcdr null endp
+     number-fixed number-string number numberp oddp optimize or otherwise
+     package-name package packagep parse-integer parse-number plusp pop prog
+     prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
+     quote-regexp random regexp regexp-exec regexp-test regexpp remhash
+     replace-regexp rest return return-from revappend reverse rotatef round
+     rplaca rplacd schar second set-timeout setf setq shadow shiftf sin sleep
+     some space special speed sqrt standard-object string string-capitalize
+     string-downcase string-equal string-greaterp string-lessp
+     string-not-equal string-not-greaterp string-not-lessp string-upcase
+     string/= string< string<= string= string> string>= stringp structure
+     svref sxhash symbol symbol-function symbol-macrolet symbol-name
+     symbol-package symbol-plist symbol-value symbolp t tagbody tan third
+     thread threadp throw type type-of typep unintern unless unsigned-byte
+     unwind-protect upcase use-package values values-list vector vector-pop
+     vector-push vectorp warn when with-output-to-string without-interrupts
+     zerop λ
 
      stream input-stream output-stream text-input-stream text-output-stream
 
@@ -103,6 +104,39 @@
 (defmacro in-package (name)
   `(setq *package* (find-package ',name)))
 
+(defun mapc1 (f list)
+  (let rec ((p list))
+    (if (not p) list
+        (progn
+          (funcall f (%pop p))
+          (rec p)))))
+
+(defun mapc2 (f list1 list2)
+  (let rec ((p list1)
+            (q list2))
+    (if (not (and p q)) list1
+        (progn
+          (funcall f (%pop p) (%pop q))
+          (rec p q)))))
+
+(defun mapc (f . lists)
+  (let ((first (car lists)))
+    (let rec ((lists lists))
+      (if (finished lists) first
+          (progn
+            (apply f (mapcar #'car lists))
+            (rec (mapcar #'cdr lists)))))))
+
+(define-compiler-macro mapc (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPC"))
+    ((null (cdr lists))
+     `(mapc1 ,func ,@lists))
+    ((null (cddr lists))
+     `(mapc2 ,func ,@lists))
+    (form)))
+
 (defun some1 (test list)
   (let rec ((list list))
     (when list
@@ -130,6 +164,37 @@
      `(map1 ,func ,@lists))
     ((null (cddr lists))
      `(map2 ,func ,@lists))
+    (form)))
+
+(defun maplist1 (func lst)
+  (let rec ((ret nil) (lst lst))
+    (if lst
+        (rec (cons (funcall func lst) ret)
+             (cdr lst))
+        (nreverse ret))))
+
+(defun maplist2 (func lst1 lst2)
+  (let rec ((ret nil) (lst1 lst1) (lst2 lst2))
+    (if (and lst1 lst2)
+        (rec (cons (funcall func lst1 lst2) ret)
+             (cdr lst1) (cdr lst2))
+        (nreverse ret))))
+
+(defun maplist (f . lists)
+  (let rec (ret (tails lists))
+    (if (finished tails)
+        (nreverse ret)
+        (rec (cons (apply f tails) ret)
+             (map1 #'cdr tails)))))
+
+(define-compiler-macro maplist (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPLIST"))
+    ((null (cdr lists))
+     `(maplist1 ,func ,@lists))
+    ((null (cddr lists))
+     `(maplist2 ,func ,@lists))
     (form)))
 
 ;; every returns false as soon as any invocation of predicate
@@ -556,39 +621,6 @@
 (defmacro rest (list)
   `(cdr ,list))
 
-(defun mapc1 (f list)
-  (let rec ((p list))
-    (if (not p) list
-        (progn
-          (funcall f (pop p))
-          (rec p)))))
-
-(defun mapc2 (f list1 list2)
-  (let rec ((p list1)
-            (q list2))
-    (if (not (and p q)) list1
-        (progn
-          (funcall f (pop p) (pop q))
-          (rec p q)))))
-
-(defun mapc (f . lists)
-  (let ((first (car lists)))
-    (let rec ((lists lists))
-      (if (finished lists) first
-          (progn
-            (apply f (mapcar #'car lists))
-            (rec (mapcar #'cdr lists)))))))
-
-(define-compiler-macro mapc (&whole form func &rest lists)
-  (cond
-    ((null lists)
-     (error "Missing list argument to MAPC"))
-    ((null (cdr lists))
-     `(mapc1 ,func ,@lists))
-    ((null (cddr lists))
-     `(mapc2 ,func ,@lists))
-    (form)))
-
 ;;; basic looping
 
 (defmacro dolist ((var list-form &rest result-form) &body body)
@@ -770,6 +802,9 @@
 (defun nth (n list)
   (car (nthcdr n list)))
 
+(define-compiler-macro nth (n list)
+  `(car (nthcdr ,n ,list)))
+
 (defun (setf nth) (value n list)
   (setf (car (nthcdr n list)) value))
 
@@ -837,45 +872,6 @@
   (let ((list nil))
     (dotimes (i size list)
       (setq list (cons initial-element list)))))
-
-(defun make-array (dimensions &key
-                              element-type
-                              initial-element
-                              initial-contents
-                              adjustable
-                              fill-pointer
-                              displaced-to
-                              displaced-index-offset)
-  (when (listp dimensions)
-    (error "MAKE-ARRAY: multi-dimensional arrays not supported (yet?)"))
-  (make-vector dimensions initial-element initial-contents))
-
-(define-compiler-macro make-array (&whole form
-                                          dimensions &key
-                                          initial-element
-                                          initial-contents
-                                          &allow-other-keys)
-  (cond
-    ((listp dimensions)
-     form)
-    (t
-     `(make-vector ,dimensions ,initial-element ,initial-contents))))
-
-(defun aref (array &rest pos)
-  (when (cdr pos)
-    (error "AREF: multi-dimensional arrays not supported (yet?)"))
-  (svref array (car pos)))
-
-(define-compiler-macro aref (&whole form array &rest pos)
-  (cond
-    ((cdr pos) form)
-    (t
-     `(svref ,array ,(car pos)))))
-
-(defun (setf aref) (value array &rest pos)
-  (when (cdr pos)
-    (error "SETF AREF: multi-dimensional arrays not supported (yet?)"))
-  (setf (svref array (car pos)) value))
 
 (defun (setf elt) (value seq index)
   (cond
@@ -1046,3 +1042,11 @@
                  ,oldvalue))))))))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
+
+(defmacro with-backtrace (&rest body)
+  `(handler-bind ((error (lambda (error)
+                           (format *standard-output* "~S~%" error)
+                           (format *standard-output* "~S~%" (%:%backtrace)))))
+     ,@body))
+
+(export 'with-backtrace)
