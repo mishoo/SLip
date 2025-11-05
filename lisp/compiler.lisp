@@ -242,10 +242,15 @@
              (strcat msg " (" (or *current-file* "line") ":" *current-pos* ")")
              msg)))
 
+(defmacro pop (name)
+  (if (safe-atom-p name)
+      `(%pop ,name)
+      (error "POP: we don't have POP yet")))
+
 (defun map1 (func lst)
   (let rec ((ret nil) (lst lst))
     (if lst
-        (rec (cons (funcall func (%pop lst)) ret)
+        (rec (cons (funcall func (pop lst)) ret)
              lst)
         (nreverse ret))))
 
@@ -253,27 +258,27 @@
   (let ((ret (vector)))
     (let rec ((lst lst))
       (if lst (progn
-                (%vector-push ret (funcall func (%pop lst)))
+                (%vector-push ret (funcall func (pop lst)))
                 (rec lst))
           ret))))
 
 (defun map2 (func lst1 lst2)
   (let rec ((ret nil) (lst1 lst1) (lst2 lst2))
     (if (and lst1 lst2)
-        (rec (cons (funcall func (%pop lst1) (%pop lst2)) ret)
+        (rec (cons (funcall func (pop lst1) (pop lst2)) ret)
              lst1 lst2)
         (nreverse ret))))
 
 (defun foreach (lst func)
   (let rec ((lst lst))
     (when lst
-      (funcall func (%pop lst))
+      (funcall func (pop lst))
       (rec lst))))
 
 (defun foreach-index (lst func)
   (let rec ((lst lst) (index 0))
     (when lst
-      (funcall func (%pop lst) index)
+      (funcall func (pop lst) index)
       (rec lst (1+ index)))))
 
 (defmacro incf (var)
@@ -810,7 +815,7 @@
       (lambda (varname)
         (unless values
           (error/wp (strcat "Missing required argument " varname)))
-        (push (list varname (%pop values)) parallel)))
+        (push (list varname (pop values)) parallel)))
 
     (foreach optional
       (lambda (argdef)
@@ -822,7 +827,7 @@
                (push (list suppname nil) sequential)))
             (t
              (let ((temp (gensym)))
-               (push (list temp (%pop values)) parallel)
+               (push (list temp (pop values)) parallel)
                (push (list varname temp) sequential)
                (when suppname
                  (push (list suppname t) sequential))))))))
@@ -937,7 +942,7 @@
 ;;                (let* ((v (car env))
 ;;                       (skip (and (consp v)
 ;;                                  (eq '%skip-count (car v))
-;;                                  (%pop v))))
+;;                                  (pop v))))
 ;;                  (or (position v i (1- (length v)))
 ;;                      (frame (cdr env) (if skip i (1+ i))))))))
 ;;     (frame env 0)))
@@ -1053,8 +1058,8 @@
                           (cond
                             (optional?
                              (add thisarg (if default-value
-                                              `(or (%pop ,values) ,default-value)
-                                              `(%pop ,values))))
+                                              `(or (pop ,values) ,default-value)
+                                              `(pop ,values))))
                             (aux?
                              (add thisarg nil))
                             (key?
@@ -1066,7 +1071,7 @@
                                                                       #.+keyword-package+)))))
                             (t
                              (add thisarg `(if ,values
-                                               (%pop ,values)
+                                               (pop ,values)
                                                (%dbind-error-missing-arg ',thisarg)))))
                           (rec optional? rest? key? aux? (cdr args) values (1+ i)))))
 
@@ -1080,7 +1085,7 @@
                                 (thisarg-p (caddr thisarg)))
                             (when thisarg-p
                               (add thisarg-p `(if ,values t nil)))
-                            (add thisarg `(if ,values (%pop ,values) ,default))))
+                            (add thisarg `(if ,values (pop ,values) ,default))))
                          (key?
                           (let ((thisarg (car thisarg))
                                 (default (if (cdr thisarg)
@@ -1113,7 +1118,7 @@
                          (rest? (error/wp "Invalid argument list following &REST/&BODY"))
                          (t
                           (let ((sublist (gensym)))
-                            (add sublist `(if ,values (%pop ,values) (%dbind-error-missing-sublist)))
+                            (add sublist `(if ,values (pop ,values) (%dbind-error-missing-sublist)))
                             (rec nil nil nil nil thisarg sublist 0))))
                        (rec optional? rest? key? aux? (cdr args) values (1+ i))))))
                  (t (error/wp "Invalid lambda-list"))))))
@@ -1336,7 +1341,8 @@
      (values t form))
 
     ((and (consp form)
-          (eq 'quote (car form)))
+          (eq 'quote (car form))
+          (null (cddr form)))
      (values t (cadr form)))
 
     ((symbolp form)
@@ -1368,11 +1374,11 @@
         ((null exps))
         ((and (stringp (car exps))
               (cdr exps))
-         (setq documentation (append documentation (list (%pop exps))))
+         (setq documentation (append documentation (list (pop exps))))
          (rec))
         ((and (consp (car exps))
               (eq 'declare (caar exps)))
-         (setq declarations (append declarations (cdr (%pop exps))))
+         (setq declarations (append declarations (cdr (pop exps))))
          (rec))))
     (values exps declarations documentation)))
 
@@ -1663,7 +1669,7 @@
           ;; effects.
           (comp-seq args env nil t))
          (t
-          (%seq (comp-list args env)
+          (%seq (comp-arguments args env)
                 (gen (strcat opname))
                 (unless more? (gen "RET"))))))
 
@@ -1773,7 +1779,7 @@
              (unless val? (gen "POP"))
              (unless more? (gen "RET"))))
 
-     (comp-list (exps env)
+     (comp-arguments (exps env)
        (with-seq-output <<
          (let rec ((exps exps))
            (when exps
@@ -1800,9 +1806,9 @@
        (let* ((block (or (find-block name env)
                          (throw name nil)))
               (data (cddr block))
-              (label (%pop data))
-              (val? (%pop data))
-              (more? (%pop data)))
+              (label (pop data))
+              (val? (pop data))
+              (more? (pop data)))
          (%seq (comp value env val? t)
                (if val?
                    (gen "LRET" label (car block))
@@ -1828,7 +1834,7 @@
                                            :tag tbody (gensym "tag")))))
                      (rec (cdr forms) (%rplacd p cell)))
                    (rec (cdr forms) p))))
-           (%pop tags)
+           (pop tags)
            (cond
              ((null tags)
               (<< (comp-seq forms env nil t)
@@ -1837,7 +1843,7 @@
                 (<< (gen "BLOCK"))           ; define the tagbody entry
                 (foreach forms (lambda (x)
                                  (if (atom x)
-                                     (<< (vector (cadddr (%pop tags)))) ; label
+                                     (<< (vector (cadddr (pop tags)))) ; label
                                      (<< (comp x env nil t)))))
                 (when val? (<< (gen "NIL"))) ; tagbody returns NIL
                 (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
@@ -1951,12 +1957,12 @@
                   (cond
                     (more? (let ((k (mklabel)))
                              (%seq (gen "SAVE" k)
-                                   (comp-list args env)
+                                   (comp-arguments args env)
                                    the-function
                                    (gen (if apply "APPLY" "CALL") (length args))
                                    (vector k)
                                    (unless val? (gen "POP")))))
-                    (t (%seq (comp-list args env)
+                    (t (%seq (comp-arguments args env)
                              the-function
                              (gen (if apply "APPLY" "CALL") (length args))))))
                 (maybe-inline-global (f)
@@ -1985,7 +1991,7 @@
                 ((%primitivep f)
                  (if (and (not val?) (not (%prim-side-effects f)))
                      (comp-seq args env nil more?)
-                     (%seq (comp-list args env)
+                     (%seq (comp-arguments args env)
                            (gen "PRIM" f (length args))
                            (unless val? (gen "POP"))
                            (unless more? (gen "RET")))))
@@ -2011,13 +2017,13 @@
                ;; then call it. Of course, it would be nice if we would also
                ;; do compile-time argument matching and perhaps avoid the
                ;; XARGS overhead, but oh well.. good enough for now.
-               (%seq (comp-list args env)
+               (%seq (comp-arguments args env)
                      ;; this sets the machine n_args value, which is required
                      ;; by the function header (either ARGS, ARG_ or XARGS).
                      (gen "NARGS" (if apply (- (length args)) (length args)))
-                     (let ((name (when (eq (%pop f) '%fn)
-                                   (%pop f)))
-                           (args (%pop f))
+                     (let ((name (when (eq (pop f) '%fn)
+                                   (pop f)))
+                           (args (pop f))
                            (body f))
                        (comp-inner-lambda name args body env val? more?))))))
            (t (mkret (comp f env t t))))))
@@ -2260,7 +2266,7 @@
      (comp-values (forms env val? more?)
        (cond
          (val?
-          (%seq (comp-list forms env)
+          (%seq (comp-arguments forms env)
                 (gen "VALUES" (length forms))
                 (unless more? (gen "RET"))))
          (t
@@ -2282,7 +2288,7 @@
          ((null bindings)
           (comp-decl-seq body env val? more?))
          ((symbolp bindings)
-          (comp-named-let bindings (%pop body) body env val? more?))
+          (comp-named-let bindings (pop body) body env val? more?))
          ((null body)
           (comp-seq `(,@(cadr (get-bindings bindings t)) nil) env val? more?))
          (t
