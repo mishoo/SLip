@@ -262,6 +262,16 @@
                 (rec lst))
           ret))))
 
+(defun map2-vector (func lst1 lst2)
+  (let ((ret (vector)))
+    (let rec ((lst1 lst1)
+              (lst2 lst2))
+      (if (and lst1 lst2)
+          (progn
+            (%vector-push ret (funcall func (pop lst1) (pop lst2)))
+            (rec lst1 lst2))
+          ret))))
+
 (defun map2 (func lst1 lst2)
   (let rec ((ret nil) (lst1 lst1) (lst2 lst2))
     (if (and lst1 lst2)
@@ -1397,22 +1407,25 @@
   `(multiple-value-bind (,exps declarations) (dig-declarations ,exps)
      (setq declarations (zip-declarations declarations))
      (let ((locally-special (getf declarations :special)))
-       (labels ((maybe-special (name)
+       (labels ((maybe-special (name &optional init)
                   (if (%memq name locally-special)
-                      (list name :var :special t)
-                      (list name :var)))
+                      (list name :var :name name :init init :special t)
+                      (list name :var :name name :init init)))
                 (declare-locally-special (&key except)
-                  (when locally-special
-                    (setq env (extenv env :lex
-                                      (cons '%skip-count
-                                            (map1-vector
-                                             (lambda (name)
-                                               (list name :var :special t))
-                                             (if except
-                                                 (filter locally-special
-                                                         (lambda (name)
-                                                           (not (%memq name except))))
-                                                 locally-special))))))))
+                  (let ((locally-special (filter locally-special
+                                                 (lambda (name)
+                                                   (not (%memq name except))))))
+                    (when locally-special
+                      (setq env
+                            (extend-compiler-env
+                             (list :lex
+                                   (cons
+                                    '%skip-count
+                                    (map1-vector
+                                     (lambda (name)
+                                       (list name :var :name name :special t))
+                                     locally-special)))
+                             env))))))
          ,@body))))
 
 (defun flatten (sym forms)
@@ -1739,7 +1752,7 @@
           (%seq (comp first env t t)
                 (comp-seq rest env nil t)
                 (unless more? (gen "RET"))))
-         ((comp first env val? more?))))
+         ((comp first env t more?))))
 
      (comp-prog1 (first rest env val? more?)
        (cond

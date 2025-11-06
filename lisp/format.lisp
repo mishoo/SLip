@@ -8,7 +8,7 @@
           *print-base*
           *print-radix*
           *print-pretty*
-          format formatter time))
+          format formatter time print))
 
 (defpackage :sl-format
   (:use :sl :%))
@@ -451,6 +451,10 @@
     `(let ((,t1 (get-internal-run-time)))
        (multiple-value-prog1 (progn ,@body)
          (format t "Evaluation time: ~,2Fms~%" (- (get-internal-run-time) ,t1))))))
+
+;; XXX: temporary
+(defun print (&rest args)
+  (format t "~{~S~^ ~}~%" args))
 
 (defun error args
   (%error (apply #'format nil args)))
