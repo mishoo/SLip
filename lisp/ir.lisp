@@ -65,10 +65,23 @@
           (irexp-pop (cadr form) val?))
          ((setq)
           (irexp-setq (cdr form) val?))
-
+         ((if)
+          (arg-count form 2 3)
+          (irexp-if (cadr form) (caddr form) (caddr form) val?))
+         ((or)
+          (irexp-or (cdr form) val?))
+         ((c/c)
+          (arg-count form 0 0)
+          (when val? '(c/c)))
          ((let)
           (arg-count form 1)
           (irexp-let (cadr form) (cddr form) val?))
+         ((let*)
+          (arg-count form 1)
+          (irexp-let* (cadr form) (cddr form) val?))
+         ((multiple-value-bind)
+          (arg-count form 2)
+          (irexp-mvb (cadr form) (caddr form) (cdddr form) val?))
 
          (t
           `(,(car form) ,@(mapcar (lambda (arg) (irexp arg t)) (cdr form)))))))))
@@ -83,8 +96,11 @@
 (defun binding-index (binding)
   (cadr binding))
 
+(defun binding-data (binding)
+  (cddr binding))
+
 (defun binding-prop (binding prop &optional default)
-  (getf (cddr binding) prop default))
+  (getf (binding-data binding) prop default))
 
 (defun (setf binding-prop) (value binding prop &optional default)
   (declare (ignore default))
@@ -108,13 +124,13 @@
         ((eq smac *none*)
          (cond
            ((binding-prop binding :special)
-            `(IR SPECIAL-VARIABLE ,name ,binding))
+            `(IR SPECIAL-VARIABLE ,name ,(binding-data binding)))
            (val?
             (when ref
               (incf (binding-prop binding :referenced 0)))
             (when set
               (incf (binding-prop binding :assigned 0)))
-            `(IR LEXICAL-VARIABLE ,name ,binding))))
+            `(IR LEXICAL-VARIABLE ,name ,(binding-data binding)))))
         (val?
          (irexp smac t))))))
 
@@ -139,15 +155,15 @@
   (let ((env *compiler-env*))
     (with-declarations forms
       (declare-locally-special)
-      (irexp-maybe-new-env env forms val?))))
+      (irexp-maybe-new-env env nil forms val?))))
 
-(defun irexp-maybe-new-env (env forms val?)
+(defun irexp-maybe-new-env (env type forms val?)
   (cond
     ((eq env *compiler-env*)
      (irexp-progn forms val?))
     (t
      (let ((*compiler-env* env))
-       `(IR ENV ,env ,(irexp-progn forms val?))))))
+       `(IR ENV ,type ,env ,(irexp-progn forms val?))))))
 
 (defun irexp-prog1 (first rest val?)
   (cond
@@ -217,4 +233,74 @@
                       (list :lex (map2-vector #'maybe-special names inits))
                       env))
            (declare-locally-special :except names)
-           (irexp-maybe-new-env env body val?)))))))
+           (irexp-maybe-new-env env 'LET body val?)))))))
+
+(defun irexp-let* (definitions body val?)
+  (cond
+    ((null definitions)
+     (irexp-decl-seq body val?))
+    (t
+     (let ((env *compiler-env*)
+           (frame (vector)))
+       (with-declarations body
+         (sl::with-collectors (names inits)
+           (let rec ((defs definitions))
+             (when defs
+               (cond
+                 ((consp (car defs))
+                  (names (caar defs))
+                  (inits (cadar defs)))
+                 (t
+                  (names (car defs))
+                  (inits nil)))
+               (rec (cdr defs))))
+           (setq env (extend-compiler-env (list :lex frame) env))
+           (map2 (lambda (name init)
+                   (vector-push-extend
+                    (maybe-special name (with-env (irexp init t)))
+                    frame))
+                 names inits)
+           (declare-locally-special :except names)
+           (irexp-maybe-new-env env 'LET* body val?)))))))
+
+(defun irexp-if (pred then else val?)
+  (cond
+    ((always-true-p pred)
+     (irexp then val?))
+    ((always-false-p pred)
+     (irexp else val?))
+    ((and (consp pred)
+          ;; XXX BUG: should check if NOT or NULL are local functions
+          (%memq (car pred) '(not null)))
+     (irexp-if (cadr pred) else then val?))
+    (t
+     `(if ,(irexp pred t)
+          ,(irexp then val?)
+          ,(irexp else val?)))))
+
+(defun irexp-or (exps val?)
+  (cond
+    ((null exps)
+     (irexp-const nil val?))
+    ((cdr exps)
+     (cond
+       ((always-true-p (car exps))
+        (irexp (car exps) val?))
+       ((always-false-p (car exps))
+        (irexp-or (cdr exps) val?))
+       (t
+        `(or ,(irexp (car exps) t)
+             ,@(irexp-or (cdr exps) val?)))))
+    (t
+     (irexp (car exps) val?))))
+
+(defun irexp-mvb (names values-form body val?)
+  (cond
+    ((null body)
+     (irexp-progn (list values-form nil) val?))
+    (names
+     (let ((env *compiler-env*))
+       (with-declarations body
+         `(IR MVB ,(irexp values-form t)))))
+    (t
+     (irexp-decl-seq (list* values-form body) val?))))
