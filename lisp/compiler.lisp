@@ -308,15 +308,15 @@
     (declare (ignore args))
     value))
 
-(defun filter (lst &optional (pred #'identity))
+(defun filter (lst pred)
   (let rec ((lst lst)
             (ret nil))
-    (cond
-      ((null lst) (nreverse ret))
-      ((funcall pred (car lst))
-       (rec (cdr lst) (cons (car lst) ret)))
-      (t
-       (rec (cdr lst) ret)))))
+    (if lst
+        (rec (cdr lst)
+             (if (funcall pred (car lst))
+                 (cons (car lst) ret)
+                 ret))
+        (nreverse ret))))
 
 (defmacro prog2 (exp1 exp2 . body)
   `(progn

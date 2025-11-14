@@ -452,6 +452,7 @@ export class LispSymbol {
     BASE_PACK.PACKAGE_VAR = special("*PACKAGE*", BASE_PACK);
     global("MOST-POSITIVE-FIXNUM", Number.MAX_SAFE_INTEGER);
     global("MOST-NEGATIVE-FIXNUM", Number.MIN_SAFE_INTEGER);
+    global("PI", Math.PI);
 
     function special(name, value = false) {
         let sym = BASE_PACK.intern(name);

@@ -44,7 +44,7 @@
      multiple-value-list multiple-value-prog1 multiple-value-setq name-char
      nconc nil not notany notevery nreconc nreverse nth nthcdr null endp
      number-fixed number-string number numberp oddp optimize or otherwise
-     package-name package packagep parse-integer parse-number plusp pop prog
+     package-name package packagep parse-integer parse-number pi plusp pop prog
      prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
      quote-regexp random regexp regexp-exec regexp-test regexpp remhash
      replace-regexp rest return return-from revappend reverse rotatef round

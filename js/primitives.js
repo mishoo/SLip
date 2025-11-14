@@ -43,6 +43,7 @@ const S_SYMBOL              = LispSymbol.get("SYMBOL");
 const S_CONS                = LispSymbol.get("CONS");
 const S_INTEGER             = LispSymbol.get("INTEGER");
 const S_NUMBER              = LispSymbol.get("NUMBER");
+const S_FLOAT               = LispSymbol.get("FLOAT");
 const S_STRING              = LispSymbol.get("STRING");
 const S_CHARACTER           = LispSymbol.get("CHARACTER");
 const S_HASH_TABLE          = LispSymbol.get("HASH-TABLE");
@@ -1402,7 +1403,7 @@ defp("%type-of", false, function(m, nargs){
     if (LispCons.is(x)) return S_CONS;
     if (LispStdInstance.is(x)) return S_STANDARD_OBJECT;
     if (Number.isInteger(x)) return S_INTEGER;
-    if (typeof x === "number") return S_NUMBER;
+    if (typeof x === "number") return S_FLOAT;
     if (typeof x === "string") return S_STRING;
     if (LispChar.is(x)) return S_CHARACTER;
     if (LispHash.is(x)) return S_HASH_TABLE;
