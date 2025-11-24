@@ -82,9 +82,20 @@
          ((multiple-value-bind)
           (arg-count form 2)
           (irexp-mvb (cadr form) (caddr form) (cdddr form) val?))
+         ((values)
+          (irexp-values (cdr form) val?))
+         ((labels)
+          (irexp-labels (cadr form) (cddr form) val?))
+         ((flets)
+          (irexp-flets (cadr form) (cddr form) val?))
 
          (t
-          `(,(car form) ,@(mapcar (lambda (arg) (irexp arg t)) (cdr form)))))))))
+          `(,(car form) ,@(irexp-arguments (cdr form)))))))))
+
+(defun irexp-arguments (args)
+  (mapcar (lambda (arg)
+            (irexp arg t))
+          args))
 
 (defun irexp-const (const val?)
   (when val?
@@ -303,4 +314,31 @@
        (with-declarations body
          `(IR MVB ,(irexp values-form t)))))
     (t
-     (irexp-decl-seq (list* values-form body) val?))))
+     `(progn
+        ,(irexp values-form nil)
+        ,(irexp-decl-seq body val?)))))
+
+(defun irexp-values (forms val?)
+  (cond
+    (val?
+     `(values ,@(irexp-arguments forms)))
+    (t
+     (irexp-progn forms nil))))
+
+(defun irexp-labels (definitions body val?)
+  (cond
+    ((and definitions body)
+     (let ((env *compiler-env*)
+           (frame (mapcar (lambda (fun)
+                            (let ((name (car fun))
+                                  (args (cadr fun))
+                                  (body (cddr fun)))
+                              (list name :func
+                                    :lambda-list (parse-lambda-list args)
+                                    :lambda-body body)))
+                          definitions)))
+       (setq env (extend-compiler-env (list :lex (as-vector frame)) env))
+       (foreach frame
+         (lambda (fun)))))
+    (body
+     (irexp-decl-seq body val?))))

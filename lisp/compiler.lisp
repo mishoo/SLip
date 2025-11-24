@@ -1703,6 +1703,8 @@
        (cond
          ((not exps)
           (comp-const nil val? more?))
+         ((not (cdr exps))
+          (error/wp "Odd number of arguments to SETQ"))
          ((not (cddr exps))
           (comp-one-setq (car exps) (cadr exps) env val? more?))
          (t (%seq (comp-one-setq (car exps) (cadr exps) env nil t)
