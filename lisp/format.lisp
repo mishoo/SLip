@@ -331,7 +331,8 @@
   (let ((*format-current-args* (if atmod? args (car args))))
     (catch 'abort-format-iteration
       (labels ((iterate (list i)
-                 (when (eq i maxn)
+                 (when (or (eq i maxn)
+                           (not *format-current-args*))
                    (throw 'abort-format-iteration nil))
                  (if list
                      (let ((x (car list)))
@@ -348,8 +349,8 @@
         (if colmod?
             ;; iterate once for each argument sublist
             (foreach *format-current-args*
-                     (lambda (*format-current-args*)
-                       (iterate sublist 0)))
+              (lambda (*format-current-args*)
+                (iterate sublist 0)))
             ;; normal case (no colmod)
             (iterate sublist 0)))))
   (if atmod? nil (cdr args)))
