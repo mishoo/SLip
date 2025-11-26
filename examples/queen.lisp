@@ -46,7 +46,6 @@
            #:with-row-col
            #:piece-char
            #:char-piece
-           #:*unicode*
 
            #:move
            #:move-from

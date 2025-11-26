@@ -6,6 +6,8 @@
 
 (in-package :chess-board)
 
+(dom:load-css "./examples/chess-board.css")
+
 (defun display-game (pgn)
   (let* ((pgn (parse-pgn pgn :ext-moves t))
          (content (dom:from-html (make-layout pgn)))
@@ -15,7 +17,9 @@
          (running t))
     (labels
         ((on-close (target event)
-           (setf running nil))
+           (without-interrupts
+             ;; (dom:prevent-default event)
+             (setf running nil)))
          (on-reverse (target event)
            (dom:toggle-class (dom:query "._board" dlg) "reverse")))
       (let ((receivers (make-hash :close #'on-close
@@ -52,7 +56,7 @@
 <div class='layout'>
   <div class='cont-board'>~A</div>
   <div class='cont-ctrl'>
-    <label><input type='checkbox' class='_reverse' /> Reverse board</label>
+    <button class='_reverse'>Reverse board</button>
   </div>
   <div class='cont-list'>Ze list</div>
   <div class='cont-title _drag-dialog'>~A</div>
@@ -68,15 +72,16 @@
   (with-output-to-string (output)
     (write-string "<div class='board _board'>" output)
     (write-string +svg-chessboard+ output)
-    (board-foreach
-     board
-     (lambda (piece row col index)
-       (declare (ignore index))
-       (format output "<div class='piece' ~
-                            data-row='~D' data-col='~D' ~
-                            data-piece='~C'></div>"
-               row col
-               (piece-char piece))))
+    (let ((*unicode* nil))
+      (board-foreach
+       board
+       (lambda (piece row col index)
+         (declare (ignore index))
+         (format output "<div class='piece' ~
+                              data-row='~D' data-col='~D' ~
+                              data-piece='~C'></div>"
+                 row col
+                 (piece-char piece)))))
     (write-string "</div>" output)))
 
 (defparameter g (make-game))
@@ -84,15 +89,3 @@
 
 (defun test ()
   (display-game (sl-stream:open-url "https://lichess.org/api/games/user/vlbz?max=1")))
-
-((lambda-js () "
-  let link = document.querySelector('#chess-board-css');
-  if (!link) {
-    link = document.createElement('link');
-    link.id = 'chess-board-css';
-    link.rel = 'stylesheet';
-    link.type = 'text/css';
-    document.querySelector('head').appendChild(link);
-  }
-  link.href = './examples/chess-board.css?kc=' + Date.now();
-"))

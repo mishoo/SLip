@@ -1,6 +1,4 @@
 .pgn-viewer {
-
-    font-family: sans-serif;
     background: #fff;
     color: #000;
     border-color: #465 !important;
@@ -24,6 +22,7 @@
     }
 
     .cont-ctrl {
+        font-family: sans-serif;
         grid-column: 1;
         grid-row: 3;
         display: flex;
@@ -37,6 +36,7 @@
     }
 
     .cont-title {
+        font-family: sans-serif;
         grid-column: 1 / span 2;
         grid-row: 1;
         display: flex;

@@ -9,8 +9,9 @@
            #:dataset
            #:query #:query-all #:do-query #:matches
            #:on-event #:off-event
-           #:event-prevent-default
-           #:make-dialog))
+           #:prevent-default
+           #:make-dialog
+           #:load-css))
 
 (in-package :dom)
 
@@ -69,8 +70,8 @@
   return element.matches(selector);
 ")
 
-(defun-js create-element (type) "
-  return document.createElement(type);
+(defun-js create-element (nodename) "
+  return document.createElement(nodename);
 ")
 
 (defun-js add-class (element cls) "
@@ -114,7 +115,8 @@
   let handler = ev => {
     let target = ev.target;
     let send_signal = () =>
-      LispProcess.sendmsg(process || this.process, signal, LispCons.fromArray([ target, ev ]));
+      LispProcess.sendmsg(process || this.process, signal,
+                          LispCons.fromArray([ target, ev ]));
     if (!selector)
       return send_signal();
     while (target) {
@@ -131,8 +133,20 @@
   element.removeEventListener(event_name, handler);
 ")
 
-(defun-js event-prevent-default (event) "
+(defun-js prevent-default (event) "
   return event.preventDefault();
+")
+
+(defun-js load-css (url) "
+  let link = document.querySelector('link[data-url=\"' + url + '\"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.dataset.url = url;
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    document.querySelector('head').appendChild(link);
+  }
+  link.href = url + '?kc=' + Date.now();
 ")
 
 ;;; this is for ide/Ymacs
