@@ -91,6 +91,8 @@
                  (case (car opt)
                    (:export
                     `(export ',(cdr opt) ,pak))
+                   (:shadow
+                    `(shadow ',(cdr opt) ,pak))
                    (:import-from
                     (destructuring-bind (source &rest names) (cdr opt)
                       (setq source (find-package source))
