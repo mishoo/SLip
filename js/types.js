@@ -623,7 +623,7 @@ export class LispProcess {
         } while (this.noint && this.m.status === STATUS_RUNNING);
     }
 
-    sendmsg(target, signal, args) {
+    static sendmsg(target, signal, args) {
         let msg = new Message(target, signal, args);
         target.handle(msg);
         return target;

@@ -3,7 +3,7 @@
 //----------------------------
 
 import { LispCons } from "../js/list.js";
-import { LispSymbol } from "../js/types.js";
+import { LispSymbol, LispProcess } from "../js/types.js";
 import { Ymacs, Ymacs_Keymap, Ymacs_Buffer,
          Ymacs_Interactive, Ymacs_Tokenizer,
          Ymacs_Lang_Lisp,
@@ -150,7 +150,7 @@ class Ymacs_SL extends Ymacs {
             };
         }
         var thread = MACHINE().eval_string("YMACS", "*THREAD*");
-        thread.sendmsg(thread, what, LispCons.fromArray(args));
+        LispProcess.sendmsg(thread, what, LispCons.fromArray(args));
     }
     ls_set(src) {
         super.ls_set(src);

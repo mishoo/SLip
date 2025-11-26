@@ -732,6 +732,8 @@
               (cond
                 ((consp (car args))
                  (push (car args) optional)
+                 (when (caddar args)
+                   (add (caddar args)))
                  (add (caar args)))
                 ((symp (car args))
                  (push (list (add (car args))) optional))
@@ -762,6 +764,8 @@
                 (rec-key (cdr args)))
               (cond
                 ((consp (car args))
+                 (when (caddar args)
+                   (add (caddar args)))
                  (push (list* (key-arg-names (caar args)) (cdar args)) key))
                 ((symp (car args))
                  (push (list (key-arg-names (car args))) key))

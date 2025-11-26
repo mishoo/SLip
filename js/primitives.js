@@ -728,9 +728,7 @@ defp("nreconc", true, function(m, nargs){
 /* -----[ arrays ]----- */
 
 defp("vector", false, function(m, nargs){
-    var a = [];
-    while (--nargs >= 0) a[nargs] = m.pop();
-    return a;
+    return m.pop_frame(nargs);
 });
 
 defp("make-vector", false, function(m, nargs){
@@ -2437,7 +2435,7 @@ defp("%sendmsg", true, function(m, nargs){
     var signal = as_string(m.pop()), process = m.pop();
     checktype(process, LispProcess);
     checktype(signal, LispString);
-    return m.process.sendmsg(process, signal, args);
+    return LispProcess.sendmsg(process, signal, args);
 });
 
 defp("%receive", true, function(m, nargs){
@@ -2520,7 +2518,7 @@ defp("dom.subscribe", true, function(m, nargs){
                 "RELATED"  : ev.relatedTarget
             });
             args = new LispCons(args, false);
-            m.process.sendmsg(process, e, args);
+            LispProcess.sendmsg(process, e, args);
         }, true);
     });
     return false;
@@ -2697,8 +2695,9 @@ defp("%js-eval", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var code = m.pop();
     checktype(code, LispString);
-    var func = new Function("$machine", "return(" + code + ")");
-    return func(m);
+    var func = new Function("$machine", "LispSymbol", "LispPackage", "LispCons", "LispHash", "LispProcess",
+                            "return(" + code + ")");
+    return func(m, LispSymbol, LispPackage, LispCons, LispHash, LispProcess);
 });
 
 defp("%js-apply", true, function(m, nargs){
@@ -2708,7 +2707,7 @@ defp("%js-apply", true, function(m, nargs){
         args = LispCons.toArray(args);
     checktype(func, LispNativeFunction);
     checktype(args, LispVector);
-    return boxit(func.apply(instance, args));
+    return boxit(func.apply(instance || m, args));
 });
 
 defp("%js-closure", false, function(m, nargs){

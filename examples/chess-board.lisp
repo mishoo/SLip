@@ -1,42 +1,33 @@
 (load "examples/queen.lisp")
+(load "lib/dom.lisp")
 
 (defpackage :chess-board
   (:use :sl :queen :ffi))
 
 (in-package :chess-board)
 
-(defun-js make-dialog (width height content) "
-  return YMACS.makeDialog({
-    width, height, content,
-    closable: true,
-    draggable: content?.querySelector('.cont-title'),
-    resizable: true,
-  });
-")
-
-(defun-js dom-node (html) "
-  let div = document.createElement('div');
-  div.innerHTML = html;
-  return div.firstElementChild;
-")
-
 (defun display-game (pgn)
-  (let* ((data (parse-pgn pgn :ext-moves t))
-         (content (dom-node (make-layout data)))
-         (dlg (make-dialog 700 500 content)))
-    ((lambda-js (dlg close-handler) "
-        let el = dlg.getElement();
-        el.classList.add('pgn-viewer');
-        dlg.addEventListener('onClose', close_handler);
-        let q = (sel) => el.querySelector(sel);
-        let board = q('._board');
-        q('._reverse').onclick = function () {
-          board.classList.toggle('reverse', this.checked);
-        };
-    ") dlg
-     (%:%js-closure
-      (lambda ()
-        (format *error-output* "Canvas closed~%"))))))
+  (let* ((pgn (parse-pgn pgn :ext-moves t))
+         (content (dom:from-html (make-layout pgn)))
+         (dlg (dom:make-dialog 700 500
+                               :content content
+                               :class-name "pgn-viewer"))
+         (running t))
+    (labels
+        ((on-close (target event)
+           (setf running nil))
+         (on-reverse (target event)
+           (dom:toggle-class (dom:query "._board" dlg) "reverse")))
+      (let ((receivers (make-hash :close #'on-close
+                                  :reverse #'on-reverse)))
+        (make-thread
+         (lambda ()
+           (dom:on-event dlg "close" :signal :close)
+           (dom:on-event dlg "click" :selector "._reverse" :signal :reverse)
+           (loop while running do (%:%receive receivers))
+           (format *error-output*
+                   "Thread exit ~A~%"
+                   (current-thread))))))))
 
 (defun make-layout (pgn)
   (let* ((headers (getf pgn :headers))
@@ -57,14 +48,14 @@
                         (or (cdr (assoc "Result" headers :test #'string-equal))
                             "*")))
          (board (board-html (game-board game))))
-    (format nil "~
+    (format nil "
 <div class='layout'>
   <div class='cont-board'>~A</div>
   <div class='cont-ctrl'>
     <label><input type='checkbox' class='_reverse' /> Reverse board</label>
   </div>
   <div class='cont-list'>Ze list</div>
-  <div class='cont-title'>~A</div>
+  <div class='cont-title _drag-dialog'>~A</div>
 </div>
 "
             board
