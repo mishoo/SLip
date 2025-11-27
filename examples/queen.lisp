@@ -1484,10 +1484,11 @@ by STRING-DESIGNATOR being its first argument."
                         (cond
                           (ext-moves
                            (push (list :move (car valid)
-                                       (game-san game (car valid) comp-moves)
-                                       (progn
-                                         (game-move game (car valid))
-                                         (game-fen game)))
+                                       :san (game-san game (car valid) comp-moves)
+                                       :fen-before (game-fen game)
+                                       :fen-after (progn
+                                                    (game-move game (car valid))
+                                                    (game-fen game)))
                                  data))
                           (t
                            (push (cons :move (car valid)) data)
@@ -1504,21 +1505,21 @@ by STRING-DESIGNATOR being its first argument."
                         (skip #\}))))
                (loop while (peek)
                      do (skip-whitespace)
-                        (or (awhen (read-result)
-                              (push (cons :result it) data)
-                              (return (nreverse data)))
-                            (when (eql (peek) #\;)
-                              (push (cons :comment (comment1)) data))
-                            (when (eql (peek) #\{)
-                              (push (cons :comment (comment2)) data))
-                            (progn
-                              (when (read-number)
-                                (skip #\.)
-                                (when (eql #\. (peek))
-                                  (skip ".."))
-                                (skip-whitespace))
-                              (move)))
-                        (skip-whitespace)
+                     (or (awhen (read-result)
+                           (push (cons :result it) data)
+                           (return (nreverse data)))
+                         (when (eql (peek) #\;)
+                           (push (cons :comment (comment1)) data))
+                         (when (eql (peek) #\{)
+                           (push (cons :comment (comment2)) data))
+                         (progn
+                           (when (read-number)
+                             (skip #\.)
+                             (when (eql #\. (peek))
+                               (skip ".."))
+                             (skip-whitespace))
+                           (move)))
+                     (skip-whitespace)
                      finally (return (nreverse data)))))))
 
       (let* ((headers (loop do (skip-whitespace)
@@ -1530,8 +1531,8 @@ by STRING-DESIGNATOR being its first argument."
                                  (cdr start-fen)
                                  +FEN-START+))
         `(:headers ,headers
-          :moves ,(read-moves game)
-          :game ,game)))))
+                   :moves ,(read-moves game)
+                   :game ,game)))))
 
 (defmethod parse-pgn ((pgn string) &rest args &key &allow-other-keys)
   (with-input-from-string (in pgn)

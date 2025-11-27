@@ -4,14 +4,21 @@
   (:export #:document
            #:element #:elementp #:node #:nodep
            #:from-html #:append-to #:remove #:insert-at
+           #:has-animations
+           #:next-sibling #:next-element-sibling
+           #:previous-sibling #:previous-element-sibling
+           #:parent-element
+           #:inner-html #:checked #:value
            #:create-element
            #:add-class #:remove-class #:toggle-class #:has-class
            #:dataset
            #:query #:query-all #:do-query #:matches
            #:on-event #:off-event
            #:prevent-default
+           #:scroll-into-view
            #:make-dialog
-           #:load-css))
+           #:load-css
+           #:style))
 
 (in-package :dom)
 
@@ -54,16 +61,22 @@
   return anchor.parentNode.insertBefore(sibling, anchor);
 ")
 
+(defun-js next-sibling (element) "return element.nextSibling")
+(defun-js next-element-sibling (element) "return element.nextElementSibling")
+(defun-js previous-sibling (element) "return element.previousSibling")
+(defun-js previous-element-sibling (element) "return element.previousElementSibling")
+(defun-js parent-element (element) "return element.parentElement")
+
 (defun-js query (selector &optional container) "
   return (container || document).querySelector(selector);
 ")
 
 (defun-js query-all (selector &optional container) "
-  return [ ...(container || document).querySelectorAll(selector) ];
+  return LispCons.fromArray((container || document).querySelectorAll(selector));
 ")
 
 (defmacro do-query ((element selector &optional container) &body body)
-  `(loop for ,element across (query-all ,selector ,container)
+  `(loop for ,element in (query-all ,selector ,container)
          do (progn ,@body)))
 
 (defun-js matches (element selector) "
@@ -94,6 +107,8 @@
   }
 ")
 
+(defun-js has-animations (element) "return element.getAnimations({ subtree: true }).length > 0")
+
 (let ((dataset (lambda-js (element key value) "
                   if (arguments.length === 2) return element.dataset[key];
                   return element.dataset[key] = value;")))
@@ -106,6 +121,38 @@
     (when (symbolp key)
       (setf key (%:%js-camelcase-name key)))
     (funcall dataset element key value)))
+
+(defmacro define-simple-accessor (name prop)
+  `(let ((accessor (lambda-js (element value) ,(format nil "
+  if (arguments.length === 1) return element.~A;
+  return element.~A = value;
+" prop prop))))
+     (defun ,name (element)
+       (funcall accessor element))
+     (defun (setf ,name) (value element)
+       (funcall accessor element value))))
+
+(define-simple-accessor checked "checked")
+(define-simple-accessor value "value")
+(define-simple-accessor inner-html "innerHTML")
+
+(let ((style (lambda-js (element prop value) "
+  if (arguments.length === 2) return window.getComputedStyle(element).getPropertyValue(prop);
+  element.style.setProperty(prop, value);
+  return value;
+")))
+  (defun style (element prop)
+    (when (symbolp prop)
+      (setf prop (string-downcase (symbol-name prop))))
+    (funcall style element prop))
+  (defun (setf style) (value element prop)
+    (when (symbolp prop)
+      (setf prop (string-downcase (symbol-name prop))))
+    (funcall style element prop value)))
+
+(defun-js scroll-into-view (element &key (block "nearest") (inline "nearest")) "
+  element.scrollIntoView({ block, inline });
+")
 
 (defun-js on-event (element event-name
                             &key
