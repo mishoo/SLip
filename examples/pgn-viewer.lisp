@@ -1,12 +1,12 @@
-(load "examples/queen.lisp")
+(load "lib/queen.lisp")
 (load "lib/dom.lisp")
 
-(defpackage :chess-board
-  (:use :sl :queen :ffi))
+(defpackage :pgn-viewer
+  (:use :sl :queen))
 
-(in-package :chess-board)
+(in-package :pgn-viewer)
 
-(dom:load-css "./examples/chess-board.css")
+(dom:load-css "./examples/pgn-viewer.css")
 
 (defun display-game (pgn)
   (let* ((pgn (parse-pgn pgn :ext-moves t))
