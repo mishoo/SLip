@@ -1,5 +1,5 @@
 .pgn-viewer {
-    background: #ddc !important;
+    background: #eed !important;
     color: #000;
     border-color: #465 !important;
 
@@ -23,8 +23,14 @@
     .cont-board {
         grid-column: 1;
         grid-row: 2;
-        padding: 8px 8px 0 8px;
+        padding: 16px;
         overflow: hidden;
+
+        .board {
+            align-self: center;
+            margin: auto;
+            height: 100%;
+        }
     }
 
     .cont-ctrl {
@@ -33,9 +39,10 @@
         grid-row: 3;
         display: flex;
         align-items: stretch;
-        padding: 8px;
+        padding: 0 0 16px 0;
         display: flex;
         gap: 8px;
+        justify-content: center;
 
         button {
             display: block;
@@ -60,7 +67,8 @@
         grid-row: 2 / span 2;
         grid-column: 2;
         overflow: auto;
-        border-left: 1px solid #ccc;
+        background-color: #ddc;
+        border-left: 1px solid #bba;
         min-width: 15em;
     }
 
@@ -81,14 +89,18 @@
         aspect-ratio: 1/1;
         transition: transform 0.5s;
         border: 2px solid #000;
-
         background-color: #ffe;
-        svg {
+
+        &::before {
+            content: "";
+            background-image: url("data:image/svg+xml,%3Csvg fill='currentColor' viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M255.9.2h-64v64h64zM0 64.17v64h64v-64zM128 .2H64v64h64zm64 255.9v64h64v-64zM0 192.12v64h64v-64zM383.85.2h-64v64h64zm128 0h-64v64h64zM128 256.1H64v64h64zM511.8 448v-64h-64v64zm0-128v-64h-64v64zM383.85 512h64v-64h-64zm128-319.88v-64h-64v64zM128 512h64v-64h-64zM0 512h64v-64H0zm255.9 0h64v-64h-64zM0 320.07v64h64v-64zm319.88-191.92v-64h-64v64zm-64 128h64v-64h-64zm-64 128v64h64v-64zm128-64h64v-64h-64zm0-127.95h64v-64h-64zm0 191.93v64h64v-64zM64 384.05v64h64v-64zm128-255.9v-64h-64v64zm191.92 255.9h64v-64h-64zm-128-191.93v-64h-64v64zm128-127.95v64h64v-64zm-128 255.9v64h64v-64zm-64-127.95H128v64h64zm191.92 64h64v-64h-64zM128 128.15H64v64h64zm0 191.92v64h64v-64z'/%3E%3C/svg%3E");
             display: block;
             position: absolute;
             width: 100%;
             height: 100%;
-            color: #ddc;
+            background-repeat: no-repeat;
+            background-size: 100% 100%;
+            opacity: 0.15;
         }
 
         .piece {
@@ -146,12 +158,12 @@
                 background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='45' height='45'%3E%3Cg stroke='%23000' stroke-width='1.5'%3E%3Cpath d='M22.5 11.625V6' fill='none' stroke-linecap='round'/%3E%3Cpath d='M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5' fill='%23fff' fill-rule='evenodd'/%3E%3Cpath d='M11.5 37c5.5 3.5 15.5 3.5 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10z' fill='%23fff' fill-rule='evenodd' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M20 8h5M11.5 29.5C17 27 27 27 32.5 30' fill='none' stroke-linecap='round'/%3E%3Cpath d='M11.5 37c5.5-2.5 15.5-2.5 21 0M11.5 33.5c5.5-2 15.5-2 21 0' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E");
             }
 
-            // It's unfortunate that we can't specify individual/composable translate-x and
-            // translate-y; that would allow us to keep using data-row and data-col and we'd need
-            // only 16 rules to cover all board fields. The rules below are generated with
-            // make-pieces-css (see it in Lisp). Incidentally, switching from data-row/data-col to
-            // field indexes simplified the Lisp code, so it was worth it.
-            
+            /* It's unfortunate that we can't specify individual/composable translate-x and
+               translate-y; that would allow us to keep using data-row and data-col and we'd need
+               only 16 rules to cover all board fields. The rules below are generated with
+               make-pieces-css (see it in Lisp). Incidentally, switching from data-row/data-col to
+               field indexes simplified the Lisp code, so it was worth it. */
+
             &[data-index='0'] { translate: 0% 700% }
             &[data-index='1'] { translate: 100% 700% }
             &[data-index='2'] { translate: 200% 700% }
@@ -233,10 +245,14 @@
     .moves-list {
         display: grid;
         grid-template-columns: 5em 1fr 1fr;
+        align-items: center;
         .index {
+            color: #776;
             grid-column: 1;
             text-align: right;
             padding: 2px 25px 2px 5px;
+            font-family: sans-serif;
+            font-size: 90%;
             &::after {
                 content: ".";
             }
@@ -254,7 +270,7 @@
         input { display: none }
         padding: 2px 5px;
         &:has(input:checked) {
-            background-color: #5c5;
+            background-color: #575;
             color: #fff;
         }
     }

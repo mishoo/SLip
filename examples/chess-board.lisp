@@ -11,7 +11,7 @@
 (defun display-game (pgn)
   (let* ((pgn (parse-pgn pgn :ext-moves t))
          (content (dom:from-html (make-layout pgn)))
-         (dlg (dom:make-dialog 700 500
+         (dlg (dom:make-dialog 800 620
                                :content content
                                :class-name "pgn-viewer"))
          (running t)
@@ -129,6 +129,8 @@
            (case (dom:key event)
              ("ArrowLeft" (on-prev target event))
              ("ArrowRight" (on-next target event))
+             ("Home" (on-start target event))
+             ("End" (on-end target event))
              ("Escape" (dom:close-dialog dlg)))))
 
       (reset)
@@ -157,9 +159,6 @@
                    "Thread exit ~A~%"
                    (current-thread))))))))
 
-(defconstant +svg-chessboard+
-  "<svg fill='currentColor' viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'><path d='M255.9.2h-64v64h64zM0 64.17v64h64v-64zM128 .2H64v64h64zm64 255.9v64h64v-64zM0 192.12v64h64v-64zM383.85.2h-64v64h64zm128 0h-64v64h64zM128 256.1H64v64h64zM511.8 448v-64h-64v64zm0-128v-64h-64v64zM383.85 512h64v-64h-64zm128-319.88v-64h-64v64zM128 512h64v-64h-64zM0 512h64v-64H0zm255.9 0h64v-64h-64zM0 320.07v64h64v-64zm319.88-191.92v-64h-64v64zm-64 128h64v-64h-64zm-64 128v64h64v-64zm128-64h64v-64h-64zm0-127.95h64v-64h-64zm0 191.93v64h64v-64zM64 384.05v64h64v-64zm128-255.9v-64h-64v64zm191.92 255.9h64v-64h-64zm-128-191.93v-64h-64v64zm128-127.95v64h64v-64zm-128 255.9v64h64v-64zm-64-127.95H128v64h64zm191.92 64h64v-64h-64zM128 128.15H64v64h64zm0 191.92v64h64v-64z'/></svg>")
-
 (defun make-layout (pgn)
   (let* ((headers (getf pgn :headers))
          (game (getf pgn :game))
@@ -182,22 +181,20 @@
 <div class='layout'>
   <div class='cont-board'>
     <div class='board _board'>
-      ~A
       <div class='_pieces'></div>
     </div>
   </div>
   <div class='cont-ctrl'>
     <button class='_reverse'>↺</button>
-    <button class='_start'>⯬</button>
-    <button class='_prev'>🞀</button>
-    <button class='_next'>🞂</button>
-    <button class='_end'>⯮</button>
+    <button class='_start'>⏮</button>
+    <button class='_prev'>❮</button>
+    <button class='_next'>❯</button>
+    <button class='_end'>⏭</button>
   </div>
   <div class='cont-list'><form>~A</form></div>
   <div class='cont-title _drag-dialog'>~A</div>
 </div>
 "
-            +svg-chessboard+
             (moves-html pgn)
             title)))
 
@@ -238,6 +235,9 @@
 
 (defun test ()
   (display-game (sl-stream:open-url "examples/test.pgn")))
+
+(defun lichess (&optional (user "vlbz"))
+  (display-game (sl-stream:open-url (format nil "https://lichess.org/api/games/user/~A?max=1" user))))
 
 (defun make-pieces-css ()
   (with-output-to-string (out)
