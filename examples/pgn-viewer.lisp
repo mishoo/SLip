@@ -16,7 +16,7 @@
                                :class-name "pgn-viewer"))
          (running t)
          (current-fen (game-fen (getf pgn :game)))
-         (el-pieces (dom:query "._pieces" dlg))
+         (el-pieces (dom:query dlg "._pieces"))
          (transitions 0))
     (dom:focus dlg)
     (labels
@@ -24,13 +24,10 @@
            (setf running nil))
 
          (on-reverse (target event)
-           (dom:toggle-class (dom:query "._board" dlg) "reverse"))
-
-         (piece-selector (index)
-           (format nil ".piece[data-index='~D']:not(.fade-out)" index))
+           (dom:toggle-class (dom:query dlg "._board") "reverse"))
 
          (piece-element (index)
-           (dom:query (piece-selector index) el-pieces))
+           (dom:query el-pieces (piece-selector index)))
 
          (goto-move (move fen-before fen-after &optional (forward t))
            (let* ((from (move-from move))
@@ -70,10 +67,12 @@
                              (dom:style piece :z-index) transitions)
                        (dom:on-event piece "transitionend" :signal :animation-end))))
                   (t
-                   (let ((g (make-game)))
-                     (reset-from-fen g fen-after)
-                     (setf (dom:inner-html el-pieces)
-                           (pieces-html (game-board g))))))
+                   (morph-to-fen el-pieces fen-after)
+                   ;; (let ((g (make-game)))
+                   ;;   (reset-from-fen g fen-after)
+                   ;;   (setf (dom:inner-html el-pieces)
+                   ;;         (pieces-html (game-board g))))
+                   ))
                 (setf current-fen fen-after))
                (t
                 ;; direction backward, should reset to fen-before
@@ -95,13 +94,10 @@
                        (pieces-html (game-board g)))))))
 
          (reset ()
-           (let ((g (make-game)))
-             (setf current-fen +fen-start+)
-             (reset-from-fen g +fen-start+)
-             (setf (dom:inner-html el-pieces)
-                   (pieces-html (game-board g)))
-             (dom:do-query (el "input[name='move']" dlg)
-               (setf (dom:checked el) nil))))
+           (setf current-fen +fen-start+)
+           (morph-to-fen el-pieces +fen-start+)
+           (dom:do-query (el dlg "input[name='move']")
+             (setf (dom:checked el) nil)))
 
          (next-move (move-elements)
            (let* ((index (position-if #'dom:checked move-elements)))
@@ -116,14 +112,14 @@
            (reset))
 
          (on-end (target event)
-           (let ((moves (reverse (dom:query-all "input[name='move']" dlg))))
+           (let ((moves (reverse (dom:query-all dlg "input[name='move']"))))
              (on-move (car moves) nil)))
 
          (on-prev (target event)
-           (next-move (reverse (dom:query-all "input[name='move']" dlg))))
+           (next-move (reverse (dom:query-all dlg "input[name='move']"))))
 
          (on-next (target event)
-           (next-move (dom:query-all "input[name='move']" dlg)))
+           (next-move (dom:query-all dlg "input[name='move']")))
 
          (on-keydown (target event)
            (case (dom:key event)
@@ -158,6 +154,56 @@
            (format *error-output*
                    "Thread exit ~A~%"
                    (current-thread))))))))
+
+(defun piece-selector (index)
+  (format nil ".piece[data-index='~D']:not(.fade-out, ._morph)" index))
+
+(defun morph-to-fen (el-pieces fen)
+  (let* ((*unicode* nil)
+         (g (make-game))
+         (board (game-board g)))
+    (without-interrupts
+      (reset-from-fen g fen)
+
+      ;; 1. pieces already in-place should stay so.
+      (dom:do-query (el el-pieces ".piece[data-piece]:not(.fade-out)")
+        (let ((index (parse-integer (dom:dataset el :index)))
+              (piece (char-piece (svref (dom:dataset el :piece) 0))))
+          (when (= piece (board-get board index))
+            (board-set board index 0)
+            (dom:add-class el "_morph"))))
+
+      ;; 2. any non-zero board fields should now be resolved.
+      (board-foreach
+       board
+       (lambda (piece row col index)
+         (let ((pchar (piece-char piece))
+               (el (dom:query el-pieces (piece-selector index))))
+           ;; 2.1. maybe the piece we want is somewhere..
+           (setf el (dom:query el-pieces (format nil ".piece[data-piece='~C']:not(.fade-out, ._morph)" pchar)))
+           (cond
+             (el
+              (setf (dom:dataset el :index) index)
+              (dom:on-event el "transitionend" :signal :animation-end)
+              (dom:add-class el "_morph"))
+             (t
+              ;; 2.2. not found, we need to invent it.
+              (setf el (dom:from-html (format nil "<div class='piece _morph fade-out' ~
+                                                        data-index='~D' data-piece='~C'></div>"
+                                              index pchar)))
+              (dom:append-to el-pieces el)
+              (dom:trigger-reflow el)
+              (dom:on-event el "transitionend" :signal :animation-end)
+              (dom:remove-class el "fade-out"))))))
+
+      ;; 3. any unused elements (not _morph) should disappear
+      (dom:do-query (el el-pieces ".piece[data-piece]:not(.fade-out)")
+        (cond
+          ((dom:has-class el "_morph")
+           (dom:remove-class el "_morph"))
+          (t
+           (dom:add-class el "fade-out")
+           (dom:on-event el "transitionend" :signal :animation-end)))))))
 
 (defun make-layout (pgn)
   (let* ((headers (getf pgn :headers))

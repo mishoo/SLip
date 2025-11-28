@@ -16,6 +16,9 @@
            #:on-event #:off-event
            #:prevent-default
            #:scroll-into-view
+           #:trigger-reflow
+           #:offset-width
+           #:offset-height
            #:focus
            #:key
            #:make-dialog
@@ -80,16 +83,16 @@
 (define-simple-getter previous-element-sibling "previousElementSibling")
 (define-simple-getter parent-element "parentElement")
 
-(defun-js query (selector &optional container) "
+(defun-js query (container selector) "
   return (container || document).querySelector(selector);
 ")
 
-(defun-js query-all (selector &optional container) "
+(defun-js query-all (container selector) "
   return LispCons.fromArray((container || document).querySelectorAll(selector));
 ")
 
-(defmacro do-query ((element selector &optional container) &body body)
-  `(loop for ,element in (query-all ,selector ,container)
+(defmacro do-query ((element container selector) &body body)
+  `(loop for ,element in (query-all ,container ,selector)
          do (progn ,@body)))
 
 (defun-js matches (element selector) "
@@ -138,6 +141,9 @@
 (define-simple-accessor checked "checked")
 (define-simple-accessor value "value")
 (define-simple-accessor inner-html "innerHTML")
+(define-simple-accessor trigger-reflow "offsetWidth")
+(define-simple-accessor offset-width "offsetWidth")
+(define-simple-accessor offset-height "offsetHeight")
 
 (let ((style (lambda-js (element prop value) "
   if (arguments.length === 2)
