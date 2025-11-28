@@ -18,6 +18,7 @@
          (current-fen (game-fen (getf pgn :game)))
          (el-pieces (dom:query "._pieces" dlg))
          (transitions 0))
+    (dom:focus dlg)
     (labels
         ((on-close (target event)
            (setf running nil))
@@ -116,21 +117,33 @@
          (on-start (target event)
            (reset))
 
+         (on-end (target event)
+           (let ((moves (reverse (dom:query-all "input[name='move']" dlg))))
+             (on-move (car moves) nil)))
+
          (on-prev (target event)
            (next-move (reverse (dom:query-all "input[name='move']" dlg))))
 
          (on-next (target event)
-           (next-move (dom:query-all "input[name='move']" dlg))))
+           (next-move (dom:query-all "input[name='move']" dlg)))
+
+         (on-keydown (target event)
+           (case (dom:key event)
+             ("ArrowLeft" (on-prev target event))
+             ("ArrowRight" (on-next target event))
+             ("Escape" (dom:close-dialog dlg)))))
 
       (reset)
 
-      (let ((receivers (make-hash :close #'on-close
-                                  :reverse #'on-reverse
-                                  :move #'on-move
-                                  :animation-end #'on-animation-end
-                                  :prev #'on-prev
-                                  :next #'on-next
-                                  :start #'on-start)))
+      (let ((receivers (make-hash :close          #'on-close
+                                  :reverse        #'on-reverse
+                                  :move           #'on-move
+                                  :animation-end  #'on-animation-end
+                                  :prev           #'on-prev
+                                  :next           #'on-next
+                                  :start          #'on-start
+                                  :end            #'on-end
+                                  :keydown        #'on-keydown)))
         (make-thread
          (lambda ()
            (dom:on-event dlg "close" :signal :close)
@@ -138,7 +151,9 @@
            (dom:on-event dlg "click" :selector "._start" :signal :start)
            (dom:on-event dlg "click" :selector "._prev" :signal :prev)
            (dom:on-event dlg "click" :selector "._next" :signal :next)
+           (dom:on-event dlg "click" :selector "._end" :signal :end)
            (dom:on-event dlg "input" :selector "input[name='move']" :signal :move)
+           (dom:on-event dlg "keydown" :signal :keydown)
            (loop while running do (%:%receive receivers))
            (format *error-output*
                    "Thread exit ~A~%"
@@ -222,9 +237,6 @@
                          (if (move-white? move) "white" "black")
                          fen-before fen-after move san))))
     (write-string "</div>" output)))
-
-(defparameter g (make-game))
-(reset-from-fen g +fen-start+)
 
 (defun test ()
   (display-game (sl-stream:open-url "examples/test.pgn")))

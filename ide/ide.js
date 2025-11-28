@@ -801,7 +801,7 @@ export function make_desktop(load_files = []) {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
         ymacs.setColorTheme([ "ef-elea-dark" ]);
     } else {
-        ymacs.setColorTheme([ "ef-duo-light" ]);
+        ymacs.setColorTheme([ "ef-elea-light" ]);
     }
     ymacs.addClass("Ymacs-hl-line");
     document.body.appendChild(ymacs.getElement());

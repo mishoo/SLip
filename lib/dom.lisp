@@ -16,7 +16,10 @@
            #:on-event #:off-event
            #:prevent-default
            #:scroll-into-view
+           #:focus
+           #:key
            #:make-dialog
+           #:close-dialog
            #:load-css
            #:style))
 
@@ -24,13 +27,23 @@
 
 (defconstant document ((lambda-js () "return document")))
 
-(defun-js elementp (thing) "
-  return thing instanceof Element;
-")
+(defmacro define-simple-getter (name prop)
+  `(defun-js ,name (element)
+     ,(format nil "return element.~A" prop)))
 
-(defun-js nodep (thing) "
-  return thing instanceof Node;
-")
+(defmacro define-simple-accessor (name prop)
+  `(let ((accessor (lambda-js (element value) ,(format nil "
+  if (arguments.length === 1) return element.~A;
+  return element.~A = value;
+" prop prop))))
+     (defun ,name (element)
+       (funcall accessor element))
+     (defun (setf ,name) (value element)
+       (funcall accessor element value))))
+
+(defun-js elementp (thing) "return thing instanceof Element")
+
+(defun-js nodep (thing) "return thing instanceof Node")
 
 (deftype element ()
   '(satisfies elementp))
@@ -61,11 +74,11 @@
   return anchor.parentNode.insertBefore(sibling, anchor);
 ")
 
-(defun-js next-sibling (element) "return element.nextSibling")
-(defun-js next-element-sibling (element) "return element.nextElementSibling")
-(defun-js previous-sibling (element) "return element.previousSibling")
-(defun-js previous-element-sibling (element) "return element.previousElementSibling")
-(defun-js parent-element (element) "return element.parentElement")
+(define-simple-getter next-sibling "nextSibling")
+(define-simple-getter next-element-sibling "nextElementSibling")
+(define-simple-getter previous-sibling "previousSibling")
+(define-simple-getter previous-element-sibling "previousElementSibling")
+(define-simple-getter parent-element "parentElement")
 
 (defun-js query (selector &optional container) "
   return (container || document).querySelector(selector);
@@ -122,22 +135,13 @@
       (setf key (%:%js-camelcase-name key)))
     (funcall dataset element key value)))
 
-(defmacro define-simple-accessor (name prop)
-  `(let ((accessor (lambda-js (element value) ,(format nil "
-  if (arguments.length === 1) return element.~A;
-  return element.~A = value;
-" prop prop))))
-     (defun ,name (element)
-       (funcall accessor element))
-     (defun (setf ,name) (value element)
-       (funcall accessor element value))))
-
 (define-simple-accessor checked "checked")
 (define-simple-accessor value "value")
 (define-simple-accessor inner-html "innerHTML")
 
 (let ((style (lambda-js (element prop value) "
-  if (arguments.length === 2) return window.getComputedStyle(element).getPropertyValue(prop);
+  if (arguments.length === 2)
+    return window.getComputedStyle(element).getPropertyValue(prop);
   element.style.setProperty(prop, value);
   return value;
 ")))
@@ -153,6 +157,8 @@
 (defun-js scroll-into-view (element &key (block "nearest") (inline "nearest")) "
   element.scrollIntoView({ block, inline });
 ")
+
+(defun-js focus (element) "element.focus()")
 
 (defun-js on-event (element event-name
                             &key
@@ -180,9 +186,9 @@
   element.removeEventListener(event_name, handler);
 ")
 
-(defun-js prevent-default (event) "
-  return event.preventDefault();
-")
+(defun-js prevent-default (event) "return event.preventDefault()")
+
+(define-simple-getter key "key")
 
 (defun-js load-css (url) "
   let link = document.querySelector('link[data-url=\"' + url + '\"]');
@@ -205,5 +211,9 @@
     resizable: true,
   });
   if (class_name) dlg.addClass(class_name);
-  return dlg.getElement();
+  let el = dlg.getElement();
+  el.tabIndex = 1;
+  return el;
 ")
+
+(defun-js close-dialog (dlg) "dlg._ymacs_object.close()")
