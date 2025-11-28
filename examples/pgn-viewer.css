@@ -50,7 +50,7 @@
             text-align: center;
             font-size: 22px;
             border: none;
-            background-color: rgba(0, 0, 0, 0.1);
+            background-color: rgba(0, 0, 0, 0.15);
             border-radius: 4px;
             &:hover {
                 background-color: rgba(0, 0, 0, 0.5);
@@ -107,7 +107,7 @@
             position: absolute;
             width: 12.5%;
             height: 12.5%;
-            transition: translate 0.4s, opacity 0.5s;
+            transition: translate 0.4s cubic-bezier(.22,.46,.35,.96), scale 0.5s, opacity 0.5s;
 
             &[data-piece]::after {
                 transition: transform 0.6s;
@@ -232,6 +232,7 @@
 
         .fade-out {
             opacity: 0;
+            scale: 0.5;
         }
 
         &.reverse {

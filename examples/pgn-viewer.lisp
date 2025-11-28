@@ -15,9 +15,11 @@
                                :content content
                                :class-name "pgn-viewer"))
          (running t)
-         (current-fen (game-fen (getf pgn :game)))
+         (current-fen +fen-start+)
          (el-pieces (dom:query dlg "._pieces"))
          (transitions 0))
+    (setf (dom:style dlg "left") "40px"
+          (dom:style dlg "bottom") "40px")
     (dom:focus dlg)
     (labels
         ((on-close (target event)
@@ -29,54 +31,57 @@
          (piece-element (index)
            (dom:query el-pieces (piece-selector index)))
 
-         (goto-move (move fen-before fen-after &optional (forward t))
-           (let* ((from (move-from move))
-                  (to (move-to move))
-                  (white (move-white? move))
-                  (capture (when (move-capture? move)
-                             (move-captured-index move))))
+         (goto-move (move fen-before fen-after)
+           (without-interrupts
              (cond
-               (forward
-                ;; direction forward, should reset to fen-after
-                (cond
-                  ((string= current-fen fen-before)
-                   (without-interrupts
-                     (let ((piece (piece-element from)))
-                       (incf transitions)
-                       (cond
-                         (capture
-                          (let ((capture (piece-element capture)))
-                            (dom:add-class capture "fade-out")))
-                         ((move-oo? move)
-                          (let ((rook (piece-element (if white
-                                                         #.(field-index "H1")
-                                                         #.(field-index "H8")))))
-                            (setf (dom:dataset rook :index)
-                                  (if white
-                                      #.(field-index "F1")
-                                      #.(field-index "F8")))))
-                         ((move-ooo? move)
-                          (let ((rook (piece-element (if white
-                                                         #.(field-index "A1")
-                                                         #.(field-index "A8")))))
-                            (setf (dom:dataset rook :index)
-                                  (if white
-                                      #.(field-index "D1")
-                                      #.(field-index "D8"))))))
-                       (setf (dom:dataset piece :index) to
-                             (dom:style piece :z-index) transitions)
-                       (dom:on-event piece "transitionend" :signal :animation-end))))
-                  (t
-                   (morph-to-fen el-pieces fen-after)
-                   ;; (let ((g (make-game)))
-                   ;;   (reset-from-fen g fen-after)
-                   ;;   (setf (dom:inner-html el-pieces)
-                   ;;         (pieces-html (game-board g))))
-                   ))
-                (setf current-fen fen-after))
+               ((string= current-fen fen-before)
+                (let* ((from (move-from move))
+                       (to (move-to move))
+                       (white (move-white? move))
+                       (capture (when (move-capture? move)
+                                  (move-captured-index move)))
+                       (piece (piece-element from)))
+                  (incf transitions)
+                  (when (move-promote? move)
+                    (let* ((*unicode* nil)
+                           (promo-piece (move-promoted-piece move))
+                           (promo-char (piece-char promo-piece))
+                           (el (dom:from-html
+                                (format nil "<div class='piece fade-out' ~
+                                                  data-index='~D' data-piece='~C'></div>"
+                                        to promo-char))))
+                      (dom:append-to el-pieces el)
+                      (dom:trigger-reflow el)
+                      (dom:on-event el "transitionend" :signal :animation-end)
+                      (dom:remove-class el "fade-out")
+                      (dom:add-class piece "fade-out")))
+                  (cond
+                    (capture
+                     (let ((capture (piece-element capture)))
+                       (dom:add-class capture "fade-out")
+                       (dom:on-event capture "transitionend" :signal :animation-end)))
+                    ((move-oo? move)
+                     (let ((rook (piece-element (if white
+                                                    #.(field-index "H1")
+                                                    #.(field-index "H8")))))
+                       (setf (dom:dataset rook :index)
+                             (if white
+                                 #.(field-index "F1")
+                                 #.(field-index "F8")))))
+                    ((move-ooo? move)
+                     (let ((rook (piece-element (if white
+                                                    #.(field-index "A1")
+                                                    #.(field-index "A8")))))
+                       (setf (dom:dataset rook :index)
+                             (if white
+                                 #.(field-index "D1")
+                                 #.(field-index "D8"))))))
+                  (setf (dom:dataset piece :index) to
+                        (dom:style piece :z-index) transitions)
+                  (dom:on-event piece "transitionend" :signal :animation-end)))
                (t
-                ;; direction backward, should reset to fen-before
-                ))))
+                (morph-to-fen el-pieces fen-after)))
+             (setf current-fen fen-after)))
 
          (on-move (target event)
            (setf (dom:checked target) t)
@@ -95,31 +100,40 @@
 
          (reset ()
            (setf current-fen +fen-start+)
-           (morph-to-fen el-pieces +fen-start+)
+           (morph-to-fen el-pieces current-fen)
            (dom:do-query (el dlg "input[name='move']")
-             (setf (dom:checked el) nil)))
+             (setf (dom:checked el) nil))
+           (setf (dom:scroll-top (dom:query dlg "._cont-list")) 0))
 
-         (next-move (move-elements)
-           (let* ((index (position-if #'dom:checked move-elements)))
+         (next-move (backwards)
+           (let* ((move-elements (dom:query-all dlg "input[name='move']"))
+                  (index (position-if #'dom:checked
+                                      (if backwards
+                                          (setf move-elements
+                                                (nreverse move-elements))
+                                          move-elements))))
              (cond
-               ((not index)
+               ((and (not index) (not backwards))
                 (on-move (car move-elements) nil))
+               ((not index)
+                (reset))
                ((< (incf index) (length move-elements))
                 (let ((next (elt move-elements index)))
-                  (on-move next nil))))))
+                  (on-move next nil)))
+               (backwards (reset)))))
 
          (on-start (target event)
            (reset))
 
          (on-end (target event)
-           (let ((moves (reverse (dom:query-all dlg "input[name='move']"))))
+           (let ((moves (nreverse (dom:query-all dlg "input[name='move']"))))
              (on-move (car moves) nil)))
 
          (on-prev (target event)
-           (next-move (reverse (dom:query-all dlg "input[name='move']"))))
+           (next-move t))
 
          (on-next (target event)
-           (next-move (dom:query-all dlg "input[name='move']")))
+           (next-move nil))
 
          (on-keydown (target event)
            (case (dom:key event)
@@ -127,7 +141,8 @@
              ("ArrowRight" (on-next target event))
              ("Home" (on-start target event))
              ("End" (on-end target event))
-             ("Escape" (dom:close-dialog dlg)))))
+             ("Escape" (dom:close-dialog dlg))
+             (("ArrowUp" "ArrowDown") (on-reverse target event)))))
 
       (reset)
 
@@ -177,12 +192,15 @@
       (board-foreach
        board
        (lambda (piece row col index)
-         (let ((pchar (piece-char piece))
-               (el (dom:query el-pieces (piece-selector index))))
+         (let* ((pchar (piece-char piece))
+                (el (dom:query-all
+                     el-pieces
+                     (format nil ".piece[data-piece='~C']:not(.fade-out, ._morph)"
+                             pchar))))
            ;; 2.1. maybe the piece we want is somewhere..
-           (setf el (dom:query el-pieces (format nil ".piece[data-piece='~C']:not(.fade-out, ._morph)" pchar)))
            (cond
              (el
+              (setf el (elt el (random (length el))))
               (setf (dom:dataset el :index) index)
               (dom:on-event el "transitionend" :signal :animation-end)
               (dom:add-class el "_morph"))
@@ -237,7 +255,7 @@
     <button class='_next'>❯</button>
     <button class='_end'>⏭</button>
   </div>
-  <div class='cont-list'><form>~A</form></div>
+  <div class='cont-list _cont-list'><form>~A</form></div>
   <div class='cont-title _drag-dialog'>~A</div>
 </div>
 "
@@ -294,3 +312,7 @@
                            index
                            (* col 100)
                            (* (- 7 row) 100))))))
+
+(defun test-promo ()
+  (display-game "1. e4 Nf6 2. e5 d5 3. exd6 Ne4 4. dxc7 Nxf2 5. cxd8=N Nxd1 6.
+  Kxd1 e5 7. Ke2 e4 8. Kf2 e3+ 9. Kg3 e2 10. Kh4 e1=Q+"))

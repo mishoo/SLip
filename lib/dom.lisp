@@ -17,8 +17,8 @@
            #:prevent-default
            #:scroll-into-view
            #:trigger-reflow
-           #:offset-width
-           #:offset-height
+           #:offset-width #:offset-height
+           #:scroll-left #:scroll-top
            #:focus
            #:key
            #:make-dialog
@@ -144,6 +144,8 @@
 (define-simple-accessor trigger-reflow "offsetWidth")
 (define-simple-accessor offset-width "offsetWidth")
 (define-simple-accessor offset-height "offsetHeight")
+(define-simple-accessor scroll-left "scrollLeft")
+(define-simple-accessor scroll-top "scrollTop")
 
 (let ((style (lambda-js (element prop value) "
   if (arguments.length === 2)
