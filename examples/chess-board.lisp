@@ -26,22 +26,15 @@
          (on-reverse (target event)
            (dom:toggle-class (dom:query "._board" dlg) "reverse"))
 
-         (piece-selector (row col)
-           (format nil ".piece[data-row='~D'][data-col='~D']:not(.fade-out)" row col))
+         (piece-selector (index)
+           (format nil ".piece[data-index='~D']:not(.fade-out)" index))
 
-         (piece-element (row &optional col)
-           (unless col
-             (setf col (index-col row)
-                   row (index-row row)))
-           (dom:query (piece-selector row col) el-pieces))
+         (piece-element (index)
+           (dom:query (piece-selector index) el-pieces))
 
          (goto-move (move fen-before fen-after &optional (forward t))
            (let* ((from (move-from move))
                   (to (move-to move))
-                  (r1 (index-row from))
-                  (c1 (index-col from))
-                  (r2 (index-row to))
-                  (c2 (index-col to))
                   (white (move-white? move))
                   (capture (when (move-capture? move)
                              (move-captured-index move))))
@@ -51,7 +44,7 @@
                 (cond
                   ((string= current-fen fen-before)
                    (without-interrupts
-                     (let ((piece (piece-element r1 c1)))
+                     (let ((piece (piece-element from)))
                        (incf transitions)
                        (cond
                          (capture
@@ -61,14 +54,19 @@
                           (let ((rook (piece-element (if white
                                                          #.(field-index "H1")
                                                          #.(field-index "H8")))))
-                            (setf (dom:dataset rook :col) 5)))
+                            (setf (dom:dataset rook :index)
+                                  (if white
+                                      #.(field-index "F1")
+                                      #.(field-index "F8")))))
                          ((move-ooo? move)
                           (let ((rook (piece-element (if white
                                                          #.(field-index "A1")
                                                          #.(field-index "A8")))))
-                            (setf (dom:dataset rook :col) 3))))
-                       (setf (dom:dataset piece :row) r2
-                             (dom:dataset piece :col) c2
+                            (setf (dom:dataset rook :index)
+                                  (if white
+                                      #.(field-index "D1")
+                                      #.(field-index "D8"))))))
+                       (setf (dom:dataset piece :index) to
                              (dom:style piece :z-index) transitions)
                        (dom:on-event piece "transitionend" :signal :animation-end))))
                   (t
@@ -209,11 +207,11 @@
       (board-foreach
        board
        (lambda (piece row col index)
-         (declare (ignore index))
+         (declare (ignore row col))
          (format output "<div class='piece' ~
-                              data-row='~D' data-col='~D' ~
+                              data-index='~D' ~
                               data-piece='~C'></div>"
-                 row col
+                 index
                  (piece-char piece)))))))
 
 (defun moves-html (pgn)
@@ -240,3 +238,13 @@
 
 (defun test ()
   (display-game (sl-stream:open-url "examples/test.pgn")))
+
+(defun make-pieces-css ()
+  (with-output-to-string (out)
+    (loop for row from 0 to 7 do
+          (loop for col from 0 to 7
+                for index = (board-index row col)
+                do (format out "&[data-index='~D'] { translate: ~F% ~F% }~%"
+                           index
+                           (* col 100)
+                           (* (- 7 row) 100))))))
