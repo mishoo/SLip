@@ -46,9 +46,13 @@
 
         button {
             display: block;
-            width: 1.5em;
-            text-align: center;
+            min-width: 1.5em;
+            padding: 1px 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 22px;
+            line-height: 32px;
             border: none;
             background-color: rgba(0, 0, 0, 0.15);
             border-radius: 4px;

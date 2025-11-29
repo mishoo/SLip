@@ -10,9 +10,8 @@
 
 (defun display-game (pgn)
   (let* ((pgn (parse-pgn pgn :ext-moves t))
-         (content (dom:from-html (make-layout pgn)))
          (dlg (dom:make-dialog 800 620
-                               :content content
+                               :content (dom:from-html (make-layout pgn))
                                :class-name "pgn-viewer"))
          (running t)
          (current-fen +fen-start+)
@@ -135,12 +134,33 @@
 
          (on-keydown (target event)
            (case (dom:key event)
-             ("ArrowLeft" (on-prev target event))
-             ("ArrowRight" (on-next target event))
-             ("Home" (on-start target event))
-             ("End" (on-end target event))
-             ("Escape" (dom:close-dialog dlg))
-             (("ArrowUp" "ArrowDown") (on-reverse target event)))))
+             ("ArrowLeft"
+              (on-prev target event)
+              (dom:prevent-default event))
+             ("ArrowRight"
+              (on-next target event)
+              (dom:prevent-default event))
+             ("Home"
+              (on-start target event)
+              (dom:prevent-default event))
+             ("End"
+              (on-end target event)
+              (dom:prevent-default event))
+             ("Escape"
+              (dom:close-dialog dlg)
+              (dom:prevent-default event))
+             (("f" "c")
+              (on-fen (dom:query dlg "._fen") event)
+              (dom:prevent-default event))
+             (("ArrowUp" "ArrowDown")
+              (on-reverse target event)
+              (dom:prevent-default event))))
+
+         (on-fen (target event)
+           (if (dom:clipboard-write-text current-fen)
+               (ymacs:signal-info (format nil "FEN copied" current-fen)
+                                  :timeout 666 :anchor target)
+               (ymacs:signal-info "Didn't work (permissions?)" :timeout 3000))))
 
       (reset)
 
@@ -152,6 +172,7 @@
                                   :next           #'on-next
                                   :start          #'on-start
                                   :end            #'on-end
+                                  :fen            #'on-fen
                                   :keydown        #'on-keydown)))
         (make-thread
          (lambda ()
@@ -161,6 +182,7 @@
            (dom:on-event dlg "click" :selector "._prev" :signal :prev)
            (dom:on-event dlg "click" :selector "._next" :signal :next)
            (dom:on-event dlg "click" :selector "._end" :signal :end)
+           (dom:on-event dlg "click" :selector "._fen" :signal :fen)
            (dom:on-event dlg "input" :selector "input[name='move']" :signal :move)
            (dom:on-event el-pieces "transitionend" :signal :animation-end)
            (dom:on-event dlg "keydown" :signal :keydown)
@@ -245,11 +267,14 @@
     </div>
   </div>
   <div class='cont-ctrl'>
-    <button class='_reverse'>↺</button>
-    <button class='_start'>⏮</button>
-    <button class='_prev'>❮</button>
-    <button class='_next'>❯</button>
-    <button class='_end'>⏭</button>
+    <button class='_reverse' title='Reverse board'>🗘</button>
+    <div style='padding-left: 20px'></div>
+    <button class='_start' title='Start position'>⏮</button>
+    <button class='_prev' title='Previous move'>❮</button>
+    <button class='_next' title='Next move'>❯</button>
+    <button class='_end' title='Last position'>⏭</button>
+    <div style='padding-left: 20px'></div>
+    <button class='_fen' title='Copy FEN to clipboard'>F</button>
   </div>
   <div class='cont-list _cont-list'><form>~A</form></div>
   <div class='cont-title _drag-dialog'>~A</div>

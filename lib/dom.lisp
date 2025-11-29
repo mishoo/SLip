@@ -15,8 +15,10 @@
            #:query #:query-all #:do-query #:matches
            #:on-event #:off-event
            #:prevent-default
+           #:shift-key #:ctrl-key #:alt-key #:meta-key
            #:scroll-into-view
            #:trigger-reflow
+           #:clipboard-write-text
            #:offset-width #:offset-height
            #:scroll-left #:scroll-top
            #:focus
@@ -195,6 +197,20 @@
 ")
 
 (defun-js prevent-default (event) "return event.preventDefault()")
+(define-simple-getter shift-key "shiftKey")
+(define-simple-getter alt-key "altKey")
+(define-simple-getter ctrl-key "ctrlKey")
+(define-simple-getter meta-key "metaKey")
+
+(defun-js clipboard-write-text (text) "
+  try {
+    navigator.clipboard.writeText(text);
+    return true;
+  }
+  catch(ex) {
+    return false;
+  }
+")
 
 (define-simple-getter key "key")
 
