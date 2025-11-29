@@ -52,14 +52,12 @@
                                         to promo-char))))
                       (dom:append-to el-pieces el)
                       (dom:trigger-reflow el)
-                      (dom:on-event el "transitionend" :signal :animation-end)
                       (dom:remove-class el "fade-out")
                       (dom:add-class piece "fade-out")))
                   (cond
                     (capture
                      (let ((capture (piece-element capture)))
-                       (dom:add-class capture "fade-out")
-                       (dom:on-event capture "transitionend" :signal :animation-end)))
+                       (dom:add-class capture "fade-out")))
                     ((move-oo? move)
                      (let ((rook (piece-element (if white
                                                     #.(field-index "H1")
@@ -77,8 +75,7 @@
                                  #.(field-index "D1")
                                  #.(field-index "D8"))))))
                   (setf (dom:dataset piece :index) to
-                        (dom:style piece :z-index) transitions)
-                  (dom:on-event piece "transitionend" :signal :animation-end)))
+                        (dom:style piece :z-index) transitions)))
                (t
                 (morph-to-fen el-pieces fen-after)))
              (setf current-fen fen-after)))
@@ -93,6 +90,7 @@
          (on-animation-end (target event)
            (without-interrupts
              (unless (dom:has-animations el-pieces)
+               ;; (format t "RESET: ~A~%" current-fen)
                (let ((g (make-game)))
                  (reset-from-fen g current-fen)
                  (setf (dom:inner-html el-pieces)
@@ -164,6 +162,7 @@
            (dom:on-event dlg "click" :selector "._next" :signal :next)
            (dom:on-event dlg "click" :selector "._end" :signal :end)
            (dom:on-event dlg "input" :selector "input[name='move']" :signal :move)
+           (dom:on-event el-pieces "transitionend" :signal :animation-end)
            (dom:on-event dlg "keydown" :signal :keydown)
            (loop while running do (%:%receive receivers))
            (format *error-output*
@@ -202,7 +201,6 @@
              (el
               (setf el (elt el (random (length el))))
               (setf (dom:dataset el :index) index)
-              (dom:on-event el "transitionend" :signal :animation-end)
               (dom:add-class el "_morph"))
              (t
               ;; 2.2. not found, we need to invent it.
@@ -211,7 +209,6 @@
                                               index pchar)))
               (dom:append-to el-pieces el)
               (dom:trigger-reflow el)
-              (dom:on-event el "transitionend" :signal :animation-end)
               (dom:remove-class el "fade-out"))))))
 
       ;; 3. any unused elements (not _morph) should disappear
@@ -220,8 +217,7 @@
           ((dom:has-class el "_morph")
            (dom:remove-class el "_morph"))
           (t
-           (dom:add-class el "fade-out")
-           (dom:on-event el "transitionend" :signal :animation-end)))))))
+           (dom:add-class el "fade-out")))))))
 
 (defun make-layout (pgn)
   (let* ((headers (getf pgn :headers))
