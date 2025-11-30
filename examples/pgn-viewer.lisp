@@ -18,7 +18,7 @@
          (el-pieces (dom:query dlg "._pieces"))
          (transitions 0))
     (setf (dom:style dlg "left") "40px"
-          (dom:style dlg "bottom") "40px")
+          (dom:style dlg "bottom") "60px")
     (dom:focus dlg)
     (labels
         ((on-close (target event)
@@ -40,7 +40,6 @@
                        (capture (when (move-capture? move)
                                   (move-captured-index move)))
                        (piece (piece-element from)))
-                  (incf transitions)
                   (when (move-promote? move)
                     (let* ((*unicode* nil)
                            (promo-piece (move-promoted-piece move))
@@ -74,7 +73,7 @@
                                  #.(field-index "D1")
                                  #.(field-index "D8"))))))
                   (setf (dom:dataset piece :index) to
-                        (dom:style piece :z-index) transitions)))
+                        (dom:style piece :z-index) (incf transitions))))
                (t
                 (morph-to-fen el-pieces fen-after)))
              (setf current-fen fen-after)))
@@ -186,7 +185,12 @@
            (dom:on-event dlg "input" :selector "input[name='move']" :signal :move)
            (dom:on-event el-pieces "transitionend" :signal :animation-end)
            (dom:on-event dlg "keydown" :signal :keydown)
-           (loop while running do (%:%receive receivers))
+           (%:%catch-all-errors)
+           (loop while running
+                 do (handler-case
+                        (%:%receive receivers)
+                      (error (err)
+                        (format *error-output* "!ERROR: ~A~%" err))))
            (format *error-output*
                    "Thread exit ~A~%"
                    (current-thread))))))))

@@ -2469,6 +2469,14 @@ defp("%no-interrupts", true, function(m, nargs){
     return old;
 });
 
+defp("%catch-all-errors", true, function(m, nargs){
+    checknargs(nargs, 0, 1);
+    let val = nargs > 0 ? m.pop() : true;
+    let old = m.process.catch_all;
+    m.process.catch_all = val;
+    return old;
+});
+
 /* -----[ DOM ]----- */
 
 defp("dom.get-element-by-id", false, function(m, nargs){

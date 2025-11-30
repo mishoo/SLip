@@ -566,6 +566,10 @@ const start = () => {
             }
         }
     } catch(ex) {
+        if (!(ex instanceof LispPrimitiveError) && process.catch_all) {
+            console.dir(ex);
+            ex = new LispPrimitiveError(String(ex));
+        }
         if (ex instanceof LispPrimitiveError) {
             var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
             if (process.m.status === STATUS_RUNNING) {
@@ -598,6 +602,7 @@ export class LispProcess {
         this.receivers = false;
         this.mailbox = new LispQueue();
         this.noint = false;
+        this.catch_all = false;
         m.process = this;
         m.set_closure(closure);
         this.resume();
