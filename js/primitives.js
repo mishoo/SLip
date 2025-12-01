@@ -43,6 +43,7 @@ const S_SYMBOL              = LispSymbol.get("SYMBOL");
 const S_CONS                = LispSymbol.get("CONS");
 const S_INTEGER             = LispSymbol.get("INTEGER");
 const S_NUMBER              = LispSymbol.get("NUMBER");
+const S_FLOAT               = LispSymbol.get("FLOAT");
 const S_STRING              = LispSymbol.get("STRING");
 const S_CHARACTER           = LispSymbol.get("CHARACTER");
 const S_HASH_TABLE          = LispSymbol.get("HASH-TABLE");
@@ -727,9 +728,7 @@ defp("nreconc", true, function(m, nargs){
 /* -----[ arrays ]----- */
 
 defp("vector", false, function(m, nargs){
-    var a = [];
-    while (--nargs >= 0) a[nargs] = m.pop();
-    return a;
+    return m.pop_frame(nargs);
 });
 
 defp("make-vector", false, function(m, nargs){
@@ -1402,7 +1401,7 @@ defp("%type-of", false, function(m, nargs){
     if (LispCons.is(x)) return S_CONS;
     if (LispStdInstance.is(x)) return S_STANDARD_OBJECT;
     if (Number.isInteger(x)) return S_INTEGER;
-    if (typeof x === "number") return S_NUMBER;
+    if (typeof x === "number") return S_FLOAT;
     if (typeof x === "string") return S_STRING;
     if (LispChar.is(x)) return S_CHARACTER;
     if (LispHash.is(x)) return S_HASH_TABLE;
@@ -2433,10 +2432,9 @@ defp("%sendmsg", true, function(m, nargs){
     checknargs(nargs, 2);
     var args = false;
     while (nargs-- > 2) args = new LispCons(m.pop(), args);
-    var signal = as_string(m.pop()), process = m.pop();
+    var signal = m.pop(), process = m.pop();
     checktype(process, LispProcess);
-    checktype(signal, LispString);
-    return m.process.sendmsg(process, signal, args);
+    return LispProcess.sendmsg(process, signal, args);
 });
 
 defp("%receive", true, function(m, nargs){
@@ -2467,6 +2465,14 @@ defp("%no-interrupts", true, function(m, nargs){
     checktype(process, LispProcess);
     var old = process.noint;
     process.noint = noint;
+    return old;
+});
+
+defp("%catch-all-errors", true, function(m, nargs){
+    checknargs(nargs, 0, 1);
+    let val = nargs > 0 ? m.pop() : true;
+    let old = m.process.catch_all;
+    m.process.catch_all = val;
     return old;
 });
 
@@ -2519,7 +2525,7 @@ defp("dom.subscribe", true, function(m, nargs){
                 "RELATED"  : ev.relatedTarget
             });
             args = new LispCons(args, false);
-            m.process.sendmsg(process, e, args);
+            LispProcess.sendmsg(process, e, args);
         }, true);
     });
     return false;
@@ -2696,8 +2702,9 @@ defp("%js-eval", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var code = m.pop();
     checktype(code, LispString);
-    var func = new Function("$machine", "return(" + code + ")");
-    return func(m);
+    var func = new Function("$machine", "LispSymbol", "LispPackage", "LispCons", "LispHash", "LispProcess",
+                            "return(" + code + ")");
+    return func(m, LispSymbol, LispPackage, LispCons, LispHash, LispProcess);
 });
 
 defp("%js-apply", true, function(m, nargs){
@@ -2707,7 +2714,7 @@ defp("%js-apply", true, function(m, nargs){
         args = LispCons.toArray(args);
     checktype(func, LispNativeFunction);
     checktype(args, LispVector);
-    return boxit(func.apply(instance, args));
+    return boxit(func.apply(instance || m, args));
 });
 
 defp("%js-closure", false, function(m, nargs){

@@ -39,12 +39,12 @@
      length let let* letterp list list* listp load locally log macroexpand
      macroexpand-1 macrolet make-array make-hash make-list make-package
      make-regexp make-symbol make-thread make-vector makunbound mapc mapcar
-     maplist max member min minusp mod most-negative-fixnum
+     mapcan maplist max member min minusp mod most-negative-fixnum
      most-positive-fixnum multiple-value-bind multiple-value-call
      multiple-value-list multiple-value-prog1 multiple-value-setq name-char
      nconc nil not notany notevery nreconc nreverse nth nthcdr null endp
      number-fixed number-string number numberp oddp optimize or otherwise
-     package-name package packagep parse-integer parse-number plusp pop prog
+     package-name package packagep parse-integer parse-number pi plusp pop prog
      prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
      quote-regexp random regexp regexp-exec regexp-test regexpp remhash
      replace-regexp rest return return-from revappend reverse rotatef round
@@ -80,17 +80,19 @@
         (use nil)
         (pak (gensym "DEFPACKAGE")))
     (foreach options
-             (lambda (opt)
-               (case (car opt)
-                 (:nicknames
-                  (setq nicknames (append nicknames (cdr opt))))
-                 (:use
-                  (setq use (append use (cdr opt)))))))
+      (lambda (opt)
+        (case (car opt)
+          (:nicknames
+           (setq nicknames (append nicknames (cdr opt))))
+          (:use
+           (setq use (append use (cdr opt)))))))
     `(let ((,pak (make-package ',name ',use ',nicknames)))
        ,@(map1 (lambda (opt)
                  (case (car opt)
                    (:export
                     `(export ',(cdr opt) ,pak))
+                   (:shadow
+                    `(shadow ',(cdr opt) ,pak))
                    (:import-from
                     (destructuring-bind (source &rest names) (cdr opt)
                       (setq source (find-package source))
@@ -103,6 +105,35 @@
 
 (defmacro in-package (name)
   `(setq *package* (find-package ',name)))
+
+(defun some1 (test list)
+  (let rec ((list list))
+    (when list
+      (or (funcall test (%pop list))
+          (rec list)))))
+
+(defun finished (tails)
+  (some1 #'null tails))
+
+(define-compiler-macro finished (tails)
+  `(some1 #'null ,tails))
+
+(defun mapcar (f . lists)
+  (let rec (ret (tails lists))
+    (if (finished tails)
+        (nreverse ret)
+        (rec (cons (apply f (map1 #'car tails)) ret)
+             (map1 #'cdr tails)))))
+
+(define-compiler-macro mapcar (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPCAR"))
+    ((null (cdr lists))
+     `(map1 ,func ,@lists))
+    ((null (cddr lists))
+     `(map2 ,func ,@lists))
+    (form)))
 
 (defun mapc1 (f list)
   (let rec ((p list))
@@ -135,35 +166,6 @@
      `(mapc1 ,func ,@lists))
     ((null (cddr lists))
      `(mapc2 ,func ,@lists))
-    (form)))
-
-(defun some1 (test list)
-  (let rec ((list list))
-    (when list
-      (or (funcall test (%pop list))
-          (rec list)))))
-
-(defun finished (tails)
-  (some1 #'null tails))
-
-(define-compiler-macro finished (tails)
-  `(some1 #'null ,tails))
-
-(defun mapcar (f . lists)
-  (let rec (ret (tails lists))
-    (if (finished tails)
-        (nreverse ret)
-        (rec (cons (apply f (map1 #'car tails)) ret)
-             (map1 #'cdr tails)))))
-
-(define-compiler-macro mapcar (&whole form func &rest lists)
-  (cond
-    ((null lists)
-     (error "Missing list argument to MAPCAR"))
-    ((null (cdr lists))
-     `(map1 ,func ,@lists))
-    ((null (cddr lists))
-     `(map2 ,func ,@lists))
     (form)))
 
 (defun maplist1 (func lst)
@@ -292,8 +294,6 @@
      `(notevery1 ,func ,@lists))
     (form)))
 
-;;; setf
-
 (defmacro with-collectors ((&rest names) &body body)
   (let (lists tails syms adders)
     (flet ((mk-collector (arg)
@@ -307,11 +307,11 @@
                (push `(,name (cdr ,vlist)) syms)
                (when vadd
                  (push `(,vadd (el)
-                         `(setq ,',vtail (setf (cdr ,',vtail) (cons ,el nil))))
+                         `(setq ,',vtail (%rplacd ,',vtail (cons ,el nil))))
                        adders))
                (when vconc
                  (push `(,vconc (lst)
-                         `(setq ,',vtail (last (setf (cdr ,',vtail) ,lst))))
+                         `(setq ,',vtail (last (%rplacd ,',vtail ,lst))))
                        adders)))))
       (foreach names #'mk-collector)
       `(let (,@(mapcar (lambda (name) `(,name (list nil))) lists))
@@ -319,6 +319,43 @@
            (macrolet (,@adders)
              (symbol-macrolet (,@syms)
                ,@body)))))))
+
+(defun mapcan1 (f list)
+  (with-collectors ((result nil add))
+    (let rec ((list list))
+      (when list
+        (add (funcall f (car list)))
+        (rec (cdr list))))
+    result))
+
+(defun mapcan2 (f list1 list2)
+  (with-collectors ((result nil add))
+    (let rec ((list1 list1)
+              (list2 list2))
+      (when (and list1 list2)
+        (add (funcall f (car list1) (car list2)))
+        (rec (cdr list1) (cdr list2))))
+    result))
+
+(defun mapcan (f . lists)
+  (with-collectors ((result nil add))
+    (let rec ((tails lists))
+      (unless (finished tails)
+        (add (apply f (map1 #'car tails)))
+        (rec (map1 #'cdr tails))))
+    result))
+
+(define-compiler-macro mapcan (&whole form func &rest lists)
+  (cond
+    ((null lists)
+     (error "Missing list argument to MAPCAN"))
+    ((null (cdr lists))
+     `(mapcan1 ,func ,@lists))
+    ((null (cddr lists))
+     `(mapcan2 ,func ,@lists))
+    (form)))
+
+;;; setf
 
 (defmacro %mvb-internal (names form &body body)
   `(multiple-value-bind ,names ,form ,@body))

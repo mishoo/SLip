@@ -1,7 +1,6 @@
 (in-package :sl)
 
-(export '(collect-if
-          remove remove-if remove-if-not
+(export '(remove remove-if remove-if-not
           find find-if find-if-not
           position position-if position-if-not
           count count-if count-if-not
@@ -15,15 +14,10 @@
 
 (in-package :sl-seq)
 
-(import '(sl::with-collectors
+(import '(%:filter
+          sl::with-collectors
           sl-list::make-subject-test
           sl-list::update-for-key))
-
-(defun collect-if (test list)
-  (with-collectors (elements)
-    (dolist (el list elements)
-      (when (funcall test el)
-        (elements el)))))
 
 (defun remove-if (predicate list &key key (start 0) end count from-end)
   (update-for-key predicate key)
@@ -34,28 +28,29 @@
         (let* ((index (length list))
                (end (or end index)))
           (nreverse
-           (collect-if (lambda (x)
-                         (or (< (decf index) start)
-                             (and end (>= index end))
-                             (not (funcall predicate x))
-                             (<= count 0)
-                             (progn (decf count) nil)))
-                       (reverse list)))))
+           (filter (reverse list)
+                   (lambda (x)
+                     (or (< (decf index) start)
+                         (and end (>= index end))
+                         (not (funcall predicate x))
+                         (<= count 0)
+                         (progn (decf count) nil)))))))
        (t
         (let ((index -1))
-          (collect-if (lambda (x)
-                        (or (< (incf index) start)
-                            (and end (>= index end))
-                            (not (funcall predicate x))
-                            (<= count 0)
-                            (progn (decf count) nil)))
-                      list)))))
+          (filter list
+                  (lambda (x)
+                    (or (< (incf index) start)
+                        (and end (>= index end))
+                        (not (funcall predicate x))
+                        (<= count 0)
+                        (progn (decf count) nil))))))))
     (t
      (let ((index -1))
-       (collect-if (lambda (x)
-                     (or (< (incf index) start)
-                         (and end (>= index end))
-                         (not (funcall predicate x)))) list)))))
+       (filter list
+               (lambda (x)
+                 (or (< (incf index) start)
+                     (and end (>= index end))
+                     (not (funcall predicate x)))))))))
 
 (defun remove-if-not (predicate list &rest args)
   (apply #'remove-if (complement predicate) list args))

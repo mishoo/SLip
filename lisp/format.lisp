@@ -8,7 +8,7 @@
           *print-base*
           *print-radix*
           *print-pretty*
-          format formatter time))
+          format formatter time print))
 
 (defpackage :sl-format
   (:use :sl :%))
@@ -331,7 +331,8 @@
   (let ((*format-current-args* (if atmod? args (car args))))
     (catch 'abort-format-iteration
       (labels ((iterate (list i)
-                 (when (eq i maxn)
+                 (when (or (eq i maxn)
+                           (not *format-current-args*))
                    (throw 'abort-format-iteration nil))
                  (if list
                      (let ((x (car list)))
@@ -348,8 +349,8 @@
         (if colmod?
             ;; iterate once for each argument sublist
             (foreach *format-current-args*
-                     (lambda (*format-current-args*)
-                       (iterate sublist 0)))
+              (lambda (*format-current-args*)
+                (iterate sublist 0)))
             ;; normal case (no colmod)
             (iterate sublist 0)))))
   (if atmod? nil (cdr args)))
@@ -451,6 +452,10 @@
     `(let ((,t1 (get-internal-run-time)))
        (multiple-value-prog1 (progn ,@body)
          (format t "Evaluation time: ~,2Fms~%" (- (get-internal-run-time) ,t1))))))
+
+;; XXX: temporary
+(defun print (&rest args)
+  (format t "~{~S~^ ~}~%" args))
 
 (defun error args
   (%error (apply #'format nil args)))

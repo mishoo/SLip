@@ -9,7 +9,7 @@
 
 (import '(sl-ffi:defun-js))
 (import '(sl::defun-memoize2))
-(export '(make-dialog))
+(export '(make-dialog signal-info))
 
 (defun grep (list pred)
   (when list
@@ -31,6 +31,10 @@
 
 (defun-js make-dialog (width height) "
   return YMACS.makeDialog({ width, height, closable: true, draggable: true });
+")
+
+(defun-js signal-info (text &key is-html timeout anchor type) "
+  YMACS.popupMessage({ text, isHtml: is_html, timeout, anchor, type });
 ")
 
 (defun send-ymacs-notify (what value)
@@ -189,6 +193,4 @@
      (lambda ()
        (let ((*package* (find-package :sl-user))
              (*read-table* *read-table*))
-         (let looop ()
-           (%receive *handlers*)
-           (looop))))))
+         (loop do (%receive *handlers*))))))

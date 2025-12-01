@@ -452,6 +452,7 @@ export class LispSymbol {
     BASE_PACK.PACKAGE_VAR = special("*PACKAGE*", BASE_PACK);
     global("MOST-POSITIVE-FIXNUM", Number.MAX_SAFE_INTEGER);
     global("MOST-NEGATIVE-FIXNUM", Number.MIN_SAFE_INTEGER);
+    global("PI", Math.PI);
 
     function special(name, value = false) {
         let sym = BASE_PACK.intern(name);
@@ -565,6 +566,10 @@ const start = () => {
             }
         }
     } catch(ex) {
+        if (!(ex instanceof LispPrimitiveError) && process.catch_all) {
+            console.dir(ex);
+            ex = new LispPrimitiveError(String(ex));
+        }
         if (ex instanceof LispPrimitiveError) {
             var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
             if (process.m.status === STATUS_RUNNING) {
@@ -597,6 +602,7 @@ export class LispProcess {
         this.receivers = false;
         this.mailbox = new LispQueue();
         this.noint = false;
+        this.catch_all = false;
         m.process = this;
         m.set_closure(closure);
         this.resume();
@@ -622,7 +628,7 @@ export class LispProcess {
         } while (this.noint && this.m.status === STATUS_RUNNING);
     }
 
-    sendmsg(target, signal, args) {
+    static sendmsg(target, signal, args) {
         let msg = new Message(target, signal, args);
         target.handle(msg);
         return target;
@@ -634,7 +640,9 @@ export class LispProcess {
         }
         this.receivers = receivers;
         this.m.status = STATUS_WAITING;
-        return false;
+        this.checkmail();
+        // This must return undefined. Return value comes later from
+        // one of the handlers.
     }
 
     handle(msg) {

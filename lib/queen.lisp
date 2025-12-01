@@ -46,7 +46,6 @@
            #:with-row-col
            #:piece-char
            #:char-piece
-           #:*unicode*
 
            #:move
            #:move-from
@@ -1438,9 +1437,9 @@ by STRING-DESIGNATOR being its first argument."
 
 ;;;; FILE: pgn.lisp
 
-(defgeneric parse-pgn (input))
+(defgeneric parse-pgn (input &key ext-moves &allow-other-keys))
 
-(defmethod parse-pgn ((in stream))
+(defmethod parse-pgn ((in stream) &key ext-moves)
   (with-parse-stream in
     (labels
         ((read-sym ()
@@ -1474,15 +1473,26 @@ by STRING-DESIGNATOR being its first argument."
            (let ((data '()))
              (flet ((move ()
                       (let* ((movestr (read-while #'non-whitespace?))
-                             (valid (game-parse-san game movestr)))
+                             (comp-moves (game-compute-moves game))
+                             (valid (game-parse-san game movestr comp-moves)))
                         (skip-whitespace)
                         (cond
                           ((null valid)
                            (error "Invalid move (~A)" movestr))
                           ((< 1 (length valid))
                            (error "Ambiguous move (~A)" movestr)))
-                        (game-move game (car valid))
-                        (push (cons :move (car valid)) data)))
+                        (cond
+                          (ext-moves
+                           (push (list :move (car valid)
+                                       :san (game-san game (car valid) comp-moves)
+                                       :fen-before (game-fen game)
+                                       :fen-after (progn
+                                                    (game-move game (car valid))
+                                                    (game-fen game)))
+                                 data))
+                          (t
+                           (push (cons :move (car valid)) data)
+                           (game-move game (car valid))))))
                     (comment1 ()
                       (skip #\;)
                       (read-while (lambda (ch)
@@ -1495,21 +1505,21 @@ by STRING-DESIGNATOR being its first argument."
                         (skip #\}))))
                (loop while (peek)
                      do (skip-whitespace)
-                        (or (awhen (read-result)
-                              (push (cons :result it) data)
-                              (return (nreverse data)))
-                            (when (eql (peek) #\;)
-                              (push (cons :comment (comment1)) data))
-                            (when (eql (peek) #\{)
-                              (push (cons :comment (comment2)) data))
-                            (progn
-                              (when (read-number)
-                                (skip #\.)
-                                (when (eql #\. (peek))
-                                  (skip ".."))
-                                (skip-whitespace))
-                              (move)))
-                        (skip-whitespace)
+                     (or (awhen (read-result)
+                           (push (cons :result it) data)
+                           (return (nreverse data)))
+                         (when (eql (peek) #\;)
+                           (push (cons :comment (comment1)) data))
+                         (when (eql (peek) #\{)
+                           (push (cons :comment (comment2)) data))
+                         (progn
+                           (when (read-number)
+                             (skip #\.)
+                             (when (eql #\. (peek))
+                               (skip ".."))
+                             (skip-whitespace))
+                           (move)))
+                     (skip-whitespace)
                      finally (return (nreverse data)))))))
 
       (let* ((headers (loop do (skip-whitespace)
@@ -1521,12 +1531,12 @@ by STRING-DESIGNATOR being its first argument."
                                  (cdr start-fen)
                                  +FEN-START+))
         `(:headers ,headers
-          :moves ,(read-moves game)
-          :game ,game)))))
+                   :moves ,(read-moves game)
+                   :game ,game)))))
 
-(defmethod parse-pgn ((pgn string))
+(defmethod parse-pgn ((pgn string) &rest args &key &allow-other-keys)
   (with-input-from-string (in pgn)
-    (parse-pgn in)))
+    (apply #'parse-pgn in args)))
 
 ;;;; FILE: eval.lisp
 

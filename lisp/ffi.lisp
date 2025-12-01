@@ -17,15 +17,17 @@
   name)
 
 (defmacro defun-js (name args body)
-  (let* ((js-name (to-js-name name))
+  (let* ((parsed (%:parse-lambda-list args))
+         (argnames (getf parsed :names))
+         (js-name (to-js-name name))
          (sym (gensym))
-         (js-argnames (mapcar #'to-js-name args)))
+         (js-argnames (mapcar #'to-js-name argnames)))
     `(let ((,sym (%js-eval ,(format nil "function ~A (~{~A~^, ~}) { ~A }"
                                     js-name
                                     js-argnames
                                     body))))
-       (defun ,name args
-         (%js-apply ,sym nil args)))))
+       (defun ,name ,args
+         (%js-apply ,sym nil (vector ,@argnames))))))
 
 (defmacro lambda-js (args body)
   (let* ((sym (gensym))
