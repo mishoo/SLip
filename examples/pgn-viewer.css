@@ -2,11 +2,17 @@
     background: #eed !important;
     color: #000;
     border-color: #465 !important;
+    opacity: 0.9;
 
     &:focus-within {
         outline: none;
         border-color: #fff !important;
         z-index: 110;
+        opacity: 1;
+        .cont-title {
+            opacity: 1;
+            background: #bdc;
+        }
     }
 
     .layout {
@@ -83,8 +89,9 @@
         display: flex;
         align-items: center;
         padding-left: 10px;
-        background: #acb;
+        background: #bba;
         border-bottom: 1px solid #465;
+        opacity: 0.6;
     }
 
     .board {

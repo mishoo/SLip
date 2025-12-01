@@ -2432,9 +2432,8 @@ defp("%sendmsg", true, function(m, nargs){
     checknargs(nargs, 2);
     var args = false;
     while (nargs-- > 2) args = new LispCons(m.pop(), args);
-    var signal = as_string(m.pop()), process = m.pop();
+    var signal = m.pop(), process = m.pop();
     checktype(process, LispProcess);
-    checktype(signal, LispString);
     return LispProcess.sendmsg(process, signal, args);
 });
 

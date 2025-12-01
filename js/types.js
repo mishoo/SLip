@@ -640,7 +640,9 @@ export class LispProcess {
         }
         this.receivers = receivers;
         this.m.status = STATUS_WAITING;
-        return this.checkmail();
+        this.checkmail();
+        // This must return undefined. Return value comes later from
+        // one of the handlers.
     }
 
     handle(msg) {
@@ -657,12 +659,10 @@ export class LispProcess {
             if (f) {
                 this.m._callnext(f, msg.args);
                 this.resume();
-                return;         // must return undefined
             } else {
                 console.warn("No receiver for message ", msg, " in process ", this.pid);
             }
         }
-        return false;
     }
 
     set_timeout(timeout, closure) {

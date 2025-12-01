@@ -148,7 +148,7 @@
              ("Escape"
               (dom:close-dialog dlg)
               (dom:prevent-default event))
-             (("f" "c")
+             (("f" "F" "c" "C")
               (on-fen (dom:query dlg "._fen") event)
               (dom:prevent-default event))
              (("ArrowUp" "ArrowDown")
