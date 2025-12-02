@@ -120,6 +120,7 @@ export const OP = {
     BXOR: 99,
     BASH: 100,
     BCNT: 101,
+    BNOT: 102,
 };
 
 const OP_LEN = [
@@ -225,6 +226,7 @@ const OP_LEN = [
     0 /* BXOR */,
     0 /* BASH */,
     0 /* BCNT */,
+    0 /* BNOT */,
 ];
 
 export function want_bound(name, val) {
@@ -1923,6 +1925,9 @@ let OP_RUN = [
         let num = m.pop_integer(), count = 0;
         while (num) num &= num - 1, ++count;
         m.push(count);
+    },
+    /*OP.BNOT*/ (m) => {
+        m.push(~m.pop_integer());
     },
 ];
 

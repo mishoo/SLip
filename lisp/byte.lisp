@@ -51,6 +51,9 @@
 (define-compiler-macro op-cnt (num)
   `(%:%op BCNT ,num))
 
+(define-compiler-macro op-not (num)
+  `(%:%op BNOT ,num))
+
 (defun logand (&rest integers)
   (do ((ret -1)
        (p integers (cdr p)))
@@ -119,6 +122,16 @@
     (t
      `(op-cnt ,integer))))
 
+(defun lognot (integer)
+  (op-not integer))
+
+(define-compiler-macro lognot (integer)
+  (cond
+    ((integerp integer)
+     (op-not integer))
+    (t
+     `(op-not ,integer))))
+
 (defun ash (integer count)
   (op-ash integer count))
 
@@ -127,6 +140,8 @@
     ((and (integerp integer)
           (integerp count))
      (op-ash integer count))
+    ((eql count 0)
+     integer)
     (t
      `(op-ash ,integer ,count))))
 
@@ -165,11 +180,9 @@
     (t form)))
 
 (defun dpb (newbyte bytespec integer)
-  (let* ((size (byte-size bytespec))
-         (pos (byte-position bytespec))
-         (mask (1- (ash 1 size)))
-         (tmask (ash mask pos)))
-    (logior (logxor tmask (logior tmask integer))
+  (let ((pos (byte-position bytespec))
+        (mask (1- (ash 1 (byte-size bytespec)))))
+    (logior (logand integer (lognot (ash mask pos)))
             (ash (logand newbyte mask) pos))))
 
 (define-compiler-macro dpb (&whole form newbyte bytespec integer)
@@ -184,10 +197,10 @@
             (tmask (ash mask pos)))
        (cond
          ((integerp newbyte)
-          `(logior (logxor (logior ,integer ,tmask) ,tmask)
+          `(logior (logand ,integer ,(lognot tmask))
                    ,(ash (logand newbyte mask) pos)))
          (t
-          `(logior (logxor (logior ,integer ,tmask) ,tmask)
+          `(logior (logand ,integer ,(lognot tmask))
                    (ash (logand ,newbyte ,mask) ,pos))))))
     (t form)))
 
