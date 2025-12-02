@@ -73,13 +73,15 @@
                                  #.(field-index "D1")
                                  #.(field-index "D8"))))))
                   (setf (dom:dataset piece :index) to
-                        (dom:style piece :z-index) (incf transitions))))
+                        (dom:style piece :z-index) (+ 10 (incf transitions)))))
                (t
                 (morph-to-fen el-pieces fen-after)))
              (setf current-fen fen-after)))
 
          (on-move (target event)
+           (highlight-clear)
            (setf (dom:checked target) t)
+           (highlight-move)
            (dom:scroll-into-view (dom:parent-element target))
            (goto-move (parse-integer (dom:dataset target :move))
                       (dom:dataset target :fen-before)
@@ -92,10 +94,30 @@
                (let ((g (make-game)))
                  (reset-from-fen g current-fen)
                  (setf (dom:inner-html el-pieces)
-                       (pieces-html (game-board g)))))))
+                       (pieces-html (game-board g)))
+                 (highlight-move)))))
+
+         (highlight-clear ()
+           (dom:do-query (el el-pieces ".piece.highlight")
+             (dom:remove el)))
+
+         (highlight-move ()
+           (let ((el-move (dom:query dlg "input[name='move']:checked")))
+             (when el-move
+               (let* ((move (parse-integer (dom:dataset el-move :move)))
+                      (from (move-from move))
+                      (to (move-to move)))
+                 (dom:append-to
+                  el-pieces
+                  (dom:from-html
+                   (format nil
+                           "<div class='piece highlight from' data-index='~D'></div>~
+                                <div class='piece highlight to' data-index='~D'></div>"
+                           from to)))))))
 
          (reset ()
            (setf current-fen +fen-start+)
+           (highlight-clear)
            (morph-to-fen el-pieces current-fen)
            (dom:do-query (el dlg "input[name='move']")
              (setf (dom:checked el) nil))

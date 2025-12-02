@@ -118,7 +118,8 @@
             position: absolute;
             width: 12.5%;
             height: 12.5%;
-            transition: translate 0.4s cubic-bezier(.22,.46,.35,.96), scale 0.5s, opacity 0.5s;
+            transition: translate 0.25s cubic-bezier(.22,.46,.35,.96), scale 0.4s, opacity 0.5s;
+            z-index: 5;
 
             &[data-piece]::after {
                 transition: transform 0.6s;
@@ -239,6 +240,14 @@
             &[data-index='117'] { translate: 500% 0% }
             &[data-index='118'] { translate: 600% 0% }
             &[data-index='119'] { translate: 700% 0% }
+
+            /*
+            &.highlight {
+                background: #ada;
+                opacity: 0.4;
+                z-index: 3;
+            }
+             */
         }
 
         .fade-out {

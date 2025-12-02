@@ -140,6 +140,8 @@
     ((and (integerp integer)
           (integerp count))
      (op-ash integer count))
+    ((eql count 0)
+     integer)
     (t
      `(op-ash ,integer ,count))))
 
