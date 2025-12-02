@@ -11,6 +11,23 @@
 
 (in-package :sl-type)
 
+(defun integer-predicate (obj &optional (min '*) (max '*))
+  (and (integerp obj)
+       (if (eq min '*) t (>= obj min))
+       (if (eq max '*) t (<= obj max))))
+
+(define-compiler-macro integer-predicate (&whole form obj &optional (min ''*) (max ''*))
+  (cond
+    ((and (equal min ''*) (equal max ''*))
+     `(integerp ,obj))
+    ((%:safe-atom-p obj)
+     `(and (integerp ,obj)
+           ,@(unless (equal min ''*)
+               `((<= ,min ,obj)))
+           ,@(unless (equal max ''*)
+               `((>= ,max ,obj)))))
+    (t form)))
+
 ;; Map type name -> predicate, which must be funcallable and return T if and
 ;; only if the type matches. Symbols are preferred because a compiler macro
 ;; will optimize TYPEP calls into direct calls to the predicate whenever
@@ -25,6 +42,7 @@
    'list           'listp
    'symbol         'symbolp
    'number         'numberp
+   'integer        'integer-predicate
    'function       'functionp
    'char           'charp
    'character      'charp
@@ -75,11 +93,6 @@
 (defpredicate t (obj) (declare (ignore obj)) t)
 (defpredicate nil (obj) (declare (ignore obj)) nil)
 
-(defpredicate integer (obj &optional (min '*) (max '*))
-  (and (integerp obj)
-       (if (eq min '*) t (>= obj min))
-       (if (eq max '*) t (<= obj max))))
-
 (defpredicate or (obj &rest typespecs)
   (do ((ts typespecs (cdr ts)))
       ((null ts) nil)
@@ -122,67 +135,62 @@
 
 (setf (symbol-function 'typep) #'%typep)
 
+(defun %expand (tspec object)
+  (let expand ((tspec tspec))
+    (cond
+      ((eq tspec t)
+       t)
+      ((not tspec)
+       nil)
+      ((symbolp tspec)
+       (aif (gethash tspec *complex-types*)
+            (expand (funcall it nil))
+            (let ((pred (gethash tspec *ext-types*)))
+              (if (and pred (symbolp pred))
+                  `(,pred ,object)
+                  `(%typep ,object ',tspec)))))
+      ((atom tspec)
+       (error "Unexpected atom in type spec: ~S" tspec))
+      (t
+       (case (car tspec)
+         ((and)
+          (cond
+            ((null (cdr tspec)) 'nil)
+            ((null (cddr tspec))
+             (expand (cadr tspec)))
+            (t
+             `(when ,(expand (cadr tspec))
+                ,(expand `(and ,@(cddr tspec)))))))
+         ((or)
+          (cond
+            ((null (cdr tspec)) 't)
+            ((null (cddr tspec))
+             (expand (cadr tspec)))
+            (t
+             `(if ,(expand (cadr tspec)) 't
+                  ,(expand `(or ,@(cddr tspec)))))))
+         ((not)
+          `(not ,(expand (cadr tspec))))
+         ((eql)
+          `(eql ,object ,(cadr tspec)))
+         ((satisfies)
+          `(,(cadr tspec) ,object))
+         ((member)
+          `(member ,object ',(cdr tspec)))
+         (t
+          (aif (gethash (car tspec) *complex-types*)
+               (expand (funcall it (cdr tspec)))
+               (let ((pred (gethash (car tspec) *ext-types*)))
+                 (if (and pred (symbolp pred))
+                     `(,pred ,object ,@(mapcar (lambda (x) `',x)
+                                               (cdr tspec)))
+                     `(%typep ,object ',tspec))))))))))
+
 (defun expand (tspec object)
-  (symbol-macrolet (($thing (progn
-                              (incf count)
-                              '$thing)))
-    (let* ((count 0)
-           (code
-            (let expand ((tspec tspec))
-              (cond
-                ((eq tspec t)
-                 t)
-                ((not tspec)
-                 nil)
-                ((symbolp tspec)
-                 (aif (gethash tspec *complex-types*)
-                      (expand (funcall it nil))
-                      (let ((pred (gethash tspec *ext-types*)))
-                        (if (and pred (symbolp pred))
-                            `(,pred ,$thing)
-                            `(%typep ,$thing ',tspec)))))
-                ((atom tspec)
-                 (error "Unexpected atom in type spec: ~S" tspec))
-                (t
-                 (case (car tspec)
-                   ((and)
-                    (cond
-                      ((null (cdr tspec)) 'nil)
-                      ((null (cddr tspec))
-                       (expand (cadr tspec)))
-                      (t
-                       `(when ,(expand (cadr tspec))
-                          ,(expand `(and ,@(cddr tspec)))))))
-                   ((or)
-                    (cond
-                      ((null (cdr tspec)) 't)
-                      ((null (cddr tspec))
-                       (expand (cadr tspec)))
-                      (t
-                       `(if ,(expand (cadr tspec)) 't
-                            ,(expand `(or ,@(cddr tspec)))))))
-                   ((not)
-                    `(not ,(expand (cadr tspec))))
-                   ((eql)
-                    `(eql ,$thing ,(cadr tspec)))
-                   ((satisfies)
-                    `(,(cadr tspec) ,$thing))
-                   ((member)
-                    `(member ,$thing ',(cdr tspec)))
-                   (t
-                    (aif (gethash (car tspec) *complex-types*)
-                         (expand (funcall it (cdr tspec)))
-                         (let ((pred (gethash (car tspec) *ext-types*)))
-                           (if (and pred (symbolp pred))
-                               `(,pred ,$thing ,@(mapcar (lambda (x) `',x)
-                                                         (cdr tspec)))
-                               `(%typep ,$thing ',tspec)))))))))))
-      (if (and (> count 1)
-               (not (%:safe-atom-p object)))
-          `(let (($thing ,object))
-             ,code)
-          `(symbol-macrolet (($thing ,object))
-             ,code)))))
+  (if (%:safe-atom-p object)
+      (%expand tspec object)
+      `(let (($thing ,object))
+         ,(%expand tspec '$thing))))
 
 (define-compiler-macro typep (&whole form object typespec)
   (cond
