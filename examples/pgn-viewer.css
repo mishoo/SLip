@@ -99,7 +99,7 @@
         max-height: 100%;
         aspect-ratio: 1/1;
         transition: transform 0.5s;
-        border: 2px solid #000;
+        outline: 2px solid #000;
         background-color: #ffe;
 
         &::before {
@@ -120,6 +120,11 @@
             height: 12.5%;
             transition: translate 0.25s cubic-bezier(.22,.46,.35,.96), scale 0.4s, opacity 0.5s;
             z-index: 5;
+
+            &.dragging {
+                z-index: 10;
+                transition: 0s;
+            }
 
             &[data-piece]::after {
                 transition: transform 0.6s;
@@ -241,13 +246,16 @@
             &[data-index='118'] { translate: 600% 0% }
             &[data-index='119'] { translate: 700% 0% }
 
-            /*
             &.highlight {
-                background: #ada;
-                opacity: 0.4;
                 z-index: 3;
+                opacity: 0.4;
+                &.target {
+                    background: #ada;
+                }
+                &.check {
+                    background: radial-gradient(ellipse, #f00 0%, #f007 40%, #f000 70%);
+                }
             }
-             */
         }
 
         .fade-out {

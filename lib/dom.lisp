@@ -7,22 +7,23 @@
            #:has-animations
            #:next-sibling #:next-element-sibling
            #:previous-sibling #:previous-element-sibling
-           #:parent-element
+           #:parent-element #:closest
            #:inner-html #:checked #:value
            #:create-element
            #:add-class #:remove-class #:toggle-class #:has-class
            #:dataset
            #:query #:query-all #:do-query #:matches
-           #:on-event #:off-event
-           #:prevent-default
+           #:on-event #:off-event #:with-events #:done-events
+           #:prevent-default #:stop-propagation #:stop-immediate-propagation
            #:shift-key #:ctrl-key #:alt-key #:meta-key
            #:scroll-into-view
+           #:bounding-client-rect
            #:trigger-reflow
            #:clipboard-write-text
            #:offset-width #:offset-height
            #:scroll-left #:scroll-top
            #:focus
-           #:key
+           #:key #:client-x #:client-y
            #:make-dialog
            #:close-dialog
            #:load-css
@@ -84,6 +85,8 @@
 (define-simple-getter previous-sibling "previousSibling")
 (define-simple-getter previous-element-sibling "previousElementSibling")
 (define-simple-getter parent-element "parentElement")
+
+(defun-js closest (element selector) "return element.closest(selector)")
 
 (defun-js query (container selector) "
   return (container || document).querySelector(selector);
@@ -149,10 +152,34 @@
 (define-simple-accessor scroll-left "scrollLeft")
 (define-simple-accessor scroll-top "scrollTop")
 
+(defun-js bounding-client-rect (el &optional relative-to) "
+  let box = el.getBoundingClientRect();
+  box = {
+    left: box.left,
+    top: box.top,
+    right: box.right,
+    bottom: box.bottom,
+    width: box.width,
+    height: box.height,
+  };
+  if (relative_to) {
+    let rel = relative_to.getBoundingClientRect();
+    box.left -= rel.left;
+    box.right -= rel.left;
+    box.top -= rel.top;
+    box.bottom -= rel.top;
+  }
+  return new Values([ box.left, box.top, box.width, box.height, box.right, box.bottom ]);
+")
+
 (let ((style (lambda-js (element prop value) "
   if (arguments.length === 2)
     return window.getComputedStyle(element).getPropertyValue(prop);
-  element.style.setProperty(prop, value);
+  if (value === false) {
+    element.style.removeProperty(prop);
+  } else {
+    element.style.setProperty(prop, value);
+  }
   return value;
 ")))
   (defun style (element prop)
@@ -172,6 +199,9 @@
 
 (defun-js on-event (element event-name
                             &key
+                            capture
+                            once
+                            passive
                             selector
                             process
                             (signal event-name)) "
@@ -188,15 +218,32 @@
       target = target.parentElement;
     }
   };
-  element.addEventListener(event_name, handler);
+  element.addEventListener(event_name, handler, { capture, once, passive });
   return handler;
 ")
 
-(defun-js off-event (element event-name handler) "
-  element.removeEventListener(event_name, handler);
+(defun-js off-event (element event-name handler &key capture) "
+  element.removeEventListener(event_name, handler, { capture });
 ")
 
+(defmacro with-events ((element &rest events) &body body)
+  (let ((el (gensym "element"))
+        (handlers (mapcar (lambda (ev) (gensym (car ev))) events)))
+    `(let* ((,el ,element)
+            ,@(mapcar (lambda (handler ev)
+                        `(,handler (on-event ,el ,@ev)))
+                      handlers events))
+       (flet ((done-events ()
+                ,@(mapcar (lambda (handler ev)
+                            `(off-event ,el ,(car ev) ,handler
+                                        ,@(aif (getf (cdr ev) :capture)
+                                               `(:capture ,it))))
+                          handlers events)))
+         ,@body))))
+
 (defun-js prevent-default (event) "return event.preventDefault()")
+(defun-js stop-propagation (event) "return event.stopPropagation()")
+(defun-js stop-immediate-propagation (event) "return event.stopImmediatePropagation()")
 (define-simple-getter shift-key "shiftKey")
 (define-simple-getter alt-key "altKey")
 (define-simple-getter ctrl-key "ctrlKey")
@@ -213,6 +260,8 @@
 ")
 
 (define-simple-getter key "key")
+(define-simple-getter client-x "clientX")
+(define-simple-getter client-y "clientY")
 
 (defun-js load-css (url) "
   let link = document.querySelector('link[data-url=\"' + url + '\"]');

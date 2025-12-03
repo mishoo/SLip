@@ -29,6 +29,7 @@ import {
 import { LispPrimitiveError } from "./error.js";
 import { LispMachine, OP } from "./machine.js";
 import { repeat_string, UNICODE } from "./utils.js";
+import { Values } from "./stack.js";
 
 let ALL_PRIMITIVES = false;
 
@@ -2703,8 +2704,9 @@ defp("%js-eval", true, function(m, nargs){
     var code = m.pop();
     checktype(code, LispString);
     var func = new Function("$machine", "LispSymbol", "LispPackage", "LispCons", "LispHash", "LispProcess",
+                            "Values",
                             "return(" + code + ")");
-    return func(m, LispSymbol, LispPackage, LispCons, LispHash, LispProcess);
+    return func(m, LispSymbol, LispPackage, LispCons, LispHash, LispProcess, Values);
 });
 
 defp("%js-apply", true, function(m, nargs){
