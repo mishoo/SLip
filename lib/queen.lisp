@@ -63,6 +63,7 @@
            #:move-captured-index
            #:move-oo?
            #:move-ooo?
+           #:move-check?
 
            #:game
            #:make-game

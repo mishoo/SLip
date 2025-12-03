@@ -8,13 +8,18 @@
 
 (dom:load-css "./examples/pgn-viewer.css")
 
-(defun display-game (pgn)
-  (let* ((pgn (parse-pgn pgn :ext-moves t))
-         (dlg (dom:make-dialog 800 620
+(defgeneric display-game (pgn))
+
+(defmethod display-game (pgn)
+  (display-game (parse-pgn pgn :ext-moves t)))
+
+(defmethod display-game ((pgn cons))
+  (let* ((dlg (dom:make-dialog 800 620
                                :content (dom:from-html (make-layout pgn))
                                :class-name "pgn-viewer"))
          (running t)
          (current-fen +fen-start+)
+         (el-board (dom:query dlg "._board"))
          (el-pieces (dom:query dlg "._pieces"))
          (transitions 0))
     (setf (dom:style dlg "left") "40px"
@@ -25,7 +30,7 @@
            (setf running nil))
 
          (on-reverse (target event)
-           (dom:toggle-class (dom:query dlg "._board") "reverse"))
+           (dom:toggle-class el-board "reverse"))
 
          (piece-element (index)
            (dom:query el-pieces (piece-selector index)))
@@ -81,7 +86,6 @@
          (on-move (target event)
            (highlight-clear)
            (setf (dom:checked target) t)
-           (highlight-move)
            (dom:scroll-into-view (dom:parent-element target))
            (goto-move (parse-integer (dom:dataset target :move))
                       (dom:dataset target :fen-before)
@@ -95,25 +99,25 @@
                  (reset-from-fen g current-fen)
                  (setf (dom:inner-html el-pieces)
                        (pieces-html (game-board g)))
-                 (highlight-move)))))
+                 (highlight-check)))))
 
          (highlight-clear ()
            (dom:do-query (el el-pieces ".piece.highlight")
              (dom:remove el)))
 
-         (highlight-move ()
-           (let ((el-move (dom:query dlg "input[name='move']:checked")))
-             (when el-move
-               (let* ((move (parse-integer (dom:dataset el-move :move)))
-                      (from (move-from move))
-                      (to (move-to move)))
-                 (dom:append-to
-                  el-pieces
-                  (dom:from-html
-                   (format nil
-                           "<div class='piece highlight from' data-index='~D'></div>~
-                                <div class='piece highlight to' data-index='~D'></div>"
-                           from to)))))))
+         (highlight-fields (indexes &optional (classes ""))
+           (without-interrupts
+             (dolist (idx indexes)
+               (dom:append-to
+                el-pieces
+                (dom:from-html
+                 (format nil "<div class='piece highlight ~A' data-index='~D'></div>"
+                         classes idx))))))
+
+         (highlight-check ()
+           (let* ((g (reset-from-fen (make-game) current-fen)))
+             (when (attacked? g)
+               (highlight-fields (list (king-index g)) "check"))))
 
          (reset ()
            (setf current-fen +fen-start+)
@@ -175,26 +179,113 @@
               (dom:prevent-default event))
              (("ArrowUp" "ArrowDown")
               (on-reverse target event)
+              (dom:prevent-default event))
+             (("r" "R")
+              ;; restart
+              (dom:close-dialog dlg)
+              (display-game pgn)
               (dom:prevent-default event))))
 
          (on-fen (target event)
            (if (dom:clipboard-write-text current-fen)
                (ymacs:signal-info (format nil "FEN copied" current-fen)
                                   :timeout 666 :anchor target)
-               (ymacs:signal-info "Didn't work (permissions?)" :timeout 3000))))
+               (ymacs:signal-info "Didn't work (permissions?)" :timeout 3000)))
+
+         (event-to-index (ev)
+           (multiple-value-bind (board-x board-y board-width board-height)
+                                (dom:bounding-client-rect el-board)
+             (let* ((reversed (dom:has-class el-board "reverse"))
+                    (ev-x (dom:client-x ev))
+                    (ev-y (dom:client-y ev))
+                    (rel-x (- ev-x board-x))
+                    (rel-y (- ev-y board-y))
+                    (col (floor (* 8 (/ rel-x board-width))))
+                    (row (- 7 (floor (* 8 (/ rel-y board-height))))))
+               (when (and (typep col '(integer 0 7))
+                          (typep row '(integer 0 7)))
+                 (when reversed
+                   (setf col (- 7 col)
+                         row (- 7 row)))
+                 (board-index row col)))))
+
+         (on-piece-mousedown (piece event)
+           (without-interrupts
+             (let* ((index (parse-integer (dom:dataset piece :index)))
+                    (g (reset-from-fen (make-game) current-fen))
+                    (all-moves (game-compute-moves g))
+                    (moves (remove index all-moves :test-not #'eql :key #'move-from))
+                    (reversed (dom:has-class el-board "reverse"))
+                    (start-x (dom:client-x event))
+                    (start-y (dom:client-y event))
+                    (target-field nil))
+               ;; (format t "~{~A~^ ~}~%" (mapcar #'index-field (mapcar #'move-to moves)))
+               (unless moves (return-from on-piece-mousedown nil))
+               (dom:prevent-default event)
+               (dom:stop-immediate-propagation event)
+               (dom:add-class piece "dragging")
+               (dom:with-events (dom:document
+                                 ("mousemove" :capture t :signal :move)
+                                 ("mouseup" :capture t :signal :done))
+                 (multiple-value-bind (board-x board-y board-width board-height)
+                                      (dom:bounding-client-rect el-board)
+                   (multiple-value-bind (piece-x piece-y piece-width piece-height)
+                                        (dom:bounding-client-rect piece el-board)
+                     (labels
+                         ((on-move (target ev)
+                            (without-interrupts
+                              (let* ((diff-x (- (dom:client-x ev) start-x))
+                                     (diff-y (- (dom:client-y ev) start-y))
+                                     (drag-x (+ piece-x diff-x))
+                                     (drag-y (+ piece-y diff-y)))
+                                (when reversed
+                                  (setf drag-x (- board-width drag-x piece-width)
+                                        drag-y (- board-height drag-y piece-height)))
+                                (setf (dom:style piece :translate)
+                                      (format nil "~Fpx ~Fpx" drag-x drag-y)))
+                              (let ((index (event-to-index ev)))
+                                (unless (eql index target-field)
+                                  (highlight-clear)
+                                  (cond
+                                    ((member index moves :key #'move-to)
+                                     (setf target-field index)
+                                     (highlight-fields (list index) "target"))
+                                    (t
+                                     (setf target-field nil)))))))
+                          (on-done (target ev)
+                            (without-interrupts
+                              (highlight-clear)
+                              (dom:done-events)
+                              (dom:remove-class piece "dragging")
+                              (setf (dom:style piece :translate) nil)
+                              (when target-field
+                                (let ((move (find target-field moves :key #'move-to)))
+                                  (game-move g move)
+                                  (setf current-fen (game-fen g))
+                                  (setf (dom:dataset piece :index) target-field
+                                        (dom:style piece :z-index) 10)
+                                  (morph-to-fen el-pieces current-fen)))
+                              'drag-done)))
+                       (loop with drag-receivers = (make-hash
+                                                    :move #'on-move
+                                                    :done #'on-done)
+                             until (eq (%:%receive drag-receivers) 'drag-done))
+                       ;; (format t "Done dragging~%")
+                       ))))))))
 
       (reset)
 
-      (let ((receivers (make-hash :close          #'on-close
-                                  :reverse        #'on-reverse
-                                  :move           #'on-move
-                                  :animation-end  #'on-animation-end
-                                  :prev           #'on-prev
-                                  :next           #'on-next
-                                  :start          #'on-start
-                                  :end            #'on-end
-                                  :fen            #'on-fen
-                                  :keydown        #'on-keydown)))
+      (let ((receivers (make-hash :close            #'on-close
+                                  :reverse          #'on-reverse
+                                  :move             #'on-move
+                                  :animation-end    #'on-animation-end
+                                  :prev             #'on-prev
+                                  :next             #'on-next
+                                  :start            #'on-start
+                                  :end              #'on-end
+                                  :fen              #'on-fen
+                                  :keydown          #'on-keydown
+                                  :piece-mousedown  #'on-piece-mousedown)))
         (make-thread
          (lambda ()
            (dom:on-event dlg "close" :signal :close)
@@ -204,6 +295,7 @@
            (dom:on-event dlg "click" :selector "._next" :signal :next)
            (dom:on-event dlg "click" :selector "._end" :signal :end)
            (dom:on-event dlg "click" :selector "._fen" :signal :fen)
+           (dom:on-event dlg "mousedown" :selector ".piece[data-piece]" :signal :piece-mousedown)
            (dom:on-event dlg "input" :selector "input[name='move']" :signal :move)
            (dom:on-event el-pieces "transitionend" :signal :animation-end)
            (dom:on-event dlg "keydown" :signal :keydown)

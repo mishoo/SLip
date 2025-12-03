@@ -1,6 +1,6 @@
 import { LispPrimitiveError } from "./error.js";
 
-class Values {
+export class Values {
     constructor(vals) {
         this.vals = vals;
     }
