@@ -52,7 +52,7 @@
 
         button {
             display: block;
-            min-width: 1.5em;
+            min-width: 1.7em;
             padding: 1px 4px;
             display: flex;
             align-items: center;
@@ -66,7 +66,7 @@
                 background-color: rgba(0, 0, 0, 0.5);
                 color: #fff;
             }
-            &:active {
+            &:active, &.active {
                 background-color: rgba(0, 0, 0, 0.8);
                 color: #fff;
             }
@@ -118,7 +118,7 @@
             position: absolute;
             width: 12.5%;
             height: 12.5%;
-            transition: translate 0.25s cubic-bezier(.22,.46,.35,.96), scale 0.4s, opacity 0.5s;
+            transition: translate 0.25s cubic-bezier(.22,.46,.35,.96), scale 0.25s, opacity 0.25s;
             z-index: 5;
 
             &.dragging {
