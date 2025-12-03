@@ -194,7 +194,7 @@
 
          (event-to-index (ev)
            (multiple-value-bind (board-x board-y board-width board-height)
-                                (dom:bounding-client-rect el-board)
+               (dom:bounding-client-rect el-board)
              (let* ((reversed (dom:has-class el-board "reverse"))
                     (ev-x (dom:client-x ev))
                     (ev-y (dom:client-y ev))
@@ -228,9 +228,9 @@
                                  ("mousemove" :capture t :signal :move)
                                  ("mouseup" :capture t :signal :done))
                  (multiple-value-bind (board-x board-y board-width board-height)
-                                      (dom:bounding-client-rect el-board)
+                     (dom:bounding-client-rect el-board)
                    (multiple-value-bind (piece-x piece-y piece-width piece-height)
-                                        (dom:bounding-client-rect piece el-board)
+                       (dom:bounding-client-rect piece el-board)
                      (labels
                          ((on-move (target ev)
                             (without-interrupts
