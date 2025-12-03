@@ -157,34 +157,50 @@
          (on-next (target event)
            (next-move nil))
 
+         (active-blink (selector)
+           (let ((el (dom:query dlg selector)))
+             (when el
+               (dom:add-class el "active")
+               (clear-timeout (dom:dataset el :timer))
+               (setf (dom:dataset el :timer)
+                     (set-timeout 100 (lambda ()
+                                        (dom:remove-class el "active")))))))
+
          (on-keydown (target event)
-           (case (dom:key event)
-             ("ArrowLeft"
-              (on-prev target event)
-              (dom:prevent-default event))
-             ("ArrowRight"
-              (on-next target event)
-              (dom:prevent-default event))
-             ("Home"
-              (on-start target event)
-              (dom:prevent-default event))
-             ("End"
-              (on-end target event)
-              (dom:prevent-default event))
-             ("Escape"
-              (dom:close-dialog dlg)
-              (dom:prevent-default event))
-             (("f" "F" "c" "C")
-              (on-fen (dom:query dlg "._fen") event)
-              (dom:prevent-default event))
-             (("ArrowUp" "ArrowDown")
-              (on-reverse target event)
-              (dom:prevent-default event))
-             (("r" "R")
-              ;; restart
-              (dom:close-dialog dlg)
-              (display-game pgn)
-              (dom:prevent-default event))))
+           (without-interrupts
+             (case (dom:key event)
+               ("ArrowLeft"
+                (on-prev target event)
+                (active-blink "._prev")
+                (dom:prevent-default event))
+               ("ArrowRight"
+                (on-next target event)
+                (active-blink "._next")
+                (dom:prevent-default event))
+               ("Home"
+                (on-start target event)
+                (active-blink "._start")
+                (dom:prevent-default event))
+               ("End"
+                (on-end target event)
+                (active-blink "._end")
+                (dom:prevent-default event))
+               ("Escape"
+                (dom:close-dialog dlg)
+                (dom:prevent-default event))
+               (("f" "F" "c" "C")
+                (on-fen (dom:query dlg "._fen") event)
+                (active-blink "._fen")
+                (dom:prevent-default event))
+               (("ArrowUp" "ArrowDown")
+                (on-reverse target event)
+                (active-blink "._reverse")
+                (dom:prevent-default event))
+               (("r" "R")
+                ;; restart
+                (dom:close-dialog dlg)
+                (display-game pgn)
+                (dom:prevent-default event)))))
 
          (on-fen (target event)
            (if (dom:clipboard-write-text current-fen)
