@@ -329,10 +329,10 @@
   (format nil ".piece[data-index='~D']:not(.fade-out, ._morph)" index))
 
 (defun morph-to-fen (el-pieces fen)
-  (let* ((*unicode* nil)
-         (g (make-game))
-         (board (game-board g)))
-    (without-interrupts
+  (without-interrupts
+    (let* ((*unicode* nil)
+           (g (make-game))
+           (board (game-board g)))
       (reset-from-fen g fen)
 
       ;; 1. pieces already in-place should stay so.
@@ -443,10 +443,10 @@
                      (fen-after (getf data :fen-after)))
                  (when (move-white? move)
                    (format output "<div class='index'>~D</div>" (incf index)))
-                 (format output "<div class='~A'>
-                   <label class='move'>
-                     <input name='move' type='radio' data-fen-before='~A' data-fen-after='~A' data-move='~A' />
-                     ~A
+                 (format output "<div class='~A'>~
+                   <label class='move'>~
+                     <input name='move' type='radio' data-fen-before='~A' data-fen-after='~A' data-move='~A' />~
+                     ~A~
                    </label></div>"
                          (if (move-white? move) "white" "black")
                          fen-before fen-after move san))))
