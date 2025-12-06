@@ -18,7 +18,8 @@
                                :content (dom:from-html (make-layout pgn))
                                :class-name "pgn-viewer"))
          (running t)
-         (current-fen +fen-start+)
+         (start-fen (get-header pgn "FEN" +fen-start+))
+         (current-fen start-fen)
          (el-board (dom:query dlg "._board"))
          (el-pieces (dom:query dlg "._pieces"))
          (transitions 0))
@@ -120,7 +121,7 @@
                (highlight-fields (list (king-index g)) "check"))))
 
          (reset ()
-           (setf current-fen +fen-start+)
+           (setf current-fen start-fen)
            (highlight-clear)
            (morph-to-fen el-pieces current-fen)
            (dom:do-query (el dlg "input[name='move']")
@@ -325,6 +326,14 @@
                    "Thread exit ~A~%"
                    (current-thread))))))))
 
+(defun get-header (pgn name &optional default)
+  (let* ((headers (getf pgn :headers))
+         (cell (assoc (string name) headers
+                      :test #'string-equal)))
+    (if cell
+        (cdr cell)
+        default)))
+
 (defun piece-selector (index)
   (format nil ".piece[data-index='~D']:not(.fade-out, ._morph)" index))
 
@@ -376,23 +385,15 @@
            (dom:add-class el "fade-out")))))))
 
 (defun make-layout (pgn)
-  (let* ((headers (getf pgn :headers))
-         (game (getf pgn :game))
+  (let* ((game (getf pgn :game))
          (title (format nil "<div><b>~A</b> [~A~A] - <b>~A</b> [~A~A] (~A)</div>"
-                        (or (cdr (assoc "White" headers :test #'string-equal))
-                            "White")
-                        (or (cdr (assoc "WhiteElo" headers :test #'string-equal))
-                            "?")
-                        (or (cdr (assoc "WhiteRatingDiff" headers :test #'string-equal))
-                            "")
-                        (or (cdr (assoc "Black" headers :test #'string-equal))
-                            "Black")
-                        (or (cdr (assoc "BlackElo" headers :test #'string-equal))
-                            "?")
-                        (or (cdr (assoc "BlackRatingDiff" headers :test #'string-equal))
-                            "")
-                        (or (cdr (assoc "Result" headers :test #'string-equal))
-                            "*"))))
+                        (get-header pgn "White" "White")
+                        (get-header pgn "WhiteElo" "?")
+                        (get-header pgn "WhiteRatingDiff" "")
+                        (get-header pgn "Black" "Black")
+                        (get-header pgn "BlackElo" "?")
+                        (get-header pgn "BlackRatingDiff" "")
+                        (get-header pgn "Result" "*"))))
     (format nil "
 <div class='layout'>
   <div class='cont-board'>

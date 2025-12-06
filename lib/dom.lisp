@@ -235,8 +235,8 @@
                           LispCons.fromArray([ target, ev ]));
     if (!selector)
       return send_signal();
-    while (target) {
-      if (target instanceof Element && target.matches(selector))
+    while (target instanceof Element) {
+      if (target.matches(selector))
         return send_signal();
       target = target.parentElement;
     }
