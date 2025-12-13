@@ -124,6 +124,7 @@
             &.dragging {
                 z-index: 10;
                 transition: 0s;
+                scale: 1.1;
             }
 
             &[data-piece]::after {

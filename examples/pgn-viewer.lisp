@@ -84,7 +84,7 @@
                 (morph-to-fen el-pieces fen-after)))
              (setf current-fen fen-after)))
 
-         (on-move (target event)
+         (on-move-click (target event)
            (highlight-clear)
            (setf (dom:checked target) t)
            (dom:scroll-into-view (dom:parent-element target))
@@ -137,12 +137,12 @@
                                           move-elements))))
              (cond
                ((and (not index) (not backwards))
-                (on-move (car move-elements) nil))
+                (on-move-click (car move-elements) nil))
                ((not index)
                 (reset))
                ((< (incf index) (length move-elements))
                 (let ((next (elt move-elements index)))
-                  (on-move next nil)))
+                  (on-move-click next nil)))
                (backwards (reset)))))
 
          (on-start (target event)
@@ -150,7 +150,7 @@
 
          (on-end (target event)
            (let ((moves (nreverse (dom:query-all dlg "input[name='move']"))))
-             (on-move (car moves) nil)))
+             (on-move-click (car moves) nil)))
 
          (on-prev (target event)
            (next-move t))
@@ -206,7 +206,7 @@
          (on-fen (target event)
            (if (dom:clipboard-write-text current-fen)
                (ymacs:signal-info (format nil "FEN copied" current-fen)
-                                  :timeout 666 :anchor target)
+                                  :timeout 1000 :anchor target)
                (ymacs:signal-info "Didn't work (permissions?)" :timeout 3000)))
 
          (event-to-index (ev)
@@ -294,7 +294,7 @@
 
       (let ((receivers (make-hash :close            #'on-close
                                   :reverse          #'on-reverse
-                                  :move             #'on-move
+                                  :move             #'on-move-click
                                   :animation-end    #'on-animation-end
                                   :prev             #'on-prev
                                   :next             #'on-next

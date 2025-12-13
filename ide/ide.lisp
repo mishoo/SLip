@@ -193,4 +193,4 @@
      (lambda ()
        (let ((*package* (find-package :sl-user))
              (*read-table* *read-table*))
-         (loop do (%receive *handlers*))))))
+         (loop (%receive *handlers*))))))
