@@ -1,17 +1,16 @@
 (defpackage :dom
   (:use :sl :ffi)
-  (:shadow #:remove)
   (:export #:document #:document-element
            #:create-document-fragment
            #:element #:elementp #:node #:nodep
-           #:from-html #:append-to #:remove #:insert-before #:insert-after
+           #:from-html #:append-to #:remove-element #:insert-before #:insert-after
            #:replace-children #:replace-with
            #:has-animations
            #:first-child #:first-element-child #:last-child #:last-element-child
            #:next-sibling #:next-element-sibling
            #:previous-sibling #:previous-element-sibling
            #:parent-element #:closest
-           #:inner-html #:checked #:value
+           #:inner-html #:inner-text #:checked #:value
            #:create-element
            #:add-class #:remove-class #:toggle-class #:has-class #:class-name
            #:dataset
@@ -28,6 +27,7 @@
            #:scroll-left #:scroll-top #:scroll-width #:scroll-height
            #:focus
            #:key #:client-x #:client-y
+           #:trigger
            #:make-dialog
            #:close-dialog
            #:load-css
@@ -76,7 +76,7 @@
 (defun-js append-to (parent child)
   "return parent.appendChild(child)")
 
-(defun-js remove (element)
+(defun-js remove-element (element)
   "return element.remove()")
 
 (defun-js insert-before (anchor sibling)
@@ -159,6 +159,7 @@
 (define-simple-accessor checked "checked")
 (define-simple-accessor value "value")
 (define-simple-accessor inner-html "innerHTML")
+(define-simple-accessor inner-text "innerText")
 (define-simple-accessor outer-html "outerHTML")
 (define-simple-getter trigger-reflow "offsetWidth")
 (define-simple-getter offset-width "offsetWidth")
@@ -261,7 +262,8 @@
                                         ,@(aif (getf (cdr ev) :capture)
                                                `(:capture ,it))))
                           handlers events)))
-         ,@body))))
+         ,@body
+         (done-events)))))
 
 (defun-js prevent-default (event) "return event.preventDefault()")
 (defun-js stop-propagation (event) "return event.stopPropagation()")
@@ -281,9 +283,16 @@
   }
 ")
 
-(define-simple-getter key "key")
 (define-simple-getter client-x "clientX")
 (define-simple-getter client-y "clientY")
+
+(defun-js key (event) "return event.key === ' ' ? 'Space' : event.key")
+
+(defun-js trigger (element event-name &key data bubbles cancelable composed) "
+  let event = new Event(event_name, { bubbles, cancelable, composed });
+  if (data !== false) event.data = data;
+  element.dispatchEvent(event);
+")
 
 (defun-js load-css (url) "
   let link = document.querySelector('link[data-url=\"' + url + '\"]');

@@ -70,6 +70,10 @@
                 background-color: rgba(0, 0, 0, 0.8);
                 color: #fff;
             }
+            &.pressed {
+                background-color: rgba(40, 150, 40, 0.8);
+                color: #fff;
+            }
         }
     }
 
@@ -251,7 +255,7 @@
                 z-index: 3;
                 opacity: 0.4;
                 &.target {
-                    background: #ada;
+                    background: #2c28;
                 }
                 &.check {
                     background: radial-gradient(ellipse, #f00 0%, #f007 40%, #f000 70%);

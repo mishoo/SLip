@@ -660,17 +660,25 @@ export class LispProcess {
                 this.m._callnext(f, msg.args);
                 this.resume();
             } else {
-                console.warn("No receiver for message ", msg, " in process ", this.pid);
+                // XXX: it's becoming useful to just ignore the case
+                // where a handler is not defined. Perhaps we should
+                // have an option for %receive - ignore, warn, or error?
+                //
+                // console.warn("No receiver for message ", msg, " in process ", this.pid);
             }
         }
     }
 
     set_timeout(timeout, closure) {
         var tm = setTimeout(() => {
-            this.m.push(new LispRet(this.m, this.m.pc, true));
-            this.m.n_args = 0;
-            this.m._callnext(closure);
-            this.resume();
+            new LispProcess(this.m, closure);
+            // this.m.push(new LispRet(this.m, this.m.pc, true));
+            // this.m.n_args = 0;
+            // this.m._callnext(closure);
+            // // XXX BUG: this wakes up a thread from STATUS_WAITING and
+            // // makes the %receive form return... what does it return?!
+            // // We mess up the stack here.
+            // this.resume();
         }, timeout);
         return tm;
     }
