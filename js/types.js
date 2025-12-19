@@ -595,6 +595,7 @@ const start = () => {
 export class LispProcess {
     static type = "process";
     static is(x) { return x instanceof LispProcess }
+    static timer_thread = null;
 
     constructor(parent_machine, closure) {
         this.pid = ++PID;
@@ -669,16 +670,17 @@ export class LispProcess {
         }
     }
 
-    set_timeout(timeout, closure) {
+    set_timeout(timeout, closure, use_this_thread) {
         var tm = setTimeout(() => {
-            new LispProcess(this.m, closure);
-            // this.m.push(new LispRet(this.m, this.m.pc, true));
-            // this.m.n_args = 0;
-            // this.m._callnext(closure);
-            // // XXX BUG: this wakes up a thread from STATUS_WAITING and
-            // // makes the %receive form return... what does it return?!
-            // // We mess up the stack here.
-            // this.resume();
+            let tt = use_this_thread ? this : LispProcess.timer_thread;
+            if (!tt) {
+                LispProcess.timer_thread = new LispProcess(new LispMachine(), closure);
+            } else {
+                tt.m.push(new LispRet(tt.m, tt.m.pc, true));
+                tt.m.n_args = 0;
+                tt.m._callnext(closure);
+                tt.resume();
+            }
         }, timeout);
         return tm;
     }

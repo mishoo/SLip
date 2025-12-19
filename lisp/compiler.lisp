@@ -112,12 +112,11 @@
    #'qq))
 
 (defun declaim-inline (names)
-  (foreach names
-    (lambda (name)
-      (multiple-value-bind (setter name) (%:maybe-setter name)
-        ;; XXX: disabled. Not safe for now.
-        ;; (%set-symbol-prop (or setter name) :inline-request t)
-        ))))
+  (when *enable-inline*
+    (foreach names
+      (lambda (name)
+        (multiple-value-bind (setter name) (%:maybe-setter name)
+          (%set-symbol-prop (or setter name) :inline-request t))))))
 
 (defmacro declaim (&rest declarations)
   (foreach declarations
@@ -206,6 +205,10 @@
 (defvar *error-output* (%make-text-memory-output-stream))
 (defvar *trace-output* (%make-text-memory-output-stream))
 (defvar *standard-input*)
+
+;; XXX: only for global functions for now, and it's risky if they use globals
+;; which are not special (introduced with defvar or defglobal).
+(defparameter *enable-inline* nil)
 
 (defvar *build-count* 0)
 (defmacro delay-eval body
@@ -2535,7 +2538,8 @@
 
 (defun load (url)
   (let ((*package* *package*)
-        (*read-table* *read-table*))
+        (*read-table* *read-table*)
+        (*enable-inline* *enable-inline*))
     (%load url)
     nil))
 

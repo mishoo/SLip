@@ -8,6 +8,8 @@
 
 (dom:load-css "./examples/pgn-viewer.css")
 
+(defparameter *autoplay-timeout* 1000)
+
 (defgeneric display-game (pgn))
 
 (defmethod display-game (pgn)
@@ -171,50 +173,61 @@
          (on-play (button)
            (when (next-move nil)
              (toggle-play button)
-             (let ((timeout 1000)
-                   (timer))
+             (let ((timer))
                (dom:with-events (dlg
                                  ("keydown" :signal :play-keydown))
-                 (labels ((signal ()
-                            (%:%sendmsg thread :play-next))
-                          (restart-timer ()
-                            (clear-timeout timer)
-                            (setf timer (set-timeout timeout #'signal)))
-                          (next ()
-                            (if (next-move nil)
-                                (restart-timer)
-                                'play-done))
-                          (stop ()
-                            (clear-timeout timer)
-                            'play-done)
-                          (exit (&rest _)
-                            (stop)
-                            (throw 'exit-thread nil))
-                          (button (btn event)
-                            (cond
-                              ((eq btn button)
+                 (labels
+                     ((signal ()
+                        (%:%sendmsg thread :play-next))
+                      (restart-timer ()
+                        (clear-timeout timer)
+                        (setf timer (set-timeout *autoplay-timeout* #'signal)))
+                      (next ()
+                        (if (next-move nil)
+                            (restart-timer)
+                            'play-done))
+                      (stop ()
+                        (clear-timeout timer)
+                        'play-done)
+                      (exit (&rest _)
+                        (stop)
+                        (throw 'exit-thread nil))
+                      (action (btn event)
+                        (cond
+                          ((eq btn button)
+                           (dom:prevent-default event)
+                           (stop))
+                          (t
+                           (restart-timer)
+                           (on-action btn event))))
+                      (keydown (target event)
+                        (labels ((notf-timeout ()
+                                   (ymacs:signal-info (format nil "Speed: ~,2Fs"
+                                                              (/ *autoplay-timeout* 1000))
+                                                      :timeout 1000 :anchor button)))
+                          (without-interrupts
+                            (case (dom:key event)
+                              ("Space"
                                (dom:prevent-default event)
+                               (dom:stop-immediate-propagation event)
                                (stop))
+                              ("0"
+                               (setf *autoplay-timeout* 1000)
+                               (notf-timeout))
+                              (("+" "=")
+                               (setf *autoplay-timeout* (/ *autoplay-timeout* 1.25))
+                               (notf-timeout))
+                              ("-"
+                               (setf *autoplay-timeout* (* *autoplay-timeout* 1.25))
+                               (notf-timeout))
                               (t
-                               (restart-timer)
-                               (on-button btn event))))
-                          (keydown (target event)
-                            (without-interrupts
-                              (case (dom:key event)
-                                ("Space"
-                                 (dom:prevent-default event)
-                                 (dom:stop-immediate-propagation event)
-                                 (stop))
-                                ("+" (setf timeout (/ timeout 1.25)))
-                                ("-" (setf timeout (* timeout 1.25)))
-                                (t
-                                 (when (on-keydown target event)
-                                   (restart-timer)))))))
+                               (when (on-keydown target event)
+                                 (restart-timer))))))))
                    (let ((receivers (make-hash
                                      :close          #'exit
                                      :play-keydown   #'keydown
                                      :play-next      #'next
-                                     :button         #'button
+                                     :action         #'action
                                      :animation-end  #'on-animation-end)))
                      (restart-timer)
                      (loop until (eq 'play-done (%:%receive receivers)))
@@ -240,7 +253,7 @@
                (t
                 (let ((btn (dom:query dlg (format nil "button[data-key~~=\"~A\"]" (dom:key event)))))
                   (when btn
-                    (on-button btn event)
+                    (on-action btn event)
                     t))))))
 
          (on-fen (target)
@@ -249,18 +262,18 @@
                                   :timeout 1000 :anchor target)
                (ymacs:signal-info "Didn't work (permissions?)" :timeout 3000)))
 
-         (on-button (button event)
+         (on-action (el event)
            (without-interrupts
-             (active-blink button)
+             (active-blink el)
              (dom:prevent-default event)
-             (ecase (dom:dataset button :action)
-               ("reverse" (on-reverse button))
-               ("start" (on-start button))
-               ("prev" (on-prev button))
-               ("next" (on-next button))
-               ("end" (on-end button))
-               ("fen" (on-fen button))
-               ("play" (on-play button)))))
+             (ecase (dom:dataset el :action)
+               ("reverse" (on-reverse el))
+               ("start" (on-start el))
+               ("prev" (on-prev el))
+               ("next" (on-next el))
+               ("end" (on-end el))
+               ("fen" (on-fen el))
+               ("play" (on-play el)))))
 
          (coords-to-index (rel-x rel-y)
            (multiple-value-bind (board-x board-y board-width board-height)
@@ -342,15 +355,15 @@
              (dom:with-events
                (dlg
                 ("close" :signal :close)
-                ("click" :selector "button[data-action]" :signal :button)
-                ("mousedown" :selector ".piece[data-piece]" :signal :piece-mousedown)
+                ("click" :selector "[data-action]" :signal :action)
+                ("mousedown" :selector "[data-piece]" :signal :piece-mousedown)
                 ("input" :selector "input[name='move']" :signal :move)
                 ("keydown" :signal :keydown)
                 ("transitionend" :signal :animation-end))
                (catch 'exit-thread
                  (loop with receivers = (make-hash
                                          :close            #'on-close
-                                         :button           #'on-button
+                                         :action           #'on-action
                                          :move             #'on-move-click
                                          :animation-end    #'on-animation-end
                                          :keydown          #'on-keydown

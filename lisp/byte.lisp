@@ -7,10 +7,12 @@
 (defpackage :sl-byte
   (:use :sl :%))
 
+;; (setq %:*enable-inline* t)
+
 (in-package :sl-byte)
 
 (declaim (inline byte byte-size byte-position
-                 logand logior logxor logtest logcount
+                 logand logior lognot logxor logtest logcount
                  ash ldb ldb-test dpb))
 
 (defun byte (size position)

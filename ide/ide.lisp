@@ -172,7 +172,9 @@
 
         ;; no colon?
         ((regexp-test #/[^:]/ query)
-         (symbol-completion query (append (%:%list-packages)
+         (symbol-completion query (append (mapcar (lambda (pak)
+                                                    (string (list pak ":")))
+                                                  (%:%list-packages))
                                           (as-list (%accessible-symbols *package* nil)))))
 
         ;; dunno what to do here, just return empty list

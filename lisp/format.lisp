@@ -22,6 +22,7 @@
 (defparameter *print-pretty* t)
 
 (import 'sl::defun-memoize)
+(import 'sl::with-collectors)
 
 (defparameter *format-handlers* (make-hash))
 
@@ -68,10 +69,13 @@
      ,@body))
 
 (defmacro def-format (char cmdargs &body body)
-  (let ((v (gensym)))
-    `(setf (gethash ,(upcase char) *format-handlers*)
-           (lambda (output args colmod? atmod? . ,v)
-             (with-format-args ,cmdargs ,v ,@body)))))
+  (let ((v (gensym))
+        (name (intern (strcat "INTERNAL-FORMAT-" (char-code (upcase char))))))
+    `(progn
+       (defun ,name (output args colmod? atmod? . ,v)
+         (with-format-args ,cmdargs ,v ,@body))
+       (setf (gethash ,(upcase char) *format-handlers*)
+             ',name))))
 
 (defmacro with-input (instr &body body)
   (let ((stream (gensym)))
@@ -441,6 +445,44 @@
      (apply format stream args))
     (t
      (error "Unsupported format control ~A" format))))
+
+;; (defun %expand-format (list args stream)
+;;   (with-collectors (forms)
+;;     (let looop ((list list))
+;;       (when list
+;;         (let ((x (car list)))
+;;           (cond
+;;             ((listp x)
+;;              (let ((handler (gethash (car x) *format-handlers*))
+;;                    (cmdargs (cdr x)))
+;;                (forms `(setf ,args (,handler ,stream ,args ,@(mapcar (lambda (x) `',x) cmdargs))))))
+;;             (t
+;;              (forms `(%stream-put ,stream ,x))))
+;;           (looop (cdr list)))))
+;;     forms))
+;;
+;; (define-compiler-macro format (&whole form stream format . args)
+;;   (cond
+;;     ((stringp format)
+;;      (cond
+;;        ((eq stream t)
+;;         (let ((vargs (gensym "args")))
+;;           `(let ((,vargs (list ,@args)))
+;;              ,@(%expand-format (%parse-format format) vargs '*standard-output*))))
+;;        ((eq stream nil)
+;;         (let ((vstream (gensym "stream"))
+;;               (vargs (gensym "args")))
+;;           `(let ((,vstream (%make-text-memory-output-stream))
+;;                  (,vargs (list ,@args)))
+;;              ,@(%expand-format (%parse-format format) vargs vstream)
+;;              (%get-output-stream-string ,vstream))))
+;;        (t
+;;         (let ((vstream (gensym "stream"))
+;;               (vargs (gensym "args")))
+;;           `(let ((,vstream ,stream)
+;;                  (,vargs (list ,@args)))
+;;              ,@(%expand-format (%parse-format format) vargs vstream))))))
+;;     (t form)))
 
 (defun formatter (control-string)
   (let ((parsed (%parse-format control-string)))

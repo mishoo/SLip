@@ -2446,11 +2446,12 @@ defp("%receive", true, function(m, nargs){
 });
 
 defp("set-timeout", true, function(m, nargs){
-    checknargs(nargs, 2, 2);
+    checknargs(nargs, 2, 3);
+    var use_this_thread = nargs === 3 ? m.pop() : false;
     var closure = m.pop(), timeout = m.pop();
     checktype(closure, LispClosure);
     checktype(timeout, LispNumber);
-    return m.process.set_timeout(timeout, closure);
+    return m.process.set_timeout(timeout, closure, use_this_thread);
 });
 
 defp("clear-timeout", true, function(m, nargs){
