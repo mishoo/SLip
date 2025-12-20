@@ -59,6 +59,7 @@ const S_OUTPUT_STREAM       = LispSymbol.get("OUTPUT-STREAM");
 const S_TEXT_INPUT_STREAM   = LispSymbol.get("TEXT-INPUT-STREAM");
 const S_TEXT_OUTPUT_STREAM  = LispSymbol.get("TEXT-OUTPUT-STREAM");
 const S_STANDARD_OBJECT     = LispSymbol.get("STANDARD-OBJECT");
+const S_LOCAL_NICKNAMES     = LispSymbol.get("LOCAL-NICKNAMES");
 
 const LispList = {
     is: LispCons.isList,
@@ -2030,6 +2031,30 @@ defp("%function-name", true, function(m, nargs){
     return f.name;
 });
 
+function want_package(designator, m) {
+    if (LispPackage.is(designator)) {
+        return designator;
+    }
+    if (designator === false && m) {
+        return checktype(m.gvar(BASE_PACK.PACKAGE_VAR), LispPackage);
+    }
+    designator = as_string(designator);
+    if (m) {
+        let current = m.gvar(BASE_PACK.PACKAGE_VAR);
+        if (LispPackage.is(current)) {
+            let local_nicknames = current.getProp(S_LOCAL_NICKNAMES);
+            if (local_nicknames && local_nicknames.has(designator)) {
+                designator = local_nicknames.get(designator);
+            }
+        }
+    }
+    let pak = LispPackage.get_existing(designator);
+    if (!pak) {
+        error(`Cannot find package ${designator}`);
+    }
+    return pak;
+}
+
 defp("make-package", true, function(m, nargs){
     checknargs(nargs, 1, 3);
     var nicknames = nargs >= 3 ? m.pop() : false;
@@ -2038,11 +2063,7 @@ defp("make-package", true, function(m, nargs){
     checktype(name, LispString);
     var pak = LispPackage.get(name);
     LispCons.forEach(uses, function(use){
-        use = as_string(use);
-        var p = LispPackage.get_existing(use);
-        if (!LispPackage.is(p))
-            error("Cannot find package " + use);
-        pak.use(p);
+        pak.use(want_package(use));
     });
     LispCons.forEach(nicknames, function(nick){
         pak.alias(as_string(nick));
@@ -2059,15 +2080,8 @@ defp("make-symbol", true, function(m, nargs){
 
 defp("intern", true, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var pak = nargs == 2 ? m.pop() : false;
+    var pak = want_package(nargs == 2 ? m.pop() : false, m);
     var name = m.pop();
-    if (pak === false) {
-        pak = m.gvar(BASE_PACK.PACKAGE_VAR);
-    }
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
-    checktype(pak, LispPackage);
     checktype(name, LispString);
     var sym = pak.find_or_intern(name);
     return sym === S_NIL ? false : sym === S_T ? true : sym;
@@ -2075,32 +2089,16 @@ defp("intern", true, function(m, nargs){
 
 defp("unintern", true, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var pak = nargs == 2 ? m.pop() : false;
+    var pak = want_package(nargs == 2 ? m.pop() : false, m);
     var name = as_string(m.pop());
-    if (pak === false) {
-        pak = m.gvar(BASE_PACK.PACKAGE_VAR);
-    }
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
-    checktype(pak, LispPackage);
-    checktype(name, LispString);
     pak.unintern(name);
     return S_NIL;
 });
 
 defp("find-symbol", false, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var pak = nargs == 2 ? m.pop() : false;
+    var pak = want_package(nargs == 2 ? m.pop() : false, m);
     var name = as_string(m.pop());
-    if (pak === false) {
-        pak = m.gvar(BASE_PACK.PACKAGE_VAR);
-    }
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
-    checktype(name, LispString);
-    checktype(pak, LispPackage);
     var sym = pak.find(name);
     if (!sym) error("Symbol " + name + " not found in " + pak.name);
     return sym;
@@ -2108,15 +2106,8 @@ defp("find-symbol", false, function(m, nargs){
 
 defp("shadow", true, function(m, nargs){
     checknargs(nargs, 1, 2);
-    var pak = nargs == 2 ? m.pop() : false;
+    var pak = want_package(nargs == 2 ? m.pop() : false, m);
     var syms = as_list(m.pop());
-    if (pak === false) {
-        pak = m.gvar(BASE_PACK.PACKAGE_VAR);
-    }
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
-    checktype(pak, LispPackage);
     LispCons.forEach(syms, function(sym){
         pak.shadow(as_string(sym));
     });
@@ -2126,74 +2117,49 @@ defp("shadow", true, function(m, nargs){
 defp("%accessible-symbols", false, function(m, nargs){
     checknargs(nargs, 1, 2);
     var ext = nargs == 2 ? m.pop() : false;
-    var pak = m.pop();
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
-    checktype(pak, LispPackage);
+    var pak = want_package(m.pop(), m);
     return ext ? pak.all_exported() : pak.all_accessible();
 });
 
 defp("%external-symbols", false, function(m, nargs){
     checknargs(nargs, 1);
-    var pak = m.pop();
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
-    checktype(pak, LispPackage);
+    var pak = want_package(m.pop(), m);
     return pak.all_exported();
 });
 
 defp("%symbol-accessible", false, function(m, nargs){
     checknargs(nargs, 2, 2);
-    var pak = m.pop(), sym = m.pop();
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
+    var pak = want_package(m.pop(), m);
+    var sym = m.pop();
     checktype(sym, LispSymbol);
-    checktype(pak, LispPackage);
     return pak.all_accessible().indexOf(sym) >= 0; // XXX: optimize this
 });
 
 defp("%interned-symbols", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var pak = m.pop();
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
-    checktype(pak, LispPackage);
+    var pak = want_package(m.pop(), m);
     return pak.all_interned();
 });
 
 defp("%find-exported-symbol", false, function(m, nargs){
     checknargs(nargs, 2, 2);
-    var pak = m.pop(), name = as_string(m.pop());
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
+    var pak = want_package(m.pop(), m);
+    var name = as_string(m.pop());
     checktype(name, LispString);
-    checktype(pak, LispPackage);
     return pak.find_exported(name);
 });
 
 defp("%find-internal-symbol", false, function(m, nargs){
     checknargs(nargs, 2, 2);
-    var pak = m.pop(), name = as_string(m.pop());
-    if (!LispPackage.is(pak)) {
-        pak = LispPackage.get_existing(as_string(pak));
-    }
+    var pak = want_package(m.pop(), m);
+    var name = as_string(m.pop());
     checktype(name, LispString);
-    checktype(pak, LispPackage);
     return pak.find_internal(name);
 });
 
 defp("find-package", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var name = m.pop();
-    if (LispPackage.is(name)) return name;
-    name = as_string(name);
-    checktype(name, LispString);
-    return LispPackage.get_existing(name);
+    return want_package(m.pop(), m);
 });
 
 defp("%list-packages", false, function(_, nargs){
@@ -2203,12 +2169,20 @@ defp("%list-packages", false, function(_, nargs){
 
 defp("package-name", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    var name = m.pop();
-    if (LispPackage.is(name)) return name.name;
-    name = as_string(name);
-    checktype(name, LispString);
-    var pak = LispPackage.get_existing(name);
-    if (!pak) error("Package " + name + " not found");
+    let pak = want_package(m.pop(), m);
+    return pak.name;
+});
+
+defp("package-local-name", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let pak = want_package(m.pop(), m);
+    let current = m.gvar(BASE_PACK.PACKAGE_VAR);
+    let local_nicknames = current.getProp(S_LOCAL_NICKNAMES);
+    if (local_nicknames) {
+        for (let [ key, val ] of local_nicknames) {
+            if (val === pak.name) return key;
+        }
+    }
     return pak.name;
 });
 
@@ -2392,6 +2366,20 @@ defp("symbol-plist", false, function(m, nargs){
 defp("%set-symbol-plist", true, function(m, nargs){
     checknargs(nargs, 2, 2);
     return checktype(m.pop(), LispSymbol).plist = checktype(m.pop(), LispList);
+});
+
+defp("%set-package-prop", true, function(m, nargs){
+    checknargs(nargs, 3, 3);
+    var val = m.pop(), key = m.pop(), pak = m.pop();
+    checktype(pak, LispPackage);
+    return pak.setProp(key, val);
+});
+
+defp("%get-package-prop", false, function(m, nargs){
+    checknargs(nargs, 2, 2);
+    var key = m.pop(), pak = m.pop();
+    checktype(pak, LispPackage);
+    return pak.getProp(key);
 });
 
 /* -----[ processes ]----- */

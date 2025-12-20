@@ -150,9 +150,9 @@
                    (<< ":"))
                   ((%symbol-accessible symbol *package*))
                   ((%find-exported-symbol symbol pak)
-                   (<< (package-name pak) ":"))
+                   (<< (package-local-name pak) ":"))
                   ((%symbol-accessible symbol pak)
-                   (<< (package-name pak) "::")))))
+                   (<< (package-local-name pak) "::")))))
         (<< (symbol-name symbol)))))
 
 ;;;; pretty printing

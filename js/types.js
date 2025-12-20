@@ -312,6 +312,13 @@ export class LispPackage {
         this.symbols = new LispHash();
         this.exports = new Map();
         this.uses = [];
+        this.props = new Map();
+    }
+    setProp(key, val) {
+        return this.props.set(key, val), val;
+    }
+    getProp(key) {
+        return this.props.get(key) ?? false;
     }
     toString() { return "#<PACKAGE " + this.name + ">" }
     intern(name, sym) {

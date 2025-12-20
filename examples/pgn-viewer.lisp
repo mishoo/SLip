@@ -2,7 +2,8 @@
 (load "lib/dom.lisp")
 
 (defpackage :pgn-viewer
-  (:use :sl :queen))
+  (:use :sl)
+  (:local-nicknames (:q :queen)))
 
 (in-package :pgn-viewer)
 
@@ -13,14 +14,14 @@
 (defgeneric display-game (pgn))
 
 (defmethod display-game (pgn)
-  (display-game (parse-pgn pgn :ext-moves t)))
+  (display-game (q:parse-pgn pgn :ext-moves t)))
 
 (defmethod display-game ((pgn cons))
   (let* ((dlg (dom:make-dialog 700 530
                                :content (dom:from-html (make-layout pgn))
                                :class-name "pgn-viewer"))
          (thread nil)
-         (start-fen (get-header pgn "FEN" +fen-start+))
+         (start-fen (get-header pgn "FEN" q:+fen-start+))
          (current-fen start-fen)
          (el-board (dom:query dlg "._board"))
          (el-pieces (dom:query dlg "._pieces"))
@@ -42,16 +43,16 @@
            (without-interrupts
              (cond
                ((string= current-fen fen-before)
-                (let* ((from (move-from move))
-                       (to (move-to move))
-                       (white (move-white? move))
-                       (capture (when (move-capture? move)
-                                  (move-captured-index move)))
+                (let* ((from (q:move-from move))
+                       (to (q:move-to move))
+                       (white (q:move-white? move))
+                       (capture (when (q:move-capture? move)
+                                  (q:move-captured-index move)))
                        (piece (piece-element from)))
-                  (when (move-promote? move)
+                  (when (q:move-promote? move)
                     (let* ((*unicode* nil)
-                           (promo-piece (move-promoted-piece move))
-                           (promo-char (piece-char promo-piece))
+                           (promo-piece (q:move-promoted-piece move))
+                           (promo-char (q:piece-char promo-piece))
                            (el (dom:from-html
                                 (format nil "<div class='piece fade-out' ~
                                                   data-index='~D' data-piece='~C'></div>"
@@ -64,22 +65,22 @@
                     (capture
                      (let ((capture (piece-element capture)))
                        (dom:add-class capture "fade-out")))
-                    ((move-oo? move)
+                    ((q:move-oo? move)
                      (let ((rook (piece-element (if white
-                                                    #.(field-index "H1")
-                                                    #.(field-index "H8")))))
+                                                    #.(q:field-index "H1")
+                                                    #.(q:field-index "H8")))))
                        (setf (dom:dataset rook :index)
                              (if white
-                                 #.(field-index "F1")
-                                 #.(field-index "F8")))))
-                    ((move-ooo? move)
+                                 #.(q:field-index "F1")
+                                 #.(q:field-index "F8")))))
+                    ((q:move-ooo? move)
                      (let ((rook (piece-element (if white
-                                                    #.(field-index "A1")
-                                                    #.(field-index "A8")))))
+                                                    #.(q:field-index "A1")
+                                                    #.(q:field-index "A8")))))
                        (setf (dom:dataset rook :index)
                              (if white
-                                 #.(field-index "D1")
-                                 #.(field-index "D8"))))))
+                                 #.(q:field-index "D1")
+                                 #.(q:field-index "D8"))))))
                   (setf (dom:dataset piece :index) to
                         (dom:style piece :z-index) (+ 10 (incf transitions)))))
                (t
@@ -98,10 +99,10 @@
            (without-interrupts
              (unless (dom:has-animations el-pieces)
                ;; (format t "RESET: ~A~%" current-fen)
-               (let ((g (make-game)))
-                 (reset-from-fen g current-fen)
+               (let ((g (q:make-game)))
+                 (q:reset-from-fen g current-fen)
                  (setf (dom:inner-html el-pieces)
-                       (pieces-html (game-board g)))
+                       (pieces-html (q:game-board g)))
                  (highlight-check)))))
 
          (highlight-clear ()
@@ -118,9 +119,9 @@
                          classes idx))))))
 
          (highlight-check ()
-           (let* ((g (reset-from-fen (make-game) current-fen)))
-             (when (attacked? g)
-               (highlight-fields (list (king-index g)) "check"))))
+           (let* ((g (q:reset-from-fen (q:make-game) current-fen)))
+             (when (q:attacked? g)
+               (highlight-fields (list (q:king-index g)) "check"))))
 
          (reset ()
            (setf current-fen start-fen)
@@ -283,14 +284,14 @@
                     (row (- 7 (floor (* 8 (/ rel-y board-height))))))
                (when (and (typep col '(integer 0 7))
                           (typep row '(integer 0 7)))
-                 (board-index row col)))))
+                 (q:board-index row col)))))
 
          (on-piece-mousedown (piece event)
            (without-interrupts
              (let* ((index (parse-integer (dom:dataset piece :index)))
-                    (g (reset-from-fen (make-game) current-fen))
-                    (all-moves (game-compute-moves g))
-                    (moves (remove index all-moves :test-not #'eql :key #'move-from))
+                    (g (q:reset-from-fen (q:make-game) current-fen))
+                    (all-moves (q:game-compute-moves g))
+                    (moves (remove index all-moves :test-not #'eql :key #'q:move-from))
                     (reversed (dom:has-class el-board "reverse"))
                     (start-x (dom:client-x event))
                     (start-y (dom:client-y event))
@@ -324,7 +325,7 @@
                                   (unless (eql index target-field)
                                     (highlight-clear)
                                     (cond
-                                      ((member index moves :key #'move-to)
+                                      ((member index moves :key #'q:move-to)
                                        (setf target-field index)
                                        (highlight-fields (list index) "target"))
                                       (t
@@ -335,9 +336,9 @@
                               (dom:remove-class piece "dragging")
                               (setf (dom:style piece :translate) nil)
                               (when target-field
-                                (let ((move (find target-field moves :key #'move-to)))
-                                  (game-move g move)
-                                  (setf current-fen (game-fen g))
+                                (let ((move (find target-field moves :key #'q:move-to)))
+                                  (q:game-move g move)
+                                  (setf current-fen (q:game-fen g))
                                   (setf (dom:dataset piece :index) target-field
                                         (dom:style piece :z-index) 10)
                                   (morph-to-fen el-pieces current-fen)))
@@ -392,23 +393,23 @@
 (defun morph-to-fen (el-pieces fen)
   (without-interrupts
     (let* ((*unicode* nil)
-           (g (make-game))
-           (board (game-board g)))
-      (reset-from-fen g fen)
+           (g (q:make-game))
+           (board (q:game-board g)))
+      (q:reset-from-fen g fen)
 
       ;; 1. pieces already in-place should stay so.
       (dom:do-query (el el-pieces ".piece[data-piece]:not(.fade-out)")
         (let ((index (parse-integer (dom:dataset el :index)))
-              (piece (char-piece (svref (dom:dataset el :piece) 0))))
-          (when (= piece (board-get board index))
-            (board-set board index 0)
+              (piece (q:char-piece (svref (dom:dataset el :piece) 0))))
+          (when (= piece (q:board-get board index))
+            (q:board-set board index 0)
             (dom:add-class el "_morph"))))
 
       ;; 2. any non-zero board fields should now be resolved.
-      (board-foreach
+      (q:board-foreach
        board
        (lambda (piece row col index)
-         (let* ((pchar (piece-char piece))
+         (let* ((pchar (q:piece-char piece))
                 (el (dom:query-all
                      el-pieces
                      (format nil ".piece[data-piece='~C']:not(.fade-out, ._morph)"
@@ -474,7 +475,7 @@
 (defun pieces-html (board)
   (with-output-to-string (output)
     (let ((*unicode* nil))
-      (board-foreach
+      (q:board-foreach
        board
        (lambda (piece row col index)
          (declare (ignore row col))
@@ -482,7 +483,7 @@
                               data-index='~D' ~
                               data-piece='~C'></div>"
                  index
-                 (piece-char piece)))))))
+                 (q:piece-char piece)))))))
 
 (defun moves-html (pgn)
   (with-output-to-string (output)
@@ -495,14 +496,14 @@
                      (san (getf data :san))
                      (fen-before (getf data :fen-before))
                      (fen-after (getf data :fen-after)))
-                 (when (move-white? move)
+                 (when (q:move-white? move)
                    (format output "<div class='index'>~D</div>" (incf index)))
                  (format output "<div class='~A'>~
                    <label class='move'>~
                      <input name='move' type='radio' data-fen-before='~A' data-fen-after='~A' data-move='~A' />~
                      ~A~
                    </label></div>"
-                         (if (move-white? move) "white" "black")
+                         (if (q:move-white? move) "white" "black")
                          fen-before fen-after move san))))
     (write-string "</div>" output)))
 
@@ -516,7 +517,7 @@
   (with-output-to-string (out)
     (loop for row from 0 to 7 do
           (loop for col from 0 to 7
-                for index = (board-index row col)
+                for index = (q:board-index row col)
                 do (format out "&[data-index='~D'] { translate: ~F% ~F% }~%"
                            index
                            (* col 100)
