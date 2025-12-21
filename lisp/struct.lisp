@@ -7,11 +7,15 @@
 
 (in-package :sl-struct)
 
+;; (setf %:*enable-inline* t)
+
 (defconstant *structures* (make-hash-table))
 
+(declaim (inline substructp))
 (defun substructp (tgt struct)
   (if (member tgt (structure-include struct)) t nil))
 
+(declaim (inline structurep))
 (defun structurep (thing &optional name)
   (cond
     ((not name) (%structp thing))
@@ -21,12 +25,14 @@
        (or (eq ctor tgt)
            (substructp tgt ctor))))))
 
+(declaim (inline assert-struct))
 (defun assert-struct (thing &optional name)
   (unless (structurep thing name)
     (if name
         (error "Expected structure ~S." name)
         (error "Expected structure."))))
 
+(declaim (inline find-structure))
 (defun find-structure (name &optional (errorp t))
   (or (gethash name *structures*)
       (when errorp
@@ -41,7 +47,6 @@
      `(gethash ,name *structures*))
     (t form)))
 
-(declaim (inline structure-of))
 (defun structure-of (x)
   (assert-struct x)
   (%struct-struct x))
@@ -51,6 +56,7 @@
 
 (defglobal *structure* nil)
 
+(declaim (inline make-structure))
 (defun make-structure (name &key slots include print-object print-function)
   (when (find-structure name nil)
     (warn "Redefining structure ~S." name))
@@ -69,24 +75,24 @@
                 (:name print-object :read-only t :type function)
                 (:name print-function :read-only t :type function))))
 
+(declaim (inline structure-name))
 (defun structure-name (struct)
-  (assert-struct struct 'structure)
   (%struct-ref struct 0))
 
+(declaim (inline structure-slots))
 (defun structure-slots (struct)
-  (assert-struct struct 'structure)
   (%struct-ref struct 1))
 
+(declaim (inline structure-include))
 (defun structure-include (struct)
-  (assert-struct struct 'structure)
   (%struct-ref struct 2))
 
+(declaim (inline structure-print-object))
 (defun structure-print-object (struct)
-  (assert-struct struct 'structure)
   (%struct-ref struct 3))
 
+(declaim (inline structure-print-function))
 (defun structure-print-function (struct)
-  (assert-struct struct 'structure)
   (%struct-ref struct 4))
 
 (defun parse-slot (args)

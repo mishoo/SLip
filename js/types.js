@@ -312,6 +312,13 @@ export class LispPackage {
         this.symbols = new LispHash();
         this.exports = new Map();
         this.uses = [];
+        this.props = new Map();
+    }
+    setProp(key, val) {
+        return this.props.set(key, val), val;
+    }
+    getProp(key) {
+        return this.props.get(key) ?? false;
     }
     toString() { return "#<PACKAGE " + this.name + ">" }
     intern(name, sym) {
@@ -505,9 +512,11 @@ export class LispQueue {
     constructor() {
         this.list = new LispCons(false, false);
         this.tail = this.list;
+        this.size = 0;
     }
     push(el) {
         this.tail = this.tail.cdr = new LispCons(el, false);
+        ++this.size;
     }
     push_front(el) {
         if (!LispCons.find(this.list.cdr, el)) {
@@ -518,6 +527,7 @@ export class LispQueue {
     reenq(cell) {
         this.tail = this.tail.cdr = cell;
         cell.cdr = false;
+        ++this.size;
     }
     pop() {
         let cell = this.list.cdr;
@@ -525,6 +535,7 @@ export class LispQueue {
         if (!(this.list.cdr = cell.cdr)) {
             this.tail = this.list;
         }
+        --this.size;
         return cell;
     }
 }
@@ -546,23 +557,18 @@ const start = () => {
     let count = 0, startTime = Date.now(), process, cell;
     try {
         while (true) {
-            if ((++count & 511) === 0) {
-                if (Date.now() - startTime > 10) {
+            if ((++count & 255) === 0) {
+                if (Date.now() - startTime > 30) {
                     break;
                 }
             }
             cell = QUEUE.pop();
             if (!cell) return;
             process = cell.car;
-            if (process instanceof LispProcess) {
-                process.run(100);
-                if (process.m.status === STATUS_RUNNING) {
-                    // still running, re-enqueue; we avoid consing a new cell.
-                    QUEUE.reenq(cell);
-                }
-            }
-            else {
-                console.error("Unknown object in scheduler queue", process);
+            process.run(2000);
+            if (process.m.status === STATUS_RUNNING) {
+                // still running, re-enqueue; we avoid consing a new cell.
+                QUEUE.reenq(cell);
             }
         }
     } catch(ex) {
@@ -595,6 +601,7 @@ const start = () => {
 export class LispProcess {
     static type = "process";
     static is(x) { return x instanceof LispProcess }
+    static timer_thread = null;
 
     constructor(parent_machine, closure) {
         this.pid = ++PID;
@@ -660,17 +667,26 @@ export class LispProcess {
                 this.m._callnext(f, msg.args);
                 this.resume();
             } else {
-                console.warn("No receiver for message ", msg, " in process ", this.pid);
+                // XXX: it's becoming useful to just ignore the case
+                // where a handler is not defined. Perhaps we should
+                // have an option for %receive - ignore, warn, or error?
+                //
+                // console.warn("No receiver for message ", msg, " in process ", this.pid);
             }
         }
     }
 
-    set_timeout(timeout, closure) {
+    set_timeout(timeout, closure, use_this_thread) {
         var tm = setTimeout(() => {
-            this.m.push(new LispRet(this.m, this.m.pc, true));
-            this.m.n_args = 0;
-            this.m._callnext(closure);
-            this.resume();
+            let tt = use_this_thread ? this : LispProcess.timer_thread;
+            if (!tt) {
+                LispProcess.timer_thread = new LispProcess(new LispMachine(), closure);
+            } else {
+                tt.m.push(new LispRet(tt.m, tt.m.pc, true));
+                tt.m.n_args = 0;
+                tt.m._callnext(closure);
+                tt.resume();
+            }
         }, timeout);
         return tm;
     }

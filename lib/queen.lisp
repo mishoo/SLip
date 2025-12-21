@@ -97,6 +97,8 @@
 (defparameter *queen-read-table* (make-hash-table))
 (setf *read-table* *queen-read-table*)
 
+(setf %:*enable-inline* t)
+
 (defmacro once-only (names . body)
   (let ((gensyms (mapcar (lambda (_) (gensym)) names)))
     `(let (,@(mapcar (lambda (g) `(,g (gensym))) gensyms))
@@ -315,7 +317,7 @@ by STRING-DESIGNATOR being its first argument."
 (defconstant +WHITE+      #x40)
 (defconstant +BLACK+      #x00)
 
-(defparameter +FEN-START+ "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+(defconstant +FEN-START+ "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 
 (defparameter *unicode* nil)
 
@@ -960,10 +962,10 @@ by STRING-DESIGNATOR being its first argument."
 
 ;;; move generation
 
-(defparameter +MOVES-KNIGHT+ '(31 33 14 18 -18 -14 -33 -31))
-(defparameter +MOVES-BISHOP+ '(15 17 -15 -17))
-(defparameter +MOVES-ROOK+   '(1 16 -16 -1))
-(defparameter +MOVES-QING+   `(,@+MOVES-BISHOP+ ,@+MOVES-ROOK+))
+(defconstant +MOVES-KNIGHT+ '(31 33 14 18 -18 -14 -33 -31))
+(defconstant +MOVES-BISHOP+ '(15 17 -15 -17))
+(defconstant +MOVES-ROOK+   '(1 16 -16 -1))
+(defconstant +MOVES-QING+   `(,@+MOVES-BISHOP+ ,@+MOVES-ROOK+))
 
 (defun king-index (game &optional (side (game-side game)))
   (declare (optimize speed)

@@ -75,9 +75,25 @@
 (defun assert (test . arguments)
   (unless test (apply #'error arguments)))
 
+(defun package-local-nicknames (&optional (package *package*))
+  (%:%get-package-prop package '%:local-nicknames))
+
+(defun add-package-local-nickname (nick global &optional (package *package*))
+  (let ((hash (package-local-nicknames package)))
+    (unless hash
+      (%:%set-package-prop package '%:local-nicknames
+                           (setq hash (make-hash))))
+    (%:%hash-set (string global) (string nick) hash)))
+
+(defun remove-package-local-nickname (old-nick &optional (package *package*))
+  (let ((hash (package-local-nicknames package)))
+    (when hash
+      (remhash old-nick (string hash)))))
+
 (defmacro defpackage (name &rest options)
   (let ((nicknames nil)
         (use nil)
+        (local nil)
         (pak (gensym "DEFPACKAGE")))
     (foreach options
       (lambda (opt)
@@ -85,7 +101,9 @@
           (:nicknames
            (setq nicknames (append nicknames (cdr opt))))
           (:use
-           (setq use (append use (cdr opt)))))))
+           (setq use (append use (cdr opt))))
+          (:local-nicknames
+           (setq local (append local (cdr opt)))))))
     `(let ((,pak (make-package ',name ',use ',nicknames)))
        ,@(map1 (lambda (opt)
                  (case (car opt)
@@ -99,7 +117,12 @@
                       `(import ',(map1 (lambda (name)
                                          (find-symbol name source))
                                        names)
-                               ,pak)))))
+                               ,pak)))
+                   (:local-nicknames
+                    `(progn
+                       ,@(map1 (lambda (ln)
+                                 `(add-package-local-nickname ,(car ln) ,(cadr ln) ,pak))
+                               (cdr opt))))))
                options)
        ,pak)))
 

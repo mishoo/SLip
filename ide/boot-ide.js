@@ -100,7 +100,8 @@ import "../js/primitives.js";
         div.scrollIntoView();
     };
 
-    let total = 0;
+    let total_time = 0;
+    let total_size = 0;
 
     function compile(files, cont, nosave) {
         if (files.length == 0) return cont ? cont() : null;
@@ -110,7 +111,8 @@ import "../js/primitives.js";
         var bytecode = machine.atomic_call(LispSymbol.get("%LOAD").function, [ filename ]);
         if (!nosave) {
             let diff = performance.now() - time;
-            total += diff;
+            total_time += diff;
+            total_size += bytecode.length;
             log(`... <span style='color: green'>${diff.toFixed(2)}ms, ${bytecode.length} chars</span>`);
             var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
             save(fasl, bytecode, function(error){
@@ -127,7 +129,7 @@ import "../js/primitives.js";
     };
 
     function recompile_all() {
-        total = 0;
+        total_time = 0;
         document.addEventListener("ymacs-slip-warning", (ev) => {
             ev.preventDefault();
             log(`<span style='color: red'>WARN: ${ev.message}</span>`);
@@ -137,11 +139,13 @@ import "../js/primitives.js";
         });
         load_fasls([ "lisp/compiler.lisp" ], function(){
             compile([ "lisp/compiler.lisp" ], function(){
+                total_size = 0;
                 compile([ "lisp/compiler.lisp" ], function () {
                     let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
                     //lisp_files.unshift("lisp/compiler.lisp");
                     compile(lisp_files, function () {
-                        log(`<span style='color: blue'>Total compile time: ${total.toFixed(2)}ms</span>`);
+                        log(`<span style='color: blue'>Total compile time: ${total_time.toFixed(2)}ms</span>`);
+                        log(`<span style='color: blue'>Total “bytecode” size: ${total_size} characters</span>`);
                         log("<span style='color: green'><b>DONE — press ENTER to reload</b></span>");
                         document.addEventListener("keydown", ev => {
                             if (ev.key == "Enter") {

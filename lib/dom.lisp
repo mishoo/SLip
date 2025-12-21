@@ -1,16 +1,18 @@
 (defpackage :dom
   (:use :sl :ffi)
-  (:shadow #:remove)
-  (:export #:document
+  (:export #:document #:document-element
+           #:create-document-fragment
            #:element #:elementp #:node #:nodep
-           #:from-html #:append-to #:remove #:insert-at
+           #:from-html #:append-to #:remove-element #:insert-before #:insert-after
+           #:replace-children #:replace-with
            #:has-animations
+           #:first-child #:first-element-child #:last-child #:last-element-child
            #:next-sibling #:next-element-sibling
            #:previous-sibling #:previous-element-sibling
            #:parent-element #:closest
-           #:inner-html #:checked #:value
+           #:inner-html #:inner-text #:checked #:value
            #:create-element
-           #:add-class #:remove-class #:toggle-class #:has-class
+           #:add-class #:remove-class #:toggle-class #:has-class #:class-name
            #:dataset
            #:query #:query-all #:do-query #:matches
            #:on-event #:off-event #:with-events #:done-events
@@ -20,10 +22,12 @@
            #:bounding-client-rect
            #:trigger-reflow
            #:clipboard-write-text
-           #:offset-width #:offset-height
-           #:scroll-left #:scroll-top
+           #:offset-width #:offset-height #:offset-left #:offset-top #:offset-parent
+           #:client-width #:client-height #:client-left #:client-top
+           #:scroll-left #:scroll-top #:scroll-width #:scroll-height
            #:focus
            #:key #:client-x #:client-y
+           #:trigger
            #:make-dialog
            #:close-dialog
            #:load-css
@@ -32,6 +36,7 @@
 (in-package :dom)
 
 (defconstant document ((lambda-js () "return document")))
+(defconstant document-element ((lambda-js () "return document.documentElement")))
 
 (defmacro define-simple-getter (name prop)
   `(defun-js ,name (element)
@@ -68,57 +73,61 @@
   return div.firstChild;
 ")
 
-(defun-js append-to (parent child) "
-  return parent.appendChild(child);
-")
+(defun-js append-to (parent child)
+  "return parent.appendChild(child)")
 
-(defun-js remove (element) "
-  return element.remove();
-")
+(defun-js remove-element (element)
+  "return element.remove()")
 
-(defun-js insert-at (anchor sibling) "
-  return anchor.parentNode.insertBefore(sibling, anchor);
-")
+(defun-js insert-before (anchor sibling)
+  "return anchor.before(sibling)")
 
+(defun-js insert-after (anchor sibling)
+  "return anchor.after(sibling)")
+
+(defun-js replace-with (element replacement)
+  "return element.replaceWith(replacement)")
+
+(defun-js replace-children (element &rest replacement)
+  "return element.replaceChildren(...LispCons.toArray(replacement))")
+
+(define-simple-getter first-child "firstChild")
+(define-simple-getter first-element-child "firstElementChild")
+(define-simple-getter last-child "lastChild")
+(define-simple-getter last-element-child "lastElementChild")
 (define-simple-getter next-sibling "nextSibling")
 (define-simple-getter next-element-sibling "nextElementSibling")
 (define-simple-getter previous-sibling "previousSibling")
 (define-simple-getter previous-element-sibling "previousElementSibling")
 (define-simple-getter parent-element "parentElement")
 
-(defun-js closest (element selector) "return element.closest(selector)")
+(defun-js closest (element selector)
+  "return element.closest(selector)")
 
-(defun-js query (container selector) "
-  return (container || document).querySelector(selector);
-")
+(defun-js query (container selector)
+  "return (container || document).querySelector(selector)")
 
-(defun-js query-all (container selector) "
-  return LispCons.fromArray((container || document).querySelectorAll(selector));
-")
+(defun-js query-all (container selector)
+  "return LispCons.fromArray((container || document).querySelectorAll(selector))")
 
 (defmacro do-query ((element container selector) &body body)
   `(loop for ,element in (query-all ,container ,selector)
          do (progn ,@body)))
 
-(defun-js matches (element selector) "
-  return element.matches(selector);
-")
+(defun-js matches (element selector)
+  "return element.matches(selector)")
 
-(defun-js create-element (nodename) "
-  return document.createElement(nodename);
-")
+(defun-js create-element (nodename)
+  "return document.createElement(nodename)")
 
-(defun-js add-class (element cls) "
-  element.classList.add(cls);
-")
+(defun-js add-class (element cls)
+  "element.classList.add(cls)")
 
-(defun-js remove-class (element cls) "
-  element.classList.remove(cls);
-")
+(defun-js remove-class (element cls)
+  "element.classList.remove(cls)")
 
-(defun-js has-class (element cls) "
-  return element.classList.contains(cls);
-")
+(defun-js has-class (element cls)
+  "return element.classList.contains(cls)")
 
 (defun-js toggle-class (element cls &optional (condition nil condition-passed-p)) "
   if (condition_passed_p) {
@@ -128,10 +137,14 @@
   }
 ")
 
-(defun-js has-animations (element) "return element.getAnimations({ subtree: true }).length > 0")
+(define-simple-accessor class-name "className")
+
+(defun-js has-animations (element)
+  "return element.getAnimations({ subtree: true }).length > 0")
 
 (let ((dataset (lambda-js (element key value) "
                   if (arguments.length === 2) return element.dataset[key];
+                  if (value === false) return delete element.dataset[key], false;
                   return element.dataset[key] = value;")))
   (defun dataset (element key)
     (when (symbolp key)
@@ -146,11 +159,22 @@
 (define-simple-accessor checked "checked")
 (define-simple-accessor value "value")
 (define-simple-accessor inner-html "innerHTML")
-(define-simple-accessor trigger-reflow "offsetWidth")
-(define-simple-accessor offset-width "offsetWidth")
-(define-simple-accessor offset-height "offsetHeight")
+(define-simple-accessor inner-text "innerText")
+(define-simple-accessor outer-html "outerHTML")
+(define-simple-getter trigger-reflow "offsetWidth")
+(define-simple-getter offset-width "offsetWidth")
+(define-simple-getter offset-height "offsetHeight")
+(define-simple-getter offset-left "offsetLeft")
+(define-simple-getter offset-top "offsetTop")
+(define-simple-getter offset-parent "offsetParent")
+(define-simple-getter client-width "clientWidth")
+(define-simple-getter client-height "clientHeight")
+(define-simple-getter client-left "clientLeft")
+(define-simple-getter client-top "clientTop")
 (define-simple-accessor scroll-left "scrollLeft")
 (define-simple-accessor scroll-top "scrollTop")
+(define-simple-getter scroll-width "scrollWidth")
+(define-simple-getter scroll-height "scrollHeight")
 
 (defun-js bounding-client-rect (el &optional relative-to) "
   let box = el.getBoundingClientRect();
@@ -191,11 +215,11 @@
       (setf prop (string-downcase (symbol-name prop))))
     (funcall style element prop value)))
 
-(defun-js scroll-into-view (element &key (block "nearest") (inline "nearest")) "
-  element.scrollIntoView({ block, inline });
-")
+(defun-js scroll-into-view (element &key (block "nearest") (inline "nearest"))
+  "element.scrollIntoView({ block, inline })")
 
-(defun-js focus (element) "element.focus()")
+(defun-js focus (element)
+  "return element.focus()")
 
 (defun-js on-event (element event-name
                             &key
@@ -212,8 +236,8 @@
                           LispCons.fromArray([ target, ev ]));
     if (!selector)
       return send_signal();
-    while (target) {
-      if (target instanceof Element && target.matches(selector))
+    while (target instanceof Element) {
+      if (target.matches(selector))
         return send_signal();
       target = target.parentElement;
     }
@@ -222,9 +246,8 @@
   return handler;
 ")
 
-(defun-js off-event (element event-name handler &key capture) "
-  element.removeEventListener(event_name, handler, { capture });
-")
+(defun-js off-event (element event-name handler &key capture)
+  "element.removeEventListener(event_name, handler, { capture })")
 
 (defmacro with-events ((element &rest events) &body body)
   (let ((el (gensym "element"))
@@ -239,7 +262,8 @@
                                         ,@(aif (getf (cdr ev) :capture)
                                                `(:capture ,it))))
                           handlers events)))
-         ,@body))))
+         ,@body
+         (done-events)))))
 
 (defun-js prevent-default (event) "return event.preventDefault()")
 (defun-js stop-propagation (event) "return event.stopPropagation()")
@@ -259,9 +283,16 @@
   }
 ")
 
-(define-simple-getter key "key")
 (define-simple-getter client-x "clientX")
 (define-simple-getter client-y "clientY")
+
+(defun-js key (event) "return event.key === ' ' ? 'Space' : event.key")
+
+(defun-js trigger (element event-name &key data bubbles cancelable composed) "
+  let event = new Event(event_name, { bubbles, cancelable, composed });
+  if (data !== false) event.data = data;
+  element.dispatchEvent(event);
+")
 
 (defun-js load-css (url) "
   let link = document.querySelector('link[data-url=\"' + url + '\"]');
@@ -289,4 +320,5 @@
   return el;
 ")
 
-(defun-js close-dialog (dlg) "dlg._ymacs_object.close()")
+(defun-js close-dialog (dlg)
+  "dlg._ymacs_object.close()")

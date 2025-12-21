@@ -1224,8 +1224,21 @@ export class LispMachine {
     }
 
     loop() {
-        while (this.pc >= 0 && this.pc < this.code.length) {
-            vmrun(this);
+        try {
+            while (this.pc >= 0 && this.pc < this.code.length) {
+                vmrun(this);
+            }
+        } catch(ex) {
+            if (ex instanceof LispPrimitiveError) {
+                var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
+                if (pe && pe.function) {
+                    this._callnext(pe.function, LispCons.fromArray(["~A", ex.message]));
+                    return this.loop();
+                }
+            } else {
+                console.log(ex);
+                console.log(this.backtrace());
+            }
         }
         return this.stack.sp > 0 ? this.pop() : false;
     }
@@ -1250,10 +1263,6 @@ export class LispMachine {
         //if (this.trace) this.trace = [ closure, args ];
         try {
             return this.loop();
-        } catch(ex) {
-            console.log(ex);
-            console.log(this.backtrace());
-            //console.log(LispMachine.disassemble(machine.code));
         } finally {
             //this.trace = save_trace;
             this.f = save_f;

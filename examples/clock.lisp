@@ -101,7 +101,7 @@
     ;; this also works:
     ;;   (sleep 0.016)
     ;;   (animate-clock)
-    (set-timeout 16 #'animate-clock)))
+    (set-timeout 16 #'animate-clock t)))
 
 (with-canvas
   (let ((iii 0))

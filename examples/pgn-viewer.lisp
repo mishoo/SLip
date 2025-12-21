@@ -2,23 +2,27 @@
 (load "lib/dom.lisp")
 
 (defpackage :pgn-viewer
-  (:use :sl :queen))
+  (:use :sl)
+  (:local-nicknames (:q :queen)))
 
 (in-package :pgn-viewer)
 
 (dom:load-css "./examples/pgn-viewer.css")
 
+(defparameter *autoplay-timeout* 1000)
+
 (defgeneric display-game (pgn))
 
 (defmethod display-game (pgn)
-  (display-game (parse-pgn pgn :ext-moves t)))
+  (display-game (q:parse-pgn pgn :ext-moves t)))
 
 (defmethod display-game ((pgn cons))
-  (let* ((dlg (dom:make-dialog 800 620
+  (let* ((dlg (dom:make-dialog 700 530
                                :content (dom:from-html (make-layout pgn))
                                :class-name "pgn-viewer"))
-         (running t)
-         (current-fen +fen-start+)
+         (thread nil)
+         (start-fen (get-header pgn "FEN" q:+fen-start+))
+         (current-fen start-fen)
          (el-board (dom:query dlg "._board"))
          (el-pieces (dom:query dlg "._pieces"))
          (transitions 0))
@@ -27,9 +31,9 @@
     (dom:focus dlg)
     (labels
         ((on-close (target event)
-           (setf running nil))
+           (throw 'exit-thread nil))
 
-         (on-reverse (target event)
+         (on-reverse (button)
            (dom:toggle-class el-board "reverse"))
 
          (piece-element (index)
@@ -39,16 +43,16 @@
            (without-interrupts
              (cond
                ((string= current-fen fen-before)
-                (let* ((from (move-from move))
-                       (to (move-to move))
-                       (white (move-white? move))
-                       (capture (when (move-capture? move)
-                                  (move-captured-index move)))
+                (let* ((from (q:move-from move))
+                       (to (q:move-to move))
+                       (white (q:move-white? move))
+                       (capture (when (q:move-capture? move)
+                                  (q:move-captured-index move)))
                        (piece (piece-element from)))
-                  (when (move-promote? move)
+                  (when (q:move-promote? move)
                     (let* ((*unicode* nil)
-                           (promo-piece (move-promoted-piece move))
-                           (promo-char (piece-char promo-piece))
+                           (promo-piece (q:move-promoted-piece move))
+                           (promo-char (q:piece-char promo-piece))
                            (el (dom:from-html
                                 (format nil "<div class='piece fade-out' ~
                                                   data-index='~D' data-piece='~C'></div>"
@@ -61,29 +65,29 @@
                     (capture
                      (let ((capture (piece-element capture)))
                        (dom:add-class capture "fade-out")))
-                    ((move-oo? move)
+                    ((q:move-oo? move)
                      (let ((rook (piece-element (if white
-                                                    #.(field-index "H1")
-                                                    #.(field-index "H8")))))
+                                                    #.(q:field-index "H1")
+                                                    #.(q:field-index "H8")))))
                        (setf (dom:dataset rook :index)
                              (if white
-                                 #.(field-index "F1")
-                                 #.(field-index "F8")))))
-                    ((move-ooo? move)
+                                 #.(q:field-index "F1")
+                                 #.(q:field-index "F8")))))
+                    ((q:move-ooo? move)
                      (let ((rook (piece-element (if white
-                                                    #.(field-index "A1")
-                                                    #.(field-index "A8")))))
+                                                    #.(q:field-index "A1")
+                                                    #.(q:field-index "A8")))))
                        (setf (dom:dataset rook :index)
                              (if white
-                                 #.(field-index "D1")
-                                 #.(field-index "D8"))))))
+                                 #.(q:field-index "D1")
+                                 #.(q:field-index "D8"))))))
                   (setf (dom:dataset piece :index) to
                         (dom:style piece :z-index) (+ 10 (incf transitions)))))
                (t
                 (morph-to-fen el-pieces fen-after)))
              (setf current-fen fen-after)))
 
-         (on-move (target event)
+         (on-move-click (target event)
            (highlight-clear)
            (setf (dom:checked target) t)
            (dom:scroll-into-view (dom:parent-element target))
@@ -95,15 +99,15 @@
            (without-interrupts
              (unless (dom:has-animations el-pieces)
                ;; (format t "RESET: ~A~%" current-fen)
-               (let ((g (make-game)))
-                 (reset-from-fen g current-fen)
+               (let ((g (q:make-game)))
+                 (q:reset-from-fen g current-fen)
                  (setf (dom:inner-html el-pieces)
-                       (pieces-html (game-board g)))
+                       (pieces-html (q:game-board g)))
                  (highlight-check)))))
 
          (highlight-clear ()
            (dom:do-query (el el-pieces ".piece.highlight")
-             (dom:remove el)))
+             (dom:remove-element el)))
 
          (highlight-fields (indexes &optional (classes ""))
            (without-interrupts
@@ -115,12 +119,12 @@
                          classes idx))))))
 
          (highlight-check ()
-           (let* ((g (reset-from-fen (make-game) current-fen)))
-             (when (attacked? g)
-               (highlight-fields (list (king-index g)) "check"))))
+           (let* ((g (q:reset-from-fen (q:make-game) current-fen)))
+             (when (q:attacked? g)
+               (highlight-fields (list (q:king-index g)) "check"))))
 
          (reset ()
-           (setf current-fen +fen-start+)
+           (setf current-fen start-fen)
            (highlight-clear)
            (morph-to-fen el-pieces current-fen)
            (dom:do-query (el dlg "input[name='move']")
@@ -136,106 +140,162 @@
                                           move-elements))))
              (cond
                ((and (not index) (not backwards))
-                (on-move (car move-elements) nil))
+                (on-move-click (car move-elements) nil)
+                (cdr move-elements))
                ((not index)
-                (reset))
+                (reset)
+                nil)
                ((< (incf index) (length move-elements))
                 (let ((next (elt move-elements index)))
-                  (on-move next nil)))
-               (backwards (reset)))))
+                  (on-move-click next nil)
+                  (< (1+ index) (length move-elements))))
+               (backwards
+                (reset)
+                move-elements))))
 
-         (on-start (target event)
+         (on-start (button)
            (reset))
 
-         (on-end (target event)
+         (on-end (button)
            (let ((moves (nreverse (dom:query-all dlg "input[name='move']"))))
-             (on-move (car moves) nil)))
+             (on-move-click (car moves) nil)))
 
-         (on-prev (target event)
+         (on-prev (button)
            (next-move t))
 
-         (on-next (target event)
+         (on-next (button)
            (next-move nil))
 
-         (active-blink (selector)
-           (let ((el (dom:query dlg selector)))
-             (when el
-               (dom:add-class el "active")
-               (clear-timeout (dom:dataset el :timer))
-               (setf (dom:dataset el :timer)
-                     (set-timeout 100 (lambda ()
-                                        (dom:remove-class el "active")))))))
+         (toggle-play (btn)
+           (rotatef (dom:inner-text btn)
+                    (dom:dataset btn :toggle))
+           (dom:toggle-class btn "pressed"))
+
+         (on-play (button)
+           (when (next-move nil)
+             (toggle-play button)
+             (let ((timer))
+               (dom:with-events (dlg
+                                 ("keydown" :signal :play-keydown))
+                 (labels
+                     ((signal ()
+                        (%:%sendmsg thread :play-next))
+                      (restart-timer ()
+                        (clear-timeout timer)
+                        (setf timer (set-timeout *autoplay-timeout* #'signal)))
+                      (next ()
+                        (if (next-move nil)
+                            (restart-timer)
+                            'play-done))
+                      (stop ()
+                        (clear-timeout timer)
+                        'play-done)
+                      (exit (&rest _)
+                        (stop)
+                        (throw 'exit-thread nil))
+                      (action (btn event)
+                        (cond
+                          ((eq btn button)
+                           (dom:prevent-default event)
+                           (stop))
+                          (t
+                           (restart-timer)
+                           (on-action btn event))))
+                      (keydown (target event)
+                        (labels ((notf-timeout ()
+                                   (ymacs:signal-info (format nil "Speed: ~,2Fs"
+                                                              (/ *autoplay-timeout* 1000))
+                                                      :timeout 1000 :anchor button)))
+                          (without-interrupts
+                            (case (dom:key event)
+                              ("Space"
+                               (dom:prevent-default event)
+                               (dom:stop-immediate-propagation event)
+                               (stop))
+                              ("0"
+                               (setf *autoplay-timeout* 1000)
+                               (notf-timeout))
+                              (("+" "=")
+                               (setf *autoplay-timeout* (/ *autoplay-timeout* 1.25))
+                               (notf-timeout))
+                              ("-"
+                               (setf *autoplay-timeout* (* *autoplay-timeout* 1.25))
+                               (notf-timeout))
+                              (t
+                               (when (on-keydown target event)
+                                 (restart-timer))))))))
+                   (let ((receivers (make-hash
+                                     :close          #'exit
+                                     :play-keydown   #'keydown
+                                     :play-next      #'next
+                                     :action         #'action
+                                     :animation-end  #'on-animation-end)))
+                     (restart-timer)
+                     (loop until (eq 'play-done (%:%receive receivers)))
+                     (toggle-play button)))))))
+
+         (active-blink (el)
+           (dom:add-class el "active")
+           (clear-timeout (dom:dataset el :timer))
+           (setf (dom:dataset el :timer)
+                 (set-timeout 100 (lambda ()
+                                    (dom:remove-class el "active")))))
 
          (on-keydown (target event)
            (without-interrupts
              (case (dom:key event)
-               ("ArrowLeft"
-                (on-prev target event)
-                (active-blink "._prev")
-                (dom:prevent-default event))
-               ("ArrowRight"
-                (on-next target event)
-                (active-blink "._next")
-                (dom:prevent-default event))
-               ("Home"
-                (on-start target event)
-                (active-blink "._start")
-                (dom:prevent-default event))
-               ("End"
-                (on-end target event)
-                (active-blink "._end")
-                (dom:prevent-default event))
                ("Escape"
+                (dom:prevent-default event)
+                (dom:close-dialog dlg))
+               ("r"
+                (dom:prevent-default event)
                 (dom:close-dialog dlg)
-                (dom:prevent-default event))
-               (("f" "F" "c" "C")
-                (on-fen (dom:query dlg "._fen") event)
-                (active-blink "._fen")
-                (dom:prevent-default event))
-               (("ArrowUp" "ArrowDown")
-                (on-reverse target event)
-                (active-blink "._reverse")
-                (dom:prevent-default event))
-               (("r" "R")
-                ;; restart
-                (dom:close-dialog dlg)
-                (display-game pgn)
-                (dom:prevent-default event)))))
+                (display-game pgn))
+               (t
+                (let ((btn (dom:query dlg (format nil "button[data-key~~=\"~A\"]" (dom:key event)))))
+                  (when btn
+                    (on-action btn event)
+                    t))))))
 
-         (on-fen (target event)
+         (on-fen (target)
            (if (dom:clipboard-write-text current-fen)
                (ymacs:signal-info (format nil "FEN copied" current-fen)
-                                  :timeout 666 :anchor target)
+                                  :timeout 1000 :anchor target)
                (ymacs:signal-info "Didn't work (permissions?)" :timeout 3000)))
 
-         (event-to-index (ev)
+         (on-action (el event)
+           (without-interrupts
+             (active-blink el)
+             (dom:prevent-default event)
+             (ecase (dom:dataset el :action)
+               ("reverse" (on-reverse el))
+               ("start" (on-start el))
+               ("prev" (on-prev el))
+               ("next" (on-next el))
+               ("end" (on-end el))
+               ("fen" (on-fen el))
+               ("play" (on-play el)))))
+
+         (coords-to-index (rel-x rel-y)
            (multiple-value-bind (board-x board-y board-width board-height)
                (dom:bounding-client-rect el-board)
-             (let* ((reversed (dom:has-class el-board "reverse"))
-                    (ev-x (dom:client-x ev))
-                    (ev-y (dom:client-y ev))
-                    (rel-x (- ev-x board-x))
-                    (rel-y (- ev-y board-y))
-                    (col (floor (* 8 (/ rel-x board-width))))
+             (declare (ignore board-x board-y))
+             (let* ((col (floor (* 8 (/ rel-x board-width))))
                     (row (- 7 (floor (* 8 (/ rel-y board-height))))))
                (when (and (typep col '(integer 0 7))
                           (typep row '(integer 0 7)))
-                 (when reversed
-                   (setf col (- 7 col)
-                         row (- 7 row)))
-                 (board-index row col)))))
+                 (q:board-index row col)))))
 
          (on-piece-mousedown (piece event)
            (without-interrupts
              (let* ((index (parse-integer (dom:dataset piece :index)))
-                    (g (reset-from-fen (make-game) current-fen))
-                    (all-moves (game-compute-moves g))
-                    (moves (remove index all-moves :test-not #'eql :key #'move-from))
+                    (g (q:reset-from-fen (q:make-game) current-fen))
+                    (all-moves (q:game-compute-moves g))
+                    (moves (remove index all-moves :test-not #'eql :key #'q:move-from))
                     (reversed (dom:has-class el-board "reverse"))
                     (start-x (dom:client-x event))
                     (start-y (dom:client-y event))
                     (target-field nil))
-               ;; (format t "~{~A~^ ~}~%" (mapcar #'index-field (mapcar #'move-to moves)))
                (unless moves (return-from on-piece-mousedown nil))
                (dom:prevent-default event)
                (dom:stop-immediate-propagation event)
@@ -258,26 +318,27 @@
                                   (setf drag-x (- board-width drag-x piece-width)
                                         drag-y (- board-height drag-y piece-height)))
                                 (setf (dom:style piece :translate)
-                                      (format nil "~Fpx ~Fpx" drag-x drag-y)))
-                              (let ((index (event-to-index ev)))
-                                (unless (eql index target-field)
-                                  (highlight-clear)
-                                  (cond
-                                    ((member index moves :key #'move-to)
-                                     (setf target-field index)
-                                     (highlight-fields (list index) "target"))
-                                    (t
-                                     (setf target-field nil)))))))
+                                      (format nil "~Fpx ~Fpx" drag-x drag-y))
+                                (let ((index (coords-to-index
+                                              (+ drag-x (/ piece-width 2))
+                                              (+ drag-y (/ piece-height 2)))))
+                                  (unless (eql index target-field)
+                                    (highlight-clear)
+                                    (cond
+                                      ((member index moves :key #'q:move-to)
+                                       (setf target-field index)
+                                       (highlight-fields (list index) "target"))
+                                      (t
+                                       (setf target-field nil))))))))
                           (on-done (target ev)
                             (without-interrupts
                               (highlight-clear)
-                              (dom:done-events)
                               (dom:remove-class piece "dragging")
                               (setf (dom:style piece :translate) nil)
                               (when target-field
-                                (let ((move (find target-field moves :key #'move-to)))
-                                  (game-move g move)
-                                  (setf current-fen (game-fen g))
+                                (let ((move (find target-field moves :key #'q:move-to)))
+                                  (q:game-move g move)
+                                  (setf current-fen (q:game-fen g))
                                   (setf (dom:dataset piece :index) target-field
                                         (dom:style piece :z-index) 10)
                                   (morph-to-fen el-pieces current-fen)))
@@ -285,69 +346,70 @@
                        (loop with drag-receivers = (make-hash
                                                     :move #'on-move
                                                     :done #'on-done)
-                             until (eq (%:%receive drag-receivers) 'drag-done))
-                       ;; (format t "Done dragging~%")
-                       ))))))))
+                             until (eq (%:%receive drag-receivers) 'drag-done))))))))))
 
       (reset)
 
-      (let ((receivers (make-hash :close            #'on-close
-                                  :reverse          #'on-reverse
-                                  :move             #'on-move
-                                  :animation-end    #'on-animation-end
-                                  :prev             #'on-prev
-                                  :next             #'on-next
-                                  :start            #'on-start
-                                  :end              #'on-end
-                                  :fen              #'on-fen
-                                  :keydown          #'on-keydown
-                                  :piece-mousedown  #'on-piece-mousedown)))
-        (make-thread
-         (lambda ()
-           (dom:on-event dlg "close" :signal :close)
-           (dom:on-event dlg "click" :selector "._reverse" :signal :reverse)
-           (dom:on-event dlg "click" :selector "._start" :signal :start)
-           (dom:on-event dlg "click" :selector "._prev" :signal :prev)
-           (dom:on-event dlg "click" :selector "._next" :signal :next)
-           (dom:on-event dlg "click" :selector "._end" :signal :end)
-           (dom:on-event dlg "click" :selector "._fen" :signal :fen)
-           (dom:on-event dlg "mousedown" :selector ".piece[data-piece]" :signal :piece-mousedown)
-           (dom:on-event dlg "input" :selector "input[name='move']" :signal :move)
-           (dom:on-event el-pieces "transitionend" :signal :animation-end)
-           (dom:on-event dlg "keydown" :signal :keydown)
-           (%:%catch-all-errors)
-           (loop while running
-                 do (handler-case
-                        (%:%receive receivers)
-                      (error (err)
-                        (format *error-output* "!ERROR: ~A~%" err))))
-           (format *error-output*
-                   "Thread exit ~A~%"
-                   (current-thread))))))))
+      (labels
+          ((main ()
+             (%:%catch-all-errors)
+             (dom:with-events
+               (dlg
+                ("close" :signal :close)
+                ("click" :selector "[data-action]" :signal :action)
+                ("mousedown" :selector "[data-piece]" :signal :piece-mousedown)
+                ("input" :selector "input[name='move']" :signal :move)
+                ("keydown" :signal :keydown)
+                ("transitionend" :signal :animation-end))
+               (catch 'exit-thread
+                 (loop with receivers = (make-hash
+                                         :close            #'on-close
+                                         :action           #'on-action
+                                         :move             #'on-move-click
+                                         :animation-end    #'on-animation-end
+                                         :keydown          #'on-keydown
+                                         :piece-mousedown  #'on-piece-mousedown)
+                       do (handler-case
+                              (%:%receive receivers)
+                            (error (err)
+                              (format *error-output* "!ERROR: ~A~%" err)))))
+               (format *error-output*
+                       "Thread exit ~A~%"
+                       (current-thread)))))
+
+        (setf thread (make-thread #'main))))))
+
+(defun get-header (pgn name &optional default)
+  (let* ((headers (getf pgn :headers))
+         (cell (assoc (string name) headers
+                      :test #'string-equal)))
+    (if cell
+        (cdr cell)
+        default)))
 
 (defun piece-selector (index)
   (format nil ".piece[data-index='~D']:not(.fade-out, ._morph)" index))
 
 (defun morph-to-fen (el-pieces fen)
-  (let* ((*unicode* nil)
-         (g (make-game))
-         (board (game-board g)))
-    (without-interrupts
-      (reset-from-fen g fen)
+  (without-interrupts
+    (let* ((*unicode* nil)
+           (g (q:make-game))
+           (board (q:game-board g)))
+      (q:reset-from-fen g fen)
 
       ;; 1. pieces already in-place should stay so.
       (dom:do-query (el el-pieces ".piece[data-piece]:not(.fade-out)")
         (let ((index (parse-integer (dom:dataset el :index)))
-              (piece (char-piece (svref (dom:dataset el :piece) 0))))
-          (when (= piece (board-get board index))
-            (board-set board index 0)
+              (piece (q:char-piece (svref (dom:dataset el :piece) 0))))
+          (when (= piece (q:board-get board index))
+            (q:board-set board index 0)
             (dom:add-class el "_morph"))))
 
       ;; 2. any non-zero board fields should now be resolved.
-      (board-foreach
+      (q:board-foreach
        board
        (lambda (piece row col index)
-         (let* ((pchar (piece-char piece))
+         (let* ((pchar (q:piece-char piece))
                 (el (dom:query-all
                      el-pieces
                      (format nil ".piece[data-piece='~C']:not(.fade-out, ._morph)"
@@ -376,23 +438,15 @@
            (dom:add-class el "fade-out")))))))
 
 (defun make-layout (pgn)
-  (let* ((headers (getf pgn :headers))
-         (game (getf pgn :game))
+  (let* ((game (getf pgn :game))
          (title (format nil "<div><b>~A</b> [~A~A] - <b>~A</b> [~A~A] (~A)</div>"
-                        (or (cdr (assoc "White" headers :test #'string-equal))
-                            "White")
-                        (or (cdr (assoc "WhiteElo" headers :test #'string-equal))
-                            "?")
-                        (or (cdr (assoc "WhiteRatingDiff" headers :test #'string-equal))
-                            "")
-                        (or (cdr (assoc "Black" headers :test #'string-equal))
-                            "Black")
-                        (or (cdr (assoc "BlackElo" headers :test #'string-equal))
-                            "?")
-                        (or (cdr (assoc "BlackRatingDiff" headers :test #'string-equal))
-                            "")
-                        (or (cdr (assoc "Result" headers :test #'string-equal))
-                            "*"))))
+                        (get-header pgn "White" "White")
+                        (get-header pgn "WhiteElo" "?")
+                        (get-header pgn "WhiteRatingDiff" "")
+                        (get-header pgn "Black" "Black")
+                        (get-header pgn "BlackElo" "?")
+                        (get-header pgn "BlackRatingDiff" "")
+                        (get-header pgn "Result" "*"))))
     (format nil "
 <div class='layout'>
   <div class='cont-board'>
@@ -401,14 +455,15 @@
     </div>
   </div>
   <div class='cont-ctrl'>
-    <button class='_reverse' title='Reverse board'>🗘</button>
+    <button data-action='reverse' data-key='ArrowUp ArrowDown' title='Reverse board'>🗘</button>
     <div style='padding-left: 20px'></div>
-    <button class='_start' title='Start position'>⏮</button>
-    <button class='_prev' title='Previous move'>❮</button>
-    <button class='_next' title='Next move'>❯</button>
-    <button class='_end' title='Last position'>⏭</button>
+    <button data-action='start' data-key='Home' title='Start position'>⏮</button>
+    <button data-action='prev' data-key='ArrowLeft' title='Previous move'>❮</button>
+    <button data-action='play' data-key='Space' title='Play' data-toggle='⏸'>▶</button>
+    <button data-action='next' data-key='ArrowRight' title='Next move'>❯</button>
+    <button data-action='end' data-key='End' title='Last position'>⏭</button>
     <div style='padding-left: 20px'></div>
-    <button class='_fen' title='Copy FEN to clipboard'>F</button>
+    <button data-action='fen' data-key='F f C c' title='Copy FEN to clipboard'>F</button>
   </div>
   <div class='cont-list _cont-list'><form>~A</form></div>
   <div class='cont-title _drag-dialog'>~A</div>
@@ -420,7 +475,7 @@
 (defun pieces-html (board)
   (with-output-to-string (output)
     (let ((*unicode* nil))
-      (board-foreach
+      (q:board-foreach
        board
        (lambda (piece row col index)
          (declare (ignore row col))
@@ -428,7 +483,7 @@
                               data-index='~D' ~
                               data-piece='~C'></div>"
                  index
-                 (piece-char piece)))))))
+                 (q:piece-char piece)))))))
 
 (defun moves-html (pgn)
   (with-output-to-string (output)
@@ -441,14 +496,14 @@
                      (san (getf data :san))
                      (fen-before (getf data :fen-before))
                      (fen-after (getf data :fen-after)))
-                 (when (move-white? move)
+                 (when (q:move-white? move)
                    (format output "<div class='index'>~D</div>" (incf index)))
-                 (format output "<div class='~A'>
-                   <label class='move'>
-                     <input name='move' type='radio' data-fen-before='~A' data-fen-after='~A' data-move='~A' />
-                     ~A
+                 (format output "<div class='~A'>~
+                   <label class='move'>~
+                     <input name='move' type='radio' data-fen-before='~A' data-fen-after='~A' data-move='~A' />~
+                     ~A~
                    </label></div>"
-                         (if (move-white? move) "white" "black")
+                         (if (q:move-white? move) "white" "black")
                          fen-before fen-after move san))))
     (write-string "</div>" output)))
 
@@ -462,7 +517,7 @@
   (with-output-to-string (out)
     (loop for row from 0 to 7 do
           (loop for col from 0 to 7
-                for index = (board-index row col)
+                for index = (q:board-index row col)
                 do (format out "&[data-index='~D'] { translate: ~F% ~F% }~%"
                            index
                            (* col 100)

@@ -20,12 +20,11 @@
   (let* ((parsed (%:parse-lambda-list args))
          (argnames (getf parsed :names))
          (js-name (to-js-name name))
-         (sym (gensym))
+         (sym (gensym name))
          (js-argnames (mapcar #'to-js-name argnames)))
-    `(let ((,sym (%js-eval ,(format nil "function ~A (~{~A~^, ~}) { ~A }"
-                                    js-name
-                                    js-argnames
-                                    body))))
+    `(progn
+       (defglobal ,sym
+         (%js-eval ,(format nil "function ~A (~{~A~^, ~}) { ~A }" js-name js-argnames body)))
        (defun ,name ,args
          (%js-apply ,sym nil (vector ,@argnames))))))
 
