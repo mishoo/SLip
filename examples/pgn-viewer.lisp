@@ -2,7 +2,7 @@
 (load "lib/dom.lisp")
 
 (defpackage :pgn-viewer
-  (:use :sl)
+  (:use :sl :queen)
   (:local-nicknames (:q :queen)))
 
 (in-package :pgn-viewer)

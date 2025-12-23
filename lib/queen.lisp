@@ -135,30 +135,18 @@ by STRING-DESIGNATOR being its first argument."
 (defmacro with-parse-stream (input &body body)
   (let ((pos (gensym "pos"))
         (line (gensym "line"))
-        (col (gensym "col"))
-        (log (gensym "log"))
-        (-next (gensym "-next")))
-    `(let ((,pos 0) (,line 1) (,col 0) (,log nil))
+        (col (gensym "col")))
+    `(let ((,pos 0) (,line 1) (,col 0))
        (labels
-           ((,-next ()
-              (if ,log
-                  (pop ,log)
-                  (read-char ,input nil 'EOF)))
-
-            (unget (ch)
-              (push ch ,log))
-
-            (peek ()
-              (if ,log
-                  (car ,log)
-                  (peek-char nil ,input nil nil)))
+           ((peek ()
+              (peek-char nil ,input nil nil))
 
             (next ()
-              (let ((ch (,-next)))
+              (let ((ch (read-char ,input nil 'EOF)))
                 (when (and (eql ch #\Return)
                            (eql (peek) #\Newline))
                   (incf ,pos)
-                  (setf ch (,-next)))
+                  (setf ch (read-char ,input nil 'EOF)))
                 (case ch
                   (EOF
                    nil)
@@ -203,19 +191,6 @@ by STRING-DESIGNATOR being its first argument."
               (or (digit? ch)
                   (letter? ch)))
 
-            (look-ahead (len func)
-              (let ((savepos ,pos)
-                    (saveline ,line)
-                    (savecol ,col))
-                (let ((chars (loop repeat len collect (next))))
-                  (or (funcall func chars)
-                      (progn
-                        (setf ,pos savepos
-                              ,line saveline
-                              ,col savecol
-                              ,log (nconc chars ,log))
-                        nil)))))
-
             (skip (ch &optional no-error)
               (cond
                 ((characterp ch)
@@ -225,54 +200,40 @@ by STRING-DESIGNATOR being its first argument."
                        (unless no-error
                          (croak "Expected ~A but found ~A" ch curr)))))
                 ((stringp ch)
-                 (let ((match
-                        (look-ahead (length ch)
-                                    (lambda (chars)
-                                      (unless (member nil chars)
-                                        (string= ch (string chars)))))))
-                   (if match match
+                 (let* ((i -1)
+                        (n (length ch))
+                        (val (read-while (lambda (curr)
+                                           (and (< (incf i) n)
+                                                (eql curr (char ch i)))))))
+                   (if (= i n) val
                        (unless no-error
-                         (croak "Expected ~A ch")))))
+                         (croak "Expected ~A but found ~A" ch val)))))
                 (t
                  (error "Unknown token in `skip'"))))
 
-            (read-number ()
-              (let (n d ch)
-                (tagbody
-                 next
-                 (setq ch (next))
-                 (unless ch (go finish))
-                 (setq d (digit? ch))
-                 (unless d (go finish))
-                 (setf n (+ d (* (or n 0) 10)))
-                 (go next)
-                 finish
-                 (when ch (unget ch)))
-                n))
+            (read-integer ()
+              (let ((str (read-while #'digit?)))
+                (unless (zerop (length str))
+                  (parse-integer str))))
 
             (read-string (&optional (quote #\") (esc #\\))
               (skip quote)
-              (let* ((escaped nil))
-                (prog1 (read-while (lambda (ch)
-                                     (cond
-                                       (escaped
-                                        (setf escaped nil)
-                                        t)
-                                       ((eql ch quote)
-                                        nil)
-                                       ((eql ch esc)
-                                        (next)
-                                        (setf escaped t)
-                                        t)
-                                       (t t))))
-                  (skip quote))))
+              (read-while (lambda (ch)
+                            (cond
+                              ((eql ch esc)
+                               (next)
+                               (or (peek)
+                                   (error "Unexpected EOF reading string")))
+                              ((eql ch quote)
+                               (next)
+                               nil)
+                              (t t)))))
 
             (skip-whitespace ()
               (read-while #'whitespace?)))
 
          (declare (ignorable #'peek
                              #'next
-                             #'unget
                              #'eof?
                              #'croak
                              #'read-while
@@ -284,15 +245,9 @@ by STRING-DESIGNATOR being its first argument."
                              #'skip
                              #'read-string
                              #'skip-whitespace
-                             #'look-ahead
-                             #'read-number))
+                             #'read-integer))
 
-         (unwind-protect
-             (progn ,@body)
-           ;; XXX: no unread-char yet.
-           ;; (when ,log
-           ;;   (unread-char (car ,log) ,input))
-           )))))
+         ,@body))))
 
 ;;;; FILE: board.lisp
 
@@ -571,11 +526,11 @@ by STRING-DESIGNATOR being its first argument."
            (type board board)
            (type (function (piece (integer 0 7) (integer 0 7) board-index) t) fn))
   (loop for row from 0 to 7 do
-    (loop for col from 0 to 7
-          for index = (board-index row col)
-          for piece = (board-get board index)
-          when (not (zerop piece))
-            do (funcall fn piece row col index))))
+        (loop for col from 0 to 7
+              for index = (board-index row col)
+              for piece = (board-get board index)
+              when (not (zerop piece))
+              do (funcall fn piece row col index))))
 
 (defun print-board (board &key (output t))
   (loop for row from 7 downto 0
@@ -608,24 +563,25 @@ by STRING-DESIGNATOR being its first argument."
         (state 0))
     (with-parse-stream in
       (labels ((read-row (row)
-                 (loop for ch = (next)
+                 (loop for ch = (peek)
                        for col upfrom 0
                        do (cond
                             ((member ch '(#\p #\n #\k #\b #\r #\q #\P #\N #\K #\B #\R #\Q))
+                             (next)
                              (board-set-rc board row col (char-piece ch)))
                             ((member ch '(#\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8))
+                             (next)
                              (dotimes (i (- (char-code ch) 48))
                                (board-set-rc board row col 0)
                                (incf col))
                              (decf col))
-                            (t (unget ch)
-                               (return)))))
+                            (t (return)))))
 
                (read-position ()
                  (loop for row from 7 downto 0
                        do (read-row row)
-                          (unless (zerop row)
-                            (skip #\/))))
+                       (unless (zerop row)
+                         (skip #\/))))
 
                (read-side ()
                  (case (next)
@@ -659,10 +615,10 @@ by STRING-DESIGNATOR being its first argument."
                                           (- (char-code (char-downcase col)) 97))))))
 
                (read-halfmove ()
-                 (setf (game-halfmove game) (read-number)))
+                 (setf (game-halfmove game) (read-integer)))
 
                (read-fullmove ()
-                 (setf (game-fullmove game) (read-number))))
+                 (setf (game-fullmove game) (read-integer))))
 
         ;; now do it
         (read-position)
@@ -708,8 +664,8 @@ by STRING-DESIGNATOR being its first argument."
                            (write-char (piece-char p))))
                      finally (unless (zerop empty)
                                (format t "~D" empty)))
-               (unless (zerop row)
-                 (write-char #\/)))
+            (unless (zerop row)
+              (write-char #\/)))
       (write-char #\SPACE)
       (write-char (if (= 0 (game-side game)) #\b #\w))
       (write-char #\SPACE)
@@ -732,19 +688,23 @@ by STRING-DESIGNATOR being its first argument."
 (deftype move ()
   '(unsigned-byte 32))
 
+(defmacro pipe (init &rest forms)
+  (loop for result = init then (append form (list result))
+        for form in forms
+        finally (return result)))
+
 (defun make-move (from to piece capture enpa)
   (declare (optimize speed)
            (type board-index from to)
            (type piece piece capture)
            (type (unsigned-byte 1) enpa))
-  (let ((move (dpb (index-col from) (byte 3 0) 0)))
-    (declare (type move move))
-    (setf move (dpb (index-row from) (byte 3 3) move))
-    (setf move (dpb (index-col to) (byte 3 6) move))
-    (setf move (dpb (index-row to) (byte 3 9) move))
-    (setf move (dpb piece (byte 7 12) move))
-    (setf move (dpb capture (byte 6 23) move))
-    (setf move (dpb enpa (byte 1 29) move))))
+  (pipe (index-col from)
+        (dpb (index-row from) (byte 3 3))
+        (dpb (index-col to) (byte 3 6))
+        (dpb (index-row to) (byte 3 9))
+        (dpb piece (byte 7 12))
+        (dpb capture (byte 6 23))
+        (dpb enpa (byte 1 29))))
 
 (defun move-from (move)
   (declare (type move move))
@@ -974,14 +934,14 @@ by STRING-DESIGNATOR being its first argument."
   (loop with king = (logior +KING+ side)
         with board = (game-board game)
         for row from 0 to 7 do
-          (loop for col from 0 to 7
-                for index = (board-index row col)
-                when (= (board-get board index) king)
-                  do (return-from king-index index))))
+        (loop for col from 0 to 7
+              for index = (board-index row col)
+              when (= (board-get board index) king)
+              do (return-from king-index index))))
 
 (defun attacked? (game &optional
-                         (side (game-side game))
-                         (index (king-index game side)))
+                       (side (game-side game))
+                       (index (king-index game side)))
   (declare (optimize speed)
            (type piece side)
            (type game game)
@@ -1039,99 +999,99 @@ by STRING-DESIGNATOR being its first argument."
          (opp-king (king-index game opp))
          flag in-check)
     (loop for row from 0 to 7 do
-      (loop for col from 0 to 7
-            for from = (board-index row col)
-            for piece = (board-get board from)
-            when (same-side? piece side) do
-              (labels
-                  ((move-pawn (c1 c2 a1 a2 on-start on-end)
-                     (labels ((try-enpa (delta)
-                                (when enpa
+          (loop for col from 0 to 7
+                for from = (board-index row col)
+                for piece = (board-get board from)
+                when (same-side? piece side) do
+                (labels
+                    ((move-pawn (c1 c2 a1 a2 on-start on-end)
+                       (labels ((try-enpa (delta)
+                                  (when enpa
+                                    (let ((to (+ from delta)))
+                                      (when (= to enpa)
+                                        (add (make-move from to piece (logior +PAWN+ opp) 1))))))
+                                (try-capture (delta)
                                   (let ((to (+ from delta)))
-                                    (when (= to enpa)
-                                      (add (make-move from to piece (logior +PAWN+ opp) 1))))))
-                              (try-capture (delta)
-                                (let ((to (+ from delta)))
-                                  (when (index-valid? to)
-                                    (with-piece (board to p)
-                                      (when (opp-side? piece p)
-                                        (maybe-promote (make-move from to piece p 0)))))))
-                              (try-advance (delta)
-                                (let ((to (+ from delta)))
-                                  ;; `to' index should be always valid
-                                  (with-piece (board to p t)
-                                    (when (zerop p)
-                                      (maybe-promote (make-move from to piece 0 0))
-                                      ;; we want to return true if the field is empty, so that
-                                      ;; i.e. if we're in check and D3 doesn't get us out (in which
-                                      ;; case `add' will return nil), we still want to try D4.
-                                      t))))
-                              (maybe-promote (move)
-                                (cond
-                                  (on-end
-                                   (when (add (move-set-promoted-piece move +KNIGHT+))
-                                     (%add (move-set-promoted-piece move +BISHOP+))
-                                     (%add (move-set-promoted-piece move +ROOK+))
-                                     (%add (move-set-promoted-piece move +QUEEN+))))
-                                  (t
-                                   (add move)))))
+                                    (when (index-valid? to)
+                                      (with-piece (board to p)
+                                        (when (opp-side? piece p)
+                                          (maybe-promote (make-move from to piece p 0)))))))
+                                (try-advance (delta)
+                                  (let ((to (+ from delta)))
+                                    ;; `to' index should be always valid
+                                    (with-piece (board to p t)
+                                      (when (zerop p)
+                                        (maybe-promote (make-move from to piece 0 0))
+                                        ;; we want to return true if the field is empty, so that
+                                        ;; i.e. if we're in check and D3 doesn't get us out (in which
+                                        ;; case `add' will return nil), we still want to try D4.
+                                        t))))
+                                (maybe-promote (move)
+                                  (cond
+                                    (on-end
+                                     (when (add (move-set-promoted-piece move +KNIGHT+))
+                                       (%add (move-set-promoted-piece move +BISHOP+))
+                                       (%add (move-set-promoted-piece move +ROOK+))
+                                       (%add (move-set-promoted-piece move +QUEEN+))))
+                                    (t
+                                     (add move)))))
 
-                       (declare (inline try-enpa try-capture try-advance maybe-promote))
+                         (declare (inline try-enpa try-capture try-advance maybe-promote))
 
-                       (unless (try-enpa c1) (try-capture c1))
-                       (unless (try-enpa c2) (try-capture c2))
-                       (when (and (try-advance a1) on-start)
-                         (try-advance a2))))
+                         (unless (try-enpa c1) (try-capture c1))
+                         (unless (try-enpa c2) (try-capture c2))
+                         (when (and (try-advance a1) on-start)
+                           (try-advance a2))))
 
-                   (move-knight ()
-                     (mapc #'move +MOVES-KNIGHT+))
+                     (move-knight ()
+                       (mapc #'move +MOVES-KNIGHT+))
 
-                   (move-bishop ()
-                     (mapc #'repeat +MOVES-BISHOP+))
+                     (move-bishop ()
+                       (mapc #'repeat +MOVES-BISHOP+))
 
-                   (move-rook ()
-                     (mapc #'repeat +MOVES-ROOK+))
+                     (move-rook ()
+                       (mapc #'repeat +MOVES-ROOK+))
 
-                   (move-queen ()
-                     (mapc #'repeat +MOVES-QING+))
+                     (move-queen ()
+                       (mapc #'repeat +MOVES-QING+))
 
-                   (in-check? ()
-                     (if flag
-                         in-check
-                         (setf flag t
-                               in-check (attacked? game side my-king))))
+                     (in-check? ()
+                       (if flag
+                           in-check
+                           (setf flag t
+                                 in-check (attacked? game side my-king))))
 
-                   (move-king (oo ooo oo1 oo2 ooo1 ooo2 ooo3)
-                     (mapc #'move +MOVES-QING+)
-                     ;; note: `add' discards all moves that leave our king in check, so it's not
-                     ;; necessary to test here whether the target field is attacked; we only
-                     ;; have to check the middle field (i.e. F1 for white's O-O).
-                     (when (and (logtest (game-state game) oo)
-                                (zerop (board-get board oo1))
-                                (zerop (board-get board oo2))
-                                (not (in-check?))
-                                (not (attacked? game side oo1)))
-                       (add (make-move from oo2 piece 0 0)))
-                     (when (and (logtest (game-state game) ooo)
-                                (zerop (board-get board ooo1))
-                                (zerop (board-get board ooo2))
-                                (zerop (board-get board ooo3))
-                                (not (in-check?))
-                                (not (attacked? game side ooo1)))
-                       (add (make-move from ooo2 piece 0 0))))
+                     (move-king (oo ooo oo1 oo2 ooo1 ooo2 ooo3)
+                       (mapc #'move +MOVES-QING+)
+                       ;; note: `add' discards all moves that leave our king in check, so it's not
+                       ;; necessary to test here whether the target field is attacked; we only
+                       ;; have to check the middle field (i.e. F1 for white's O-O).
+                       (when (and (logtest (game-state game) oo)
+                                  (zerop (board-get board oo1))
+                                  (zerop (board-get board oo2))
+                                  (not (in-check?))
+                                  (not (attacked? game side oo1)))
+                         (add (make-move from oo2 piece 0 0)))
+                       (when (and (logtest (game-state game) ooo)
+                                  (zerop (board-get board ooo1))
+                                  (zerop (board-get board ooo2))
+                                  (zerop (board-get board ooo3))
+                                  (not (in-check?))
+                                  (not (attacked? game side ooo1)))
+                         (add (make-move from ooo2 piece 0 0))))
 
-                   (move (delta)
-                     (declare (type fixnum delta))
-                     (let ((to (+ from delta)))
-                       (when (index-valid? to)
-                         (with-piece (board to p t)
-                           (when (or (zerop p) (opp-side? p side))
-                             (add (make-move from to piece p 0)))))))
+                     (move (delta)
+                       (declare (type fixnum delta))
+                       (let ((to (+ from delta)))
+                         (when (index-valid? to)
+                           (with-piece (board to p t)
+                             (when (or (zerop p) (opp-side? p side))
+                               (add (make-move from to piece p 0)))))))
 
-                   (repeat (delta)
-                     (declare (type fixnum delta))
-                     (loop for to = (+ from delta) then (+ to delta)
-                           while (index-valid? to) do
+                     (repeat (delta)
+                       (declare (type fixnum delta))
+                       (loop for to = (+ from delta) then (+ to delta)
+                             while (index-valid? to) do
                              (let ((p (board-get board to)))
                                (cond
                                  ((zerop p)
@@ -1142,40 +1102,40 @@ by STRING-DESIGNATOR being its first argument."
                                  (t
                                   (return))))))
 
-                   (add (m)
-                     (with-move (game m t)
-                       (let ((index (if (is-king? piece) (move-to m) my-king)))
-                         (unless (attacked? game side index)
-                           (car (push (if (attacked? game opp opp-king)
-                                          (move-set-check m)
-                                          m)
-                                      moves))))))
+                     (add (m)
+                       (with-move (game m t)
+                         (let ((index (if (is-king? piece) (move-to m) my-king)))
+                           (unless (attacked? game side index)
+                             (car (push (if (attacked? game opp opp-king)
+                                            (move-set-check m)
+                                            m)
+                                        moves))))))
 
-                   (%add (m)
-                     (with-move (game m t)
-                       (car (push (if (attacked? game opp opp-king)
-                                      (move-set-check m)
-                                      m)
-                                  moves)))))
+                     (%add (m)
+                       (with-move (game m t)
+                         (car (push (if (attacked? game opp opp-king)
+                                        (move-set-check m)
+                                        m)
+                                    moves)))))
 
-                (declare (inline move-pawn move-king in-check?))
+                  (declare (inline move-pawn move-king in-check?))
 
-                (case piece
-                  (#.+PAWN+                  (move-pawn -15 -17 -16 -32 (= row 6) (= row 1)))
-                  (#.+WPAWN+                 (move-pawn +15 +17 +16 +32 (= row 1) (= row 6)))
-                  ((#.+KNIGHT+ #.+WKNIGHT+)  (move-knight))
-                  ((#.+BISHOP+ #.+WBISHOP+)  (move-bishop))
-                  ((#.+ROOK+ #.+WROOK+)      (move-rook))
-                  ((#.+QUEEN+ #.+WQUEEN+)    (move-queen))
-                  (#.+KING+                  (move-king +BLACK-OO+ +BLACK-OOO+ $F8 $G8 $D8 $C8 $B8))
-                  (#.+WKING+                 (move-king +WHITE-OO+ +WHITE-OOO+ $F1 $G1 $D1 $C1 $B1))))))
+                  (case piece
+                    (#.+PAWN+                  (move-pawn -15 -17 -16 -32 (= row 6) (= row 1)))
+                    (#.+WPAWN+                 (move-pawn +15 +17 +16 +32 (= row 1) (= row 6)))
+                    ((#.+KNIGHT+ #.+WKNIGHT+)  (move-knight))
+                    ((#.+BISHOP+ #.+WBISHOP+)  (move-bishop))
+                    ((#.+ROOK+ #.+WROOK+)      (move-rook))
+                    ((#.+QUEEN+ #.+WQUEEN+)    (move-queen))
+                    (#.+KING+                  (move-king +BLACK-OO+ +BLACK-OOO+ $F8 $G8 $D8 $C8 $B8))
+                    (#.+WKING+                 (move-king +WHITE-OO+ +WHITE-OOO+ $F1 $G1 $D1 $C1 $B1))))))
 
     moves))
 
 (defgeneric game-parse-san (game input &optional moves))
 
 (defmethod game-parse-san (game (in stream)
-                           &optional (moves (game-compute-moves game)))
+                                &optional (moves (game-compute-moves game)))
   (let* ((side (game-side game))
          (white (is-white? side))
          (promo nil)
@@ -1239,12 +1199,12 @@ by STRING-DESIGNATOR being its first argument."
                      (when (and file rank)
                        (setf from (board-index rank file)))))
 
-                 (maybe-skip (&rest chars)
+                 (maybe-skip (chars)
                    (when (member (peek) chars :test #'eql)
                      (next)))
 
                  (skip-sep ()
-                   (awhen (maybe-skip #\x #\: #\-)
+                   (awhen (maybe-skip '(#\x #\: #\-))
                      (when (or (eql it #\x) (eql it #\:))
                        (setf capture t))))
 
@@ -1290,7 +1250,7 @@ by STRING-DESIGNATOR being its first argument."
                 (setf capture (logxor it +WHITE+))))
             (read-to)
             (setf promo (read-promo))
-            (loop while (maybe-skip #\# #\+ #\! #\?))
+            (loop while (maybe-skip '(#\# #\+ #\! #\?)))
 
             (when (and (not piece) (or from-file from-rank to-file to-rank))
               (setf piece (logior side +PAWN+)))
@@ -1307,7 +1267,7 @@ by STRING-DESIGNATOR being its first argument."
       (loop for m in moves when (matches m) collect m))))
 
 (defmethod game-parse-san (game (san string)
-                           &optional (moves (game-compute-moves game)))
+                                &optional (moves (game-compute-moves game)))
   (with-input-from-string (in san)
     (game-parse-san game in moves)))
 
@@ -1332,14 +1292,14 @@ by STRING-DESIGNATOR being its first argument."
           (t
            (let (same-row same-col ambiguous)
              (loop for m in moves until (and same-row same-col) do
-               (when (and (= (move-piece m) piece)
-                          (/= (move-from m) from)
-                          (= (move-to m) to))
-                 (setf ambiguous t)
-                 (when (= (index-row (move-from m)) row)
-                   (setf same-row t))
-                 (when (= (index-col (move-from m)) col)
-                   (setf same-col t))))
+                   (when (and (= (move-piece m) piece)
+                              (/= (move-from m) from)
+                              (= (move-to m) to))
+                     (setf ambiguous t)
+                     (when (= (index-row (move-from m)) row)
+                       (setf same-row t))
+                     (when (= (index-col (move-from m)) col)
+                       (setf same-col t))))
              (write-char (char-upcase (piece-char piece)) out)
              (when ambiguous
                (cond
@@ -1401,25 +1361,25 @@ by STRING-DESIGNATOR being its first argument."
                (let ((moves (game-compute-moves game)))
                  (if (> depth 1)
                      (loop for m in moves do
-                       (with-move (game m t)
-                         (rec (1- depth))))
+                           (with-move (game m t)
+                             (rec (1- depth))))
                      (loop for m in moves
                            when (move-capture? m)
-                             do (incf captures)
+                           do (incf captures)
                            when (move-enpa? m)
-                             do (incf enpa)
+                           do (incf enpa)
                            when (move-castle? m)
-                             do (incf castles)
+                           do (incf castles)
                            when (move-promote? m)
-                             do (incf promotions)
+                           do (incf promotions)
                            when (move-check? m)
-                             do (incf checks)
+                           do (incf checks)
                            do (incf count)
-                              (when (and count-mates (move-check? m))
-                                (with-move (game m t)
-                                  (if (and (attacked? game)
-                                           (null (game-compute-moves game)))
-                                      (incf checkmates)))))))))
+                           (when (and count-mates (move-check? m))
+                             (with-move (game m t)
+                               (if (and (attacked? game)
+                                        (null (game-compute-moves game)))
+                                   (incf checkmates)))))))))
       (rec depth)
       (format t "Depth: ~D, Count: ~D, Captures: ~D, Enpa: ~D, Checks: ~D, Promo: ~D, Castle: ~D~%"
               depth count captures enpa checks promotions castles)
@@ -1457,33 +1417,17 @@ by STRING-DESIGNATOR being its first argument."
              (skip #\])
              (cons name value)))
 
-         (read-result ()
-           (if (eql #\* (peek))
-               (progn (next) "*")
-               (look-ahead 3 (lambda (chars)
-                               (unless (member nil chars)
-                                 (let ((str (string chars)))
-                                   (cond
-                                     ((string= "1-0" str)
-                                      "1-0")
-                                     ((string= "0-1" str)
-                                      "0-1")
-                                     ((string= "1/2" str)
-                                      (skip "-1/2")
-                                      "1/2-1/2"))))))))
-
          (read-moves (game)
            (let ((data '()))
              (flet ((move ()
-                      (let* ((movestr (read-while #'non-whitespace?))
-                             (comp-moves (game-compute-moves game))
-                             (valid (game-parse-san game movestr comp-moves)))
+                      (let* ((comp-moves (game-compute-moves game))
+                             (valid (game-parse-san game in comp-moves)))
                         (skip-whitespace)
                         (cond
                           ((null valid)
-                           (error "Invalid move (~A)" movestr))
+                           (croak "Invalid move"))
                           ((< 1 (length valid))
-                           (error "Ambiguous move (~A)" movestr)))
+                           (croak "Ambiguous move")))
                         (cond
                           (ext-moves
                            (push (list :move (car valid)
@@ -1497,32 +1441,41 @@ by STRING-DESIGNATOR being its first argument."
                            (push (cons :move (car valid)) data)
                            (game-move game (car valid))))))
                     (comment1 ()
-                      (skip #\;)
                       (read-while (lambda (ch)
                                     (not (eql #\Newline ch)))))
                     (comment2 ()
-                      (skip #\{)
                       (prog1
                           (read-while (lambda (ch)
                                         (not (eql #\} ch))))
                         (skip #\}))))
-               (loop while (peek)
-                     do (skip-whitespace)
-                     (or (awhen (read-result)
-                           (push (cons :result it) data)
-                           (return (nreverse data)))
-                         (when (eql (peek) #\;)
-                           (push (cons :comment (comment1)) data))
-                         (when (eql (peek) #\{)
-                           (push (cons :comment (comment2)) data))
-                         (progn
-                           (when (read-number)
+               (loop for ch = (peek) while ch do
+                     (skip-whitespace)
+                     (cond
+                       ((eql ch #\;)
+                        (next)
+                        (push (cons :comment (comment1)) data))
+                       ((eql ch #\{)
+                        (next)
+                        (push (cons :comment (comment2)) data))
+                       (t
+                        (awhen (read-integer)
+                          (cond
+                            ((and (= it 0) (eql (peek) #\-)) ; 0-1
+                             (skip "-1")
+                             (return (nreverse data)))
+                            ((and (= it 1) (eql (peek) #\-)) ; 1-0
+                             (skip "-0")
+                             (return (nreverse data)))
+                            ((and (= it 1) (eql (peek) #\/)) ; 1-2/1-2
+                             (skip "/2-1/2")
+                             (return (nreverse data)))
+                            (t
                              (skip #\.)
+                             (skip-whitespace)
                              (when (eql #\. (peek))
                                (skip ".."))
-                             (skip-whitespace))
-                           (move)))
-                     (skip-whitespace)
+                             (skip-whitespace))))
+                        (move)))
                      finally (return (nreverse data)))))))
 
       (let* ((headers (loop do (skip-whitespace)
@@ -1563,7 +1516,7 @@ by STRING-DESIGNATOR being its first argument."
      nil))
 
 (defscore *p-scores*
-  ( 0   0   0   0   0   0   0   0)
+    ( 0   0   0   0   0   0   0   0)
   (50  50  50  50  50  50  50  50)
   (10  10  20  30  30  20  10  10)
   ( 5   5  10  25  25  10   5   5)
@@ -1573,7 +1526,7 @@ by STRING-DESIGNATOR being its first argument."
   ( 0   0   0   0   0   0   0   0))
 
 (defscore *n-scores*
-  (-50 -40 -30 -30 -30 -30 -40 -50)
+    (-50 -40 -30 -30 -30 -30 -40 -50)
   (-40 -20   0   0   0   0 -20 -40)
   (-30   0  10  15  15  10   0 -30)
   (-30   5  15  20  20  15   5 -30)
@@ -1583,7 +1536,7 @@ by STRING-DESIGNATOR being its first argument."
   (-50 -40 -30 -30 -30 -30 -40 -50))
 
 (defscore *b-scores*
-  (-20 -10 -10 -10 -10 -10 -10 -20)
+    (-20 -10 -10 -10 -10 -10 -10 -20)
   (-10   0   0   0   0   0   0 -10)
   (-10   0   5  10  10   5   0 -10)
   (-10   5   5  10  10   5   5 -10)
@@ -1593,7 +1546,7 @@ by STRING-DESIGNATOR being its first argument."
   (-20 -10 -10 -10 -10 -10 -10 -20))
 
 (defscore *r-scores*
-  ( 0   0   0   0   0   0   0   0)
+    ( 0   0   0   0   0   0   0   0)
   ( 5  10  10  10  10  10  10   5)
   (-5   0   0   0   0   0   0  -5)
   (-5   0   0   0   0   0   0  -5)
@@ -1603,7 +1556,7 @@ by STRING-DESIGNATOR being its first argument."
   ( 0   0   0   5   5   0   0   0))
 
 (defscore *q-scores*
-  (-20 -10 -10  -5  -5 -10 -10 -20)
+    (-20 -10 -10  -5  -5 -10 -10 -20)
   (-10   0   0   0   0   0   0 -10)
   (-10   0   5   5   5   5   0 -10)
   ( -5   0   5   5   5   5   0  -5)
@@ -1613,7 +1566,7 @@ by STRING-DESIGNATOR being its first argument."
   (-20 -10 -10  -5  -5 -10 -10 -20))
 
 (defscore *k-scores-opening*
-  (-30 -40 -40 -50 -50 -40 -40 -30)
+    (-30 -40 -40 -50 -50 -40 -40 -30)
   (-30 -40 -40 -50 -50 -40 -40 -30)
   (-30 -40 -40 -50 -50 -40 -40 -30)
   (-30 -40 -40 -50 -50 -40 -40 -30)
@@ -1623,7 +1576,7 @@ by STRING-DESIGNATOR being its first argument."
   ( 20  30  10   0   0  10  30  20))
 
 (defscore *k-scores-ending*
-  (-50 -40 -30 -20 -20 -30 -40 -50)
+    (-50 -40 -30 -20 -20 -30 -40 -50)
   (-30 -20 -10   0   0 -10 -20 -30)
   (-30 -10  20  30  30  20 -10 -30)
   (-30 -10  30  40  40  30 -10 -30)
@@ -1751,11 +1704,11 @@ by STRING-DESIGNATOR being its first argument."
                    (setf score (- (quies game (- β) (- α)
                                          (game-compute-moves game)
                                          line))))
-                 (when (>= score β)
-                   (return β))
-                 (when (> score α)
-                   (setf α score)
-                   (setf (car pline) (cons move (car line))))
+              (when (>= score β)
+                (return β))
+              (when (> score α)
+                (setf α score)
+                (setf (car pline) (cons move (car line))))
               finally (return α)))))
 
 ;; (declaim (type (function () score) pvs))
@@ -1791,23 +1744,23 @@ by STRING-DESIGNATOR being its first argument."
                 (loop for first = t then nil
                       for line = (cons nil nil)
                       for move in moves do
-                        ;; (when (= depth 5)
-                        ;;   (format t "Researching: ~A (~A..~A ~A)~%"
-                        ;;           (dump-line game (list move))
-                        ;;           α β score))
-                        (with-move (game move t)
-                          (cond
-                            (first
-                             (setf score (- (rec (1- depth) (- β) (- α) line))))
-                            (t
-                             (setf score (- (rec (1- depth) (- 0 α 1) (- α) line)))
-                             (when (< α score β)
-                               (setf score (- (rec (1- depth) (- β) (- score) line)))))))
-                        (when (> score α)
-                          (setf α score)
-                          (setf (car pline) (cons move (car line))))
-                        (when (>= α β)
-                          (return-from rec α))))
+                      ;; (when (= depth 5)
+                      ;;   (format t "Researching: ~A (~A..~A ~A)~%"
+                      ;;           (dump-line game (list move))
+                      ;;           α β score))
+                      (with-move (game move t)
+                        (cond
+                          (first
+                           (setf score (- (rec (1- depth) (- β) (- α) line))))
+                          (t
+                           (setf score (- (rec (1- depth) (- 0 α 1) (- α) line)))
+                           (when (< α score β)
+                             (setf score (- (rec (1- depth) (- β) (- score) line)))))))
+                      (when (> score α)
+                        (setf α score)
+                        (setf (car pline) (cons move (car line))))
+                      (when (>= α β)
+                        (return-from rec α))))
               α)))))
     (rec start-depth α β pline)))
 
@@ -1827,9 +1780,9 @@ by STRING-DESIGNATOR being its first argument."
                                       (- (score (1- depth) (- β) (- α))))
                         finally (return α)
                         when (> score α)
-                          do (setf α score)
+                        do (setf α score)
                         when (>= α β)
-                          do (return α)))))))
+                        do (return α)))))))
     (let ((scores (loop for m in (sort-moves (game-compute-moves game))
                         collect (cons m (with-move (game m)
                                           (score depth -32000 32000))))))
@@ -1864,8 +1817,8 @@ by STRING-DESIGNATOR being its first argument."
       (rec moves t))))
 
 (defun play (&key
-               (fen +FEN-START+)
-               (depth +MAX-DEPTH+))
+             (fen +FEN-START+)
+             (depth +MAX-DEPTH+))
   (let ((game (make-game))
         (history (list)))
     (reset-from-fen game fen)
@@ -1890,69 +1843,69 @@ by STRING-DESIGNATOR being its first argument."
                   :draw)))))
 
       (loop
-        (awhen (finished?)
-          (format t "Game ended: ~A~%" it))
-        (print-board (game-board game))
-        (format t "~A: " (if (is-white? (game-side game))
-                             "White" "Black"))
-        (finish-output)
-        (let ((line (read-line *standard-input* nil)))
-          (cond
-            ((null line)
-             (return))
+       (awhen (finished?)
+         (format t "Game ended: ~A~%" it))
+       (print-board (game-board game))
+       (format t "~A: " (if (is-white? (game-side game))
+                            "White" "Black"))
+       (finish-output)
+       (let ((line (read-line *standard-input* nil)))
+         (cond
+           ((null line)
+            (return))
 
-            ((string= line ""))
+           ((string= line ""))
 
-            ((or (string= line "exit")
-                 (string= line "end"))
-             (return))
+           ((or (string= line "exit")
+                (string= line "end"))
+            (return))
 
-            ((string= line "go")
-             (computer-move))
+           ((string= line "go")
+            (computer-move))
 
-            ((string= line "restart")
-             (reset-from-fen game fen)
-             (setf history (list)))
+           ((string= line "restart")
+            (reset-from-fen game fen)
+            (setf history (list)))
 
-            ((string= line "reset")
-             (reset-game game)
-             (setf fen +FEN-START+
-                   history (list)))
+           ((string= line "reset")
+            (reset-game game)
+            (setf fen +FEN-START+
+                  history (list)))
 
-            ((string= line "undo")
-             (pop history)
-             (reset-from-fen game fen)
-             (mapc (lambda (move)
-                     (game-move game move))
-                   (reverse history)))
+           ((string= line "undo")
+            (pop history)
+            (reset-from-fen game fen)
+            (mapc (lambda (move)
+                    (game-move game move))
+                  (reverse history)))
 
-            ((string= line "pgn")
-             (let ((game (make-game)))
-               (reset-from-fen game fen)
-               (let ((*unicode* nil))
-                 (format t "~A~%" (dump-line game (reverse history))))))
+           ((string= line "pgn")
+            (let ((game (make-game)))
+              (reset-from-fen game fen)
+              (let ((*unicode* nil))
+                (format t "~A~%" (dump-line game (reverse history))))))
 
-            ((string= line "fen")
-             (let ((*unicode* nil))
-               (format t "~A~%" (game-fen game))))
+           ((string= line "fen")
+            (let ((*unicode* nil))
+              (format t "~A~%" (game-fen game))))
 
-            (t
-             (let ((moves (game-parse-san game line)))
-               (cond
-                 ((null moves)
-                  (format t "Invalid move: ~A~%" line))
-                 ((> (length moves) 1)
-                  (format t "Ambiguous move: ~{~A~^, ~}~%"
-                          (mapcar (lambda (m)
-                                    (game-san game m))
-                                  moves)))
-                 (t
-                  (push (car moves) history)
-                  (game-move game (car moves))
-                  (print-board (game-board game))
-                  (computer-move)))))))
+           (t
+            (let ((moves (game-parse-san game line)))
+              (cond
+                ((null moves)
+                 (format t "Invalid move: ~A~%" line))
+                ((> (length moves) 1)
+                 (format t "Ambiguous move: ~{~A~^, ~}~%"
+                         (mapcar (lambda (m)
+                                   (game-san game m))
+                                 moves)))
+                (t
+                 (push (car moves) history)
+                 (game-move game (car moves))
+                 (print-board (game-board game))
+                 (computer-move)))))))
 
-        (format t "~%")))))
+       (format t "~%")))))
 
 ;;;; FILE: tests.lisp
 
@@ -1978,10 +1931,10 @@ by STRING-DESIGNATOR being its first argument."
                                    (skip-whitespace)
                                    (skip #\;)
                                    (skip #\D)
-                                   (read-number))
+                                   (read-integer))
                                  (progn
                                    (skip-whitespace)
-                                   (read-number))))))
+                                   (read-integer))))))
                 (let ((count (perft game depth))
                       (result (cdr (assoc depth results))))
                   (cond

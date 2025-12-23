@@ -1,7 +1,7 @@
 [Event "rated rapid game"]
 [Site "https://lichess.org/MwkbyY3G"]
 [Date "2025.09.11"]
-[White "fanat2017"]
+[White "fanat\"2017\""]
 [Black "vlbz"]
 [Result "0-1"]
 [GameId "MwkbyY3G"]
@@ -16,6 +16,14 @@
 [ECO "A61"]
 [Termination "Normal"]
 
-1. d4 Nf6 2. Nf3 c5 3. d5 e6 4. c4 exd5 5. cxd5 d6 6. Nc3 g6 7. Bg5 h6 8. Bf4 a6 9. a4 Nbd7 10. h3 Qe7 11. e3 b6 12. Bc4 Bb7 13. O-O Ne4 14. Qd3 f5 15. Nd2 Nxd2 16. Qxd2 Ne5 17. b3 Bg7 18. Rac1 O-O 19. Be2 h5 20. Bh2 Rae8 21. Rfe1 Qh4 22. Bg3 Qf6 23. h4 Bh6 24. Bf1 Ng4 25. Nd1 f4 26. exf4 Rxe1 27. Qxe1 Bxf4 28. Bxf4 Qxf4 29. Rc2 Qh2# 0-1
+{ multi
+line
+comment }
+
+1. d4 Nf6 2. Nf3 c5 3. d5 e6 4. c4 exd5 5. cxd5 d6 6. Nc3 g6 7. Bg5 h6 8. Bf4
+   a6 9. a4 Nbd7 10. h3 Qe7 11. e3 b6 12. Bc4 Bb7 13. O-O Ne4 14. Qd3 f5 15.
+   Nd2 Nxd2 16. Qxd2 Ne5 17. b3 Bg7 18. Rac1 O-O 19. Be2 h5 20. Bh2 Rae8 21.
+   Rfe1 Qh4 22. Bg3 Qf6 23. h4 Bh6 24. Bf1 Ng4 25. Nd1 f4 26. exf4 Rxe1 27.
+   Qxe1 Bxf4 28. Bxf4 Qxf4 29. Rc2 Qh2# 0-1
 
 
