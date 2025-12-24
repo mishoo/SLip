@@ -114,6 +114,9 @@
 (defun logtest (integer1 integer2)
   (/= 0 (op-and integer1 integer2)))
 
+(define-compiler-macro logtest (integer1 integer2)
+  `(/= 0 (op-and ,integer1 ,integer2)))
+
 (defun logcount (integer)
   (op-cnt integer))
 

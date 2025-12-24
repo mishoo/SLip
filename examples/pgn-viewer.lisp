@@ -2,7 +2,7 @@
 (load "lib/dom.lisp")
 
 (defpackage :pgn-viewer
-  (:use :sl)
+  (:use :sl :queen)
   (:local-nicknames (:q :queen)))
 
 (in-package :pgn-viewer)
@@ -17,8 +17,8 @@
   (display-game (q:parse-pgn pgn :ext-moves t)))
 
 (defmethod display-game ((pgn cons))
-  (let* ((dlg (dom:make-dialog 700 530
-                               :content (dom:from-html (make-layout pgn))
+  (let* ((dlg (dom:make-dialog 850 550
+                               :content (make-layout pgn)
                                :class-name "pgn-viewer"))
          (thread nil)
          (start-fen (get-header pgn "FEN" q:+fen-start+))
@@ -251,6 +251,9 @@
                 (dom:prevent-default event)
                 (dom:close-dialog dlg)
                 (display-game pgn))
+               ("d"
+                (when (dom:meta-key event)
+                  (ymacs:focus-editor)))
                (t
                 (let ((btn (dom:query dlg (format nil "button[data-key~~=\"~A\"]" (dom:key event)))))
                   (when btn
@@ -446,8 +449,8 @@
                         (get-header pgn "Black" "Black")
                         (get-header pgn "BlackElo" "?")
                         (get-header pgn "BlackRatingDiff" "")
-                        (get-header pgn "Result" "*"))))
-    (format nil "
+                        (get-header pgn "Result" "*")))
+         (html (format nil "
 <div class='layout'>
   <div class='cont-board'>
     <div class='board _board'>
@@ -465,12 +468,53 @@
     <div style='padding-left: 20px'></div>
     <button data-action='fen' data-key='F f C c' title='Copy FEN to clipboard'>F</button>
   </div>
-  <div class='cont-list _cont-list'><form>~A</form></div>
+  <div class='cont-list _cont-list'><div class='event-info _info'></div><form>~A</form></div>
   <div class='cont-title _drag-dialog'>~A</div>
 </div>
 "
-            (moves-html pgn)
-            title)))
+                       (moves-html pgn)
+                       title))
+         (node (dom:from-html html))
+         (info (dom:query node "._info")))
+    (labels ((add-info (name &key (label name) (trans nil))
+               (let ((value (get-header pgn name)))
+                 (when value
+                   (when (regexp-test #/^https?:\/\// value)
+                     (setf value (format nil "<a target='_blank' href='~A'>~A</a>"
+                                         value value)))
+                   (when trans (setf value (funcall trans value)))
+                   (let ((el (dom:from-html (format nil "<span class='name'>~A</span><span class='value'>~A</span>"
+                                                    label value))))
+                     (dom:append-to info el))))))
+      (add-info "Event")
+      (add-info "Site")
+      (add-info "Date"
+                :trans (lambda (val)
+                         (aif (get-header pgn "UTCTime")
+                              (format nil "~A (~A)" val it)
+                              val)))
+      (add-info "White"
+                :trans (lambda (val)
+                         (aif (get-header pgn "WhiteElo")
+                              (format nil "~A [~A~@[~A~]]" val it
+                                      (get-header pgn "WhiteRatingDiff"))
+                              val)))
+      (add-info "Black"
+                :trans (lambda (val)
+                         (aif (get-header pgn "BlackElo")
+                              (format nil "~A [~A~@[~A~]]" val it
+                                      (get-header pgn "BlackRatingDiff"))
+                              val)))
+      (add-info "Result"
+                :trans (lambda (val)
+                         (case val
+                           ("1-0" "white wins")
+                           ("0-1" "black wins")
+                           ("1/2-1/2" "draw")
+                           (t val))))
+      (add-info "Termination" :label "Term"
+                :trans (lambda (val) (format nil "~A termination" val))))
+    node))
 
 (defun pieces-html (board)
   (with-output-to-string (output)
@@ -486,26 +530,36 @@
                  (q:piece-char piece)))))))
 
 (defun moves-html (pgn)
-  (with-output-to-string (output)
-    (write-string "<div class='moves-list'>" output)
-    (loop with index = 0
-          for (tag . data) in (getf pgn :moves)
-          when (eq tag :move)
-          do (progn
-               (let ((move (pop data))
-                     (san (getf data :san))
-                     (fen-before (getf data :fen-before))
-                     (fen-after (getf data :fen-after)))
-                 (when (q:move-white? move)
-                   (format output "<div class='index'>~D</div>" (incf index)))
-                 (format output "<div class='~A'>~
-                   <label class='move'>~
+  (let ((moves (remove :move (getf pgn :moves) :test-not #'eq :key #'car)))
+    (unless (q:move-white? (getf (car moves) :move))
+      (push nil moves))
+    (setf moves (loop for (white black) on moves by #'cddr
+                      collect (cons white black)))
+    (with-output-to-string (output)
+      (write-string "<div class='moves-list'>" output)
+      (flet ((mkmove (move)
+               (let ((san (getf move :san))
+                     (fen-before (getf move :fen-before))
+                     (fen-after (getf move :fen-after))
+                     (move (getf move :move)))
+                 (format output "<span class='~A'>~
+                   <label>~
                      <input name='move' type='radio' data-fen-before='~A' data-fen-after='~A' data-move='~A' />~
                      ~A~
-                   </label></div>"
+                   </label></span>"
                          (if (q:move-white? move) "white" "black")
                          fen-before fen-after move san))))
-    (write-string "</div>" output)))
+        (loop with index = 0
+              for (white . black) in moves
+              do (progn
+                   (format output "<div class='move'><span class='index'>~D.</span> " (incf index))
+                   (cond
+                     (white (mkmove white))
+                     (t (format output "<span class='white'>..</span>")))
+                   (write-char #\Space output)
+                   (when black (mkmove black))
+                   (write-string "</div> " output))))
+      (write-string "</div>" output))))
 
 (defun test ()
   (display-game (sl-stream:open-url "examples/test.pgn")))

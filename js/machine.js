@@ -338,8 +338,27 @@ class LispCatch {
 
 var optimize = (function(){
     function find_target(code, label) {
-        return code.indexOf(label);
+        let idx = code.indexOf(label);
+        if (idx >= 0) {
+            while (++idx < code.length) {
+                if (!(code[idx] instanceof LispSymbol)) {
+                    return idx;
+                }
+            }
+        }
+        return 0;
     };
+    function next_instr(code, i, len) {
+        let a = [];
+        while (i < code.length && len > 0) {
+            if (!(code[i] instanceof LispSymbol)) {
+                a.push(code[i]);
+                --len;
+            }
+            ++i;
+        }
+        return a;
+    }
     function used_label(code, label) {
         for (var i = code.length; --i >= 0;) {
             var el = code[i];
@@ -386,6 +405,33 @@ var optimize = (function(){
         if (i+2 < code.length && code[i][0] == "FJUMPK" && code[i+1][0] == "JUMP" && code[i+2] === code[i][1]) {
             // [FJUMPK L1] [JUMP L2] L1 -> [TJUMPK L2] L1
             code.splice(i, 2, [ "TJUMPK", code[i+1][1] ]);
+            return true;
+        }
+        if (i+1 < code.length && code[i][0] == "NIL" && code[i+1][0] == "JUMP") {
+            // [NIL] [JUMP L1] ... L1 [FJUMP L2] -> [JUMP L2]
+            let tgt = find_target(code, code[i+1][1]);
+            if (tgt && code[tgt][0] == "FJUMP") {
+                code.splice(i, 1, [ "JUMP", code[tgt][1] ]);
+                return true;
+            }
+        }
+        if (code[i][0] == "FJUMP") {
+            // [FJUMP L1] ... L1 [NIL] [FJUMP L2] -> [FJUMP L2]
+            let tgt = find_target(code, code[i][1]);
+            if (tgt) {
+                let a = next_instr(code, tgt, 2); // discard in-between labels
+                if (a.length == 2 && a[0][0] == "NIL" && a[1][0] == "FJUMP") {
+                    code[i][1] = a[1][1];
+                    return true;
+                }
+            }
+        }
+        if (i+1 < code.length && code[i][0] == "NUMNEQ" && code[i+1][0] == "NOT") {
+            code.splice(i, 2, [ "NUMEQ" ]);
+            return true;
+        }
+        if (i+1 < code.length && code[i][0] == "NUMEQ" && code[i+1][0] == "NOT") {
+            code.splice(i, 2, [ "NUMNEQ" ]);
             return true;
         }
         if (/^(?:JUMP|LJUMP|RET|LRET|CALL|APPLY)$/.test(el[0])) {
@@ -543,15 +589,15 @@ var optimize = (function(){
           case "TJUMPK":
             // SAVE L1; ... L1: JUMP L2 --> SAVE L2
             var idx = find_target(code, el[1]);
-            if (idx >= 0 && idx+1 < code.length && code[idx + 1][0] == "JUMP") {
-                el[1] = code[idx + 1][1];
+            if (idx && code[idx][0] == "JUMP") {
+                el[1] = code[idx][1];
                 return true;
             }
             break;
           case "JUMP":
             var idx = find_target(code, el[1]);
-            if (idx >= 0 && idx+1 < code.length && /^(?:JUMP|RET)$/.test(code[idx + 1][0])) {
-                code[i] = code[idx + 1];
+            if (idx && /^(?:JUMP|RET)$/.test(code[idx][0])) {
+                code[i] = code[idx];
                 return true;
             }
             break;

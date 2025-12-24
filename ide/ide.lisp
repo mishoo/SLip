@@ -9,7 +9,7 @@
 
 (import '(sl-ffi:defun-js))
 (import '(sl::defun-memoize2))
-(export '(make-dialog signal-info))
+(export '(make-dialog signal-info focus-editor))
 
 (defun grep (list pred)
   (when list
@@ -35,6 +35,10 @@
 
 (defun-js signal-info (text &key is-html timeout anchor type) "
   YMACS.popupMessage({ text, isHtml: is_html, timeout, anchor, type });
+")
+
+(defun-js focus-editor () "
+  YMACS.focus();
 ")
 
 (defun send-ymacs-notify (what value)

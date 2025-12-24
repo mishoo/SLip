@@ -276,36 +276,68 @@
         }
     }
 
-    .moves-list {
+    .event-info {
+        font-family: sans-serif;
+        font-size: 90%;
         display: grid;
-        grid-template-columns: 5em 1fr 1fr;
-        align-items: center;
-        .index {
-            color: #776;
+        grid-template-columns: min-content 1fr;
+        min-width: 25em;
+        &:not(:empty) {
+            padding-top: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #bba;
+            margin-bottom: 8px;
+            background: #cdc;
+        }
+        .name {
             grid-column: 1;
+            font-weight: bold;
+            margin-left: 8px;
+            margin-right: 8px;
             text-align: right;
-            padding: 2px 25px 2px 5px;
-            font-family: sans-serif;
-            font-size: 90%;
             &::after {
-                content: ".";
+                content: ":";
             }
         }
-        .white {
+        .value {
             grid-column: 2;
         }
-        .black {
-            grid-column: 3;
+        a:link, a:visited {
+            color: #22d;
         }
     }
 
-    label.move {
-        display: block;
-        input { display: none }
-        padding: 2px 5px;
-        &:has(input:checked) {
-            background-color: #575;
-            color: #fff;
+    .moves-list {
+        font-family: sans-serif;
+        align-items: center;
+        margin: 8px;
+        .move {
+            white-space: nowrap;
+            display: inline-block;
+            margin-right: 8px;
+            padding: 2px 4px;
+
+            &:has(input:checked) {
+                background: #ded;
+            }
+
+            label {
+                cursor: pointer;
+                padding: 0 2px;
+                input { display: none }
+                &:has(input:checked) {
+                    background-color: #575;
+                    color: #fff;
+                }
+                &:hover {
+                    background: #fff;
+                }
+            }
+        }
+        .index {
+            text-align: right;
+            font-family: sans-serif;
+            font-weight: bold;
         }
     }
 }
