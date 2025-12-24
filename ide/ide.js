@@ -26,6 +26,7 @@ Ymacs_Keymap.get("emacs").defineKeys({
     "C-\\"    : "switch_to_buffer",
     "C-z"     : "switch_to_buffer",
     "M-,"     : "sl_xref_back_history",
+    "s-d"     : "sl_focus_dialog",
 });
 
 function webdav_load(filename, cont) {
@@ -616,6 +617,12 @@ Ymacs_Buffer.newCommands({
                 });
             });
         });
+    }),
+    sl_focus_dialog: Ymacs_Interactive(function(){
+        let dlg = this.ymacs.getElement().querySelector(".Ymacs_Dialog");
+        if (dlg) {
+            dlg.focus();
+        }
     }),
 });
 

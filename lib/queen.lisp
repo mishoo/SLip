@@ -1132,10 +1132,7 @@ by STRING-DESIGNATOR being its first argument."
 
     moves))
 
-(defgeneric game-parse-san (game input &optional moves))
-
-(defmethod game-parse-san (game (in stream)
-                                &optional (moves (game-compute-moves game)))
+(defun %game-parse-san (game in moves)
   (let* ((side (game-side game))
          (white (is-white? side))
          (promo nil)
@@ -1224,14 +1221,14 @@ by STRING-DESIGNATOR being its first argument."
                    (when (eql (peek) #\O)
                      (next)
                      (unless (eql (next) #\-)
-                       (return-from game-parse-san nil))
+                       (return-from %game-parse-san nil))
                      (unless (eql (next) #\O)
-                       (return-from game-parse-san nil))
+                       (return-from %game-parse-san nil))
                      (cond
                        ((eql (peek) #\-)
                         (next)
                         (unless (eql (next) #\O)
-                          (return-from game-parse-san nil))
+                          (return-from %game-parse-san nil))
                         (setf piece (logior +KING+ side)
                               from  (if white $E1 $E8)
                               to    (if white $C1 $C8)))
@@ -1266,10 +1263,16 @@ by STRING-DESIGNATOR being its first argument."
 
       (loop for m in moves when (matches m) collect m))))
 
+(defgeneric game-parse-san (game input &optional moves))
+
+(defmethod game-parse-san (game (in stream)
+                                &optional (moves (game-compute-moves game)))
+  (%game-parse-san game in moves))
+
 (defmethod game-parse-san (game (san string)
                                 &optional (moves (game-compute-moves game)))
   (with-input-from-string (in san)
-    (game-parse-san game in moves)))
+    (%game-parse-san game in moves)))
 
 (defgeneric game-san (game move &optional computed-moves))
 
@@ -1421,7 +1424,7 @@ by STRING-DESIGNATOR being its first argument."
            (let ((data '()))
              (flet ((move ()
                       (let* ((comp-moves (game-compute-moves game))
-                             (valid (game-parse-san game in comp-moves)))
+                             (valid (%game-parse-san game in comp-moves)))
                         (skip-whitespace)
                         (cond
                           ((null valid)
