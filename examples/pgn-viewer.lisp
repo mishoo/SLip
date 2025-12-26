@@ -526,7 +526,7 @@
     </div>
   </div>
   <div class='cont-ctrl'>
-    <button data-action='reverse' data-key='ArrowUp ArrowDown' title='Reverse board'>🗘</button>
+    <button data-action='reverse' data-key='ArrowUp' title='Reverse board'>🗘</button>
     <div style='padding-left: 20px'></div>
     <button data-action='start' data-key='Home' title='Start position'>⏮</button>
     <button data-action='prev' data-key='ArrowLeft' title='Previous move'>❮</button>

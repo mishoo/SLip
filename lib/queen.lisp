@@ -1939,7 +1939,7 @@ by STRING-DESIGNATOR being its first argument."
 
 ;;;; FILE: tests.lisp
 
-(defvar *perft-pathname* "examples/perftsuite.epd")
+(defvar *perft-pathname* "examples/perftsuite.txt")
 
 (defun run-perft-tests (&optional (depth 3))
   (let ((input (sl-stream:open-url *perft-pathname*)))

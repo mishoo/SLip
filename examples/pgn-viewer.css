@@ -22,7 +22,7 @@
         width: 100%;
         height: 100%;
         display: grid;
-        grid-template-columns: 1fr min-content;
+        grid-template-columns: min-content 1fr;
         grid-template-rows: 2.4em 1fr min-content;
     }
 
@@ -31,6 +31,8 @@
         grid-row: 2;
         padding: 16px;
         overflow: hidden;
+        height: 100%;
+        aspect-ratio: 1/1;
 
         .board {
             align-self: center;
@@ -83,7 +85,6 @@
         overflow: auto;
         background-color: #ddc;
         border-left: 1px solid #bba;
-        min-width: 15em;
     }
 
     .cont-title {
@@ -281,7 +282,6 @@
         font-size: 90%;
         display: grid;
         grid-template-columns: min-content 1fr;
-        min-width: 25em;
         &:not(:empty) {
             padding-top: 8px;
             padding-bottom: 8px;
