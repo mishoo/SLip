@@ -3,7 +3,8 @@
   (:export #:document #:document-element
            #:create-document-fragment
            #:element #:elementp #:node #:nodep
-           #:from-html #:append-to #:remove-element #:insert-before #:insert-after
+           #:from-html #:append-to #:prepend-to #:remove-element #:insert-before #:insert-after
+           #:remove-after
            #:replace-children #:replace-with
            #:has-animations
            #:first-child #:first-element-child #:last-child #:last-element-child
@@ -76,8 +77,20 @@
 (defun-js append-to (parent child)
   "return parent.appendChild(child)")
 
+(defun-js prepend-to (parent child)
+  "return parent.insertBefore(child, parent.firstChild)")
+
 (defun-js remove-element (element)
   "return element.remove()")
+
+(defun-js remove-after (anchor) "
+  let node = anchor.nextSibling;
+  while (node) {
+    let next = node.nextSibling;
+    node.remove();
+    node = next;
+  }
+")
 
 (defun-js insert-before (anchor sibling)
   "return anchor.before(sibling)")

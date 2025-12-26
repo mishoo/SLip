@@ -339,5 +339,20 @@
             font-family: sans-serif;
             font-weight: bold;
         }
+        .variant {
+            border-top: 1px solid #bba;
+            margin: 8px 0;
+            padding: 8px 0 8px 1em;
+            border-bottom: 1px solid #bba;
+            color: #333;
+
+            &:has(input:checked) {
+                background-color: #cfcfbf;
+            }
+
+            .black {
+                margin-left: 0.5ex;
+            }
+        }
     }
 }

@@ -25,6 +25,7 @@
          (current-fen start-fen)
          (el-board (dom:query dlg "._board"))
          (el-pieces (dom:query dlg "._pieces"))
+         (el-moves (dom:query dlg "._moves-list"))
          (transitions 0))
     (setf (dom:style dlg "left") "40px"
           (dom:style dlg "bottom") "60px")
@@ -132,12 +133,25 @@
            (setf (dom:scroll-top (dom:query dlg "._cont-list")) 0))
 
          (next-move (backwards)
-           (let* ((move-elements (dom:query-all dlg "input[name='move']"))
+           (let* ((curr (dom:query dlg "input[name='move']:checked"))
+                  (cont (if curr
+                            (dom:closest curr "._variant, ._moves-list")
+                            el-moves))
+                  (move-elements (dom:query-all cont ":scope > ._move input[name='move']"))
                   (index (position-if #'dom:checked
                                       (if backwards
                                           (setf move-elements
                                                 (nreverse move-elements))
                                           move-elements))))
+             (when (and backwards index
+                        (dom:has-class cont "_variant")
+                        (= index (1- (length move-elements))))
+               (setf move-elements (dom:query-all el-moves "input[name='move']")
+                     index (position-if #'dom:checked
+                                        (if backwards
+                                            (setf move-elements
+                                                  (nreverse move-elements))
+                                            move-elements))))
              (cond
                ((and (not index) (not backwards))
                 (on-move-click (car move-elements) nil)
@@ -289,6 +303,55 @@
                           (typep row '(integer 0 7)))
                  (q:board-index row col)))))
 
+         (on-new-move (move san fen-before)
+           (let* ((move-elements (dom:query-all dlg "input[name='move']"))
+                  (index (position-if #'dom:checked move-elements))
+                  (curr (if index (elt move-elements index)))
+                  (el (if (and index (< index (1- (length move-elements))))
+                          (elt move-elements (1+ index))
+                          (car move-elements)))
+                  (variant (when curr (dom:closest curr "._variant"))))
+             (cond
+               ((and el (string= current-fen (dom:dataset el :fen-after)))
+                ;; the next move from the list has been manually played, so
+                ;; just select it and stop here.
+                (setf (dom:checked el) t)
+                (return-from on-new-move nil))
+               (variant
+                ;; if we're inside an alternate variant, bulldoze
+                ;; the rest of it.
+                (dom:remove-after (dom:closest curr "span"))
+                (dom:remove-after (dom:closest curr "._move"))
+                (cond
+                  ((move-white? move)
+                   (let* ((html (with-output-to-string (out)
+                                  (write-string "<div class='move _move'>" out)
+                                  (move-html out move san fen-before current-fen)
+                                  (write-string "</div>" out)))
+                          (el (dom:from-html html)))
+                     (dom:insert-after (dom:closest curr "._move") el)
+                     (setf (dom:checked (dom:query el "input[name='move']")) t)))
+                  (t
+                   (let* ((html (with-output-to-string (out)
+                                  (move-html out move san fen-before current-fen)))
+                          (el (dom:from-html html)))
+                     (dom:insert-after (dom:closest curr "span") el)
+                     (setf (dom:checked (dom:query el "input[name='move']")) t)))))
+               (t
+                (let* ((html (with-output-to-string (out)
+                               (write-string "<div class='variant _variant'>" out)
+                               (write-string "<div class='move _move'>" out)
+                               (unless (move-white? move)
+                                 (write-string "<span class='white'>..</span>" out))
+                               (move-html out move san fen-before current-fen)
+                               (write-string "</div>" out)
+                               (write-string "</div>" out)))
+                       (el (dom:from-html html)))
+                  (if curr
+                      (dom:insert-after (dom:closest curr "._move") el)
+                      (dom:prepend-to el-moves el))
+                  (setf (dom:checked (dom:query el "input[name='move']")) t))))))
+
          (on-piece-mousedown (piece event)
            (without-interrupts
              (let* ((index (parse-integer (dom:dataset piece :index)))
@@ -339,12 +402,15 @@
                               (dom:remove-class piece "dragging")
                               (setf (dom:style piece :translate) nil)
                               (when target-field
-                                (let ((move (find target-field moves :key #'q:move-to)))
+                                (let* ((move (find target-field moves :key #'q:move-to))
+                                       (san (q:game-san g move all-moves))
+                                       (fen-before current-fen))
                                   (q:game-move g move)
                                   (setf current-fen (q:game-fen g))
                                   (setf (dom:dataset piece :index) target-field
                                         (dom:style piece :z-index) 10)
-                                  (morph-to-fen el-pieces current-fen)))
+                                  (morph-to-fen el-pieces current-fen)
+                                  (on-new-move move san fen-before)))
                               'drag-done)))
                        (loop with drag-receivers = (make-hash
                                                     :move #'on-move
@@ -529,6 +595,17 @@
                  index
                  (q:piece-char piece)))))))
 
+(defun move-html (output move san fen-before fen-after)
+  (format output
+          "<span class='~A'>~
+             <label>~
+               <input name='move' type='radio' data-fen-before='~A' data-fen-after='~A' data-move='~A' />~
+               ~A~
+             </label>~
+           </span>"
+          (if (q:move-white? move) "white" "black")
+          fen-before fen-after move san))
+
 (defun moves-html (pgn)
   (let ((moves (remove :move (getf pgn :moves) :test-not #'eq :key #'car)))
     (unless (q:move-white? (getf (car moves) :move))
@@ -536,26 +613,20 @@
     (setf moves (loop for (white black) on moves by #'cddr
                       collect (cons white black)))
     (with-output-to-string (output)
-      (write-string "<div class='moves-list'>" output)
+      (write-string "<div class='moves-list _moves-list'>" output)
       (flet ((mkmove (move)
                (let ((san (getf move :san))
                      (fen-before (getf move :fen-before))
                      (fen-after (getf move :fen-after))
                      (move (getf move :move)))
-                 (format output "<span class='~A'>~
-                   <label>~
-                     <input name='move' type='radio' data-fen-before='~A' data-fen-after='~A' data-move='~A' />~
-                     ~A~
-                   </label></span>"
-                         (if (q:move-white? move) "white" "black")
-                         fen-before fen-after move san))))
+                 (move-html output move san fen-before fen-after))))
         (loop with index = 0
               for (white . black) in moves
               do (progn
-                   (format output "<div class='move'><span class='index'>~D.</span> " (incf index))
+                   (format output "<div class='move _move'><span class='index'>~D.</span> " (incf index))
                    (cond
                      (white (mkmove white))
-                     (t (format output "<span class='white'>..</span>")))
+                     (t (write-string "<span class='white'>..</span>" output)))
                    (write-char #\Space output)
                    (when black (mkmove black))
                    (write-string "</div> " output))))
