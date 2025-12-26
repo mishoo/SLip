@@ -14,7 +14,8 @@
 (defgeneric display-game (pgn))
 
 (defmethod display-game (pgn)
-  (display-game (q:parse-pgn pgn :ext-moves t)))
+  (display-game (let ((q:*unicode* t))
+                  (q:parse-pgn pgn :ext-moves t))))
 
 (defmethod display-game ((pgn cons))
   (let* ((dlg (dom:make-dialog 850 550
@@ -403,7 +404,8 @@
                               (setf (dom:style piece :translate) nil)
                               (when target-field
                                 (let* ((move (find target-field moves :key #'q:move-to))
-                                       (san (q:game-san g move all-moves))
+                                       (san (let ((q:*unicode* t))
+                                              (q:game-san g move all-moves)))
                                        (fen-before current-fen))
                                   (q:game-move g move)
                                   (setf current-fen (q:game-fen g))
@@ -606,31 +608,53 @@
           (if (q:move-white? move) "white" "black")
           fen-before fen-after move san))
 
+(defun %moves-html (moves out &key (index 0))
+  (let ((last-move nil)
+        (has-wrapper nil))
+    (labels
+        ((index (index)
+           (format out "<span class='index'>~D.</span>" index))
+         (wrap ()
+           (unwrap)
+           (setf has-wrapper t)
+           (format out "<div class='move _move'>"))
+         (unwrap ()
+           (when has-wrapper
+             (write-string "</div>" out)
+             (setf has-wrapper nil))))
+      (dolist (m moves)
+        (cond
+          ((eq :move (car m))
+           (let ((san (getf m :san))
+                 (fen-before (getf m :fen-before))
+                 (fen-after (getf m :fen-after))
+                 (move (getf m :move)))
+             (setf last-move move)
+             (cond
+               ((move-white? move)
+                (wrap)
+                (index (incf index))
+                (move-html out move san fen-before fen-after))
+               (t
+                (unless has-wrapper
+                  (wrap)
+                  (index index)
+                  (write-string "<span class='white'>..</span>" out))
+                (move-html out move san fen-before fen-after)
+                (unwrap)))))
+          ((eq :variant (car m))
+           (unwrap)
+           (write-string "<div class='variant _variant'>" out)
+           (%moves-html (cdr m) out
+                        :index (if (move-white? last-move) (1- index) index))
+           (write-string "</div>" out))))
+      (unwrap))))
+
 (defun moves-html (pgn)
-  (let ((moves (remove :move (getf pgn :moves) :test-not #'eq :key #'car)))
-    (unless (q:move-white? (getf (car moves) :move))
-      (push nil moves))
-    (setf moves (loop for (white black) on moves by #'cddr
-                      collect (cons white black)))
-    (with-output-to-string (output)
-      (write-string "<div class='moves-list _moves-list'>" output)
-      (flet ((mkmove (move)
-               (let ((san (getf move :san))
-                     (fen-before (getf move :fen-before))
-                     (fen-after (getf move :fen-after))
-                     (move (getf move :move)))
-                 (move-html output move san fen-before fen-after))))
-        (loop with index = 0
-              for (white . black) in moves
-              do (progn
-                   (format output "<div class='move _move'><span class='index'>~D.</span> " (incf index))
-                   (cond
-                     (white (mkmove white))
-                     (t (write-string "<span class='white'>..</span>" output)))
-                   (write-char #\Space output)
-                   (when black (mkmove black))
-                   (write-string "</div> " output))))
-      (write-string "</div>" output))))
+  (with-output-to-string (output)
+    (write-string "<div class='moves-list _moves-list'>" output)
+    (%moves-html (getf pgn :moves) output)
+    (write-string "</div>" output)))
 
 (defun test ()
   (display-game (sl-stream:open-url "examples/test.pgn")))

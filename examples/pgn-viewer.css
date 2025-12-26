@@ -333,6 +333,10 @@
                     background: #fff;
                 }
             }
+
+            .black {
+                margin-left: 0.5ex;
+            }
         }
         .index {
             text-align: right;
@@ -348,10 +352,6 @@
 
             &:has(input:checked) {
                 background-color: #cfcfbf;
-            }
-
-            .black {
-                margin-left: 0.5ex;
             }
         }
     }
