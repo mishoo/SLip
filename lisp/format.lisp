@@ -331,29 +331,30 @@
   ;; "if atmod, use the rest of the arguments as list"
   (let ((*format-current-args* (if atmod? args (car args)))
         (i 0))
-    (catch 'abort-format-iteration
-      (labels ((iterate (list)
-                 ;; (format t "~A ~A~%" list *format-current-args*)
-                 (when (or (not *format-current-args*)
-                           (eql i maxn))
-                   (throw 'abort-format-iteration nil))
-                 (dolist (x list)
-                   (cond
-                     ((listp x)
-                      (let ((handler (gethash (car x) *format-handlers*))
-                            (cmdargs (cdr x)))
-                        (setf *format-current-args*
-                              (apply handler output *format-current-args* cmdargs))))
-                     (t
-                      (%stream-put output x))))
-                 (incf i)
-                 (iterate list)))
-        (if colmod?
-            ;; iterate once for each argument sublist
-            (foreach *format-current-args*
-              (lambda (*format-current-args*)
-                (iterate sublist)))
-            ;; normal case (no colmod)
+    (labels ((iterate (list)
+               ;; (format t "~A ~A~%" list *format-current-args*)
+               (when (or (not *format-current-args*)
+                         (eql i maxn))
+                 (throw 'abort-format-iteration nil))
+               (dolist (x list)
+                 (cond
+                   ((listp x)
+                    (let ((handler (gethash (car x) *format-handlers*))
+                          (cmdargs (cdr x)))
+                      (setf *format-current-args*
+                            (apply handler output *format-current-args* cmdargs))))
+                   (t
+                    (%stream-put output x))))
+               (incf i)
+               (iterate list)))
+      (if colmod?
+          ;; iterate once for each argument sublist
+          (foreach *format-current-args*
+            (lambda (*format-current-args*)
+              (catch 'abort-format-iteration
+                (iterate sublist))))
+          ;; normal case (no colmod)
+          (catch 'abort-format-iteration
             (iterate sublist))))
     (if atmod? *format-current-args* (cdr args))))
 
