@@ -286,6 +286,7 @@
            (without-interrupts
              (active-blink el)
              (dom:prevent-default event)
+             (dom:stop-immediate-propagation event)
              (ecase (dom:dataset el :action)
                ("reverse" (on-reverse el))
                ("start" (on-start el))
@@ -369,8 +370,8 @@
                (dom:stop-immediate-propagation event)
                (dom:add-class piece "dragging")
                (dom:with-events (dom:document
-                                 ("mousemove" :capture t :signal :move)
-                                 ("mouseup" :capture t :signal :done))
+                                 ("mousemove" :capture t :signal :drag-move)
+                                 ("mouseup" :capture t :signal :drag-done))
                  (multiple-value-bind (board-x board-y board-width board-height)
                      (dom:bounding-client-rect el-board)
                    (multiple-value-bind (piece-x piece-y piece-width piece-height)
@@ -399,6 +400,8 @@
                                       (t
                                        (setf target-field nil))))))))
                           (apply-move (move)
+                            (dom:remove-class piece "dragging")
+                            (setf (dom:style piece :translate) nil)
                             (let* ((san (let ((q:*unicode* t))
                                           (q:game-san g move all-moves)))
                                    (fen-before current-fen))
@@ -411,32 +414,81 @@
                           (on-done (target ev)
                             (without-interrupts
                               (highlight-clear)
-                              (dom:remove-class piece "dragging")
                               (unless target-field
+                                (dom:remove-class piece "dragging")
                                 (setf (dom:style piece :translate) nil)
                                 (return-from on-done 'drag-done))
                               (let* ((moves (remove target-field moves :test-not #'= :key #'q:move-to)))
                                 (cond
                                   ((cdr moves)
-                                   (let ((move (select-promotion target-field moves)))
-                                     (when move
-                                       (apply-move move))))
+                                   (let ((move (select-promotion piece moves)))
+                                     (if move
+                                         (apply-move move)
+                                         (progn
+                                           (dom:remove-class piece "dragging")
+                                           (setf (dom:style piece :translate) nil)))))
                                   (t
                                    (apply-move (car moves)))))
                               'drag-done)))
                        (loop with drag-receivers = (make-hash
-                                                    :move #'on-move
-                                                    :done #'on-done)
+                                                    :drag-move #'on-move
+                                                    :drag-done #'on-done)
                              until (eq (%:%receive drag-receivers) 'drag-done)))))))))
 
-         (select-promotion (target-field moves)
+         (select-promotion (dragged-piece moves)
            (let* ((*unicode* nil)
-                  (html (format nil "<div class='promotions'>~{<div class='piece' data-piece='~A'></div>~}</div>"
-                                (mapcar #'q:piece-char (mapcar #'q:move-promoted-piece moves))))
+                  (html (format nil "<div class='promotions ~:[black~;white~]'>~{~
+                                       <div class='piece' data-move='~D' data-piece='~C'></div>~
+                                     ~}</div>"
+                                (q:move-white? (car moves))
+                                (loop for move in moves
+                                      collect move
+                                      collect (q:piece-char (q:move-promoted-piece move)))))
                   (cont (dom:from-html html)))
              (dom:append-to el-board cont)
-             (loop (%:%receive (make-hash)))
-             nil)))
+             (dom:with-events (dlg
+                               ("click" :selector ".promotions > .piece" :signal :promo-piece)
+                               ("click" :signal :promo-quit)
+                               ("keydown" :signal :promo-keydown))
+               (let ((receivers
+                      (make-hash
+                       :close #'on-close
+                       :action (lambda (btn event)
+                                 (when (eql (dom:dataset btn :action) "reverse")
+                                   (on-action btn event)))
+                       :promo-piece (lambda (el event)
+                                      (without-interrupts
+                                        (dom:stop-immediate-propagation event)
+                                        (dom:prevent-default event)
+                                        `(done-promo ,(parse-integer (dom:dataset el :move)))))
+                       :promo-keydown (lambda (_ event)
+                                        (case (dom:key event)
+                                          ("Escape" '(done-promo nil))
+                                          (("q" "Q")
+                                           `(done-promo ,(find-if #'q:is-queen? moves
+                                                                  :key #'q:move-promoted-piece)))
+                                          (("r" "R")
+                                           `(done-promo ,(find-if #'q:is-rook? moves
+                                                                  :key #'q:move-promoted-piece)))
+                                          (("b" "B")
+                                           `(done-promo ,(find-if #'q:is-bishop? moves
+                                                                  :key #'q:move-promoted-piece)))
+                                          (("k" "K")
+                                           `(done-promo ,(find-if #'q:is-knight? moves
+                                                                  :key #'q:move-promoted-piece)))))
+                       :promo-quit (lambda (el event)
+                                     (without-interrupts
+                                       ;; for some reason we immediately get a "click" on the dragged piece.
+                                       ;; we must ignore that one.
+                                       (unless (eq el dragged-piece)
+                                         (dom:stop-immediate-propagation event)
+                                         (dom:prevent-default event)
+                                         '(done-promo nil)))))))
+                 (loop for result = (%:%receive receivers)
+                       do (when (and (consp result)
+                                     (eq 'done-promo (car result)))
+                            (dom:remove-element cont)
+                            (return (cadr result)))))))))
 
       (reset)
 
@@ -447,7 +499,7 @@
                (dlg
                 ("close" :signal :close)
                 ("click" :selector "[data-action]" :signal :action)
-                ("mousedown" :selector "[data-piece]" :signal :piece-mousedown)
+                ("mousedown" :selector "._pieces > [data-piece]" :signal :piece-mousedown)
                 ("input" :selector "input[name='move']" :signal :move)
                 ("keydown" :signal :keydown)
                 ("transitionend" :signal :animation-end))
