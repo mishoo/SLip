@@ -2,7 +2,8 @@
 (load "lib/dom.lisp")
 
 (defpackage :pgn-viewer
-  (:use :sl :queen)
+  (:use :sl ;; :queen
+        )
   (:local-nicknames (:q :queen)))
 
 (in-package :pgn-viewer)
@@ -14,7 +15,8 @@
 (defgeneric display-game (pgn))
 
 (defmethod display-game (pgn)
-  (display-game (q:parse-pgn pgn :ext-moves t)))
+  (display-game (let ((q:*unicode* t))
+                  (q:parse-pgn pgn :ext-moves t))))
 
 (defmethod display-game ((pgn cons))
   (let* ((dlg (dom:make-dialog 850 550
@@ -284,6 +286,7 @@
            (without-interrupts
              (active-blink el)
              (dom:prevent-default event)
+             (dom:stop-immediate-propagation event)
              (ecase (dom:dataset el :action)
                ("reverse" (on-reverse el))
                ("start" (on-start el))
@@ -323,7 +326,7 @@
                 (dom:remove-after (dom:closest curr "span"))
                 (dom:remove-after (dom:closest curr "._move"))
                 (cond
-                  ((move-white? move)
+                  ((q:move-white? move)
                    (let* ((html (with-output-to-string (out)
                                   (write-string "<div class='move _move'>" out)
                                   (move-html out move san fen-before current-fen)
@@ -341,7 +344,7 @@
                 (let* ((html (with-output-to-string (out)
                                (write-string "<div class='variant _variant'>" out)
                                (write-string "<div class='move _move'>" out)
-                               (unless (move-white? move)
+                               (unless (q:move-white? move)
                                  (write-string "<span class='white'>..</span>" out))
                                (move-html out move san fen-before current-fen)
                                (write-string "</div>" out)
@@ -367,8 +370,8 @@
                (dom:stop-immediate-propagation event)
                (dom:add-class piece "dragging")
                (dom:with-events (dom:document
-                                 ("mousemove" :capture t :signal :move)
-                                 ("mouseup" :capture t :signal :done))
+                                 ("mousemove" :capture t :signal :drag-move)
+                                 ("mouseup" :capture t :signal :drag-done))
                  (multiple-value-bind (board-x board-y board-width board-height)
                      (dom:bounding-client-rect el-board)
                    (multiple-value-bind (piece-x piece-y piece-width piece-height)
@@ -396,26 +399,96 @@
                                        (highlight-fields (list index) "target"))
                                       (t
                                        (setf target-field nil))))))))
+                          (apply-move (move)
+                            (dom:remove-class piece "dragging")
+                            (setf (dom:style piece :translate) nil)
+                            (let* ((san (let ((q:*unicode* t))
+                                          (q:game-san g move all-moves)))
+                                   (fen-before current-fen))
+                              (q:game-move g move)
+                              (setf current-fen (q:game-fen g))
+                              (setf (dom:dataset piece :index) target-field
+                                    (dom:style piece :z-index) 10)
+                              (morph-to-fen el-pieces current-fen)
+                              (on-new-move move san fen-before)))
                           (on-done (target ev)
                             (without-interrupts
                               (highlight-clear)
-                              (dom:remove-class piece "dragging")
-                              (setf (dom:style piece :translate) nil)
-                              (when target-field
-                                (let* ((move (find target-field moves :key #'q:move-to))
-                                       (san (q:game-san g move all-moves))
-                                       (fen-before current-fen))
-                                  (q:game-move g move)
-                                  (setf current-fen (q:game-fen g))
-                                  (setf (dom:dataset piece :index) target-field
-                                        (dom:style piece :z-index) 10)
-                                  (morph-to-fen el-pieces current-fen)
-                                  (on-new-move move san fen-before)))
+                              (unless target-field
+                                (dom:remove-class piece "dragging")
+                                (setf (dom:style piece :translate) nil)
+                                (return-from on-done 'drag-done))
+                              (let* ((moves (remove target-field moves :test-not #'= :key #'q:move-to)))
+                                (cond
+                                  ((cdr moves)
+                                   (let ((move (select-promotion piece moves)))
+                                     (if move
+                                         (apply-move move)
+                                         (progn
+                                           (dom:remove-class piece "dragging")
+                                           (setf (dom:style piece :translate) nil)))))
+                                  (t
+                                   (apply-move (car moves)))))
                               'drag-done)))
                        (loop with drag-receivers = (make-hash
-                                                    :move #'on-move
-                                                    :done #'on-done)
-                             until (eq (%:%receive drag-receivers) 'drag-done))))))))))
+                                                    :drag-move #'on-move
+                                                    :drag-done #'on-done)
+                             until (eq (%:%receive drag-receivers) 'drag-done)))))))))
+
+         (select-promotion (dragged-piece moves)
+           (let* ((*unicode* nil)
+                  (html (format nil "<div class='promotions ~:[black~;white~]'>~{~
+                                       <div class='piece' data-move='~D' data-piece='~C'></div>~
+                                     ~}</div>"
+                                (q:move-white? (car moves))
+                                (loop for move in moves
+                                      collect move
+                                      collect (q:piece-char (q:move-promoted-piece move)))))
+                  (cont (dom:from-html html)))
+             (dom:append-to el-board cont)
+             (dom:with-events (dlg
+                               ("click" :selector ".promotions > .piece" :signal :promo-piece)
+                               ("click" :signal :promo-quit)
+                               ("keydown" :signal :promo-keydown))
+               (let ((receivers
+                      (make-hash
+                       :close #'on-close
+                       :action (lambda (btn event)
+                                 (when (eql (dom:dataset btn :action) "reverse")
+                                   (on-action btn event)))
+                       :promo-piece (lambda (el event)
+                                      (without-interrupts
+                                        (dom:stop-immediate-propagation event)
+                                        (dom:prevent-default event)
+                                        `(done-promo ,(parse-integer (dom:dataset el :move)))))
+                       :promo-keydown (lambda (_ event)
+                                        (case (dom:key event)
+                                          ("Escape" '(done-promo nil))
+                                          (("q" "Q")
+                                           `(done-promo ,(find-if #'q:is-queen? moves
+                                                                  :key #'q:move-promoted-piece)))
+                                          (("r" "R")
+                                           `(done-promo ,(find-if #'q:is-rook? moves
+                                                                  :key #'q:move-promoted-piece)))
+                                          (("b" "B")
+                                           `(done-promo ,(find-if #'q:is-bishop? moves
+                                                                  :key #'q:move-promoted-piece)))
+                                          (("k" "K")
+                                           `(done-promo ,(find-if #'q:is-knight? moves
+                                                                  :key #'q:move-promoted-piece)))))
+                       :promo-quit (lambda (el event)
+                                     (without-interrupts
+                                       ;; for some reason we immediately get a "click" on the dragged piece.
+                                       ;; we must ignore that one.
+                                       (unless (eq el dragged-piece)
+                                         (dom:stop-immediate-propagation event)
+                                         (dom:prevent-default event)
+                                         '(done-promo nil)))))))
+                 (loop for result = (%:%receive receivers)
+                       do (when (and (consp result)
+                                     (eq 'done-promo (car result)))
+                            (dom:remove-element cont)
+                            (return (cadr result)))))))))
 
       (reset)
 
@@ -426,7 +499,7 @@
                (dlg
                 ("close" :signal :close)
                 ("click" :selector "[data-action]" :signal :action)
-                ("mousedown" :selector "[data-piece]" :signal :piece-mousedown)
+                ("mousedown" :selector "._pieces > [data-piece]" :signal :piece-mousedown)
                 ("input" :selector "input[name='move']" :signal :move)
                 ("keydown" :signal :keydown)
                 ("transitionend" :signal :animation-end))
@@ -486,7 +559,18 @@
            ;; 2.1. maybe the piece we want is somewhere..
            (cond
              (el
-              (setf el (elt el (random (length el))))
+              (setf el (or (dolist (el el)
+                             (let ((i (parse-integer (dom:dataset el :index))))
+                               (cond
+                                 ((q:is-pawn? piece)
+                                  (when (= col (logand i 7))
+                                    (return el)))
+                                 ((q:is-bishop? piece)
+                                  (let ((diff (abs (- i index))))
+                                    (when (or (zerop (mod diff 15))
+                                              (zerop (mod diff 17)))
+                                      (return el)))))))
+                           (elt el (random (length el)))))
               (setf (dom:dataset el :index) index)
               (dom:add-class el "_morph"))
              (t
@@ -524,7 +608,7 @@
     </div>
   </div>
   <div class='cont-ctrl'>
-    <button data-action='reverse' data-key='ArrowUp ArrowDown' title='Reverse board'>🗘</button>
+    <button data-action='reverse' data-key='ArrowUp' title='Reverse board'>🗘</button>
     <div style='padding-left: 20px'></div>
     <button data-action='start' data-key='Home' title='Start position'>⏮</button>
     <button data-action='prev' data-key='ArrowLeft' title='Previous move'>❮</button>
@@ -606,31 +690,53 @@
           (if (q:move-white? move) "white" "black")
           fen-before fen-after move san))
 
+(defun %moves-html (moves out &key (index 0))
+  (let ((last-move nil)
+        (has-wrapper nil))
+    (labels
+        ((index (index)
+           (format out "<span class='index'>~D.</span>" index))
+         (wrap ()
+           (unwrap)
+           (setf has-wrapper t)
+           (format out "<div class='move _move'>"))
+         (unwrap ()
+           (when has-wrapper
+             (write-string "</div>" out)
+             (setf has-wrapper nil))))
+      (dolist (m moves)
+        (cond
+          ((eq :move (car m))
+           (let ((san (getf m :san))
+                 (fen-before (getf m :fen-before))
+                 (fen-after (getf m :fen-after))
+                 (move (getf m :move)))
+             (setf last-move move)
+             (cond
+               ((q:move-white? move)
+                (wrap)
+                (index (incf index))
+                (move-html out move san fen-before fen-after))
+               (t
+                (unless has-wrapper
+                  (wrap)
+                  (index index)
+                  (write-string "<span class='white'>..</span>" out))
+                (move-html out move san fen-before fen-after)
+                (unwrap)))))
+          ((eq :variant (car m))
+           (unwrap)
+           (write-string "<div class='variant _variant'>" out)
+           (%moves-html (cdr m) out
+                        :index (if (q:move-white? last-move) (1- index) index))
+           (write-string "</div>" out))))
+      (unwrap))))
+
 (defun moves-html (pgn)
-  (let ((moves (remove :move (getf pgn :moves) :test-not #'eq :key #'car)))
-    (unless (q:move-white? (getf (car moves) :move))
-      (push nil moves))
-    (setf moves (loop for (white black) on moves by #'cddr
-                      collect (cons white black)))
-    (with-output-to-string (output)
-      (write-string "<div class='moves-list _moves-list'>" output)
-      (flet ((mkmove (move)
-               (let ((san (getf move :san))
-                     (fen-before (getf move :fen-before))
-                     (fen-after (getf move :fen-after))
-                     (move (getf move :move)))
-                 (move-html output move san fen-before fen-after))))
-        (loop with index = 0
-              for (white . black) in moves
-              do (progn
-                   (format output "<div class='move _move'><span class='index'>~D.</span> " (incf index))
-                   (cond
-                     (white (mkmove white))
-                     (t (write-string "<span class='white'>..</span>" output)))
-                   (write-char #\Space output)
-                   (when black (mkmove black))
-                   (write-string "</div> " output))))
-      (write-string "</div>" output))))
+  (with-output-to-string (output)
+    (write-string "<div class='moves-list _moves-list'>" output)
+    (%moves-html (getf pgn :moves) output)
+    (write-string "</div>" output)))
 
 (defun test ()
   (display-game (sl-stream:open-url "examples/test.pgn")))
@@ -649,5 +755,4 @@
                            (* (- 7 row) 100))))))
 
 (defun test-promo ()
-  (display-game "1. e4 Nf6 2. e5 d5 3. exd6 Ne4 4. dxc7 Nxf2 5. cxd8=N Nxd1 6.
-  Kxd1 e5 7. Ke2 e4 8. Kf2 e3+ 9. Kg3 e2 10. Kh4 e1=Q+"))
+  (display-game "1. e4 Nf6 2. e5 d5 3. exd6 Ne4 4. dxc7 Nxf2"))

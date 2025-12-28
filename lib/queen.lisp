@@ -205,7 +205,7 @@ by STRING-DESIGNATOR being its first argument."
                         (val (read-while (lambda (curr)
                                            (and (< (incf i) n)
                                                 (eql curr (char ch i)))))))
-                   (if (= i n) val
+                   (if (string= ch val) val
                        (unless no-error
                          (croak "Expected ~A but found ~A" ch val)))))
                 (t
@@ -1420,9 +1420,12 @@ by STRING-DESIGNATOR being its first argument."
              (skip #\])
              (cons name value)))
 
-         (read-moves (game)
-           (let ((data '()))
-             (flet ((move ()
+         (read-moves (game &optional variant)
+           (let ((data nil)
+                 (prev-game nil))
+             (flet ((done ()
+                      (return-from read-moves (nreverse data)))
+                    (move ()
                       (let* ((comp-moves (game-compute-moves game))
                              (valid (%game-parse-san game in comp-moves)))
                         (skip-whitespace)
@@ -1431,6 +1434,8 @@ by STRING-DESIGNATOR being its first argument."
                            (croak "Invalid move"))
                           ((< 1 (length valid))
                            (croak "Ambiguous move")))
+                        (setf prev-game (copy-game game)
+                              (game-board prev-game) (copy-seq (game-board game)))
                         (cond
                           (ext-moves
                            (push (list :move (car valid)
@@ -1451,8 +1456,10 @@ by STRING-DESIGNATOR being its first argument."
                           (read-while (lambda (ch)
                                         (not (eql #\} ch))))
                         (skip #\}))))
-               (loop for ch = (peek) while ch do
-                     (skip-whitespace)
+               (loop for ch = (progn
+                                (skip-whitespace)
+                                (peek))
+                     while ch do
                      (cond
                        ((eql ch #\;)
                         (next)
@@ -1460,18 +1467,38 @@ by STRING-DESIGNATOR being its first argument."
                        ((eql ch #\{)
                         (next)
                         (push (cons :comment (comment2)) data))
+                       ((eql ch #\() ; variant
+                        (next)
+                        (let ((game (copy-game prev-game)))
+                          (setf (game-board game)
+                                (copy-seq (game-board game)))
+                          (push `(:variant . ,(read-moves game t)) data)))
+                       ((eql ch #\))
+                        (when variant
+                          (next)
+                          (done))
+                        (croak "Unmatched close paren"))
+                       ((eql ch #\$) ; $N annotations, not supported but skip silently
+                        (next)
+                        (read-integer))
+                       ((eql ch #\*) ; end - result unknown
+                        (next)
+                        (when variant
+                          (skip-whitespace)
+                          (skip #\)))
+                        (done))
                        (t
                         (awhen (read-integer)
                           (cond
                             ((and (= it 0) (eql (peek) #\-)) ; 0-1
                              (skip "-1")
-                             (return (nreverse data)))
+                             (done))
                             ((and (= it 1) (eql (peek) #\-)) ; 1-0
                              (skip "-0")
-                             (return (nreverse data)))
+                             (done))
                             ((and (= it 1) (eql (peek) #\/)) ; 1-2/1-2
                              (skip "/2-1/2")
-                             (return (nreverse data)))
+                             (done))
                             (t
                              (skip #\.)
                              (skip-whitespace)
@@ -1479,7 +1506,7 @@ by STRING-DESIGNATOR being its first argument."
                                (skip ".."))
                              (skip-whitespace))))
                         (move)))
-                     finally (return (nreverse data)))))))
+                     finally (done))))))
 
       (let* ((headers (loop do (skip-whitespace)
                             while (eql #\[ (peek))
@@ -1912,7 +1939,7 @@ by STRING-DESIGNATOR being its first argument."
 
 ;;;; FILE: tests.lisp
 
-(defvar *perft-pathname* "examples/perftsuite.epd")
+(defvar *perft-pathname* "examples/perftsuite.txt")
 
 (defun run-perft-tests (&optional (depth 3))
   (let ((input (sl-stream:open-url *perft-pathname*)))

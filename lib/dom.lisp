@@ -275,8 +275,9 @@
                                         ,@(aif (getf (cdr ev) :capture)
                                                `(:capture ,it))))
                           handlers events)))
-         ,@body
-         (done-events)))))
+         (unwind-protect
+             (progn ,@body)
+           (done-events))))))
 
 (defun-js prevent-default (event) "return event.preventDefault()")
 (defun-js stop-propagation (event) "return event.stopPropagation()")
