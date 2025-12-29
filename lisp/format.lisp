@@ -331,22 +331,24 @@
   ;; "if atmod, use the rest of the arguments as list"
   (let ((*format-current-args* (if atmod? args (car args)))
         (i 0))
-    (labels ((iterate (list)
-               ;; (format t "~A ~A~%" list *format-current-args*)
-               (when (or (not *format-current-args*)
-                         (eql i maxn))
-                 (throw 'abort-format-iteration nil))
-               (dolist (x list)
-                 (cond
-                   ((listp x)
-                    (let ((handler (gethash (car x) *format-handlers*))
-                          (cmdargs (cdr x)))
-                      (setf *format-current-args*
-                            (apply handler output *format-current-args* cmdargs))))
-                   (t
-                    (%stream-put output x))))
-               (incf i)
-               (iterate list)))
+    (flet ((iterate (list)
+             (cond
+               ((eql i maxn)
+                (throw 'abort-format-iteration nil))
+               ((not *format-current-args*)
+                (if ensure-once?
+                    (setf ensure-once? nil)
+                    (throw 'abort-format-iteration nil))))
+             (dolist (x list)
+               (cond
+                 ((listp x)
+                  (let ((handler (gethash (car x) *format-handlers*))
+                        (cmdargs (cdr x)))
+                    (setf *format-current-args*
+                          (apply handler output *format-current-args* cmdargs))))
+                 (t
+                  (%stream-put output x))))
+             (incf i)))
       (if colmod?
           ;; iterate once for each argument sublist
           (foreach *format-current-args*
@@ -355,7 +357,9 @@
                 (iterate sublist))))
           ;; normal case (no colmod)
           (catch 'abort-format-iteration
-            (iterate sublist))))
+            (tagbody :loop (iterate sublist)
+                     (when *format-current-args*
+                       (go :loop))))))
     (if atmod? *format-current-args* (cdr args))))
 
 (def-format #\^ ()
