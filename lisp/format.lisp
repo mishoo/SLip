@@ -26,8 +26,6 @@
 
 (defparameter *format-handlers* (make-hash))
 
-(defparameter *format-current-args* nil)
-
 (defun print-object-to-string (obj)
   (with-output-to-string (out)
     (print-object obj out)))
@@ -211,13 +209,14 @@
       (read-sublist nil))))
 
 (defun %exec-format (list args stream)
-  (dolist (x list)
-    (cond ((listp x)
-           (let ((handler (gethash (car x) *format-handlers*))
-                 (cmdargs (cdr x)))
-             (setf args (apply handler stream args cmdargs))))
-          (t
-           (%stream-put stream x))))
+  (catch 'abort-format-iteration
+    (dolist (x list)
+      (cond ((listp x)
+             (let ((handler (gethash (car x) *format-handlers*))
+                   (cmdargs (cdr x)))
+               (setf args (apply handler stream args cmdargs))))
+            (t
+             (%stream-put stream x)))))
   args)
 
 ;;; directives
@@ -324,43 +323,67 @@
 
 ;;; iteration
 
+(defparameter *iteration-last-sublist* nil)
+
 (def-format #\{ (ensure-once? #:end-at? sublist maxn)
   ;; "If str is empty, then an argument is used as str."
   (unless sublist
     (setf sublist (%parse-format (pop args))))
   ;; "if atmod, use the rest of the arguments as list"
-  (let ((*format-current-args* (if atmod? args (car args)))
-        (i 0))
-    (labels ((iterate (list)
-               ;; (format t "~A ~A~%" list *format-current-args*)
-               (when (or (not *format-current-args*)
-                         (eql i maxn))
-                 (throw 'abort-format-iteration nil))
-               (dolist (x list)
-                 (cond
-                   ((listp x)
-                    (let ((handler (gethash (car x) *format-handlers*))
-                          (cmdargs (cdr x)))
-                      (setf *format-current-args*
-                            (apply handler output *format-current-args* cmdargs))))
-                   (t
-                    (%stream-put output x))))
-               (incf i)
-               (iterate list)))
-      (if colmod?
-          ;; iterate once for each argument sublist
-          (foreach *format-current-args*
-            (lambda (*format-current-args*)
-              (catch 'abort-format-iteration
-                (iterate sublist))))
-          ;; normal case (no colmod)
-          (catch 'abort-format-iteration
-            (iterate sublist))))
-    (if atmod? *format-current-args* (cdr args))))
+  (let ((myargs (if atmod? args (pop args)))
+        (count 0))
+    (flet ((iterate (args list set-myargs)
+             (cond
+               ((eql count maxn)
+                (throw 'max-format-iterations nil))
+               ((not args)
+                (if ensure-once?
+                    (setf ensure-once? nil)
+                    (throw 'abort-format-iteration nil))))
+             (incf count)
+             (dolist (x list)
+               (cond
+                 ((listp x)
+                  (let ((handler (gethash (car x) *format-handlers*))
+                        (cmdargs (cdr x)))
+                    (setf args
+                          (apply handler output args cmdargs))
+                    (when set-myargs
+                      (setf myargs args))))
+                 (t
+                  (%stream-put output x))))
+             args))
+      (catch 'max-format-iterations
+        (cond
+          (colmod?
+           ;; iterate once for each argument sublist
+           (let ((*iteration-last-sublist* nil))
+             (foreach myargs
+               (lambda (args)
+                 (catch 'abort-format-iteration
+                   (iterate args sublist nil)
+                   (pop myargs)
+                   (unless (cdr myargs)
+                     (setf *iteration-last-sublist* t)))))))
+          (t
+           ;; normal case (no colmod)
+           (catch 'abort-format-iteration
+             (tagbody :loop (setf myargs (iterate myargs sublist t))
+                      (when myargs
+                        (go :loop))))))))
+    (if atmod? myargs args)))
 
-(def-format #\^ ()
-  (or *format-current-args*
-      (throw 'abort-format-iteration nil)))
+(def-format #\^ ((a nil) (b nil) (c nil))
+  (cond
+    (colmod?
+     (when *iteration-last-sublist*
+       (throw 'max-format-iterations nil)))
+    ((if a (if b (if c (<= a b c)
+                     (eql a b))
+               (zerop a))
+         (not args))
+     (throw 'abort-format-iteration nil)))
+  args)
 
 (def-format #\} ()
   (error "Unmatched ~~}"))

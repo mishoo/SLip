@@ -413,7 +413,6 @@
                               (on-new-move move san fen-before)))
                           (on-done (target ev)
                             (without-interrupts
-                              (highlight-clear)
                               (unless target-field
                                 (dom:remove-class piece "dragging")
                                 (setf (dom:style piece :translate) nil)
@@ -425,6 +424,7 @@
                                      (if move
                                          (apply-move move)
                                          (progn
+                                           (highlight-clear)
                                            (dom:remove-class piece "dragging")
                                            (setf (dom:style piece :translate) nil)))))
                                   (t

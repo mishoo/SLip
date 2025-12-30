@@ -2379,15 +2379,23 @@
      (comp-catch (tag body env val? more?)
        (if body
            (let ((k1 (mklabel)))
-             (%seq (comp tag env t t)
-                   (gen "CATCH" k1)
-                   (comp-seq body env val? more?)
-                   (vector k1)
-                   (if val?
-                       (if more?
-                           (gen "UNFR" 0 1)
-                           (gen "RET"))
-                       (gen "POP"))))
+             (cond
+               ((not val?)
+                (%seq (comp tag env t t)
+                      (gen "CATCH" k1)
+                      ;; we still want body to leave the value on the stack,
+                      ;; so in normal termination it wouldn't be popped twice.
+                      (comp-seq body env t more?)
+                      (vector k1)
+                      (gen "POP")))
+               (t
+                (%seq (comp tag env t t)
+                      (gen "CATCH" k1)
+                      (comp-seq body env t more?)
+                      (vector k1)
+                      (if more?
+                          (gen "UNFR" 0 1)
+                          (gen "RET"))))))
            (comp-const nil val? more?)))
 
      (comp-throw (tag ret env)
