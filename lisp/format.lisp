@@ -232,17 +232,18 @@
   args)
 
 ;; fresh-line
-(labels ((fresh-line (stream)
-           (when (> (%stream-col stream) 0)
-             (%stream-put stream #\Newline))))
-  (def-format #\& ((n 1))
-    (when (> n 0)
-      (fresh-line output)
-      (let looop ((n (1- n)))
-        (when (> n 0)
-          (%stream-put output #\Newline)
-          (looop (1- n)))))
-    args))
+(defun %fresh-line (stream)
+  (when (> (%stream-col stream) 0)
+    (%stream-put stream #\Newline)))
+
+(def-format #\& ((n 1))
+  (when (> n 0)
+    (%fresh-line output)
+    (let looop ((n (1- n)))
+      (when (> n 0)
+        (%stream-put output #\Newline)
+        (looop (1- n)))))
+  args)
 
 ;; tilde
 (def-format #\~ ((n 1))
