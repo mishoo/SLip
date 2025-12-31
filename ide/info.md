@@ -70,10 +70,13 @@ bindings; to get a crude list of all of them, press `C-h m`):
 
 - `C-c C-r` — evaluate the selection (region).
 
-- `C-c Enter` — macroexpand-1 the current expression (the cursor must be on
-  the opening paren). The output goes to the REPL.
+- `C-c Enter` or `s-m` (Super-m, that's generally the Windows key) —
+  `macroexpand-1` the current expression (the cursor must be on the opening
+  paren). The output goes to the REPL.
 
-- `C-c M-m` — macroexpand-all the current expression.
+- `C-c M-m` or `S-s-m` — `macroexpand-all` the current expression. Use a
+  prefix argument (`C-u`) if you'd like to expand compiler macros as well
+  (that's handy for debugging compiler macros).
 
 - `C-c Delete` — clear the REPL buffer.
 

@@ -278,8 +278,7 @@
 
          (on-fen (target)
            (if (dom:clipboard-write-text current-fen)
-               (ymacs:signal-info (format nil "FEN copied" current-fen)
-                                  :timeout 1000 :anchor target)
+               (ymacs:signal-info "FEN copied" :timeout 1000 :anchor target)
                (ymacs:signal-info "Didn't work (permissions?)" :timeout 3000)))
 
          (on-action (el event)

@@ -86,8 +86,8 @@ let Ymacs_Keymap_SL = Ymacs_Keymap.define("slip", {
     "C-c C-k"                               : "sl_compile_file",
     "C-c C-r"                               : "sl_eval_region",
     "C-c M-o && C-c Delete && C-c C-Delete" : "sl_clear_output",
-    "C-c Enter"                             : "sl_macroexpand_1",
-    "C-c M-m"                               : "sl_macroexpand_all",
+    "C-c Enter && s-m"                      : "sl_macroexpand_1",
+    "C-c M-m && S-s-m"                      : "sl_macroexpand_all",
     "M-q"                                   : "sl_indent_sexp",
     "S-M-q"                                 : "fill_paragraph",
     "S-Tab"                                 : "sl_complete_symbol",
@@ -405,25 +405,31 @@ Ymacs_Buffer.newCommands({
         buf.setCode("");
         buf.cmd("sl_repl_prompt");
     }),
-    sl_macroexpand_1: Ymacs_Interactive("d", function(point){
+    sl_macroexpand_1: Ymacs_Interactive("P\nd", function(compmacs, point){
         var code = this._bufferSubstring(point);
+        var pak = find_package(this);
         try {
-            var tmp = MACHINE().read(find_package(this), code);
+            var tmp = MACHINE().read(pak, code);
         } catch(ex) {
             throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
         }
         let expr = this.cmd("buffer_substring", point, point + tmp[1]);
-        eval_lisp(this, "(sl::print-object-to-string (%::macroexpand-1 '" + expr + "))", find_package(this));
+        this.ymacs.run_lisp("MACROEXPAND-1", pak, expr, !!compmacs, (ret) => {
+            sl_log(ret);
+        });
     }),
-    sl_macroexpand_all: Ymacs_Interactive("d", function(point){
+    sl_macroexpand_all: Ymacs_Interactive("P\nd", function(compmacs, point){
         var code = this._bufferSubstring(point);
+        var pak = find_package(this);
         try {
-            var tmp = MACHINE().read(find_package(this), code);
+            var tmp = MACHINE().read(pak, code);
         } catch(ex) {
             throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
         }
         let expr = this.cmd("buffer_substring", point, point + tmp[1]);
-        eval_lisp(this, "(sl::print-object-to-string (sl::macroexpand-all '" + expr + "))", find_package(this));
+        this.ymacs.run_lisp("MACROEXPAND-ALL", pak, expr, !!compmacs, (ret) => {
+            sl_log(ret);
+        });
     }),
     sl_eval_buffer: Ymacs_Interactive(function(){
         compile_lisp(this, this.getCode());
