@@ -231,6 +231,24 @@
       (%stream-put output #\Newline))
   args)
 
+(defun repeater-compiler-macro (decline char output args count)
+  (cond
+    ((not count)
+     `(progn (%stream-put ,output ,char)
+             ,args))
+    ((numberp count)
+     `(progn (%stream-put ,output ,(%pad-string "" count char))
+             ,args))
+    ((equal count ''FETCH)
+     `(progn (%stream-put ,output (%pad-string "" (pop ,args) ,char))
+             ,args))
+    (t decline)))
+
+(define-compiler-macro internal-format-37 ;; #\%
+    (&whole decline
+            output args colmod? atmod? &optional count)
+  (repeater-compiler-macro decline #\Newline output args count))
+
 ;; fresh-line
 (labels ((fresh-line (stream)
            (when (> (%stream-col stream) 0)
@@ -251,6 +269,11 @@
       (%stream-put output "~")
       (looop (1- n))))
   args)
+
+(define-compiler-macro internal-format-126 ;; #\~
+    (&whole decline
+            output args colmod? atmod? &optional count)
+  (repeater-compiler-macro decline #\~ output args count))
 
 ;; general-purpose ~A and ~S
 (flet ((print (output args colmod? atmod? mincol colinc minpad padchar)
@@ -373,6 +396,43 @@
                         (go :loop))))))))
     (if atmod? myargs args)))
 
+(define-compiler-macro internal-format-123 ;; #\{
+    (&whole decline
+            output args colmod? atmod? ensure-once? #:end-at?
+            &optional sublist maxn)
+  (when (or (not sublist) colmod?)
+    (return-from internal-format-123 decline))
+  `(let (,@(when (equal maxn ''FETCH)
+             (setf maxn '$maxn)
+             `(($maxn (pop ,args))))
+         (myargs ,(if atmod? args `(pop ,args))))
+     (catch 'abort-format-iteration
+       ,(cond
+          (maxn
+           (cond
+             (ensure-once?
+              `(dotimes (#:i ,maxn)
+                 ,@(%expand-format (cadr sublist) 'myargs output)
+                 (unless myargs
+                   (return))))
+             (t
+              `(dotimes (#:i ,maxn)
+                 (unless myargs
+                   (return))
+                 ,@(%expand-format (cadr sublist) 'myargs output)))))
+          (t
+           (cond
+             (ensure-once?
+              `(tagbody :loop ,@(%expand-format (cadr sublist) 'myargs output)
+                        (when myargs
+                          (go :loop))))
+             (t
+              `(tagbody :loop
+                        (when myargs
+                          ,@(%expand-format (cadr sublist) 'myargs output)
+                          (go :loop))))))))
+     ,(if atmod? 'myargs args)))
+
 (def-format #\^ ((a nil) (b nil) (c nil))
   (cond
     (colmod?
@@ -384,6 +444,13 @@
          (not args))
      (throw 'abort-format-iteration nil)))
   args)
+
+(define-compiler-macro internal-format-94 ;; #\^
+    (&whole decline
+            output args colmod? atmod? &optional a b c)
+  (when (or colmod? atmod? a b c)
+    (return-from internal-format-94 decline))
+  `(or ,args (throw 'abort-format-iteration nil)))
 
 (def-format #\} ()
   (error "Unmatched ~~}"))
@@ -468,43 +535,65 @@
     (t
      (error "Unsupported format control ~A" format))))
 
-;; (defun %expand-format (list args stream)
-;;   (with-collectors (forms)
-;;     (let looop ((list list))
-;;       (when list
-;;         (let ((x (car list)))
-;;           (cond
-;;             ((listp x)
-;;              (let ((handler (gethash (car x) *format-handlers*))
-;;                    (cmdargs (cdr x)))
-;;                (forms `(setf ,args (,handler ,stream ,args ,@(mapcar (lambda (x) `',x) cmdargs))))))
-;;             (t
-;;              (forms `(%stream-put ,stream ,x))))
-;;           (looop (cdr list)))))
-;;     forms))
-;;
-;; (define-compiler-macro format (&whole form stream format . args)
-;;   (cond
-;;     ((stringp format)
-;;      (cond
-;;        ((eq stream t)
-;;         (let ((vargs (gensym "args")))
-;;           `(let ((,vargs (list ,@args)))
-;;              ,@(%expand-format (%parse-format format) vargs '*standard-output*))))
-;;        ((eq stream nil)
-;;         (let ((vstream (gensym "stream"))
-;;               (vargs (gensym "args")))
-;;           `(let ((,vstream (%make-text-memory-output-stream))
-;;                  (,vargs (list ,@args)))
-;;              ,@(%expand-format (%parse-format format) vargs vstream)
-;;              (%get-output-stream-string ,vstream))))
-;;        (t
-;;         (let ((vstream (gensym "stream"))
-;;               (vargs (gensym "args")))
-;;           `(let ((,vstream ,stream)
-;;                  (,vargs (list ,@args)))
-;;              ,@(%expand-format (%parse-format format) vargs vstream))))))
-;;     (t form)))
+(defun quote-if-you-must (x)
+  (cond
+    ((or (eq x T)
+         (eq x NIL)
+         (stringp x)
+         (numberp x)
+         (keywordp x))
+     x)
+    (t
+     `',x)))
+
+(defun %expand-format (list args stream)
+  (with-collectors (forms)
+    (let looop ((list list))
+      (when list
+        (let ((x (car list)))
+          (cond
+            ((listp x)
+             (let ((handler (gethash (car x) *format-handlers*))
+                   (cmdargs (cdr x)))
+               (forms `(setf ,args (,handler ,stream ,args
+                                    ,@(mapcar #'quote-if-you-must cmdargs))))))
+            (t
+             (forms `(%stream-put ,stream ,x))))
+          (looop (cdr list)))))
+    forms))
+
+(define-compiler-macro format (&whole form stream format . args)
+  (cond
+    ((stringp format)
+     (cond
+       ((eq stream t)
+        (let ((vargs (gensym "args")))
+          `(let ((,vargs (list ,@args)))
+             ,@(%expand-format (%parse-format format) vargs '*standard-output*))))
+       ((eq stream nil)
+        (let ((vstream (gensym "stream"))
+              (vargs (gensym "args")))
+          `(let ((,vstream (%make-text-memory-output-stream))
+                 (,vargs (list ,@args)))
+             ,@(%expand-format (%parse-format format) vargs vstream)
+             (%get-output-stream-string ,vstream))))
+       (t
+        (let ((vstream (gensym "stream"))
+              (vargs (gensym "args"))
+              (result (gensym "result")))
+          `(let ((,vstream ,stream)
+                 (,vargs (list ,@args))
+                 (,result nil))
+             (cond
+               ((eq ,vstream t)
+                (setf ,vstream *standard-output*))
+               ((eq ,vstream nil)
+                (setf ,vstream (%make-text-memory-output-stream)
+                      ,result t)))
+             ,@(%expand-format (%parse-format format) vargs vstream)
+             (when ,result
+               (%get-output-stream-string ,vstream)))))))
+    (t form)))
 
 (defun formatter (control-string)
   (let ((parsed (%parse-format control-string)))
