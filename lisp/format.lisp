@@ -231,24 +231,6 @@
       (%stream-put output #\Newline))
   args)
 
-(defun repeater-compiler-macro (decline char output args count)
-  (cond
-    ((not count)
-     `(progn (%stream-put ,output ,char)
-             ,args))
-    ((numberp count)
-     `(progn (%stream-put ,output ,(%pad-string "" count char))
-             ,args))
-    ((equal count ''FETCH)
-     `(progn (%stream-put ,output (%pad-string "" (pop ,args) ,char))
-             ,args))
-    (t decline)))
-
-(define-compiler-macro internal-format-37 ;; #\%
-    (&whole decline
-            output args colmod? atmod? &optional count)
-  (repeater-compiler-macro decline #\Newline output args count))
-
 ;; fresh-line
 (labels ((fresh-line (stream)
            (when (> (%stream-col stream) 0)
@@ -270,51 +252,50 @@
       (looop (1- n))))
   args)
 
-(define-compiler-macro internal-format-126 ;; #\~
-    (&whole decline
-            output args colmod? atmod? &optional count)
-  (repeater-compiler-macro decline #\~ output args count))
-
 ;; general-purpose ~A and ~S
-(flet ((print (output args colmod? atmod? mincol colinc minpad padchar)
-         (cond
-           ((or (plusp mincol)
-                (plusp minpad))
-            (let ((str (print-object-to-string (car args))))
-              (%stream-put output
-                           (%pad-string str mincol padchar atmod? colinc minpad))))
-           (t
-            (print-object (car args) output)))
-         (cdr args)))
+(defun %print-general (output args colmod? atmod? mincol colinc minpad padchar)
+  (cond
+    ((or (plusp mincol)
+         (plusp minpad))
+     (let ((str (print-object-to-string (car args))))
+       (%stream-put output
+                    (%pad-string str mincol padchar atmod? colinc minpad))))
+    (t
+     (print-object (car args) output)))
+  (cdr args))
 
-  (def-format #\A ((mincol 0) (colinc 1) (minpad 0) (padchar #\Space))
-    (let ((*print-readably* nil)
-          (*print-escape* nil))
-      (print output args colmod? atmod? mincol colinc minpad padchar)))
+(def-format #\A ((mincol 0) (colinc 1) (minpad 0) (padchar #\Space))
+  (let ((*print-readably* nil)
+        (*print-escape* nil))
+    (%print-general output args colmod? atmod? mincol colinc minpad padchar)))
 
-  (def-format #\S ((mincol 0) (colinc 1) (minpad 0) (padchar #\Space))
-    (let ((*print-escape* t)
-          (*print-readably* t))
-      (print output args colmod? atmod? mincol colinc minpad padchar))))
+(def-format #\S ((mincol 0) (colinc 1) (minpad 0) (padchar #\Space))
+  (let ((*print-escape* t)
+        (*print-readably* t))
+    (%print-general output args colmod? atmod? mincol colinc minpad padchar)))
 
 ;; integers (missing ~R for now)
-(flet ((print (output args colmod? atmod? mincol padchar commachar comma-interval base)
-         (let* ((x (floor (car args)))
-                (s (if (and atmod? (plusp x))
-                       (strcat #\+ (number-string x))
-                       (number-string x base))))
-           (when colmod?
-             (setf s (%add-commas s commachar comma-interval)))
-           (%stream-put output (%pad-string (upcase s) mincol padchar t))
-           (cdr args))))
-  (def-format #\D ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-    (print output args colmod? atmod? mincol padchar commachar comma-interval 10))
-  (def-format #\B ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-    (print output args colmod? atmod? mincol padchar commachar comma-interval 2))
-  (def-format #\O ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-    (print output args colmod? atmod? mincol padchar commachar comma-interval 8))
-  (def-format #\X ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-    (print output args colmod? atmod? mincol padchar commachar comma-interval 16)))
+(defun %print-integer (output args colmod? atmod? mincol padchar commachar comma-interval base)
+  (let* ((x (floor (car args)))
+         (s (if (and atmod? (plusp x))
+                (strcat #\+ (number-string x))
+                (number-string x base))))
+    (when colmod?
+      (setf s (%add-commas s commachar comma-interval)))
+    (%stream-put output (%pad-string (upcase s) mincol padchar t))
+    (cdr args)))
+
+(def-format #\D ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
+  (%print-integer output args colmod? atmod? mincol padchar commachar comma-interval 10))
+
+(def-format #\B ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
+  (%print-integer output args colmod? atmod? mincol padchar commachar comma-interval 2))
+
+(def-format #\O ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
+  (%print-integer output args colmod? atmod? mincol padchar commachar comma-interval 8))
+
+(def-format #\X ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
+  (%print-integer output args colmod? atmod? mincol padchar commachar comma-interval 16))
 
 ;; floating-point (incomplete)
 (def-format #\f ((mincol 0) declen scale overflowchar padchar)
@@ -396,43 +377,6 @@
                         (go :loop))))))))
     (if atmod? myargs args)))
 
-(define-compiler-macro internal-format-123 ;; #\{
-    (&whole decline
-            output args colmod? atmod? ensure-once? #:end-at?
-            &optional sublist maxn)
-  (when (or (not sublist) colmod?)
-    (return-from internal-format-123 decline))
-  `(let (,@(when (equal maxn ''FETCH)
-             (setf maxn '$maxn)
-             `(($maxn (pop ,args))))
-         (myargs ,(if atmod? args `(pop ,args))))
-     (catch 'abort-format-iteration
-       ,(cond
-          (maxn
-           (cond
-             (ensure-once?
-              `(dotimes (#:i ,maxn)
-                 ,@(%expand-format (cadr sublist) 'myargs output)
-                 (unless myargs
-                   (return))))
-             (t
-              `(dotimes (#:i ,maxn)
-                 (unless myargs
-                   (return))
-                 ,@(%expand-format (cadr sublist) 'myargs output)))))
-          (t
-           (cond
-             (ensure-once?
-              `(tagbody :loop ,@(%expand-format (cadr sublist) 'myargs output)
-                        (when myargs
-                          (go :loop))))
-             (t
-              `(tagbody :loop
-                        (when myargs
-                          ,@(%expand-format (cadr sublist) 'myargs output)
-                          (go :loop))))))))
-     ,(if atmod? 'myargs args)))
-
 (def-format #\^ ((a nil) (b nil) (c nil))
   (cond
     (colmod?
@@ -444,13 +388,6 @@
          (not args))
      (throw 'abort-format-iteration nil)))
   args)
-
-(define-compiler-macro internal-format-94 ;; #\^
-    (&whole decline
-            output args colmod? atmod? &optional a b c)
-  (when (or colmod? atmod? a b c)
-    (return-from internal-format-94 decline))
-  `(or ,args (throw 'abort-format-iteration nil)))
 
 (def-format #\} ()
   (error "Unmatched ~~}"))
@@ -535,12 +472,40 @@
     (t
      (error "Unsupported format control ~A" format))))
 
+(defun formatter (control-string)
+  (let ((parsed (%parse-format control-string)))
+    (lambda (stream &rest arguments)
+      (exec-format parsed arguments stream))))
+
+(defmacro time body
+  (let ((t1 (gensym)))
+    `(let ((,t1 (get-internal-run-time)))
+       (multiple-value-prog1 (progn ,@body)
+         (format t "Evaluation time: ~,2Fms~%" (- (get-internal-run-time) ,t1))))))
+
+;; XXX: temporary
+(defun print (&rest args)
+  (format t "~{~S~^ ~}~%" args))
+
+(defun error args
+  (%error (apply #'format nil args)))
+
+(defun warn args
+  (%warn (apply #'format nil args)))
+
+;;; %:EOF - compiler macros. uncomment this to disable.
+
+;;; I'm leaving them for now, they seem to help a little in runtime speed,
+;;; although compilation time increases significantly (e.g. for the test
+;;; suite).
+
 (defun quote-if-you-must (x)
   (cond
-    ((or (eq x T)
-         (eq x NIL)
+    ((or (eq x t)
+         (eq x nil)
          (stringp x)
          (numberp x)
+         (characterp x)
          (keywordp x))
      x)
     (t
@@ -548,19 +513,96 @@
 
 (defun %expand-format (list args stream)
   (with-collectors (forms)
-    (let looop ((list list))
-      (when list
-        (let ((x (car list)))
-          (cond
-            ((listp x)
-             (let ((handler (gethash (car x) *format-handlers*))
-                   (cmdargs (cdr x)))
-               (forms `(setf ,args (,handler ,stream ,args
-                                    ,@(mapcar #'quote-if-you-must cmdargs))))))
-            (t
-             (forms `(%stream-put ,stream ,x))))
-          (looop (cdr list)))))
+    (dolist (x list)
+      (cond
+        ((listp x)
+         (let ((handler (gethash (car x) *format-handlers*))
+               (cmdargs (cdr x)))
+           (forms `(setf ,args (,handler ,stream ,args
+                                ,@(mapcar #'quote-if-you-must cmdargs))))))
+        (t
+         (forms `(%stream-put ,stream ,x)))))
     forms))
+
+(defun repeater-compiler-macro (decline char output args count)
+  (cond
+    ((not count)
+     `(progn (%stream-put ,output ,char)
+             ,args))
+    ((numberp count)
+     `(progn (%stream-put ,output ,(%pad-string "" count char))
+             ,args))
+    ((equal count ''FETCH)
+     `(progn (%stream-put ,output (%pad-string "" (pop ,args) ,char))
+             ,args))
+    (t decline)))
+
+(define-compiler-macro internal-format-37 ;; #\%
+    (&whole decline
+            output args colmod? atmod? &optional count)
+  (repeater-compiler-macro decline #\Newline output args count))
+
+(define-compiler-macro internal-format-126 ;; #\~
+    (&whole decline
+            output args colmod? atmod? &optional count)
+  (repeater-compiler-macro decline #\~ output args count))
+
+(define-compiler-macro internal-format-67 ;; #\C
+    (output args colmod? atmod?)
+  (cond
+    (colmod?
+     `(progn (%stream-put ,output (substr (%dump (pop ,args)) 2))
+             ,args))
+    (atmod?
+     `(progn (%stream-put ,output (%dump (pop ,args)))
+             ,args))
+    (t
+     `(progn (%stream-put ,output (pop ,args))
+             ,args))))
+
+(define-compiler-macro internal-format-123 ;; #\{
+    (&whole decline
+            output args colmod? atmod? ensure-once? #:end-at?
+            &optional sublist maxn)
+  (when (or (not sublist) colmod?)
+    (return-from internal-format-123 decline))
+  `(let (,@(when (equal maxn ''FETCH)
+             (setf maxn '$maxn)
+             `(($maxn (pop ,args))))
+         (myargs ,(if atmod? args `(pop ,args))))
+     (catch 'abort-format-iteration
+       ,(cond
+          (maxn
+           (cond
+             (ensure-once?
+              `(dotimes (#:i ,maxn)
+                 ,@(%expand-format (cadr sublist) 'myargs output)
+                 (unless myargs
+                   (return))))
+             (t
+              `(dotimes (#:i ,maxn)
+                 (unless myargs
+                   (return))
+                 ,@(%expand-format (cadr sublist) 'myargs output)))))
+          (t
+           (cond
+             (ensure-once?
+              `(tagbody :loop ,@(%expand-format (cadr sublist) 'myargs output)
+                        (when myargs
+                          (go :loop))))
+             (t
+              `(tagbody :loop
+                        (when myargs
+                          ,@(%expand-format (cadr sublist) 'myargs output)
+                          (go :loop))))))))
+     ,(if atmod? 'myargs args)))
+
+(define-compiler-macro internal-format-94 ;; #\^
+    (&whole decline
+            output args colmod? atmod? &optional a b c)
+  (when (or colmod? atmod? a b c)
+    (return-from internal-format-94 decline))
+  `(or ,args (throw 'abort-format-iteration nil)))
 
 (define-compiler-macro format (&whole form stream format . args)
   (cond
@@ -594,24 +636,3 @@
              (when ,result
                (%get-output-stream-string ,vstream)))))))
     (t form)))
-
-(defun formatter (control-string)
-  (let ((parsed (%parse-format control-string)))
-    (lambda (stream &rest arguments)
-      (exec-format parsed arguments stream))))
-
-(defmacro time body
-  (let ((t1 (gensym)))
-    `(let ((,t1 (get-internal-run-time)))
-       (multiple-value-prog1 (progn ,@body)
-         (format t "Evaluation time: ~,2Fms~%" (- (get-internal-run-time) ,t1))))))
-
-;; XXX: temporary
-(defun print (&rest args)
-  (format t "~{~S~^ ~}~%" args))
-
-(defun error args
-  (%error (apply #'format nil args)))
-
-(defun warn args
-  (%warn (apply #'format nil args)))
