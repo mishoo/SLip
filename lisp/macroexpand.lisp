@@ -9,6 +9,8 @@
 
 (in-package :sl-mexp)
 
+(defparameter *expand-compiler-macros* nil)
+
 (defun %with-local-vars (names thunk)
   (if names
       (let ((defs (nreverse
@@ -40,6 +42,10 @@
             ((setq m (%get-symbol-prop (car f) :MEXP))
              (funcall m f))
             ((not flag)
+             (when *expand-compiler-macros*
+               (let ((cmf (compiler-macro-function (car f))))
+                 (when cmf
+                   (setf f (funcall cmf f)))))
              (funcall-mexp f))
             ((not (symbolp (car f)))
              (rec f nil))

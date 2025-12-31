@@ -196,6 +196,20 @@
     (unless pak (error "There's no package named ~S" name))
     (setf *package* (find-package name))))
 
+(define-handler :macroexpand-1
+    (package expstring &optional sl-mexp::*expand-compiler-macros*)
+  (let* ((*package* (find-package package))
+         (reader (%:lisp-reader expstring nil))
+         (exp (cdr (funcall reader '%:next))))
+    (print-object-to-string (macroexpand-1 exp))))
+
+(define-handler :macroexpand-all
+    (package expstring &optional sl-mexp::*expand-compiler-macros*)
+  (let* ((*package* (find-package package))
+         (reader (%:lisp-reader expstring nil))
+         (exp (cdr (funcall reader '%:next))))
+    (print-object-to-string (macroexpand-all exp))))
+
 (defglobal
     *thread*
     (make-thread
