@@ -19,6 +19,9 @@
                   (q:parse-pgn pgn :ext-moves t))))
 
 (defmethod display-game ((pgn cons))
+  (%display-game pgn))
+
+(defun %display-game (pgn)
   (let* ((dlg (dom:make-dialog 850 550
                                :content (make-layout pgn)
                                :class-name "pgn-viewer"))
