@@ -124,7 +124,9 @@
   (<< ")"))
 
 (def-print (string)
-  (<< (if *print-escape* (%dump string) string)))
+  (if *print-escape*
+      (<< #\" (replace-regexp #/["\\]/g string "\\$&") #\")
+      (<< string)))
 
 (def-print (character)
   (<< (if *print-escape* (%dump character) character)))

@@ -54,7 +54,7 @@
 
         button {
             display: block;
-            min-width: 1.7em;
+            min-width: 2em;
             padding: 1px 4px;
             display: flex;
             align-items: center;
