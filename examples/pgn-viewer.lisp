@@ -217,6 +217,9 @@
                           (t
                            (restart-timer)
                            (on-action btn event))))
+                      (on-move (&rest args)
+                        (restart-timer)
+                        (apply #'on-move-click args))
                       (keydown (target event)
                         (labels ((notf-timeout ()
                                    (ymacs:signal-info (format nil "Speed: ~,2Fs"
@@ -245,6 +248,7 @@
                                      :play-keydown   #'keydown
                                      :play-next      #'next
                                      :action         #'action
+                                     :move           #'on-move
                                      :animation-end  #'on-animation-end)))
                      (restart-timer)
                      (loop until (eq 'play-done (%:%receive receivers)))
@@ -607,7 +611,7 @@
     </div>
   </div>
   <div class='cont-ctrl'>
-    <button data-action='reverse' data-key='ArrowUp' title='Reverse board'>🗘</button>
+    <button data-action='reverse' data-key='ArrowUp' title='Reverse board'>↑↓</button>
     <div style='padding-left: 20px'></div>
     <button data-action='start' data-key='Home' title='Start position'>⏮</button>
     <button data-action='prev' data-key='ArrowLeft' title='Previous move'>❮</button>
