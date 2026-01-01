@@ -413,20 +413,12 @@
                   '$collect)))
     (aif (getf *loop-collect* name)
          (list args name it)
-         (cond
-           (append?
-            (list-add *loop-variables* name)
-            (when (eq name '$collect)
-              (list-add *loop-finish* '$collect))
-            (setf (getf *loop-collect* name) t)
-            (list args name nil))
-           (t
-            (let ((tail (gensym (strcat name "-TAIL"))))
-              (list-nconc *loop-variables* (list name tail))
-              (when (eq name '$collect)
-                (list-add *loop-finish* '$collect))
-              (setf (getf *loop-collect* name) tail)
-              (list args name tail)))))))
+         (let ((tail (gensym (strcat name "-TAIL"))))
+           (list-nconc *loop-variables* (list name tail))
+           (when (eq name '$collect)
+             (list-add *loop-finish* '$collect))
+           (setf (getf *loop-collect* name) tail)
+           (list args name tail)))))
 
 (defparser (collect collecting) args
   (let* ((form (pop args))
@@ -443,10 +435,18 @@
 
 (defparser (append appending) args
   (let* ((form (pop args))
-         (vars (make-list-collect-vars args t))
-         (name (cadr vars)))
+         (vars (make-list-collect-vars args))
+         (name (cadr vars))
+         (tail (caddr vars)))
     (setf args (car vars))
-    (list-add *loop-iterate* `(setf ,name (append ,name ,form))))
+    (list-add *loop-iterate*
+              `(let (($nconc (copy-list ,form)))
+                 (when $nconc
+                   (setf ,tail
+                         (last
+                          (if ,tail
+                              (setf (cdr ,tail) $nconc)
+                              (setf ,name $nconc))))))))
   args)
 
 (defparser (nconc nconcing) args
