@@ -121,6 +121,7 @@ export const OP = {
     BASH: 100,
     BCNT: 101,
     BNOT: 102,
+    CASE: 103,
 };
 
 const OP_LEN = [
@@ -227,6 +228,7 @@ const OP_LEN = [
     0 /* BASH */,
     0 /* BCNT */,
     0 /* BNOT */,
+    1 /* CASE */,
 ];
 
 export function want_bound(name, val) {
@@ -360,13 +362,13 @@ var optimize = (function(){
         return a;
     }
     function used_label(code, label) {
-        for (var i = code.length; --i >= 0;) {
-            var el = code[i];
-            if (!(el instanceof LispSymbol)) {
-                if (el[1] === label)
-                    return true;
-                if (el[0] === "FN" && used_label(el[1], label))
-                    return true;
+        for (var i = 0; i < code.length; i++) {
+            var instr = code[i];
+            if (instr[0] === "FN" && used_label(instr[1], label))
+                return true;
+            if (op_has_label(instr[0])) {
+                if (instr[1] === label) return true;
+                if (Array.isArray(instr[1]) && instr[1].includes(label)) return true;
             }
         }
     };
@@ -759,16 +761,17 @@ function constantp(x) {
 
 function op_has_label(op) {
     switch (op) {
-      case OP.JUMP:
-      case OP.TJUMP:
-      case OP.FJUMP:
-      case OP.LRET:
-      case OP.LJUMP:
-      case OP.UPOPEN:
-      case OP.SAVE:
-      case OP.CATCH:
-      case OP.TJUMPK:
-      case OP.FJUMPK:
+      case OP.JUMP: case "JUMP":
+      case OP.TJUMP: case "TJUMP":
+      case OP.FJUMP: case "FJUMP":
+      case OP.LRET: case "LRET":
+      case OP.LJUMP: case "LJUMP":
+      case OP.UPOPEN: case "UPOPEN":
+      case OP.SAVE: case "SAVE":
+      case OP.CATCH: case "CATCH":
+      case OP.TJUMPK: case "TJUMPK":
+      case OP.FJUMPK: case "FJUMPK":
+      case OP.CASE: case "CASE":
         return true;
     }
 }
@@ -797,8 +800,13 @@ function assemble(code) {
             ret[i] = assemble(ret[i]);
             break;
           default:
-            if (op_has_label(op))
-                ret[i] = ret[i].value;
+            if (op_has_label(op)) {
+                if (Array.isArray(ret[i])) {
+                    ret[i].forEach((sym, i, a) => a[i] = sym.value);
+                } else {
+                    ret[i] = ret[i].value;
+                }
+            }
         }
         i += OP_LEN[op];
     }
@@ -808,8 +816,13 @@ function assemble(code) {
 function relocate(code, offset) {
     for (let i = 0; i < code.length;) {
         let op = code[i++];
-        if (op_has_label(op))
-            code[i] += offset;
+        if (op_has_label(op)) {
+            if (Array.isArray(code[i])) {
+                code[i].forEach((addr, i, a) => a[i] = addr + offset);
+            } else {
+                code[i] += offset;
+            }
+        }
         i += OP_LEN[op];
     }
     return code;
@@ -849,7 +862,8 @@ function dump(thing, dumped = new Map()) {
         if (typeof thing === "string") return JSON.stringify(LispChar.sanitize(thing));
         if (LispSymbol.is(thing)) {
             if (thing.pak === KEYWORD_PACK) return ":" + thing.name;
-            if (thing.pak) return thing.pak.name + "::" + thing.name;
+            if (thing.pak && thing.pak !== LispPackage.BASE_PACK)
+                return thing.pak.name + "::" + thing.name;
             return thing.name;
         }
         if (dumped.has(thing)) {
@@ -899,8 +913,16 @@ export function disassemble(code) {
             let op = code[i++];
             if (op_has_label(op)) {
                 let addr = code[i];
-                if (!labels[addr]) {
-                    labels[addr] = LispSymbol.get("L" + (++lab));
+                if (Array.isArray(addr)) {
+                    addr.forEach(addr => {
+                        if (!labels[addr]) {
+                            labels[addr] = LispSymbol.get("L" + (++lab));
+                        }
+                    });
+                } else {
+                    if (!labels[addr]) {
+                        labels[addr] = LispSymbol.get("L" + (++lab));
+                    }
                 }
             }
             i += OP_LEN[op];
@@ -922,8 +944,12 @@ export function disassemble(code) {
                 break;
               default:
                 if (op_has_label(op)) {
-                    data = [ labels[code[i]], ...code.slice(i + 1, i + OP_LEN[op]) ].map(el =>
-                        pad_string(dump(el), 8)).join("");
+                    if (Array.isArray(code[i])) {
+                        data = dump(code[i].map(addr => labels[addr]));
+                    } else {
+                        data = [labels[code[i]], ...code.slice(i + 1, i + OP_LEN[op])].map(el =>
+                            pad_string(dump(el), 8)).join("");
+                    }
                     break;
                 }
                 data = code.slice(i, i + OP_LEN[op]).map(el =>
@@ -1983,6 +2009,17 @@ let OP_RUN = [
     },
     /*OP.BNOT*/ (m) => {
         m.push(~m.pop_integer());
+    },
+    /*OP.CASE*/ (m) => {
+        let jumptable = m.code[m.pc++];
+        let cases = m.pop();
+        let value = m.pop();
+        let idx = cases.indexOf(value) + 1;
+        if (idx === 0) {
+            m.push(value);
+            m.push(cases);
+        }
+        m.pc = jumptable[idx];
     },
 ];
 

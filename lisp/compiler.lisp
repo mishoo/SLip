@@ -632,7 +632,8 @@
     `(let ((,seq (vector)))
        (flet ((,out args
                 (%seq-cat ,seq args)))
-         ,@body)
+         ,@body
+         nil)
        ,seq)))
 
 (defmacro without-interrupts body
@@ -1362,6 +1363,11 @@
           (null (cddr form)))
      (values t (cadr form)))
 
+    ((and (consp form)
+          (eq 'progn (car form))
+          (null (cddr form)))
+     (constant-value (cadr form)))
+
     ((symbolp form)
      (cond
        ((find-var-in-compiler-env form)
@@ -1454,7 +1460,98 @@
             (cons (car forms) result)
             rest)))))
 
-(defglobal *lambda-syms* '(lambda λ %fn))
+(defconstant *lambda-syms* '(lambda λ %fn))
+
+(defmacro defcompiler (sym args &body body)
+  `(%set-symbol-prop ',sym 'compiler
+                     (lambda (,@args)
+                       ,@body)))
+
+(defun compile-case (form env val? more? &key compile-expr)
+  (unless (cddr form)
+    (return-from compile-case
+      (funcall compile-expr `(progn ,(cadr form) nil)
+               env val? more?)))
+  (let ((expr (cadr form))
+        (cases (vector))
+        (addrs (vector nil))
+        (end-addr (when more?
+                    (gensym "L")))
+        (def-addr))
+    (let ((expr-code (funcall compile-expr expr env t t))
+          (body-code
+           ;; generate cases array and jumptable (addrs), as well as code for
+           ;; handling each case.
+           (with-seq-output <<
+             (catch 'done
+               (foreach (cddr form)
+                 (lambda (x)
+                   (when (car x)
+                     (let ((label (gensym "L")))
+                       (cond
+                         ;; the same label will be pushed for a case that
+                         ;; matches multiple constants.
+                         ((listp (car x))
+                          (foreach (car x)
+                            (lambda (const)
+                              (vector-push const cases)
+                              (vector-push label addrs))))
+                         ;; the default case (OTHERWISE or T) should be placed
+                         ;; at index 0 in the jumptable.
+                         ((or (eq (car x) t)
+                              (eq (car x) 'otherwise))
+                          (vector-set (setq def-addr label) addrs 0))
+                         ;; normal case - one constant, one label.
+                         (t
+                          (vector-push (car x) cases)
+                          (vector-push label addrs)))
+                       ;; generate code for the current case. When it's the
+                       ;; default, remember to POP the stack twice.
+                       (<< (vector label)
+                           (when def-addr
+                             (vector #("POP")
+                                     #("POP")))
+                           (funcall compile-expr `(progn ,@(cdr x))
+                                    env val? more?)
+                           ;; when more code follows, we jump at the end of
+                           ;; the CASE form.
+                           (when more?
+                             (vector (vector "JUMP" end-addr))))
+                       ;; if we compiled the default case, we can stop.
+                       (when def-addr
+                         (throw 'done nil)))))))
+             ;; when no default case was present, we generate one which
+             ;; returns NIL, or calls %ECASE-ERROR (if the form was ECASE).
+             (unless def-addr
+               (vector-set (setq def-addr (gensym "L")) addrs 0)
+               (<< (vector def-addr))
+               (cond
+                 ((eq 'ecase (car form))
+                  ;; XXX: this is a horrible, horrible hack. the CASE
+                  ;; instruction will leave value and cases on the stack if no
+                  ;; case matched, so we can now just call %ECASE-ERROR with
+                  ;; 2 arguments. XXX: should we handle val/more here?
+                  (<< (vector #("FGVAR" %ECASE-ERROR)
+                              #("CALL" 2))))
+                 (val?
+                  ;; return NIL by default. remember to POP values / cases.
+                  (<< (vector #("POP")
+                              #("POP")
+                              #("NIL"))
+                      (unless more? (vector #("RET")))))
+                 (t
+                  ;; no value needed, but we must still POP the stack twice.
+                  ;; No need to check, `more?' must be true here.
+                  (<< (vector #("POP")
+                              #("POP")))))))))
+      ;; final code now.
+      (with-seq-output <<
+        (<< expr-code
+            (vector (vector "CONST" cases)
+                    (vector "CASE" addrs))
+            body-code
+            (when more?
+              (vector end-addr)))))))
 
 (labels
     ((assert (p msg)
@@ -1669,6 +1766,9 @@
              (comp-op (cadr x) (cddr x) env val? more?))
             (otherwise
              (cond
+               ((aif (and (symbolp (car x))
+                          (%get-symbol-prop (car x) 'compiler))
+                     (funcall it x env val? more? :compile-expr #'comp)))
                ((aif (and (symbolp (car x))
                           (compiler-macro-function (car x)))
                      (let ((form (funcall it x)))
@@ -1892,8 +1992,9 @@
                 (tcode (comp then env val? more?))
                 (ecode (comp else env val? more?)))
             (cond
-              ((equal tcode ecode)
-               (comp pred env nil t))
+              ((equalp tcode ecode)
+               (%seq (comp pred env nil t)
+                     tcode))
               ((zerop (length tcode))
                (let ((l2 (mklabel)))
                  (%seq pcode
@@ -2598,6 +2699,12 @@
     "lisp/stream.lisp"
     "lisp/ffi.lisp"
     "ide/ide.lisp"))
+
+(defcompiler case (&rest args)
+  (apply #'compile-case args))
+
+(defcompiler ecase (&rest args)
+  (apply #'compile-case args))
 
 ;;;
 

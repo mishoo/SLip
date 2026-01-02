@@ -985,7 +985,7 @@ defp("%seq-cat", true, function(m, nargs){
     LispCons.forEach(list, function(x){
         if (x !== false) {
             if (LispCons.is(x)) {
-                seq.push.apply(seq, LispCons.toArray(x));
+                seq.push(...LispCons.toArray(x));
             }
             else if (LispVector.is(x)) {
                 seq.push(...x);
