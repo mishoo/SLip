@@ -2708,6 +2708,11 @@
 
 ;;;
 
+;; (defconstant *id-test-hash* (make-hash :foo 1 :bar 2))
+;; (%hash-set *id-test-hash* :self *id-test-hash*)
+;; (defun test-serialization-hash ()
+;;   (eq #.*id-test-hash* #.*id-test-hash*))
+
 ;; (defconstant *id-test-list* '(foo bar))
 ;; (defun test-serialization-identity ()
 ;;   (eq '#.*id-test-list* '#.*id-test-list*))

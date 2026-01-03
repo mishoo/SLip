@@ -1,5 +1,5 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispChar, LispClosure } from "./types.js";
+import { LispSymbol, LispPackage, LispHash, LispHashEqual, LispChar, LispClosure } from "./types.js";
 import { LispPrimitiveError } from "./error.js";
 import { repeat_string, pad_string } from "./utils.js";
 import { LispStack } from "./stack.js";
@@ -1013,6 +1013,14 @@ function dig_references(data) {
                 val.forEach(el => dig(el));
             }
         }
+        else if (val instanceof LispHash && !val.weak) {
+            if (mark(val)) {
+                val.data.entries().forEach(([ key, val ]) => {
+                    dig(key);
+                    dig(val);
+                });
+            }
+        }
     });
     return refd;
 }
@@ -1100,6 +1108,21 @@ function serialize_const(val, cache, refd) {
                 return "A(()=>[" + val.map(dump).join(",") + "])";
             } else {
                 return "[" + val.map(dump).join(",") + "]";
+            }
+        }
+        if (val instanceof LispHash) {
+            if (val instanceof LispHashEqual) {
+                error("Hashes with test EQUAL are not serializable");
+            }
+            if (val.weak) {
+                error("Weak hashes are not serializable");
+            }
+            let q = maybe_cached(val);
+            if (q) return q;
+            if (just_cached(val)) {
+                return `H(()=>[${[...val.data.entries()].map(dump).join(",")}])`;
+            } else {
+                return `h([${[...val.data.entries()].map(dump).join(",")}])`;
             }
         }
         if (typeof val === "string") {
@@ -1190,6 +1213,15 @@ export function unserialize(code) {
     names.push("V"); values.push(function(value){
         cache.push(value);
         return value;
+    });
+    names.push("h"); values.push(function(value){
+        return new LispHash(value);
+    });
+    names.push("H"); values.push(function(value){
+        let hash = new LispHash();
+        cache.push(hash);
+        hash.data = new Map(value());
+        return hash;
     });
     names.push("DOT"); values.push(LispCons.DOT);
     var func = new Function("return function(" + names.join(",") + "){return [" + code + "]}")();
