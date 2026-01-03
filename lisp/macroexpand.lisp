@@ -45,7 +45,9 @@
              (when *expand-compiler-macros*
                (let ((cmf (compiler-macro-function (car f))))
                  (when cmf
-                   (setf f (funcall cmf f)))))
+                   (let ((exp (funcall cmf f)))
+                     (unless (eq exp f)
+                       (return-from rec (rec exp t)))))))
              (funcall-mexp f))
             ((not (symbolp (car f)))
              (rec f nil))
