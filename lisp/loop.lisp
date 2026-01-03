@@ -14,7 +14,8 @@
           find maximizes minimizes that which below above))
 
 (defpackage :sl-loop
-  (:use :sl :%))
+  (:use :sl :%)
+  (:import-from :sl #:with-collectors))
 
 (in-package :sl-loop)
 
@@ -406,63 +407,45 @@
        (progn (pop args) (pop args))
        (gensym ,name)))
 
-(defun make-list-collect-vars (args &optional append?)
+(defun make-list-collect-vars (args &optional tail?)
   (let ((name (if (iskw (car args) 'into)
                   (progn (pop args)
                          (pop args))
                   '$collect)))
-    (aif (getf *loop-collect* name)
-         (list args name it)
-         (let ((tail (gensym (strcat name "-TAIL"))))
-           (list-nconc *loop-variables* (list name tail))
+    (aif (%:%assq name *loop-collect*)
+         (list args name (cdr it))
+         (let ((tail (when tail?
+                       (gensym (strcat name "-TAIL")))))
            (when (eq name '$collect)
              (list-add *loop-finish* '$collect))
-           (setf (getf *loop-collect* name) tail)
+           (setf *loop-collect* (cons (cons name tail)
+                                      *loop-collect*))
            (list args name tail)))))
 
 (defparser (collect collecting) args
   (let* ((form (pop args))
          (vars (make-list-collect-vars args))
-         (name (cadr vars))
-         (tail (caddr vars)))
+         (name (cadr vars)))
     (setf args (car vars))
-    (list-add *loop-iterate*
-              `(setf ,tail
-                     (if ,tail
-                         (setf (cdr ,tail) (list ,form))
-                         (setf ,name (list ,form))))))
+    (list-add *loop-iterate* `(,name ,form)))
   args)
 
 (defparser (append appending) args
   (let* ((form (pop args))
-         (vars (make-list-collect-vars args))
+         (vars (make-list-collect-vars args t))
          (name (cadr vars))
          (tail (caddr vars)))
     (setf args (car vars))
-    (list-add *loop-iterate*
-              `(let (($nconc (copy-list ,form)))
-                 (when $nconc
-                   (setf ,tail
-                         (last
-                          (if ,tail
-                              (setf (cdr ,tail) $nconc)
-                              (setf ,name $nconc))))))))
+    (list-add *loop-iterate* `(,tail (copy-list ,form))))
   args)
 
 (defparser (nconc nconcing) args
   (let* ((form (pop args))
-         (vars (make-list-collect-vars args))
+         (vars (make-list-collect-vars args t))
          (name (cadr vars))
          (tail (caddr vars)))
     (setf args (car vars))
-    (list-add *loop-iterate*
-              `(let (($nconc ,form))
-                 (when $nconc
-                   (setf ,tail
-                         (last
-                          (if ,tail
-                              (setf (cdr ,tail) $nconc)
-                              (setf ,name $nconc))))))))
+    (list-add *loop-iterate* `(,tail ,form)))
   args)
 
 (defparser (sum summing) args
@@ -622,14 +605,17 @@
           (rec (parse-clause args)))))
     `(block ,*loop-block-name*
        (let* (,@(cdr @loop-variables))
-         (tagbody
-          ,@(cdr @loop-start)
-          $loop-next
-          ,@(cdr @loop-iterate)
-          ,@(cdr @loop-body)
-          (go $loop-next)
-          $loop-end)
-         ,@(cdr @loop-finish)))))
+         (with-collectors (,@(mapcar (lambda (cell)
+                                       (list (car cell) (car cell) (cdr cell)))
+                                     *loop-collect*))
+           (tagbody
+            ,@(cdr @loop-start)
+            $loop-next
+            ,@(cdr @loop-iterate)
+            ,@(cdr @loop-body)
+            (go $loop-next)
+            $loop-end)
+           ,@(cdr @loop-finish))))))
 
 (defmacro loop (&body args)
   (if (symbolp (car args))
