@@ -1,5 +1,8 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispHashEqual, LispChar, LispClosure } from "./types.js";
+import {
+    LispSymbol, LispPackage, LispHash, LispHashEqual, LispChar, LispClosure,
+    LispArray, LispStruct, LispStdInstance, LispMutex, LispProcess
+} from "./types.js";
 import { LispPrimitiveError } from "./error.js";
 import { repeat_string, pad_string } from "./utils.js";
 import { LispStack } from "./stack.js";
@@ -349,7 +352,7 @@ var optimize = (function(){
             }
         }
         return 0;
-    };
+    }
     function next_instr(code, i, len) {
         let a = [];
         while (i < code.length && len > 0) {
@@ -371,7 +374,7 @@ var optimize = (function(){
                 if (Array.isArray(instr[1]) && instr[1].includes(label)) return true;
             }
         }
-    };
+    }
     function optimize1(code, i, pass) {
         var el = code[i];
         if (el instanceof LispSymbol) {
@@ -435,6 +438,14 @@ var optimize = (function(){
         if (i+1 < code.length && code[i][0] == "NUMEQ" && code[i+1][0] == "NOT") {
             code.splice(i, 2, [ "NUMNEQ" ]);
             return true;
+        }
+        if (i+1 < code.length && ["LVAR", "LSET"].includes(code[i][0])
+            && code[i+1][0] === "LSET"
+            && code[i+1][1] === code[i][1]
+            && code[i+1][2] === code[i][2])
+        {
+            code[i][0] = "LVAR";
+            code.splice(i+1, 1);
         }
         if (/^(?:JUMP|LJUMP|RET|LRET|CALL|APPLY)$/.test(el[0])) {
             for (var j = i + 1; j < code.length; ++j) {
@@ -735,7 +746,7 @@ var optimize = (function(){
             code.splice(i+1, 1);
             return true;
         }
-    };
+    }
     return function optimize(code) {
         let pass = 0;
         while (pass < 2) {
@@ -756,6 +767,13 @@ function constantp(x) {
         || x instanceof LispChar
         || x instanceof LispSymbol
         || x instanceof LispHash
+        || x instanceof LispClosure
+        || x instanceof LispArray
+        || x instanceof LispStruct
+        || x instanceof LispStdInstance
+        || x instanceof LispPackage
+        || x instanceof LispMutex
+        || x instanceof LispProcess
         || Array.isArray(x);
 }
 
