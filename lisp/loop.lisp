@@ -407,15 +407,14 @@
        (progn (pop args) (pop args))
        (gensym ,name)))
 
-(defun make-list-collect-vars (args &optional tail?)
+(defun make-list-collect-vars (args)
   (let ((name (if (iskw (car args) 'into)
                   (progn (pop args)
                          (pop args))
                   '$collect)))
     (aif (%:%assq name *loop-collect*)
          (list args name (cdr it))
-         (let ((tail (when tail?
-                       (gensym (strcat name "-TAIL")))))
+         (let ((tail (gensym (strcat name "-TAIL"))))
            (when (eq name '$collect)
              (list-add *loop-finish* '$collect))
            (setf *loop-collect* (cons (cons name tail)
@@ -432,7 +431,7 @@
 
 (defparser (append appending) args
   (let* ((form (pop args))
-         (vars (make-list-collect-vars args t))
+         (vars (make-list-collect-vars args))
          (name (cadr vars))
          (tail (caddr vars)))
     (setf args (car vars))
@@ -441,7 +440,7 @@
 
 (defparser (nconc nconcing) args
   (let* ((form (pop args))
-         (vars (make-list-collect-vars args t))
+         (vars (make-list-collect-vars args))
          (name (cadr vars))
          (tail (caddr vars)))
     (setf args (car vars))
