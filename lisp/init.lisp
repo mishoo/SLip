@@ -318,7 +318,7 @@
     (form)))
 
 (defmacro with-collectors ((&rest names) &body body)
-  (let (lists tails syms adders has-tails (tmp (gensym "TMP")))
+  (let (lists tails syms adders)
     (flet ((mk-collector (arg)
              (let* ((name (if (consp arg) (car arg) arg))
                     (vlist (gensym (strcat "L" name)))
@@ -333,15 +333,14 @@
                          `(setq ,',vtail (%rplacd ,',vtail (cons ,el nil))))
                        adders))
                (when vconc
-                 (setq has-tails t)
                  (push `(,vconc (lst)
-                         `(when (setq ,',tmp ,lst)
-                            (setq ,',vtail (last (%rplacd ,',vtail ,',tmp)))))
+                         `(let ((tmp ,lst))
+                            (when tmp
+                              (setq ,',vtail (last (%rplacd ,',vtail tmp))))))
                        adders)))))
       (foreach names #'mk-collector)
       `(let (,@(mapcar (lambda (name) `(,name (list nil))) lists))
-         (let (,@(when has-tails (list tmp))
-               ,@(mapcar #'list tails lists))
+         (let (,@(mapcar #'list tails lists))
            (macrolet (,@adders)
              (symbol-macrolet (,@syms)
                ,@body)))))))

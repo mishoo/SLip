@@ -124,8 +124,8 @@
   "return LispCons.fromArray((container || document).querySelectorAll(selector))")
 
 (defmacro do-query ((element container selector) &body body)
-  `(loop for ,element in (query-all ,container ,selector)
-         do (progn ,@body)))
+  `(dolist (,element (query-all ,container ,selector))
+     ,@body))
 
 (defun-js matches (element selector)
   "return element.matches(selector)")
