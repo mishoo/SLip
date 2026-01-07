@@ -155,19 +155,48 @@
 (defun-js has-animations (element)
   "return element.getAnimations({ subtree: true }).length > 0")
 
-(let ((dataset (lambda-js (element key value) "
-                  if (arguments.length === 2) return element.dataset[key];
-                  if (value === false) return delete element.dataset[key], false;
-                  return element.dataset[key] = value;")))
-  (defun dataset (element key)
-    (when (symbolp key)
-      (setf key (%:%js-camelcase-name key)))
-    (funcall dataset element key))
+(defun-js %dataset-get (element key) "
+  return element.dataset[key];
+")
 
-  (defun (setf dataset) (value element key)
-    (when (symbolp key)
-      (setf key (%:%js-camelcase-name key)))
-    (funcall dataset element key value)))
+(defun-js %dataset-set (value element key) "
+  if (value === false) return delete element.dataset[key], false;
+  return element.dataset[key] = value;
+")
+
+(defun dataset (element key)
+  (when (symbolp key)
+    (setf key (%:%js-camelcase-name key)))
+  (%dataset-get element key))
+
+(define-compiler-macro dataset (&whole form element key)
+  (multiple-value-bind (const? key) (%:constant-value key)
+    (when const?
+      (cond
+        ((symbolp key)
+         (return-from dataset
+           `(%dataset-get ,element ,(%:%js-camelcase-name key))))
+        (t
+         (return-from dataset
+           `(%dataset-get ,element ,(string key)))))))
+  form)
+
+(defun (setf dataset) (value element key)
+  (when (symbolp key)
+    (setf key (%:%js-camelcase-name key)))
+  (%dataset-set value element key))
+
+(define-compiler-macro (setf dataset) (&whole form value element key)
+  (multiple-value-bind (const? key) (%:constant-value key)
+    (when const?
+      (cond
+        ((symbolp key)
+         (return-from dataset
+           `(%dataset-set ,value ,element ,(%:%js-camelcase-name key))))
+        (t
+         (return-from dataset
+           `(%dataset-set ,value ,element ,(string key)))))))
+  form)
 
 (define-simple-accessor checked "checked")
 (define-simple-accessor value "value")
