@@ -692,7 +692,8 @@
              </label>~
            </span>"
           (if (q:move-white? move) "white" "black")
-          fen-before fen-after move san))
+          fen-before fen-after move
+          (replace-regexp #/[♟♞♚♝♜♛♙♘♔♗♖♕]/g san "<span>$&</span>")))
 
 (defun %moves-html (moves out &key (index 0))
   (let ((last-move nil)

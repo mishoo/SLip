@@ -375,6 +375,11 @@
                 &:hover {
                     background: #fff;
                 }
+
+                span {
+                    font-size: 120%;
+                    line-height: 100%;
+                }
             }
 
             .black {
