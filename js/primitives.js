@@ -1502,18 +1502,16 @@ defp("%add-commas", false, function(m, nargs){
 /* -----[ simple hashes ]----- */
 
 function make_hash(weak, m, nargs) {
-    if (nargs & 1) error("Odd number of arguments");
-    var keys = [], values = [];
+    if (nargs & 1) error("MAKE-HASH: odd number of arguments");
+    nargs >>= 1;
+    let entries = [];
     while (nargs > 0) {
-        values.push(m.pop());
-        keys.push(m.pop());
-        nargs -= 2;
+        let val = m.pop();
+        let key = m.pop();
+        entries.push([ key, val ]);
+        --nargs;
     }
-    var hash = new LispHash(null, weak);
-    keys.forEach(function(key, i){
-        hash.set(key, values[i]);
-    });
-    return hash;
+    return new LispHash(entries, weak);
 }
 
 defp("make-hash", false, function(m, nargs){

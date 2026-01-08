@@ -262,7 +262,7 @@
 
          (on-keydown (target event)
            (case (dom:key event)
-             ("Escape"
+             (("Escape" "q")
               (dom:prevent-default event)
               (dom:close-dialog dlg))
              ("r"

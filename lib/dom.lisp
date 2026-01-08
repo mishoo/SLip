@@ -238,24 +238,42 @@
   return new Values([ box.left, box.top, box.width, box.height, box.right, box.bottom ]);
 ")
 
-(let ((style (lambda-js (element prop value) "
-  if (arguments.length === 2)
-    return window.getComputedStyle(element).getPropertyValue(prop);
+(defun-js %style-get (element prop) "
+  return window.getComputedStyle(element).getPropertyValue(prop);
+")
+
+(defun-js %style-set (value element prop) "
   if (value === false) {
     element.style.removeProperty(prop);
   } else {
     element.style.setProperty(prop, value);
   }
   return value;
-")))
-  (defun style (element prop)
-    (when (symbolp prop)
-      (setf prop (string-downcase (symbol-name prop))))
-    (funcall style element prop))
-  (defun (setf style) (value element prop)
-    (when (symbolp prop)
-      (setf prop (string-downcase (symbol-name prop))))
-    (funcall style element prop value)))
+")
+
+(defun style (element prop)
+  (when (symbolp prop)
+    (setf prop (string-downcase (symbol-name prop))))
+  (%style-get element prop))
+
+(define-compiler-macro style (&whole form element prop)
+  (multiple-value-bind (const? prop) (%:constant-value prop)
+    (when const?
+      (return-from style
+        `(%style-get ,element ,(string-downcase prop)))))
+  form)
+
+(defun (setf style) (value element prop)
+  (when (symbolp prop)
+    (setf prop (string-downcase (symbol-name prop))))
+  (%style-set value element prop))
+
+(define-compiler-macro (setf style) (&whole form value element prop)
+  (multiple-value-bind (const? prop) (%:constant-value prop)
+    (when const?
+      (return-from style
+        `(%style-set ,value ,element ,(string-downcase prop)))))
+  form)
 
 (defun-js scroll-into-view (element &key (block "nearest") (inline "nearest"))
   "element.scrollIntoView({ block, inline })")
