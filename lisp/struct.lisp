@@ -186,7 +186,7 @@
                         print-function
                         predicate
                         include)
-                       (parse-name-and-options name-and-options)
+      (parse-name-and-options name-and-options)
     (when include
       (setf include (find-structure include))
       (unless (or print-object print-function)
@@ -259,14 +259,14 @@
                  (t
                   `((declaim (inline ,constructor))
                     (defun ,constructor
-                           (&key ,@(mapcar (lambda (slot)
-                                             (let ((name (getf slot :name))
-                                                   (initform (getf slot :initform)))
-                                               (cond
-                                                 (initform
-                                                  `(,name ,initform))
-                                                 (t name))))
-                                           slots))
+                        (&key ,@(mapcar (lambda (slot)
+                                          (let ((name (getf slot :name))
+                                                (initform (getf slot :initform)))
+                                            (cond
+                                              (initform
+                                               `(,name ,initform))
+                                              (t name))))
+                                        slots))
                       (%struct (find-structure ',struct-name)
                                ,@(mapcar (lambda (slot) (getf slot :name)) slots)))))))
            ',struct-name)))))

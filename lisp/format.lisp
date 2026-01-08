@@ -373,9 +373,11 @@
           (t
            ;; normal case (no colmod)
            (catch 'abort-format-iteration
-             (tagbody :loop (setf myargs (iterate myargs sublist t))
-                      (when myargs
-                        (go :loop))))))))
+             (tagbody
+              :loop
+                (setf myargs (iterate myargs sublist t))
+                (when myargs
+                  (go :loop))))))))
     (if atmod? myargs args)))
 
 (def-format #\^ ((a nil) (b nil) (c nil))
@@ -588,14 +590,17 @@
           (t
            (cond
              (ensure-once?
-              `(tagbody :loop ,@(%expand-format (cadr sublist) 'myargs output)
-                        (when myargs
-                          (go :loop))))
+              `(tagbody
+                :loop
+                ,@(%expand-format (cadr sublist) 'myargs output)
+                  (when myargs
+                    (go :loop))))
              (t
-              `(tagbody :loop
-                        (when myargs
-                          ,@(%expand-format (cadr sublist) 'myargs output)
-                          (go :loop))))))))
+              `(tagbody
+                :loop
+                  (when myargs
+                    ,@(%expand-format (cadr sublist) 'myargs output)
+                    (go :loop))))))))
      ,(if atmod? 'myargs args)))
 
 (define-compiler-macro internal-format-94 ;; #\^

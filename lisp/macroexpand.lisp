@@ -231,8 +231,8 @@
            (macrolet              macrolet-mexp)
            (symbol-macrolet       symbol-macrolet-mexp)
            (multiple-value-bind   mvb-mexp))
-         (lambda (x)
-           (%set-symbol-prop (car x) :MEXP (cadr x))))
+  (lambda (x)
+    (%set-symbol-prop (car x) :MEXP (cadr x))))
 
 (defun macroexpand-all (f)
   (let ((%:*compiler-env* (%:make-compiler-env)))

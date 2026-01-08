@@ -348,8 +348,8 @@
                           ,(canonicalize-direct-slots direct-slots)
                           ,@(canonicalize-defclass-options options))))
        (sl-type:def-val-predicate class
-                                  (lambda (obj)
-                                    (subclassp (class-of obj) class)))
+           (lambda (obj)
+             (subclassp (class-of obj) class)))
        (sl-type:defpredicate ,name (obj)
          (subclassp (class-of obj) class))
        class)))
@@ -469,8 +469,8 @@
 ;;; called until standard-class itself exists.
 
 (defun make-instance-standard-class
-       (metaclass &key name direct-superclasses direct-slots
-                  &allow-other-keys)
+    (metaclass &key name direct-superclasses direct-slots
+               &allow-other-keys)
   (declare (ignore metaclass))
   (let ((class (std-allocate-instance the-class-standard-class)))
     (setf (class-name class) name)
@@ -482,7 +482,7 @@
     class))
 
 (defun std-after-initialization-for-classes
-       (class &key direct-superclasses direct-slots &allow-other-keys)
+    (class &key direct-superclasses direct-slots &allow-other-keys)
   (let ((supers
          (or direct-superclasses
              (list (find-class 'standard-object)))))
@@ -514,10 +514,10 @@
 ;;; error), so that it's easy to add new ones.
 
 (defun make-direct-slot-definition
-       (&rest properties
-              &key name (initargs ()) (initform nil) (initfunction nil)
-              (readers ()) (writers ())
-              &allow-other-keys)
+    (&rest properties
+           &key name (initargs ()) (initform nil) (initfunction nil)
+           (readers ()) (writers ())
+           &allow-other-keys)
   (let ((slot (copy-list properties))) ; Don't want to side effect &rest list
     (setf (getf* slot :name) name)
     (setf (getf* slot :initargs) initargs)
@@ -528,9 +528,9 @@
     slot))
 
 (defun make-effective-slot-definition
-       (&rest properties
-              &key name (initargs ()) (initform nil) (initfunction nil)
-              &allow-other-keys)
+    (&rest properties
+           &key name (initargs ()) (initform nil) (initfunction nil)
+           &allow-other-keys)
   (let ((slot (copy-list properties)))  ; Don't want to side effect &rest list
     (setf (getf* slot :name) name)
     (setf (getf* slot :initargs) initargs)
@@ -851,11 +851,11 @@
 ;;; ensure-generic-function
 
 (defun ensure-generic-function
-       (function-name
-        &rest all-keys
-        &key (generic-function-class the-class-standard-gf)
-        (method-class the-class-standard-method)
-        &allow-other-keys)
+    (function-name
+     &rest all-keys
+     &key (generic-function-class the-class-standard-gf)
+     (method-class the-class-standard-method)
+     &allow-other-keys)
   (multiple-value-bind (setter sym) (%:maybe-setter function-name)
     (%:maybe-xref-info sym (if setter :generic-setf :generic))
     (when setter
@@ -894,7 +894,7 @@
 ;;; However, it cannot be called until standard-generic-function exists.
 
 (defun make-instance-standard-generic-function
-       (generic-function-class &key name lambda-list method-class)
+    (generic-function-class &key name lambda-list method-class)
   (declare (ignore generic-function-class))
   (let ((gf (std-allocate-instance the-class-standard-gf))
         (parsed-lambda-list (analyze-lambda-list lambda-list)))
@@ -915,7 +915,7 @@
 
 (defmacro defmethod (&rest args)
   (multiple-value-bind (function-name qualifiers lambda-list specializers body)
-                       (parse-defmethod args)
+      (parse-defmethod args)
     (multiple-value-bind (setter) (%:maybe-setter function-name)
       (when setter (setf function-name setter)))
     (%:maybe-xref-info function-name :method)
@@ -1176,7 +1176,7 @@
 ;;; compute-applicable-methods-using-classes
 
 (defun compute-applicable-methods-using-classes
-       (gf required-classes)
+    (gf required-classes)
   (sort
    (copy-list
     (remove-if-not (lambda (method)
@@ -1416,20 +1416,20 @@
 (defgeneric print-object (instance stream))
 (defmethod print-object ((instance standard-object) stream)
   (print-unreadable-object (instance stream)
-     (format stream "~:(~S~)"
-                    (class-name (class-of instance))))
+                           (format stream "~:(~S~)"
+                                   (class-name (class-of instance))))
   instance)
 
 ;;; Slot access
 
 (defgeneric slot-value-using-class (class instance slot-name))
 (defmethod slot-value-using-class
-           ((class standard-class) instance slot-name)
+    ((class standard-class) instance slot-name)
   (std-slot-value instance slot-name))
 
 (defgeneric (setf slot-value-using-class) (new-value class instance slot-name))
 (defmethod (setf slot-value-using-class)
-           (new-value (class standard-class) instance slot-name)
+    (new-value (class standard-class) instance slot-name)
   (setf (std-slot-value instance slot-name) new-value))
 ;;; N.B. To avoid making a forward reference to a (setf xxx) generic function:
 (defun setf-slot-value-using-class (new-value class object slot-name)
@@ -1437,17 +1437,17 @@
 
 (defgeneric slot-exists-p-using-class (class instance slot-name))
 (defmethod slot-exists-p-using-class
-           ((class standard-class) instance slot-name)
+    ((class standard-class) instance slot-name)
   (std-slot-exists-p instance slot-name))
 
 (defgeneric slot-boundp-using-class (class instance slot-name))
 (defmethod slot-boundp-using-class
-           ((class standard-class) instance slot-name)
+    ((class standard-class) instance slot-name)
   (std-slot-boundp instance slot-name))
 
 (defgeneric slot-makunbound-using-class (class instance slot-name))
 (defmethod slot-makunbound-using-class
-           ((class standard-class) instance slot-name)
+    ((class standard-class) instance slot-name)
   (std-slot-makunbound instance slot-name))
 
 ;;; Instance creation and initialization
@@ -1470,7 +1470,7 @@
 
 (defgeneric reinitialize-instance (instance &key))
 (defmethod reinitialize-instance
-           ((instance standard-object) &rest initargs)
+    ((instance standard-object) &rest initargs)
   (apply #'shared-initialize instance () initargs))
 
 (defgeneric shared-initialize (instance slot-names &key))
@@ -1479,8 +1479,8 @@
   (dolist (slot (class-slots (class-of instance)))
     (let ((slot-name (slot-definition-name slot)))
       (multiple-value-bind (init-key init-value foundp)
-                           (get-properties
-                            all-keys (slot-definition-initargs slot))
+          (get-properties
+           all-keys (slot-definition-initargs slot))
         (declare (ignore init-key))
         (if foundp
             (setf (slot-value instance slot-name) init-value)
@@ -1496,9 +1496,9 @@
 
 (defgeneric change-class (instance new-class &key))
 (defmethod change-class
-           ((old-instance standard-object)
-            (new-class standard-class)
-            &rest initargs)
+    ((old-instance standard-object)
+     (new-class standard-class)
+     &rest initargs)
   (let ((new-instance (allocate-instance new-class)))
     (dolist (slot-name (mapcar #'slot-definition-name
                                (class-slots new-class)))
@@ -1515,12 +1515,12 @@
     old-instance))
 
 (defmethod change-class
-           ((instance standard-object) (new-class symbol) &rest initargs)
+    ((instance standard-object) (new-class symbol) &rest initargs)
   (apply #'change-class instance (find-class new-class) initargs))
 
 (defgeneric update-instance-for-different-class (old new &key))
 (defmethod update-instance-for-different-class
-           ((old standard-object) (new standard-object) &rest initargs)
+    ((old standard-object) (new standard-object) &rest initargs)
   (let ((added-slots
          (remove-if (lambda (slot-name)
                       (slot-exists-p old slot-name))
@@ -1534,9 +1534,9 @@
 
 (defmethod print-object ((class standard-class) stream)
   (print-unreadable-object (class stream)
-    (format stream "~:(~S~) ~S"
-            (class-name (class-of class))
-            (class-name class)))
+                           (format stream "~:(~S~) ~S"
+                                   (class-name (class-of class))
+                                   (class-name class)))
   class)
 
 (defmethod initialize-instance :after ((class standard-class) &rest args)
@@ -1563,7 +1563,7 @@
 
 (defgeneric compute-effective-slot-definition (class direct-slots))
 (defmethod compute-effective-slot-definition
-           ((class standard-class) direct-slots)
+    ((class standard-class) direct-slots)
   (std-compute-effective-slot-definition class direct-slots))
 
 ;;;
@@ -1572,9 +1572,9 @@
 
 (defmethod print-object ((gf standard-generic-function) stream)
   (print-unreadable-object (gf stream)
-     (format stream "~:(~S~) ~S"
-             (class-name (class-of gf))
-             (generic-function-name gf)))
+                           (format stream "~:(~S~) ~S"
+                                   (class-name (class-of gf))
+                                   (generic-function-name gf)))
   gf)
 
 (defmethod initialize-instance :after ((gf standard-generic-function) &key)
@@ -1586,13 +1586,13 @@
 
 (defmethod print-object ((method standard-method) stream)
   (print-unreadable-object (method stream)
-     (format stream "~:(~S~) ~S~{ ~S~} ~S"
-                    (class-name (class-of method))
-                    (generic-function-name
-                      (method-generic-function method))
-                    (method-qualifiers method)
-                    (mapcar #'class-name
-                            (method-specializers method))))
+                           (format stream "~:(~S~) ~S~{ ~S~} ~S"
+                                   (class-name (class-of method))
+                                   (generic-function-name
+                                    (method-generic-function method))
+                                   (method-qualifiers method)
+                                   (mapcar #'class-name
+                                           (method-specializers method))))
   method)
 
 ;;;
@@ -1605,12 +1605,12 @@
 
 (defgeneric method-more-specific-p (gf method1 method2 required-classes))
 (defmethod method-more-specific-p
-           ((gf standard-generic-function) method1 method2 required-classes)
+    ((gf standard-generic-function) method1 method2 required-classes)
   (std-method-more-specific-p gf method1 method2 required-classes))
 
 (defgeneric compute-effective-method-function (gf methods))
 (defmethod compute-effective-method-function
-           ((gf standard-generic-function) methods)
+    ((gf standard-generic-function) methods)
   (std-compute-effective-method-function gf methods))
 
 ;;; describe-object is a handy tool for enquiring minds:

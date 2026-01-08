@@ -138,8 +138,8 @@
             `(block ,block-tag
                (let ((,condition nil))
                  (tagbody
-                  (handler-bind ,bindings
-                    (return-from ,block-tag ,form))
+                    (handler-bind ,bindings
+                      (return-from ,block-tag ,form))
                   ,@body))))))))
 
 (defmacro ignore-errors (&body body)
@@ -162,14 +162,14 @@
         (*handler-clusters* *handler-clusters*))
     (tagbody
      t0
-     (when *handler-clusters*
-       (let looop ((cluster (pop *handler-clusters*)))
-         (when cluster
-           (let ((handler (car cluster)))
-             (when (typep condition (car handler))
-               (funcall (cdr handler) condition)))
-           (looop (cdr cluster))))
-       (go t0)))))
+       (when *handler-clusters*
+         (let looop ((cluster (pop *handler-clusters*)))
+           (when cluster
+             (let ((handler (car cluster)))
+               (when (typep condition (car handler))
+                 (funcall (cdr handler) condition)))
+             (looop (cdr cluster))))
+         (go t0)))))
 
 (defun error (datum . arguments)
   (let ((condition (%condition datum arguments 'simple-error)))

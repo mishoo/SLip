@@ -612,7 +612,7 @@
             $loop-next
             ,@(cdr @loop-iterate)
             ,@(cdr @loop-body)
-            (go $loop-next)
+              (go $loop-next)
             $loop-end)
            ,@(cdr @loop-finish))))))
 
@@ -624,4 +624,4 @@
          (tagbody
           $loop-next
           ,@args
-          (go $loop-next)))))
+            (go $loop-next)))))

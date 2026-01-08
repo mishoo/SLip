@@ -152,9 +152,9 @@
 
 (defun union (list1 list2 &key key test test-not)
   (multiple-value-bind (list1 list2)
-                       (if (< (length list1) (length list2))
-                           (values list2 list1)
-                           (values list1 list2))
+      (if (< (length list1) (length list2))
+          (values list2 list1)
+          (values list1 list2))
     (let ((test (make-subject-test test test-not key t))
           (res list2))
       (dolist (item list1 res)
@@ -212,13 +212,13 @@
                  `(setf p (setf (cdr p) ,cell))))
       (tagbody
        :loop
-       (cond ((and a b)
-              (if (funcall predicate (car b) (car a))
-                  (setf b (cdr (add b)))
-                  (setf a (cdr (add a))))
-              (go :loop))
-             (a (add a))
-             (b (add b))))
+         (cond ((and a b)
+                (if (funcall predicate (car b) (car a))
+                    (setf b (cdr (add b)))
+                    (setf a (cdr (add a))))
+                (go :loop))
+               (a (add a))
+               (b (add b))))
       (cdr ret))))
 
 (defun %merge-sort (list predicate)

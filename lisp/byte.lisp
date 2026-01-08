@@ -213,7 +213,7 @@
 ;; https://novaspec.org/cl/f_define-setf-expander
 (define-setf-expander ldb (bytespec int)
   (multiple-value-bind (temps vals stores store-form access-form)
-                       (get-setf-expansion int)   ;Get setf expansion for int.
+      (get-setf-expansion int)   ;Get setf expansion for int.
     (let ((btemp (gensym))     ;Temp var for byte specifier.
           (store (gensym))     ;Temp var for byte to store.
           (stemp (first stores))) ;Temp var for int to store.

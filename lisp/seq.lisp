@@ -65,24 +65,24 @@
          (p ret))
     (tagbody
      :loop
-     (when (cdr p)
-       (if (funcall predicate (cadr p))
-           (setf (cdr p) (cddr p))
-           (setf p (cdr p)))
-       (go :loop)))
+       (when (cdr p)
+         (if (funcall predicate (cadr p))
+             (setf (cdr p) (cddr p))
+             (setf p (cdr p)))
+         (go :loop)))
     (cdr ret)))
 
 (defun %delete-duplicates (list test)
   (tagbody
    :loop
-   (when list
-     (let ((current (car list)))
-       (setf list
-             (setf (cdr list)
-                   (%erase-if (cdr list)
-                              (lambda (x)
-                                (funcall test current x)))))
-       (go :loop)))))
+     (when list
+       (let ((current (car list)))
+         (setf list
+               (setf (cdr list)
+                     (%erase-if (cdr list)
+                                (lambda (x)
+                                  (funcall test current x)))))
+         (go :loop)))))
 
 (defun remove-duplicates (list &key key test test-not from-end)
   (setf list (if from-end (copy-seq list) (reverse list)))

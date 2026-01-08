@@ -210,10 +210,9 @@
          (exp (cdr (funcall reader '%:next))))
     (print-object-to-string (macroexpand-all exp))))
 
-(defglobal
-    *thread*
-    (make-thread
-     (lambda ()
-       (let ((*package* (find-package :sl-user))
-             (*read-table* *read-table*))
-         (loop (%receive *handlers*))))))
+(defglobal *thread*
+  (make-thread
+   (lambda ()
+     (let ((*package* (find-package :sl-user))
+           (*read-table* *read-table*))
+       (loop (%receive *handlers*))))))
