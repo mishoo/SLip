@@ -210,6 +210,7 @@ function equal(a, b) {
             b = b.cdr;
             if (!LispCons.is(a) || !LispCons.is(b))
                 return equal(a, b);
+            if (eq(a, b)) return true;
         }
         return eq(a, b);
     }
@@ -221,9 +222,6 @@ function equal(a, b) {
 
 function equalp(a, b) {
     if (eq(a, b)) return true;
-    if (LispString.is(a) && LispString.is(b)) {
-        return a.toLowerCase() === b.toLowerCase();
-    }
     if (LispList.is(a) && LispList.is(b)) {
         while (a !== false && b !== false) {
             if (!equalp(a.car, b.car)) return false;
@@ -231,8 +229,12 @@ function equalp(a, b) {
             b = b.cdr;
             if (!LispCons.is(a) || !LispCons.is(b))
                 return equalp(a, b);
+            if (eq(a, b)) return true;
         }
         return eq(a, b);
+    }
+    if (LispString.is(a) && LispString.is(b)) {
+        return a.toLowerCase() === b.toLowerCase();
     }
     if (LispVector.is(a) && LispVector.is(b)) {
         var i = a.length;
