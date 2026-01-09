@@ -444,7 +444,6 @@ var optimize = (function(){
             && code[i+1][1] === code[i][1]
             && code[i+1][2] === code[i][2])
         {
-            code[i][0] = "LVAR";
             code.splice(i+1, 1);
         }
         if (/^(?:JUMP|LJUMP|RET|LRET|CALL|APPLY)$/.test(el[0])) {
