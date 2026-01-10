@@ -62,6 +62,17 @@ function webdav_save(filename, content, cont) {
 };
 
 class Repl_Tokenizer extends Ymacs_Lang_Lisp {
+    copy() {
+        let s = this._stream;
+        let buffer = s.buffer;
+        let m = buffer.getq("sl_repl_marker");
+        let rc = buffer._positionToRowCol(m);
+        if (s.line === rc.row) {
+            // when we reached the current prompt line, reset state.
+            this.forgetState();
+        }
+        return super.copy();
+    }
     readCustom() {
         let s = this._stream, m;
         if (s.col === 0 && (m = s.lookingAt(/^[^<\s,'`]+?>/))) {
@@ -205,7 +216,7 @@ function flash_region(buffer, begin, end) {
 };
 
 function find_toplevel_sexp(buffer, blink, noerror) {
-    var p = buffer.cmd("lisp_make_quick_parser");
+    var p = buffer.cmd("sl_lisp_make_quick_parser");
     p.parse(buffer.point());
     var exp = p.cont_exp();
     while (exp && exp.parent && exp.parent.parent) {
@@ -310,7 +321,7 @@ Ymacs_Buffer.newCommands({
     sl_get_repl_buffer: get_repl_buffer,
     sl_log: sl_log,
     sl_get_symbol: function(pos){
-        var p = this.cmd("lisp_make_quick_parser");
+        var p = this.cmd("sl_lisp_make_quick_parser");
         p.parse(pos);
         var expr = p.cont_exp();
         if (expr && expr.type === "caret")
@@ -461,7 +472,7 @@ Ymacs_Buffer.newCommands({
             this.cmd("insert", name + "> ");
             this.cmd("end_of_line");
         });
-        m = this.createMarker(null, true);
+        m = this.createMarker(null, true, "sl_repl");
         this.setq("sl_repl_marker", m);
         this.forAllFrames(function(frame){ // this stinks. :-\
             frame.ensureCaretVisible();
@@ -469,6 +480,15 @@ Ymacs_Buffer.newCommands({
             frame.redrawCaret(true);
         });
         this.tokenizer.start();
+    },
+    sl_lisp_make_quick_parser: function() {
+        let point = this.point();
+        let mrepl = this.getq("sl_repl_marker");
+        if (point >= mrepl) {
+            return this.cmd("lisp_make_quick_parser", mrepl);
+        } else {
+            return this.cmd("lisp_make_quick_parser");
+        }
     },
     sl_repl_eval: Ymacs_Interactive(function() {
         var self = this;
@@ -744,7 +764,21 @@ Ymacs_Buffer.newMode("sl_mode", function(){
 });
 
 Ymacs_Buffer.newMode("sl_repl_mode", function(){
+    this._boundPosition = (pos, side) => {
+        if (side != null) {
+            let m = this.getq("sl_repl_marker");
+            if (m) {
+                let end = m.getPosition();
+                let rc = this._positionToRowCol(end);
+                let start = this._rowColToPosition(rc.row, 0);
+                if (start <= pos && pos < end)
+                    return null;
+            }
+        }
+        return Ymacs_Buffer.prototype._boundPosition.call(this, pos);
+    };
     this.cmd("sl_mode");
+    this.cmd("sl_repl_prompt");
     this.setTokenizer(new Ymacs_Tokenizer({ type: "sl_lisp_repl", buffer: this }));
     this.pushKeymap(Ymacs_Keymap_SL_REPL);
     this.setq("modeline_custom_handler", null);
@@ -752,6 +786,7 @@ Ymacs_Buffer.newMode("sl_repl_mode", function(){
     this.setq("sl_repl_history", JSON.parse(history));
     return function() {
         this.popKeymap(Ymacs_Keymap_SL_REPL);
+        this._boundPosition = Ymacs_Buffer.prototype._boundPosition;
         this.cmd("sl_mode", false);
     };
 });
@@ -859,7 +894,6 @@ export function make_desktop(load_files = []) {
             if (load_files.length === 0) {
                 load_files = ["ide/info.md"];
             }
-            buf.cmd("sl_repl_prompt");
             load_files.forEach(name => {
                 buf.cmd("split_frame_horizontally");
                 buf.cmd("other_frame");
