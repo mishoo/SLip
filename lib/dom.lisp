@@ -124,8 +124,8 @@
   "return LispCons.fromArray((container || document).querySelectorAll(selector))")
 
 (defmacro do-query ((element container selector) &body body)
-  `(loop for ,element in (query-all ,container ,selector)
-         do (progn ,@body)))
+  `(dolist (,element (query-all ,container ,selector))
+     ,@body))
 
 (defun-js matches (element selector)
   "return element.matches(selector)")
@@ -155,19 +155,48 @@
 (defun-js has-animations (element)
   "return element.getAnimations({ subtree: true }).length > 0")
 
-(let ((dataset (lambda-js (element key value) "
-                  if (arguments.length === 2) return element.dataset[key];
-                  if (value === false) return delete element.dataset[key], false;
-                  return element.dataset[key] = value;")))
-  (defun dataset (element key)
-    (when (symbolp key)
-      (setf key (%:%js-camelcase-name key)))
-    (funcall dataset element key))
+(defun-js %dataset-get (element key) "
+  return element.dataset[key];
+")
 
-  (defun (setf dataset) (value element key)
-    (when (symbolp key)
-      (setf key (%:%js-camelcase-name key)))
-    (funcall dataset element key value)))
+(defun-js %dataset-set (value element key) "
+  if (value === false) return delete element.dataset[key], false;
+  return element.dataset[key] = value;
+")
+
+(defun dataset (element key)
+  (when (symbolp key)
+    (setf key (%:%js-camelcase-name key)))
+  (%dataset-get element key))
+
+(define-compiler-macro dataset (&whole form element key)
+  (multiple-value-bind (const? key) (%:constant-value key)
+    (when const?
+      (cond
+        ((symbolp key)
+         (return-from dataset
+           `(%dataset-get ,element ,(%:%js-camelcase-name key))))
+        (t
+         (return-from dataset
+           `(%dataset-get ,element ,(string key)))))))
+  form)
+
+(defun (setf dataset) (value element key)
+  (when (symbolp key)
+    (setf key (%:%js-camelcase-name key)))
+  (%dataset-set value element key))
+
+(define-compiler-macro (setf dataset) (&whole form value element key)
+  (multiple-value-bind (const? key) (%:constant-value key)
+    (when const?
+      (cond
+        ((symbolp key)
+         (return-from dataset
+           `(%dataset-set ,value ,element ,(%:%js-camelcase-name key))))
+        (t
+         (return-from dataset
+           `(%dataset-set ,value ,element ,(string key)))))))
+  form)
 
 (define-simple-accessor checked "checked")
 (define-simple-accessor value "value")
@@ -209,24 +238,42 @@
   return new Values([ box.left, box.top, box.width, box.height, box.right, box.bottom ]);
 ")
 
-(let ((style (lambda-js (element prop value) "
-  if (arguments.length === 2)
-    return window.getComputedStyle(element).getPropertyValue(prop);
+(defun-js %style-get (element prop) "
+  return window.getComputedStyle(element).getPropertyValue(prop);
+")
+
+(defun-js %style-set (value element prop) "
   if (value === false) {
     element.style.removeProperty(prop);
   } else {
     element.style.setProperty(prop, value);
   }
   return value;
-")))
-  (defun style (element prop)
-    (when (symbolp prop)
-      (setf prop (string-downcase (symbol-name prop))))
-    (funcall style element prop))
-  (defun (setf style) (value element prop)
-    (when (symbolp prop)
-      (setf prop (string-downcase (symbol-name prop))))
-    (funcall style element prop value)))
+")
+
+(defun style (element prop)
+  (when (symbolp prop)
+    (setf prop (string-downcase (symbol-name prop))))
+  (%style-get element prop))
+
+(define-compiler-macro style (&whole form element prop)
+  (multiple-value-bind (const? prop) (%:constant-value prop)
+    (when const?
+      (return-from style
+        `(%style-get ,element ,(string-downcase prop)))))
+  form)
+
+(defun (setf style) (value element prop)
+  (when (symbolp prop)
+    (setf prop (string-downcase (symbol-name prop))))
+  (%style-set value element prop))
+
+(define-compiler-macro (setf style) (&whole form value element prop)
+  (multiple-value-bind (const? prop) (%:constant-value prop)
+    (when const?
+      (return-from style
+        `(%style-set ,value ,element ,(string-downcase prop)))))
+  form)
 
 (defun-js scroll-into-view (element &key (block "nearest") (inline "nearest"))
   "element.scrollIntoView({ block, inline })")

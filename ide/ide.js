@@ -62,6 +62,17 @@ function webdav_save(filename, content, cont) {
 };
 
 class Repl_Tokenizer extends Ymacs_Lang_Lisp {
+    copy() {
+        let s = this._stream;
+        let buffer = s.buffer;
+        let m = buffer.getq("sl_repl_marker");
+        let rc = buffer._positionToRowCol(m);
+        if (s.line === rc.row) {
+            // when we reached the current prompt line, reset state.
+            this.forgetState();
+        }
+        return super.copy();
+    }
     readCustom() {
         let s = this._stream, m;
         if (s.col === 0 && (m = s.lookingAt(/^[^<\s,'`]+?>/))) {
@@ -190,6 +201,12 @@ class Ymacs_SL extends Ymacs {
             }
         });
     }
+    setColorTheme(theme, nosave = false) {
+        if (!nosave) {
+            localStorage.setItem(".slip-theme", JSON.stringify(theme));
+        }
+        return super.setColorTheme(theme);
+    }
 }
 
 function flash_region(buffer, begin, end) {
@@ -205,7 +222,7 @@ function flash_region(buffer, begin, end) {
 };
 
 function find_toplevel_sexp(buffer, blink, noerror) {
-    var p = buffer.cmd("lisp_make_quick_parser");
+    var p = buffer.cmd("sl_lisp_make_quick_parser");
     p.parse(buffer.point());
     var exp = p.cont_exp();
     while (exp && exp.parent && exp.parent.parent) {
@@ -310,7 +327,7 @@ Ymacs_Buffer.newCommands({
     sl_get_repl_buffer: get_repl_buffer,
     sl_log: sl_log,
     sl_get_symbol: function(pos){
-        var p = this.cmd("lisp_make_quick_parser");
+        var p = this.cmd("sl_lisp_make_quick_parser");
         p.parse(pos);
         var expr = p.cont_exp();
         if (expr && expr.type === "caret")
@@ -461,7 +478,7 @@ Ymacs_Buffer.newCommands({
             this.cmd("insert", name + "> ");
             this.cmd("end_of_line");
         });
-        m = this.createMarker(null, true);
+        m = this.createMarker(null, true, "sl_repl");
         this.setq("sl_repl_marker", m);
         this.forAllFrames(function(frame){ // this stinks. :-\
             frame.ensureCaretVisible();
@@ -469,6 +486,15 @@ Ymacs_Buffer.newCommands({
             frame.redrawCaret(true);
         });
         this.tokenizer.start();
+    },
+    sl_lisp_make_quick_parser: function() {
+        let point = this.point();
+        let mrepl = this.getq("sl_repl_marker");
+        if (point >= mrepl) {
+            return this.cmd("lisp_make_quick_parser", mrepl);
+        } else {
+            return this.cmd("lisp_make_quick_parser");
+        }
     },
     sl_repl_eval: Ymacs_Interactive(function() {
         var self = this;
@@ -630,6 +656,117 @@ Ymacs_Buffer.newCommands({
             dlg.focus();
         }
     }),
+    sl_handle_comma: Ymacs_Interactive(function(){
+        let repl = this;
+        let m = repl.getq("sl_repl_marker");
+        if (m != repl.point()) {
+            return "ymacs-decline-key";
+        }
+        let commands = {
+            "In package": () => {
+                repl.cmd("sl_repl_set_package");
+            },
+            "Defparameter": () => {
+                repl.cmd("minibuffer_prompt", "Name (symbol): ");
+                repl.cmd("minibuffer_read_string", null, (name) => {
+                    repl.cmd("minibuffer_prompt", "Value: ");
+                    let mb = repl.getMinibuffer();
+                    mb.setMark();
+                    mb.transientMarker = mb.createMarker(mb.point(), true);
+                    mb.cmd("insert", "*");
+                    mb.ensureTransientMark();
+                    repl.cmd("minibuffer_read_string", null, (value) => {
+                        set_repl_input(repl, `(defparameter ${name} ${value})`);
+                        repl.cmd("sl_repl_eval");
+                    }, (mb, value, cont) => {
+                        value = value.trim();
+                        repl.ymacs.run_lisp("READ", false, value, ([_, pos]) => {
+                            if (pos < value.length) {
+                                mb.signalError("Too many forms");
+                                return;
+                            }
+                            cont(true);
+                        });
+                    });
+                }, (mb, name, cont) => {
+                    // validator for name
+                    name = name.trim();
+                    repl.ymacs.run_lisp("READ", false, name, ([data, pos]) => {
+                        if (!(data instanceof LispSymbol)) {
+                            mb.signalError("Not a symbol", false, 2000);
+                            return;
+                        }
+                        if (pos < name.length) {
+                            mb.signalError("Too many forms");
+                            return;
+                        }
+                        cont(true);
+                    });
+                });
+            },
+            "Open file": () => {
+                repl.ymacs.run_lisp("READ-EVAL", false, "%::*CORE-FILES*", (files) => {
+                    files = LispCons.toArray(files);
+                    files.unshift("lisp/compiler.lisp");
+                    repl.cmd("minibuffer_prompt", "Open file: ");
+                    repl.cmd("minibuffer_read_string", files, file => {
+                        repl.cmd("find_file", file);
+                    });
+                });
+            },
+            "Recompile all": () => {
+                repl.cmd("sl_recompile_everything");
+            },
+            "Load/run test suite": () => {
+                repl.ymacs.run_lisp("READ-EVAL", false, `(%::load "test/all.lisp")`, () => {
+                    set_repl_input(repl, `(sl-user::run-tests :log nil :all t)`);
+                    repl.cmd("sl_repl_eval");
+                });
+            },
+            "SLip on Github": () => {
+                window.open("https://github.com/mishoo/slip/");
+            },
+        };
+        repl.cmd("minibuffer_prompt", "Command: ");
+        repl.cmd("minibuffer_read_string", Object.keys(commands), cmd => {
+            let handler = commands[cmd];
+            if (!handler) {
+                repl.signalError("No command", false, 1000);
+                return;
+            }
+            handler();
+        });
+    }),
+    sl_history_search: Ymacs_Interactive(function(){
+        let repl = this;
+        let m = repl.getq("sl_repl_marker");
+        if (m != repl.point()) {
+            return "ymacs-decline-key";
+        }
+        repl.cmd("minibuffer_prompt", "Search history (regexp): ");
+        repl.cmd("minibuffer_read_string", null, (query) => {
+            let rx;
+            try {
+                rx = new RegExp(query, "i");
+            } catch (ex) {
+                repl.signalError("Invalid regexp", false, 2000);
+                return;
+            }
+            let a = HISTORY_COMPLETIONS = get_relevant_history_rx(repl, rx);
+            if (a.length > 0) {
+                var txt = a.shift();
+                a.push(txt);
+                set_repl_input(repl, txt);
+                repl.previousCommand = "sl_repl_history_back";
+                repl.forAllFrames(function (frame) { // this stinks again. :-\
+                    frame.ensureCaretVisible();
+                    frame.redrawModelineWithTimer();
+                    frame.redrawCaret(true);
+                });
+                repl.tokenizer.start();
+            }
+        });
+    }),
 });
 
 var HISTORY_COMPLETIONS;
@@ -650,11 +787,18 @@ function get_relevant_history(buf) {
     if (input) {
         h = h.filter(function(el){
             return el.toLowerCase().indexOf(input) >= 0;
-        }).sort(function(a, b){
-            return a.indexOf(input) - b.indexOf(input);
         });
         h = uniq(h);
     }
+    return h;
+};
+
+function get_relevant_history_rx(buf, rx) {
+    var h = buf.getq("sl_repl_history").slice();
+    h = h.filter(function(el){
+        return rx.test(el);
+    });
+    h = uniq(h);
     return h;
 };
 
@@ -666,6 +810,7 @@ function get_repl_input(buf) {
 function set_repl_input(buf, text) {
     var m = buf.getq("sl_repl_marker");
     buf._replaceText(m, buf.getCodeSize(), text);
+    buf.deleteOverlay("match-paren");
 };
 
 function eval_lisp(buf, expr, pack = false) {
@@ -708,6 +853,8 @@ let Ymacs_Keymap_SL_REPL = Ymacs_Keymap.define("slip_repl", {
     "Tab" : "sl_repl_complete_symbol",
     "C-c M-p": "sl_repl_set_package",
     "Home && C-a" : "sl_repl_beginning_of_input",
+    ",": "sl_handle_comma",
+    "M-r": "sl_history_search",
 });
 
 Ymacs_Buffer.setGlobal("sl_xref_history", []);
@@ -744,7 +891,21 @@ Ymacs_Buffer.newMode("sl_mode", function(){
 });
 
 Ymacs_Buffer.newMode("sl_repl_mode", function(){
+    this._boundPosition = (pos, side) => {
+        if (side != null) {
+            let m = this.getq("sl_repl_marker");
+            if (m) {
+                let end = m.getPosition();
+                let rc = this._positionToRowCol(end);
+                let start = this._rowColToPosition(rc.row, 0);
+                if (start <= pos && pos < end)
+                    return null;
+            }
+        }
+        return Ymacs_Buffer.prototype._boundPosition.call(this, pos);
+    };
     this.cmd("sl_mode");
+    this.cmd("sl_repl_prompt");
     this.setTokenizer(new Ymacs_Tokenizer({ type: "sl_lisp_repl", buffer: this }));
     this.pushKeymap(Ymacs_Keymap_SL_REPL);
     this.setq("modeline_custom_handler", null);
@@ -752,6 +913,7 @@ Ymacs_Buffer.newMode("sl_repl_mode", function(){
     this.setq("sl_repl_history", JSON.parse(history));
     return function() {
         this.popKeymap(Ymacs_Keymap_SL_REPL);
+        this._boundPosition = Ymacs_Buffer.prototype._boundPosition;
         this.cmd("sl_mode", false);
     };
 });
@@ -811,10 +973,13 @@ export function make_desktop(load_files = []) {
         ev.preventDefault();
     });
     var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL({ ls_keyName: ".slip" });
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        ymacs.setColorTheme([ "ef-elea-dark" ]);
+    let savedTheme = localStorage.getItem(".slip-theme");
+    if (savedTheme && ymacs.setColorTheme(JSON.parse(savedTheme), true)) {
+        // we cool.
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        ymacs.setColorTheme([ "ef-elea-dark" ], true);
     } else {
-        ymacs.setColorTheme([ "ef-elea-light" ]);
+        ymacs.setColorTheme([ "ef-elea-light" ], true);
     }
     ymacs.addClass("Ymacs-hl-line");
     document.body.appendChild(ymacs.getElement());
@@ -859,7 +1024,6 @@ export function make_desktop(load_files = []) {
             if (load_files.length === 0) {
                 load_files = ["ide/info.md"];
             }
-            buf.cmd("sl_repl_prompt");
             load_files.forEach(name => {
                 buf.cmd("split_frame_horizontally");
                 buf.cmd("other_frame");

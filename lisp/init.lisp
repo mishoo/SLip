@@ -334,7 +334,9 @@
                        adders))
                (when vconc
                  (push `(,vconc (lst)
-                         `(setq ,',vtail (last (%rplacd ,',vtail ,lst))))
+                         `(let ((tmp ,lst))
+                            (when tmp
+                              (setq ,',vtail (last (%rplacd ,',vtail tmp))))))
                        adders)))))
       (foreach names #'mk-collector)
       `(let (,@(mapcar (lambda (name) `(,name (list nil))) lists))
@@ -436,7 +438,7 @@
        (values nil nil vals `(setq ,form ,@vals) form)))
     ((consp form)
      (multiple-value-bind (expander form setf-exp)
-                          (%get-setf-place form)
+         (%get-setf-place form)
        (when (eq expander t)
          ;; XXX: see above in `%get-setf-place'. We receive T when we got down
          ;; to a symbol. By recursing here we also expand an eventual
@@ -525,7 +527,7 @@
           `(setq ,form ,value))
          (setf-exp
           (multiple-value-bind (temps vals stores set)
-                               (apply expander (cdr form))
+              (apply expander (cdr form))
             (%call-setf-expansion temps vals stores set value)))
          ((and (null expander)
                (symbolp (car form)))
@@ -556,7 +558,7 @@
      `(setq ,place (,function ,place ,@args)))
     (t
      (multiple-value-bind (temp-vars temp-vals stores set get)
-                          (get-setf-expansion place)
+         (get-setf-expansion place)
        (%call-setf-expansion
         temp-vars temp-vals stores set
         `(,function ,get ,@args))))))
@@ -605,7 +607,7 @@
     ((safe-atom-p place)
      `(setq ,place (cons ,obj ,place)))
     ((multiple-value-bind (temps value-forms store-vars store-form get-form)
-                          (get-setf-expansion place)
+         (get-setf-expansion place)
        (let ((item (gensym "item"))
              (newval (gensym "newval")))
          `(let* ((,item ,obj)
@@ -620,7 +622,7 @@
       ((safe-atom-p place)
        `(%:%pop ,place))
       ((multiple-value-bind (temps value-forms store-vars store-form get-form)
-                            (get-setf-expansion place)
+           (get-setf-expansion place)
          `(let* (,@(mapcar #'list temps value-forms)
                  (,v ,get-form))
             (symbol-macrolet ((,(car store-vars) (cdr ,v)))
@@ -629,7 +631,7 @@
 
 (define-setf-expander getf (place indicator &optional default)
   (multiple-value-bind (place-tempvars place-tempvals stores set get)
-                       (get-setf-expansion place)
+      (get-setf-expansion place)
     (let ((vindicator (gensym "indicator"))
           (vdefault (gensym "default"))
           (newval (gensym "newval")))
@@ -693,13 +695,13 @@
            (declare ,@declarations)
            (tagbody
             ,next
-            (unless ,list
-              (go ,end))
-            (setf ,var (pop ,list))
+              (unless ,list
+                (go ,end))
+              (setf ,var (pop ,list))
             ,@body
-            (go ,next)
+              (go ,next)
             ,end
-            (setf ,var nil))
+              (setf ,var nil))
            ,@result-form)))))
 
 (defmacro dotimes ((var count-form &rest result-form) &body body)
@@ -713,11 +715,11 @@
            (declare ,@declarations)
            (tagbody
             ,next
-            (unless (< ,var ,count)
-              (go ,end))
+              (unless (< ,var ,count)
+                (go ,end))
             ,@body
-            (incf ,var)
-            (go ,next)
+              (incf ,var)
+              (go ,next)
             ,end)
            ,@result-form)))))
 
@@ -738,11 +740,11 @@
            (declare ,@declarations)
            (tagbody
             ,next
-            (when ,end-test-form
-              (go ,end))
+              (when ,end-test-form
+                (go ,end))
             ,@body
-            (setq ,@step)
-            (go ,next)
+              (setq ,@step)
+              (go ,next)
             ,end)
            ,@result-form)))))
 
@@ -765,10 +767,10 @@
                           (setf (car cell) (car setters)
                                 (cdr cell) (cdr setters))
                           (car code)))
-        (let ((place (car args))
+        (let ((place (car args))
               (value (cadr args)))
           (multiple-value-bind (temps vals stores set get)
-                               (get-setf-expansion place)
+              (get-setf-expansion place)
             (setters set)
             (let ((next-cell (list nil)))
               (setf (car cell)
@@ -795,11 +797,11 @@
            (declare ,@declarations)
            (tagbody
             ,next
-            (when ,end-test-form
-              (go ,end))
+              (when ,end-test-form
+                (go ,end))
             ,@body
-            (psetq ,@step)
-            (go ,next)
+              (psetq ,@step)
+              (go ,next)
             ,end)
            ,@result-form)))))
 
@@ -852,7 +854,7 @@
   (let ((vobj (gensym "obj"))
         (vcurr (gensym "curr")))
     (multiple-value-bind (temps vals stores set get)
-                         (get-setf-expansion place)
+        (get-setf-expansion place)
       `(let* ((,vobj ,obj)
               ,@(mapcar #'list temps vals)
               (,vcurr ,get))
@@ -1053,7 +1055,7 @@
   `(with-collectors (,temp-vars ,temp-vals ,store-main-vars ,store-other-vars ,setters ,getters)
      (dolist (place ,places)
        (multiple-value-bind (place-temps place-vals place-stores place-set place-get)
-                            (get-setf-expansion place)
+           (get-setf-expansion place)
          (dolist (el place-temps) (,temp-vars el))
          (dolist (el place-vals) (,temp-vals el))
          (dolist (el (cdr place-stores)) (,store-other-vars el))

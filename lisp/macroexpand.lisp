@@ -45,7 +45,9 @@
              (when *expand-compiler-macros*
                (let ((cmf (compiler-macro-function (car f))))
                  (when cmf
-                   (setf f (funcall cmf f)))))
+                   (let ((exp (funcall cmf f)))
+                     (unless (eq exp f)
+                       (return-from rec (rec exp t)))))))
              (funcall-mexp f))
             ((not (symbolp (car f)))
              (rec f nil))
@@ -229,8 +231,8 @@
            (macrolet              macrolet-mexp)
            (symbol-macrolet       symbol-macrolet-mexp)
            (multiple-value-bind   mvb-mexp))
-         (lambda (x)
-           (%set-symbol-prop (car x) :MEXP (cadr x))))
+  (lambda (x)
+    (%set-symbol-prop (car x) :MEXP (cadr x))))
 
 (defun macroexpand-all (f)
   (let ((%:*compiler-env* (%:make-compiler-env)))

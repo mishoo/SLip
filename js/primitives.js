@@ -180,6 +180,7 @@ function as_string(thing) {
     if (LispPackage.is(thing)) return thing.name;
     if (LispVector.is(thing)) return thing.map(as_string).join("");
     if (LispCons.is(thing)) return LispCons.toArray(thing).map(as_string).join("");
+    if (Number.isInteger(thing)) return String(thing);
     error("STRING: cannot coerce given object to string");
 };
 
@@ -209,6 +210,7 @@ function equal(a, b) {
             b = b.cdr;
             if (!LispCons.is(a) || !LispCons.is(b))
                 return equal(a, b);
+            if (eq(a, b)) return true;
         }
         return eq(a, b);
     }
@@ -220,9 +222,6 @@ function equal(a, b) {
 
 function equalp(a, b) {
     if (eq(a, b)) return true;
-    if (LispString.is(a) && LispString.is(b)) {
-        return a.toLowerCase() === b.toLowerCase();
-    }
     if (LispList.is(a) && LispList.is(b)) {
         while (a !== false && b !== false) {
             if (!equalp(a.car, b.car)) return false;
@@ -230,8 +229,12 @@ function equalp(a, b) {
             b = b.cdr;
             if (!LispCons.is(a) || !LispCons.is(b))
                 return equalp(a, b);
+            if (eq(a, b)) return true;
         }
         return eq(a, b);
+    }
+    if (LispString.is(a) && LispString.is(b)) {
+        return a.toLowerCase() === b.toLowerCase();
     }
     if (LispVector.is(a) && LispVector.is(b)) {
         var i = a.length;
@@ -620,7 +623,6 @@ defp("%putf", true, function(m, nargs){
         var name = "SYM";
         if (nargs == 1) {
             name = as_string(m.pop());
-            checktype(name, LispString);
             if (name === "_reset") N = -1;
         }
         return new LispSymbol(name + (++N));
@@ -985,7 +987,7 @@ defp("%seq-cat", true, function(m, nargs){
     LispCons.forEach(list, function(x){
         if (x !== false) {
             if (LispCons.is(x)) {
-                seq.push.apply(seq, LispCons.toArray(x));
+                seq.push(...LispCons.toArray(x));
             }
             else if (LispVector.is(x)) {
                 seq.push(...x);
@@ -1066,12 +1068,12 @@ defp("string", false, function(m, nargs){
 
 defp("string-downcase", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return checktype(as_string(m.pop()), LispString).toLowerCase();
+    return as_string(m.pop()).toLowerCase();
 });
 
 defp("string-upcase", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return checktype(as_string(m.pop()), LispString).toUpperCase();
+    return as_string(m.pop()).toUpperCase();
 });
 
 defp("char-downcase", false, function(m, nargs){
@@ -1086,14 +1088,14 @@ defp("char-upcase", false, function(m, nargs){
 
 defp("string-capitalize", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return checktype(as_string(m.pop()), LispString).replace(/\w+/gu, str =>
+    return as_string(m.pop()).replace(/\w+/gu, str =>
         str.charAt(0).toUpperCase() + str.substr(1).toLowerCase()
     );
 });
 
 defp("string-capitalize-1", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return checktype(as_string(m.pop()), LispString).replace(/\w+/u, str =>
+    return as_string(m.pop()).replace(/\w+/u, str =>
         str.charAt(0).toUpperCase() + str.substr(1).toLowerCase()
     );
 });
@@ -1188,11 +1190,9 @@ defp("letterp", false, function(m, nargs){
         // string ops
         checknargs(nargs, 1);
         let prev = as_string(m.pop());
-        checktype(prev, LispString);
         let ret = true;
         while (--nargs > 0) {
             let el = as_string(m.pop());
-            checktype(el, LispString);
             if (ret && !cmp(el, prev)) ret = false;
             prev = el;
         }
@@ -1238,15 +1238,12 @@ defp("replace-regexp", false, function(m, nargs){
     checknargs(nargs, 3);
     var replacement = as_string(m.pop()), string = as_string(m.pop()), rx = m.pop();
     checktype(rx, LispRegexp);
-    checktype(string, LispString);
-    checktype(replacement, LispString);
     return string.replace(rx, replacement);
 });
 
 defp("quote-regexp", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var str = as_string(m.pop());
-    checktype(str, LispString);
     return str.replace(/([\[\]\(\)\{\}\.\*\+\?\|\\])/g, "\\$1");
 });
 
@@ -1465,7 +1462,6 @@ defp("%pad-string", false, function(m, nargs){
     var str = m.pop();
     checktype(str, LispString);
     checktype(width, LispNumber);
-    checktype(chr, LispString);
     checktype(inc, LispNumber);
     checktype(min, LispNumber);
     if (min > 0) {
@@ -1489,8 +1485,6 @@ defp("%add-commas", false, function(m, nargs){
     var interval = nargs >= 3 ? m.pop() : 3;
     var ch = nargs >= 2 ? as_string(m.pop()) : ',';
     var str = as_string(m.pop());
-    checktype(str, LispString);
-    checktype(ch, LispString);
     checktype(interval, LispNumber);
     interval = Math.floor(interval);
     if (interval <= 0) error("Interval must be strictly positive");
@@ -1508,18 +1502,16 @@ defp("%add-commas", false, function(m, nargs){
 /* -----[ simple hashes ]----- */
 
 function make_hash(weak, m, nargs) {
-    if (nargs & 1) error("Odd number of arguments");
-    var keys = [], values = [];
+    if (nargs & 1) error("MAKE-HASH: odd number of arguments");
+    nargs >>= 1;
+    let entries = [];
     while (nargs > 0) {
-        values.push(m.pop());
-        keys.push(m.pop());
-        nargs -= 2;
+        let val = m.pop();
+        let key = m.pop();
+        entries.push([ key, val ]);
+        --nargs;
     }
-    var hash = new LispHash(null, weak);
-    keys.forEach(function(key, i){
-        hash.set(key, values[i]);
-    });
-    return hash;
+    return new LispHash(entries, weak);
 }
 
 defp("make-hash", false, function(m, nargs){
@@ -2060,7 +2052,6 @@ defp("make-package", true, function(m, nargs){
     var nicknames = nargs >= 3 ? m.pop() : false;
     var uses = nargs >= 2 ? m.pop() : false;
     var name = as_string(m.pop());
-    checktype(name, LispString);
     var pak = LispPackage.get(name);
     LispCons.forEach(uses, function(use){
         pak.use(want_package(use));
@@ -2145,7 +2136,6 @@ defp("%find-exported-symbol", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var pak = want_package(m.pop(), m);
     var name = as_string(m.pop());
-    checktype(name, LispString);
     return pak.find_exported(name);
 });
 
@@ -2153,7 +2143,6 @@ defp("%find-internal-symbol", false, function(m, nargs){
     checknargs(nargs, 2, 2);
     var pak = want_package(m.pop(), m);
     var name = as_string(m.pop());
-    checktype(name, LispString);
     return pak.find_internal(name);
 });
 
@@ -2471,7 +2460,6 @@ defp("%catch-all-errors", true, function(m, nargs){
 defp("dom.get-element-by-id", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var id = as_string(m.pop());
-    checktype(id, LispString);
     return document.getElementById(id);
 });
 
@@ -2718,7 +2706,6 @@ defp("%js-closure", false, function(m, nargs){
 defp("%js-camelcase-name", true, function(m, nargs){
     checknargs(nargs, 1, 1);
     var name = as_string(m.pop());
-    checktype(name, LispString);
     name = name.toLowerCase();
     var m = /^\+(.*)\+$/.exec(name);
     if (m) {

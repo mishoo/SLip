@@ -1,5 +1,8 @@
 import { LispCons } from "./list.js";
-import { LispSymbol, LispPackage, LispHash, LispChar, LispClosure } from "./types.js";
+import {
+    LispSymbol, LispPackage, LispHash, LispHashEqual, LispChar, LispClosure,
+    LispArray, LispStruct, LispStdInstance, LispMutex, LispProcess
+} from "./types.js";
 import { LispPrimitiveError } from "./error.js";
 import { repeat_string, pad_string } from "./utils.js";
 import { LispStack } from "./stack.js";
@@ -121,6 +124,7 @@ export const OP = {
     BASH: 100,
     BCNT: 101,
     BNOT: 102,
+    CASE: 103,
 };
 
 const OP_LEN = [
@@ -227,6 +231,7 @@ const OP_LEN = [
     0 /* BASH */,
     0 /* BCNT */,
     0 /* BNOT */,
+    1 /* CASE */,
 ];
 
 export function want_bound(name, val) {
@@ -347,7 +352,7 @@ var optimize = (function(){
             }
         }
         return 0;
-    };
+    }
     function next_instr(code, i, len) {
         let a = [];
         while (i < code.length && len > 0) {
@@ -360,16 +365,16 @@ var optimize = (function(){
         return a;
     }
     function used_label(code, label) {
-        for (var i = code.length; --i >= 0;) {
-            var el = code[i];
-            if (!(el instanceof LispSymbol)) {
-                if (el[1] === label)
-                    return true;
-                if (el[0] === "FN" && used_label(el[1], label))
-                    return true;
+        for (var i = 0; i < code.length; i++) {
+            var instr = code[i];
+            if (instr[0] === "FN" && used_label(instr[1], label))
+                return true;
+            if (op_has_label(instr[0])) {
+                if (instr[1] === label) return true;
+                if (Array.isArray(instr[1]) && instr[1].includes(label)) return true;
             }
         }
-    };
+    }
     function optimize1(code, i, pass) {
         var el = code[i];
         if (el instanceof LispSymbol) {
@@ -433,6 +438,13 @@ var optimize = (function(){
         if (i+1 < code.length && code[i][0] == "NUMEQ" && code[i+1][0] == "NOT") {
             code.splice(i, 2, [ "NUMNEQ" ]);
             return true;
+        }
+        if (i+1 < code.length && ["LVAR", "LSET"].includes(code[i][0])
+            && code[i+1][0] === "LSET"
+            && code[i+1][1] === code[i][1]
+            && code[i+1][2] === code[i][2])
+        {
+            code.splice(i+1, 1);
         }
         if (/^(?:JUMP|LJUMP|RET|LRET|CALL|APPLY)$/.test(el[0])) {
             for (var j = i + 1; j < code.length; ++j) {
@@ -733,7 +745,7 @@ var optimize = (function(){
             code.splice(i+1, 1);
             return true;
         }
-    };
+    }
     return function optimize(code) {
         let pass = 0;
         while (pass < 2) {
@@ -754,21 +766,29 @@ function constantp(x) {
         || x instanceof LispChar
         || x instanceof LispSymbol
         || x instanceof LispHash
+        || x instanceof LispClosure
+        || x instanceof LispArray
+        || x instanceof LispStruct
+        || x instanceof LispStdInstance
+        || x instanceof LispPackage
+        || x instanceof LispMutex
+        || x instanceof LispProcess
         || Array.isArray(x);
 }
 
 function op_has_label(op) {
     switch (op) {
-      case OP.JUMP:
-      case OP.TJUMP:
-      case OP.FJUMP:
-      case OP.LRET:
-      case OP.LJUMP:
-      case OP.UPOPEN:
-      case OP.SAVE:
-      case OP.CATCH:
-      case OP.TJUMPK:
-      case OP.FJUMPK:
+      case OP.JUMP: case "JUMP":
+      case OP.TJUMP: case "TJUMP":
+      case OP.FJUMP: case "FJUMP":
+      case OP.LRET: case "LRET":
+      case OP.LJUMP: case "LJUMP":
+      case OP.UPOPEN: case "UPOPEN":
+      case OP.SAVE: case "SAVE":
+      case OP.CATCH: case "CATCH":
+      case OP.TJUMPK: case "TJUMPK":
+      case OP.FJUMPK: case "FJUMPK":
+      case OP.CASE: case "CASE":
         return true;
     }
 }
@@ -797,8 +817,13 @@ function assemble(code) {
             ret[i] = assemble(ret[i]);
             break;
           default:
-            if (op_has_label(op))
-                ret[i] = ret[i].value;
+            if (op_has_label(op)) {
+                if (Array.isArray(ret[i])) {
+                    ret[i].forEach((sym, i, a) => a[i] = sym.value);
+                } else {
+                    ret[i] = ret[i].value;
+                }
+            }
         }
         i += OP_LEN[op];
     }
@@ -808,8 +833,13 @@ function assemble(code) {
 function relocate(code, offset) {
     for (let i = 0; i < code.length;) {
         let op = code[i++];
-        if (op_has_label(op))
-            code[i] += offset;
+        if (op_has_label(op)) {
+            if (Array.isArray(code[i])) {
+                code[i].forEach((addr, i, a) => a[i] = addr + offset);
+            } else {
+                code[i] += offset;
+            }
+        }
         i += OP_LEN[op];
     }
     return code;
@@ -849,7 +879,8 @@ function dump(thing, dumped = new Map()) {
         if (typeof thing === "string") return JSON.stringify(LispChar.sanitize(thing));
         if (LispSymbol.is(thing)) {
             if (thing.pak === KEYWORD_PACK) return ":" + thing.name;
-            if (thing.pak) return thing.pak.name + "::" + thing.name;
+            if (thing.pak && thing.pak !== LispPackage.BASE_PACK)
+                return thing.pak.name + "::" + thing.name;
             return thing.name;
         }
         if (dumped.has(thing)) {
@@ -899,8 +930,16 @@ export function disassemble(code) {
             let op = code[i++];
             if (op_has_label(op)) {
                 let addr = code[i];
-                if (!labels[addr]) {
-                    labels[addr] = LispSymbol.get("L" + (++lab));
+                if (Array.isArray(addr)) {
+                    addr.forEach(addr => {
+                        if (!labels[addr]) {
+                            labels[addr] = LispSymbol.get("L" + (++lab));
+                        }
+                    });
+                } else {
+                    if (!labels[addr]) {
+                        labels[addr] = LispSymbol.get("L" + (++lab));
+                    }
                 }
             }
             i += OP_LEN[op];
@@ -922,8 +961,12 @@ export function disassemble(code) {
                 break;
               default:
                 if (op_has_label(op)) {
-                    data = [ labels[code[i]], ...code.slice(i + 1, i + OP_LEN[op]) ].map(el =>
-                        pad_string(dump(el), 8)).join("");
+                    if (Array.isArray(code[i])) {
+                        data = dump(code[i].map(addr => labels[addr]));
+                    } else {
+                        data = [labels[code[i]], ...code.slice(i + 1, i + OP_LEN[op])].map(el =>
+                            pad_string(dump(el), 8)).join("");
+                    }
                     break;
                 }
                 data = code.slice(i, i + OP_LEN[op]).map(el =>
@@ -985,6 +1028,14 @@ function dig_references(data) {
         else if (val instanceof Array) {
             if (mark(val)) {
                 val.forEach(el => dig(el));
+            }
+        }
+        else if (val instanceof LispHash && !val.weak) {
+            if (mark(val)) {
+                val.data.entries().forEach(([ key, val ]) => {
+                    dig(key);
+                    dig(val);
+                });
             }
         }
     });
@@ -1076,6 +1127,21 @@ function serialize_const(val, cache, refd) {
                 return "[" + val.map(dump).join(",") + "]";
             }
         }
+        if (val instanceof LispHash) {
+            if (val instanceof LispHashEqual) {
+                error("Hashes with test EQUAL are not serializable");
+            }
+            if (val.weak) {
+                error("Weak hashes are not serializable");
+            }
+            let q = maybe_cached(val);
+            if (q) return q;
+            if (just_cached(val)) {
+                return `H(()=>[${[...val.data.entries()].map(dump).join(",")}])`;
+            } else {
+                return `h([${[...val.data.entries()].map(dump).join(",")}])`;
+            }
+        }
         if (typeof val === "string") {
             let q = maybe_cached(val);
             if (q) return q;
@@ -1164,6 +1230,15 @@ export function unserialize(code) {
     names.push("V"); values.push(function(value){
         cache.push(value);
         return value;
+    });
+    names.push("h"); values.push(function(value){
+        return new LispHash(value);
+    });
+    names.push("H"); values.push(function(value){
+        let hash = new LispHash();
+        cache.push(hash);
+        hash.data = new Map(value());
+        return hash;
     });
     names.push("DOT"); values.push(LispCons.DOT);
     var func = new Function("return function(" + names.join(",") + "){return [" + code + "]}")();
@@ -1983,6 +2058,17 @@ let OP_RUN = [
     },
     /*OP.BNOT*/ (m) => {
         m.push(~m.pop_integer());
+    },
+    /*OP.CASE*/ (m) => {
+        let jumptable = m.code[m.pc++];
+        let cases = m.pop();
+        let value = m.pop();
+        let idx = cases.indexOf(value) + 1;
+        if (idx === 0) {
+            m.push(value);
+            m.push(cases);
+        }
+        m.pc = jumptable[idx];
     },
 ];
 
