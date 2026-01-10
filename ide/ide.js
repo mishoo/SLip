@@ -657,7 +657,7 @@ Ymacs_Buffer.newCommands({
         }
     }),
     sl_handle_comma: Ymacs_Interactive(function(){
-        let repl = get_repl_buffer();
+        let repl = this;
         let m = repl.getq("sl_repl_marker");
         if (m == repl.point()) {
             let commands = {
@@ -738,6 +738,37 @@ Ymacs_Buffer.newCommands({
             repl.cmd("self_insert_command");
         }
     }),
+    sl_history_search: Ymacs_Interactive(function(){
+        let repl = this;
+        let m = repl.getq("sl_repl_marker");
+        if (m == repl.point()) {
+            repl.cmd("minibuffer_prompt", "Search history (regexp): ");
+            repl.cmd("minibuffer_read_string", null, (query) => {
+                let rx;
+                try {
+                    rx = new RegExp(query, "i");
+                } catch(ex) {
+                    repl.signalError("Invalid regexp", false, 2000);
+                    return;
+                }
+                let a = HISTORY_COMPLETIONS = get_relevant_history_rx(repl, rx);
+                if (a.length > 0) {
+                    var txt = a.shift();
+                    a.push(txt);
+                    set_repl_input(repl, txt);
+                    repl.previousCommand = "sl_repl_history_back";
+                    repl.forAllFrames(function (frame) { // this stinks again. :-\
+                        frame.ensureCaretVisible();
+                        frame.redrawModelineWithTimer();
+                        frame.redrawCaret(true);
+                    });
+                    repl.tokenizer.start();
+                }
+            });
+        } else {
+            return "ymacs-decline-key";
+        }
+    }),
 });
 
 var HISTORY_COMPLETIONS;
@@ -758,11 +789,18 @@ function get_relevant_history(buf) {
     if (input) {
         h = h.filter(function(el){
             return el.toLowerCase().indexOf(input) >= 0;
-        }).sort(function(a, b){
-            return a.indexOf(input) - b.indexOf(input);
         });
         h = uniq(h);
     }
+    return h;
+};
+
+function get_relevant_history_rx(buf, rx) {
+    var h = buf.getq("sl_repl_history").slice();
+    h = h.filter(function(el){
+        return rx.test(el);
+    });
+    h = uniq(h);
     return h;
 };
 
@@ -817,6 +855,7 @@ let Ymacs_Keymap_SL_REPL = Ymacs_Keymap.define("slip_repl", {
     "C-c M-p": "sl_repl_set_package",
     "Home && C-a" : "sl_repl_beginning_of_input",
     ",": "sl_handle_comma",
+    "M-r": "sl_history_search",
 });
 
 Ymacs_Buffer.setGlobal("sl_xref_history", []);
