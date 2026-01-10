@@ -659,115 +659,113 @@ Ymacs_Buffer.newCommands({
     sl_handle_comma: Ymacs_Interactive(function(){
         let repl = this;
         let m = repl.getq("sl_repl_marker");
-        if (m == repl.point()) {
-            let commands = {
-                "In package": () => {
-                    repl.cmd("sl_repl_set_package");
-                },
-                "Defparameter": () => {
-                    repl.cmd("minibuffer_prompt", "Name (symbol): ");
-                    repl.cmd("minibuffer_read_string", null, (name) => {
-                        repl.cmd("minibuffer_prompt", "Value: ");
-                        let mb = repl.getMinibuffer();
-                        mb.setMark();
-                        mb.transientMarker = mb.createMarker(mb.point(), true);
-                        mb.cmd("insert", "*");
-                        mb.ensureTransientMark();
-                        repl.cmd("minibuffer_read_string", null, (value) => {
-                            repl.cmd("insert", `(defparameter ${name} ${value})`);
-                            repl.cmd("sl_repl_eval");
-                        }, (mb, value, cont) => {
-                            value = value.trim();
-                            repl.ymacs.run_lisp("READ", false, value, ([ _, pos ]) => {
-                                if (pos < value.length) {
-                                    mb.signalError("Too many forms");
-                                    return;
-                                }
-                                cont(true);
-                            });
-                        });
-                    }, (mb, name, cont) => {
-                        // validator for name
-                        name = name.trim();
-                        repl.ymacs.run_lisp("READ", false, name, ([ data, pos ]) => {
-                            if (!(data instanceof LispSymbol)) {
-                                mb.signalError("Not a symbol", false, 2000);
-                                return;
-                            }
-                            if (pos < name.length) {
+        if (m != repl.point()) {
+            return "ymacs-decline-key";
+        }
+        let commands = {
+            "In package": () => {
+                repl.cmd("sl_repl_set_package");
+            },
+            "Defparameter": () => {
+                repl.cmd("minibuffer_prompt", "Name (symbol): ");
+                repl.cmd("minibuffer_read_string", null, (name) => {
+                    repl.cmd("minibuffer_prompt", "Value: ");
+                    let mb = repl.getMinibuffer();
+                    mb.setMark();
+                    mb.transientMarker = mb.createMarker(mb.point(), true);
+                    mb.cmd("insert", "*");
+                    mb.ensureTransientMark();
+                    repl.cmd("minibuffer_read_string", null, (value) => {
+                        set_repl_input(repl, `(defparameter ${name} ${value})`);
+                        repl.cmd("sl_repl_eval");
+                    }, (mb, value, cont) => {
+                        value = value.trim();
+                        repl.ymacs.run_lisp("READ", false, value, ([_, pos]) => {
+                            if (pos < value.length) {
                                 mb.signalError("Too many forms");
                                 return;
                             }
                             cont(true);
                         });
                     });
-                },
-                "Open file": () => {
-                    repl.ymacs.run_lisp("READ-EVAL", false, "%::*CORE-FILES*", (files) => {
-                        files = LispCons.toArray(files);
-                        files.unshift("lisp/compiler.lisp");
-                        repl.cmd("minibuffer_prompt", "Open file: ");
-                        repl.cmd("minibuffer_read_string", files, file => {
-                            repl.cmd("find_file", file);
-                        });
+                }, (mb, name, cont) => {
+                    // validator for name
+                    name = name.trim();
+                    repl.ymacs.run_lisp("READ", false, name, ([data, pos]) => {
+                        if (!(data instanceof LispSymbol)) {
+                            mb.signalError("Not a symbol", false, 2000);
+                            return;
+                        }
+                        if (pos < name.length) {
+                            mb.signalError("Too many forms");
+                            return;
+                        }
+                        cont(true);
                     });
-                },
-                "Recompile all": () => {
-                    repl.cmd("sl_recompile_everything");
-                },
-                "Load/run test suite": () => {
-                    repl.ymacs.run_lisp("READ-EVAL", false, `(%::load "test/all.lisp")`, () => {
-                        repl.cmd("insert", `(sl-user::run-tests :log nil :all t)`);
-                        repl.cmd("sl_repl_eval");
+                });
+            },
+            "Open file": () => {
+                repl.ymacs.run_lisp("READ-EVAL", false, "%::*CORE-FILES*", (files) => {
+                    files = LispCons.toArray(files);
+                    files.unshift("lisp/compiler.lisp");
+                    repl.cmd("minibuffer_prompt", "Open file: ");
+                    repl.cmd("minibuffer_read_string", files, file => {
+                        repl.cmd("find_file", file);
                     });
-                },
-                "SLip on Github": () => {
-                    window.open("https://github.com/mishoo/slip/");
-                },
-            };
-            repl.cmd("minibuffer_prompt", "Command: ");
-            repl.cmd("minibuffer_read_string", Object.keys(commands), cmd => {
-                let handler = commands[cmd];
-                if (!handler) {
-                    repl.signalError("No command", false, 1000);
-                    return;
-                }
-                handler();
-            });
-        } else {
-            repl.cmd("self_insert_command");
-        }
+                });
+            },
+            "Recompile all": () => {
+                repl.cmd("sl_recompile_everything");
+            },
+            "Load/run test suite": () => {
+                repl.ymacs.run_lisp("READ-EVAL", false, `(%::load "test/all.lisp")`, () => {
+                    set_repl_input(repl, `(sl-user::run-tests :log nil :all t)`);
+                    repl.cmd("sl_repl_eval");
+                });
+            },
+            "SLip on Github": () => {
+                window.open("https://github.com/mishoo/slip/");
+            },
+        };
+        repl.cmd("minibuffer_prompt", "Command: ");
+        repl.cmd("minibuffer_read_string", Object.keys(commands), cmd => {
+            let handler = commands[cmd];
+            if (!handler) {
+                repl.signalError("No command", false, 1000);
+                return;
+            }
+            handler();
+        });
     }),
     sl_history_search: Ymacs_Interactive(function(){
         let repl = this;
         let m = repl.getq("sl_repl_marker");
-        if (m == repl.point()) {
-            repl.cmd("minibuffer_prompt", "Search history (regexp): ");
-            repl.cmd("minibuffer_read_string", null, (query) => {
-                let rx;
-                try {
-                    rx = new RegExp(query, "i");
-                } catch(ex) {
-                    repl.signalError("Invalid regexp", false, 2000);
-                    return;
-                }
-                let a = HISTORY_COMPLETIONS = get_relevant_history_rx(repl, rx);
-                if (a.length > 0) {
-                    var txt = a.shift();
-                    a.push(txt);
-                    set_repl_input(repl, txt);
-                    repl.previousCommand = "sl_repl_history_back";
-                    repl.forAllFrames(function (frame) { // this stinks again. :-\
-                        frame.ensureCaretVisible();
-                        frame.redrawModelineWithTimer();
-                        frame.redrawCaret(true);
-                    });
-                    repl.tokenizer.start();
-                }
-            });
-        } else {
+        if (m != repl.point()) {
             return "ymacs-decline-key";
         }
+        repl.cmd("minibuffer_prompt", "Search history (regexp): ");
+        repl.cmd("minibuffer_read_string", null, (query) => {
+            let rx;
+            try {
+                rx = new RegExp(query, "i");
+            } catch (ex) {
+                repl.signalError("Invalid regexp", false, 2000);
+                return;
+            }
+            let a = HISTORY_COMPLETIONS = get_relevant_history_rx(repl, rx);
+            if (a.length > 0) {
+                var txt = a.shift();
+                a.push(txt);
+                set_repl_input(repl, txt);
+                repl.previousCommand = "sl_repl_history_back";
+                repl.forAllFrames(function (frame) { // this stinks again. :-\
+                    frame.ensureCaretVisible();
+                    frame.redrawModelineWithTimer();
+                    frame.redrawCaret(true);
+                });
+                repl.tokenizer.start();
+            }
+        });
     }),
 });
 
@@ -812,6 +810,7 @@ function get_repl_input(buf) {
 function set_repl_input(buf, text) {
     var m = buf.getq("sl_repl_marker");
     buf._replaceText(m, buf.getCodeSize(), text);
+    buf.deleteOverlay("match-paren");
 };
 
 function eval_lisp(buf, expr, pack = false) {
