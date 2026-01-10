@@ -717,6 +717,9 @@ Ymacs_Buffer.newCommands({
             "Recompile all": () => {
                 repl.cmd("sl_recompile_everything");
             },
+            "Color theme": () => {
+                repl.cmd("set_color_theme");
+            },
             "Load/run test suite": () => {
                 repl.ymacs.run_lisp("READ-EVAL", false, `(%::load "test/all.lisp")`, () => {
                     set_repl_input(repl, `(sl-user::run-tests :log nil :all t)`);
