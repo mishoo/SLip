@@ -201,6 +201,12 @@ class Ymacs_SL extends Ymacs {
             }
         });
     }
+    setColorTheme(theme, nosave = false) {
+        if (!nosave) {
+            localStorage.setItem(".slip-theme", JSON.stringify(theme));
+        }
+        return super.setColorTheme(theme);
+    }
 }
 
 function flash_region(buffer, begin, end) {
@@ -928,10 +934,13 @@ export function make_desktop(load_files = []) {
         ev.preventDefault();
     });
     var ymacs = THE_EDITOR = window.YMACS = new Ymacs_SL({ ls_keyName: ".slip" });
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        ymacs.setColorTheme([ "ef-elea-dark" ]);
+    let savedTheme = localStorage.getItem(".slip-theme");
+    if (savedTheme && ymacs.setColorTheme(JSON.parse(savedTheme), true)) {
+        // we cool.
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        ymacs.setColorTheme([ "ef-elea-dark" ], true);
     } else {
-        ymacs.setColorTheme([ "ef-elea-light" ]);
+        ymacs.setColorTheme([ "ef-elea-light" ], true);
     }
     ymacs.addClass("Ymacs-hl-line");
     document.body.appendChild(ymacs.getElement());
