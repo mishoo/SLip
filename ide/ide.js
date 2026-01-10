@@ -705,6 +705,7 @@ Ymacs_Buffer.newCommands({
                 "Open file": () => {
                     repl.ymacs.run_lisp("READ-EVAL", false, "%::*CORE-FILES*", (files) => {
                         files = LispCons.toArray(files);
+                        files.unshift("lisp/compiler.lisp");
                         repl.cmd("minibuffer_prompt", "Open file: ");
                         repl.cmd("minibuffer_read_string", files, file => {
                             repl.cmd("find_file", file);
