@@ -74,6 +74,11 @@
   (let ((ret (eval expr)))
     ret))
 
+(define-handler :read-eval (pak str)
+  (let ((*package* (or (and pak (find-package pak))
+                       *package*)))
+    (eval (svref (read1-from-string str) 0))))
+
 (defun save-result (val)
   (unless (eq val (car *results*))
     (push val *results*)

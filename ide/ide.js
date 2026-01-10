@@ -650,6 +650,87 @@ Ymacs_Buffer.newCommands({
             dlg.focus();
         }
     }),
+    sl_handle_comma: Ymacs_Interactive(function(){
+        let repl = get_repl_buffer();
+        let m = repl.getq("sl_repl_marker");
+        if (m == repl.point()) {
+            let commands = {
+                "In package": () => {
+                    repl.cmd("sl_repl_set_package");
+                },
+                "Defparameter": () => {
+                    repl.cmd("minibuffer_prompt", "Name (symbol): ");
+                    repl.cmd("minibuffer_read_string", null, (name) => {
+                        repl.cmd("minibuffer_prompt", "Value: ");
+                        let mb = repl.getMinibuffer();
+                        mb.setMark();
+                        mb.transientMarker = mb.createMarker(mb.point(), true);
+                        mb.cmd("insert", "*");
+                        mb.ensureTransientMark();
+                        repl.cmd("minibuffer_read_string", null, (value) => {
+                            repl.cmd("insert", `(defparameter ${name} ${value})`);
+                            repl.cmd("sl_repl_eval");
+                        }, (mb, value, cont) => {
+                            value = value.trim();
+                            repl.ymacs.run_lisp("READ", false, value, ([ _, pos ]) => {
+                                if (pos < value.length) {
+                                    mb.signalError("Too many forms");
+                                    return;
+                                }
+                                cont(true);
+                            });
+                        });
+                    }, (mb, name, cont) => {
+                        // validator for name
+                        name = name.trim();
+                        repl.ymacs.run_lisp("READ", false, name, ([ data, pos ]) => {
+                            if (!(data instanceof LispSymbol)) {
+                                mb.signalError("Not a symbol", false, 2000);
+                                return;
+                            }
+                            if (pos < name.length) {
+                                mb.signalError("Too many forms");
+                                return;
+                            }
+                            cont(true);
+                        });
+                    });
+                },
+                "Open file": () => {
+                    repl.ymacs.run_lisp("READ-EVAL", false, "%::*CORE-FILES*", (files) => {
+                        files = LispCons.toArray(files);
+                        repl.cmd("minibuffer_prompt", "Open file: ");
+                        repl.cmd("minibuffer_read_string", files, file => {
+                            repl.cmd("find_file", file);
+                        });
+                    });
+                },
+                "Recompile all": () => {
+                    repl.cmd("sl_recompile_everything");
+                },
+                "Load/run test suite": () => {
+                    repl.ymacs.run_lisp("READ-EVAL", false, `(%::load "test/all.lisp")`, () => {
+                        repl.cmd("insert", `(sl-user::run-tests :log nil :all t)`);
+                        repl.cmd("sl_repl_eval");
+                    });
+                },
+                "SLip on Github": () => {
+                    window.open("https://github.com/mishoo/slip/");
+                },
+            };
+            repl.cmd("minibuffer_prompt", "Command: ");
+            repl.cmd("minibuffer_read_string", Object.keys(commands), cmd => {
+                let handler = commands[cmd];
+                if (!handler) {
+                    repl.signalError("No command", false, 1000);
+                    return;
+                }
+                handler();
+            });
+        } else {
+            repl.cmd("self_insert_command");
+        }
+    }),
 });
 
 var HISTORY_COMPLETIONS;
@@ -728,6 +809,7 @@ let Ymacs_Keymap_SL_REPL = Ymacs_Keymap.define("slip_repl", {
     "Tab" : "sl_repl_complete_symbol",
     "C-c M-p": "sl_repl_set_package",
     "Home && C-a" : "sl_repl_beginning_of_input",
+    ",": "sl_handle_comma",
 });
 
 Ymacs_Buffer.setGlobal("sl_xref_history", []);
