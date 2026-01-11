@@ -3,7 +3,7 @@
 (cond
   ((and (boundp '*has-slip-tests*)
         (symbol-value '*has-slip-tests*))
-   (format t ";; Tests already loadded - skipping~%~
+   (format t ";; Tests already loaded - skipping~%~
               ;; Evaluate this to override:~%~%    ~A~%~%"
            '(setf *has-slip-tests* nil)))
   (t

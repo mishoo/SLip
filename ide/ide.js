@@ -717,11 +717,25 @@ Ymacs_Buffer.newCommands({
             "Recompile all": () => {
                 repl.cmd("sl_recompile_everything");
             },
+            "Clear output": () => {
+                repl.cmd("sl_clear_output");
+            },
             "Color theme": () => {
                 repl.cmd("set_color_theme");
             },
+            "DEMO: clock": () => {
+                set_repl_input(repl, `(sl:load "examples/clock.lisp")`);
+                repl.cmd("sl_repl_eval");
+            },
+            "DEMO: chess viewer": () => {
+                repl.ymacs.run_lisp("READ-EVAL", false, `(unless (ignore-errors (find-package :pgn-viewer))
+                                                           (sl:load "examples/pgn-viewer.lisp"))`, () => {
+                    set_repl_input(repl, `(pgn-viewer::lichess "vlbz")`);
+                    repl.cmd("sl_repl_eval");
+                });
+            },
             "Load/run test suite": () => {
-                repl.ymacs.run_lisp("READ-EVAL", false, `(%::load "test/all.lisp")`, () => {
+                repl.ymacs.run_lisp("READ-EVAL", false, `(sl:load "test/all.lisp")`, () => {
                     set_repl_input(repl, `(sl-user::run-tests :log nil :all t)`);
                     repl.cmd("sl_repl_eval");
                 });
@@ -948,6 +962,7 @@ function get_repl_buffer() {
         repl.setCode(`\
 ;; SLip build ${window.SLIP_COMMIT ?? '(unavailable)'} ${window.SLIP_DATE ?? ''}
 ;; Hacks and glory await!
+;; NEW: type comma at prompt for a quick menu.
 \n`);
         repl.cmd("end_of_buffer");
 
