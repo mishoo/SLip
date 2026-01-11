@@ -1,118 +1,124 @@
 (in-package :sl-user)
 
-(format t "Loading tests takes a few seconds, please wait...~%")
+(cond
+  ((and (boundp '*has-slip-tests*)
+        (symbol-value '*has-slip-tests*))
+   (format t ";; Tests already loadded - skipping~%~
+              ;; Evaluate this to override:~%~%    ~A~%~%"
+           '(setf *has-slip-tests* nil)))
+  (t
+   (defparameter *has-slip-tests* t)
 
-(let* ((timing (list 0 0))
-       (%:*load-timing* timing))
-  (load "test/deftest.lisp")
+   (format t "Loading tests takes a few seconds, please wait...~%")
 
-  (load "test/apply.lisp")
-  (load "test/funcall.lisp")
-  (load "test/prog1.lisp")
-  (load "test/prog2.lisp")
-  (load "test/progv.lisp")
-  (load "test/prog.lisp")
-  (load "test/or.lisp")
-  (load "test/and.lisp")
-  (load "test/let.lisp")
-  (load "test/letstar.lisp")
-  (load "test/defun.lisp")
-  (load "test/flet.lisp")
-  (load "test/labels.lisp")
-  (load "test/places.lisp")
-  (load "test/rotatef.lisp")
-  (load "test/shiftf.lisp")
-  (load "test/psetf.lisp")
+   (let* ((timing (list 0 0))
+          (%:*load-timing* timing)
+          (files (list "test/deftest.lisp"
+                       "test/apply.lisp"
+                       "test/funcall.lisp"
+                       "test/prog1.lisp"
+                       "test/prog2.lisp"
+                       "test/progv.lisp"
+                       "test/prog.lisp"
+                       "test/or.lisp"
+                       "test/and.lisp"
+                       "test/let.lisp"
+                       "test/letstar.lisp"
+                       "test/defun.lisp"
+                       "test/flet.lisp"
+                       "test/labels.lisp"
+                       "test/places.lisp"
+                       "test/rotatef.lisp"
+                       "test/shiftf.lisp"
+                       "test/psetf.lisp"
+                       "test/values.lisp"
+                       "test/values-list.lisp"
+                       "test/multiple-value-bind.lisp"
+                       "test/multiple-value-call.lisp"
+                       "test/multiple-value-list.lisp"
+                       "test/multiple-value-prog1.lisp"
+                       "test/multiple-value-setq.lisp"
+                       "test/if.lisp"
+                       "test/cond.lisp"
+                       "test/case.lisp"
+                       "test/destructuring-bind.lisp"
+                       "test/macrolet.lisp"
+                       "test/block.lisp"
+                       "test/catch.lisp"
+                       "test/unwind-protect.lisp"
+                       "test/tagbody.lisp"
+                       "test/do.lisp"
+                       "test/dolist.lisp"
+                       "test/dostar.lisp"
+                       "test/dotimes.lisp"
+                       "test/loop1.lisp"
+                       "test/loop2.lisp"
+                       "test/loop3.lisp"
+                       "test/loop4.lisp"
+                       "test/handler-bind.lisp"
+                       "test/handler-case.lisp"
+                       "test/ignore-errors.lisp"
+                       "test/error.lisp"
+                       "test/hash/clrhash.lisp"
+                       "test/hash/gethash.lisp"
+                       "test/hash/hash-table.lisp"
+                       "test/hash/hash-table-count.lisp"
+                       "test/hash/hash-table-p.lisp"
+                       "test/hash/make-hash-table.lisp"
+                       "test/hash/maphash.lisp"
+                       "test/hash/remhash.lisp"
+                       "test/hash/with-hash-table-iterator.lisp"
+                       "test/cons/append.lisp"
+                       "test/cons/member.lisp"
+                       "test/cons/adjoin.lisp"
+                       "test/cons/getf.lisp"
+                       "test/cons/get-properties.lisp"
+                       "test/cons/pop.lisp"
+                       "test/cons/push.lisp"
+                       "test/cons/pushnew.lisp"
+                       "test/cons/acons.lisp"
+                       "test/cons/pairlis.lisp"
+                       "test/cons/butlast.lisp"
+                       "test/cons/subst.lisp"
+                       "test/cons/sublis.lisp"
+                       "test/cons/assoc.lisp"
+                       "test/cons/assoc-if.lisp"
+                       "test/cons/assoc-if-not.lisp"
+                       "test/cons/rassoc.lisp"
+                       "test/cons/rassoc-if.lisp"
+                       "test/cons/rassoc-if-not.lisp"
+                       "test/cons/intersection.lisp"
+                       "test/cons/union.lisp"
+                       "test/cons/set-difference.lisp"
+                       "test/cons/set-exclusive-or.lisp"
+                       "test/seq/count.lisp"
+                       "test/seq/count-if.lisp"
+                       "test/seq/count-if-not.lisp"
+                       "test/seq/find.lisp"
+                       "test/seq/find-if.lisp"
+                       "test/seq/find-if-not.lisp"
+                       "test/seq/position.lisp"
+                       "test/seq/position-if.lisp"
+                       "test/seq/position-if-not.lisp"
+                       "test/seq/substitute.lisp"
+                       "test/seq/substitute-if.lisp"
+                       "test/seq/substitute-if-not.lisp"
+                       "test/seq/nsubstitute.lisp"
+                       "test/seq/nsubstitute-if.lisp"
+                       "test/seq/nsubstitute-if-not.lisp"
+                       "test/seq/subseq.lisp"
+                       "test/seq/remove.lisp"
+                       "test/struct/structures-01.lisp")))
 
-  (load "test/values.lisp")
-  (load "test/values-list.lisp")
-  (load "test/multiple-value-bind.lisp")
-  (load "test/multiple-value-call.lisp")
-  (load "test/multiple-value-list.lisp")
-  (load "test/multiple-value-prog1.lisp")
-  (load "test/multiple-value-setq.lisp")
+     (loop for count = (length files)
+           for file in files
+           for i from 1
+           do (progn
+                (format t ";; ~D/~D Loading ~A~%" i count file)
+                (with-output-to-string (*trace-output*)
+                  (load file))))
 
-  (load "test/if.lisp")
-  (load "test/cond.lisp")
-  (load "test/case.lisp")
-  (load "test/destructuring-bind.lisp")
-  (load "test/macrolet.lisp")
-
-  (load "test/block.lisp")
-  (load "test/catch.lisp")
-  (load "test/unwind-protect.lisp")
-  (load "test/tagbody.lisp")
-
-  (load "test/do.lisp")
-  (load "test/dolist.lisp")
-  (load "test/dostar.lisp")
-  (load "test/dotimes.lisp")
-
-  (load "test/loop1.lisp")
-  (load "test/loop2.lisp")
-  (load "test/loop3.lisp")
-  (load "test/loop4.lisp")
-
-  (load "test/handler-bind.lisp")
-  (load "test/handler-case.lisp")
-  (load "test/ignore-errors.lisp")
-  (load "test/error.lisp")
-
-  (load "test/hash/clrhash.lisp")
-  (load "test/hash/gethash.lisp")
-  (load "test/hash/hash-table.lisp")
-  (load "test/hash/hash-table-count.lisp")
-  (load "test/hash/hash-table-p.lisp")
-  (load "test/hash/make-hash-table.lisp")
-  (load "test/hash/maphash.lisp")
-  (load "test/hash/remhash.lisp")
-  (load "test/hash/with-hash-table-iterator.lisp")
-
-  (load "test/cons/append.lisp")
-  (load "test/cons/member.lisp")
-  (load "test/cons/adjoin.lisp")
-  (load "test/cons/getf.lisp")
-  (load "test/cons/get-properties.lisp")
-  (load "test/cons/pop.lisp")
-  (load "test/cons/push.lisp")
-  (load "test/cons/pushnew.lisp")
-  (load "test/cons/acons.lisp")
-  (load "test/cons/pairlis.lisp")
-  (load "test/cons/butlast.lisp")
-  (load "test/cons/subst.lisp")
-  (load "test/cons/sublis.lisp")
-  (load "test/cons/assoc.lisp")
-  (load "test/cons/assoc-if.lisp")
-  (load "test/cons/assoc-if-not.lisp")
-  (load "test/cons/rassoc.lisp")
-  (load "test/cons/rassoc-if.lisp")
-  (load "test/cons/rassoc-if-not.lisp")
-  (load "test/cons/intersection.lisp")
-  (load "test/cons/union.lisp")
-  (load "test/cons/set-difference.lisp")
-  (load "test/cons/set-exclusive-or.lisp")
-
-  (load "test/seq/count.lisp")
-  (load "test/seq/count-if.lisp")
-  (load "test/seq/count-if-not.lisp")
-  (load "test/seq/find.lisp")
-  (load "test/seq/find-if.lisp")
-  (load "test/seq/find-if-not.lisp")
-  (load "test/seq/position.lisp")
-  (load "test/seq/position-if.lisp")
-  (load "test/seq/position-if-not.lisp")
-  (load "test/seq/substitute.lisp")
-  (load "test/seq/substitute-if.lisp")
-  (load "test/seq/substitute-if-not.lisp")
-  (load "test/seq/nsubstitute.lisp")
-  (load "test/seq/nsubstitute-if.lisp")
-  (load "test/seq/nsubstitute-if-not.lisp")
-  (load "test/seq/subseq.lisp")
-  (load "test/seq/remove.lisp")
-
-  (load "test/struct/structures-01.lisp")
-
-  (format t "Network time: ~,2Fms~%~
+     (format t "Network time: ~,2Fms~%~
              Compile time: ~,2Fms~%"
-          (car timing)
-          (cadr timing)))
+             (car timing)
+             (cadr timing)))))
