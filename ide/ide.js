@@ -273,7 +273,7 @@ function find_package(buffer, start) {
         if (typeof pak === "string") return pak;
         if (LispSymbol.is(pak)) return pak.name;
     } catch(ex) {};
-    return false;
+    return buffer.getq("sl_package") || false;
 };
 
 function sl_log(txt, { newline = true } = {}) {
@@ -297,6 +297,30 @@ function sl_log(txt, { newline = true } = {}) {
     output.resumeUpdates();
     output.tokenizer.start();
 };
+
+function macroexpand(mexp_func, compmacs, point) {
+    var code = this._bufferSubstring(point);
+    var pak = find_package(this);
+    try {
+        var tmp = MACHINE().read(pak, code);
+    } catch (ex) {
+        throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
+    }
+    let expr = this.cmd("buffer_substring", point, point + tmp[1]);
+    this.ymacs.run_lisp(mexp_func, pak, expr, !!compmacs, (ret) => {
+        let buf = get_macroexpand_buffer(pak);
+        if (buf === this) {
+            buf.cmd("save_excursion", () => {
+                buf.cmd("kill_sexp");
+                let begin = buf.point();
+                buf.cmd("insert", ret);
+                buf.cmd("indent_region", begin, buf.point());
+            }, true);
+        } else {
+            buf.setCode(ret);
+        }
+    });
+}
 
 Ymacs_Buffer.newCommands({
     mode_from_name: function(name) {
@@ -423,30 +447,10 @@ Ymacs_Buffer.newCommands({
         buf.cmd("sl_repl_prompt");
     }),
     sl_macroexpand_1: Ymacs_Interactive("P\nd", function(compmacs, point){
-        var code = this._bufferSubstring(point);
-        var pak = find_package(this);
-        try {
-            var tmp = MACHINE().read(pak, code);
-        } catch(ex) {
-            throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
-        }
-        let expr = this.cmd("buffer_substring", point, point + tmp[1]);
-        this.ymacs.run_lisp("MACROEXPAND-1", pak, expr, !!compmacs, (ret) => {
-            sl_log(ret);
-        });
+        macroexpand.call(this, "MACROEXPAND-1", compmacs, point);
     }),
     sl_macroexpand_all: Ymacs_Interactive("P\nd", function(compmacs, point){
-        var code = this._bufferSubstring(point);
-        var pak = find_package(this);
-        try {
-            var tmp = MACHINE().read(pak, code);
-        } catch(ex) {
-            throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
-        }
-        let expr = this.cmd("buffer_substring", point, point + tmp[1]);
-        this.ymacs.run_lisp("MACROEXPAND-ALL", pak, expr, !!compmacs, (ret) => {
-            sl_log(ret);
-        });
+        macroexpand.call(this, "MACROEXPAND-ALL", compmacs, point);
     }),
     sl_eval_buffer: Ymacs_Interactive(function(){
         compile_lisp(this, this.getCode());
@@ -892,10 +896,14 @@ Ymacs_Buffer.newMode("sl_mode", function(){
                 pak = false;
             }
         } else {
-            pak = MACHINE().eval_string(false, "%::*PACKAGE*");
+            pak = this.getq("sl_package") || MACHINE().eval_string(false, "%::*PACKAGE*");
         }
-        if (pak) pak = pak.name;
-        else pak = "<span style='color:red'>(package not defined)</span>";
+        if (pak && typeof pak != "string") {
+            pak = pak.name;
+        }
+        if (!pak) {
+            pak = "<span style='color:red'>(package not defined)</span>";
+        }
         ret.push(pak);
         this.resumeUpdates();
         return ret.join(" ");
@@ -950,6 +958,29 @@ function list_local_fasls() {
         }
     })("", store);
     return fasls;
+}
+
+let Ymacs_Keymap_Mexp = Ymacs_Keymap.define(null, {
+    "q" : "delete_frame",
+});
+
+function get_macroexpand_buffer(pak) {
+    let ed = THE_EDITOR;
+    let mb = ed.getBuffer("*macroexpand*");
+    if (!mb) {
+        mb = ed.createBuffer({ name: "*macroexpand*" });
+        mb.dirty = () => false;
+        mb.cmd("sl_mode");
+        mb.pushKeymap(Ymacs_Keymap_Mexp);
+    }
+    mb.setq("sl_package", pak);
+    let frame = ed.getBufferFrames(mb)[0];
+    if (!frame) {
+        frame = ed.getActiveFrame().vsplit("50%");
+        frame.setBuffer(mb);
+        ed.setActiveFrame(frame);
+    }
+    return mb;
 }
 
 function get_repl_buffer() {
