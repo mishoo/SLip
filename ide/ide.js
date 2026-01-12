@@ -974,11 +974,13 @@ function get_macroexpand_buffer(pak) {
         mb.pushKeymap(Ymacs_Keymap_Mexp);
     }
     mb.setq("sl_package", pak);
+    let current = ed.getActiveFrame();
     let frame = ed.getBufferFrames(mb)[0];
     if (!frame) {
-        frame = ed.getActiveFrame().vsplit("50%");
+        frame = current.split();
         frame.setBuffer(mb);
         ed.setActiveFrame(frame);
+        current.recenterTopBottom(0);
     }
     return mb;
 }

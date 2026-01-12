@@ -113,7 +113,7 @@
            (dom:do-query (el el-pieces ".piece.highlight")
              (dom:remove-element el)))
 
-         (highlight-fields (indexes &optional (classes ""))
+         (highlight-fields (indexes classes)
            (dolist (idx indexes)
              (dom:append-to
               el-pieces
