@@ -389,7 +389,7 @@ var optimize = (function(){
             && code[i+2] === code[i][1])
         {
             // [[TF]JUMPK L1] [NIL] L1 -> (nothing)
-            code.splice(i, 2);
+            code.splice(i, 2, [ "VALUES", 1 ]); // must keep only one value, as would TJUMPK.
             return true;
         }
         if (i+2 < code.length && code[i][0] == "TJUMP" && code[i+1][0] == "JUMP" && code[i+2] === code[i][1]) {

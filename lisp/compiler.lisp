@@ -2044,7 +2044,6 @@
                      (gen (if val? "TJUMPK" "TJUMP") l1)
                      (comp-or (cdr exps) env val? more? l1)
                      (vector l1)
-                     (gen "VALUES" 1)
                      (unless more? (gen "RET")))))))
          (t
           (comp (car exps) env val? more?))))
