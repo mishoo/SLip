@@ -354,7 +354,7 @@
                       (t
                        (when errorp
                          (push (caar cases) exps))
-                       `(if (eq ,vexpr ',(caaar cases))
+                       `(if (eql ,vexpr ',(caaar cases))
                             (progn ,@(cdar cases))
                             ,(recur (cdr cases))))))
                    ((and (not (cdr cases))
@@ -365,7 +365,7 @@
                    (t
                     (when errorp
                       (push (caar cases) exps))
-                    `(if (eq ,vexpr ',(caar cases))
+                    `(if (eql ,vexpr ',(caar cases))
                          (progn ,@(cdar cases))
                          ,(recur (cdr cases))))))))
     (if safe
@@ -454,24 +454,69 @@
              (make-regexp str (downcase mods))))
 
          (skip-comment ()
-           (read-while (lambda (ch) (not (eq ch #\Newline)))))
+           (let rec ()
+             (when (and (peek) (not (eql (next) #\Newline)))
+               (rec))))
+
+         (skip-multiline-comment ()
+           (let rec ()
+             (case (peek)
+               ((nil)
+                (croak "Unfinished multiline comment"))
+               (#\|
+                (next)
+                (cond
+                  ((eql (peek) #\#)
+                   (next))
+                  (t (rec))))
+               (t
+                (next)
+                (rec)))))
+
+         (symbol-char-p (ch)
+           (not (%memq ch '(#\( #\) #\[ #\] #\{ #\}
+                            #\# #\; #\` #\' #\" #\|
+                            #\SPACE
+                            #\NEWLINE
+                            #\RETURN
+                            #\TAB
+                            #\PAGE
+                            #\NO-BREAK_SPACE
+                            #\PARAGRAPH_SEPARATOR
+                            #\LINE_SEPARATOR))))
 
          (read-symbol-name ()
-           (read-while
-            (lambda (ch)
-              (or
-               (letterp ch)
-               (digitp ch)
-               (%memq ch
-                      ;; XXX: this list should be greatly enlarged.. or better
-                      ;; said, our reader should be greatly rewritten.
-                      '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
-                        #\@ #\! #\? #\& #\= #\< #\>
-                        #\[ #\] #\{ #\} #\/ #\^ #\#
-                        #\« #\» #\❰ #\❱ #\♥ #\▪ #\§ #\✱))))))
+           (let ((esc nil)
+                 (ch nil)
+                 (out (%make-text-memory-output-stream)))
+             (let rec ()
+               (setq ch (peek))
+               (cond
+                 ((not ch)
+                  (if esc
+                      (croak "Unterminated escaped symbol")
+                      (%get-output-stream-string out)))
+                 ((eql ch #\\)
+                  (next)
+                  (unless (peek)
+                    (croak "EOF after backslash in symbol"))
+                  (%stream-put out (next))
+                  (rec))
+                 ((eql ch #\|)
+                  (setq esc (not esc))
+                  (next)
+                  (rec))
+                 (esc
+                  (%stream-put out (next))
+                  (rec))
+                 ((symbol-char-p ch)
+                  (%stream-put out (upcase (next)))
+                  (rec))
+                 (t
+                  (%get-output-stream-string out))))))
 
          (read-symbol ()
-           (let ((str (upcase (read-symbol-name))))
+           (let ((str (read-symbol-name)))
              (when (zerop (length str))
                (croak (strcat "Bad character (or reader bug) in read-symbol: " (peek))))
              (aif (and (regexp-test #/^[+-]?[0-9]*\.?[0-9]*$/ str)
@@ -516,8 +561,9 @@
              (#\/ (read-regexp))
              (#\( (apply #'vector (read-list)))
              (#\' (next) (list 'function (read-token)))
-             (#\: (next) (make-symbol (upcase (read-symbol-name))))
+             (#\: (next) (make-symbol (read-symbol-name)))
              (#\. (next) (eval (read-token)))
+             (#\| (next) (skip-multiline-comment) (read-token))
              ((#\b #\B) (next) (read-base2-number))
              ((#\o #\O) (next) (read-base8-number))
              ((#\x #\X) (next) (read-base16-number))
