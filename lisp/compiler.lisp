@@ -199,7 +199,6 @@
 (defvar *delay-eval* nil)
 
 (defvar *compiler-macros* (make-hash))
-(defvar *macroexpand-cache* nil)
 
 (defvar *standard-output* (%make-text-memory-output-stream))
 (defvar *error-output* (%make-text-memory-output-stream))
@@ -2396,12 +2395,10 @@
        (with-env (comp-decl-seq body env val? more?)))
 
      (comp-macroexpand (expander form env val? more?)
-       (let ((expansion (gethash form *macroexpand-cache*)))
-         (unless expansion
-           (setq expansion
-                 (%hash-set (funcall expander form)
-                            form
-                            *macroexpand-cache*)))
+       ;; Do not attempt to cache the expansion by form. The same form might
+       ;; be legitimately expanded multiple times in different environments
+       ;; (e.g. symbol-macros or macrolet).
+       (let ((expansion (funcall expander form)))
          (with-env (comp expansion env val? more?))))
 
      (comp-mvb (names values-form body env val? more?)
@@ -2565,8 +2562,7 @@
        (assert (and (consp exp)
                     (%memq (car exp) *lambda-syms*))
                "Expecting (LAMBDA (...) ...) in COMPILE")
-       (let ((*macroexpand-cache* (make-hash)))
-         (%eval-opcode (comp exp (make-environment) t nil))))
+       (%eval-opcode (comp exp (make-environment) t nil)))
 
      (compile-string (str &optional (filename *current-file*))
        (let ((*current-file* filename)
@@ -2592,7 +2588,6 @@
                            (form (cdr token)))
                       (unless (eq form 'EOF)
                         (let ((*current-pos* (car token))
-                              (*macroexpand-cache* (make-hash))
                               (*delay-eval* nil))
                           (comp1 form))
                         (rec)))))
