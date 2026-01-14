@@ -1598,6 +1598,10 @@
             (when more?
               (vector end-addr)))))))
 
+(defparameter *tagbody-dynest* 0
+  "Will keep track of dynamic environment nesting while compiling a TAGBODY
+  (specifically, UNWIND-PROTECT and CATCH forms surrounding GO)")
+
 (labels
     ((assert (p msg)
        (if p p (error/wp msg)))
@@ -2008,10 +2012,11 @@
                   (comp-const nil val? more?)))
              ((with-extenv (:tags (as-vector tags) :lex (vector (list tbody :tagbody)))
                 (<< (gen "BLOCK"))           ; define the tagbody entry
-                (foreach forms (lambda (x)
-                                 (if (atom x)
-                                     (<< (vector (cadddr (pop tags)))) ; label
-                                     (<< (comp x env nil t)))))
+                (let ((*tagbody-dynest* 0))
+                  (foreach forms (lambda (x)
+                                   (if (atom x)
+                                       (<< (vector (cadddr (pop tags)))) ; label
+                                       (<< (comp x env nil t))))))
                 (when val? (<< (gen "NIL"))) ; tagbody returns NIL
                 (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
                 (unless more? (<< (gen "RET")))))))))
@@ -2021,7 +2026,12 @@
          (assert pos (strcat "TAG " tag " not found"))
          (let* ((tbody (find-tagbody (caddr pos) env))
                 (i (car tbody)))
-           (gen "LJUMP" (cadddr pos) i))))
+           (cond
+             ((and (zerop i)
+                   (zerop *tagbody-dynest*))
+              (gen "JUMP" (cadddr pos)))
+             (t
+              (gen "LJUMP" (cadddr pos) i))))))
 
      (comp-if (pred then else env val? more?)
        (cond
@@ -2316,7 +2326,10 @@
                                 body env val? more?)))))
 
      (comp-lambda (name args body env)
-       (gen "FN" (comp-inner-lambda name args body env t nil) name))
+       (prog2
+           (incf *tagbody-dynest*)
+           (gen "FN" (comp-inner-lambda name args body env t nil) name)
+         (decf *tagbody-dynest*)))
 
      (comp-lambda-body (name body env val? more?)
        (if name
@@ -2521,24 +2534,27 @@
 
      (comp-catch (tag body env val? more?)
        (if body
-           (let ((k1 (mklabel)))
-             (cond
-               ((not val?)
-                (%seq (comp tag env t t)
-                      (gen "CATCH" k1)
-                      ;; we still want body to leave the value on the stack,
-                      ;; so in normal termination it wouldn't be popped twice.
-                      (comp-seq body env t more?)
-                      (vector k1)
-                      (gen "POP")))
-               (t
-                (%seq (comp tag env t t)
-                      (gen "CATCH" k1)
-                      (comp-seq body env t more?)
-                      (vector k1)
-                      (if more?
-                          (gen "UNFR" 0 1)
-                          (gen "RET"))))))
+           (prog2
+               (incf *tagbody-dynest*)
+               (let ((k1 (mklabel)))
+                 (cond
+                   ((not val?)
+                    (%seq (comp tag env t t)
+                          (gen "CATCH" k1)
+                          ;; we still want body to leave the value on the stack,
+                          ;; so in normal termination it wouldn't be popped twice.
+                          (comp-seq body env t more?)
+                          (vector k1)
+                          (gen "POP")))
+                   (t
+                    (%seq (comp tag env t t)
+                          (gen "CATCH" k1)
+                          (comp-seq body env t more?)
+                          (vector k1)
+                          (if more?
+                              (gen "UNFR" 0 1)
+                              (gen "RET"))))))
+             (decf *tagbody-dynest*))
            (comp-const nil val? more?)))
 
      (comp-throw (tag ret env)
@@ -2548,14 +2564,17 @@
 
      (comp-unwind-protect (form cleanup env val? more?)
        (if cleanup
-           (let ((k (mklabel)))
-             (%seq (gen "UPOPEN" k)
-                   (comp form env val? t) ; if val? is T, this leaves it on the stack
-                   (gen "UPEXIT")
-                   (vector k)
-                   (comp-seq cleanup env nil t) ; result of cleanup code not needed
-                   (gen "UPCLOSE")
-                   (if more? nil (gen "RET"))))
+           (prog2
+               (incf *tagbody-dynest*)
+               (let ((k (mklabel)))
+                 (%seq (gen "UPOPEN" k)
+                       (comp form env val? t) ; if val? is T, this leaves it on the stack
+                       (gen "UPEXIT")
+                       (vector k)
+                       (comp-seq cleanup env nil t) ; result of cleanup code not needed
+                       (gen "UPCLOSE")
+                       (if more? nil (gen "RET"))))
+             (decf *tagbody-dynest*))
            (comp form env val? more?)))
 
      (compile (exp)

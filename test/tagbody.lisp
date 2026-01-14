@@ -135,28 +135,28 @@
      (go -10)))
   good)
 
-;; (deftest tagbody.15
-;;   (block done
-;;     (tagbody
-;;      (go around)
-;;      #.(1+ most-positive-fixnum)
-;;      (return-from done 'good)
-;;      around
-;;      (go #.(1+ most-positive-fixnum))))
-;;   good)
+(deftest tagbody.15
+  (block done
+    (tagbody
+     (go around)
+     #.(1+ most-positive-fixnum)
+     (return-from done 'good)
+     around
+     (go #.(1+ most-positive-fixnum))))
+  good)
 
-;; (deftest tagbody.16
-;;   (let* ((t1 (1+ most-positive-fixnum))
-;;          (t2 (1+ most-positive-fixnum))
-;;          (form `(block done
-;;                   (tagbody
-;;                    (go around)
-;;                    ,t1
-;;                    (return-from done 'good)
-;;                    around
-;;                    (go ,t2)))))
-;;     (eval form))
-;;   good)
+(deftest tagbody.16
+  (let* ((t1 (1+ most-positive-fixnum))
+         (t2 (1+ most-positive-fixnum))
+         (form `(block done
+                  (tagbody
+                   (go around)
+                   ,t1
+                   (return-from done 'good)
+                   around
+                   (go ,t2)))))
+    (eval form))
+  good)
 
 ;;; Check that macros are not expanded before finding tags
 ;;; Test for issue TAGBODY-TAG-EXPANSION
