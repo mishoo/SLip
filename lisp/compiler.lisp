@@ -622,11 +622,12 @@
                (case (peek)
                  (#\) (next) (cdr ret))
                  (#\; (skip-comment) (rec))
-                 (#\. (next)
-                      (%rplacd p (read-token))
-                      (skip-ws)
-                      (skip #\))
-                      (cdr ret))
+                 (#\.
+                  (next)
+                  (%rplacd p (read-token))
+                  (skip-ws)
+                  (skip #\))
+                  (cdr ret))
                  ((nil) (croak "Unterminated list"))
                  (otherwise
                   (setq p (%rplacd p (cons (read-token) nil)))

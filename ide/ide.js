@@ -788,6 +788,11 @@ Ymacs_Buffer.newCommands({
             }
         });
     }),
+    sl_show_history: Ymacs_Interactive(function(){
+        let buf = popup_buffer("*sl-repl-history*");
+        let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+        buf.setCode(history.join("\n\n"));
+    }),
 });
 
 var HISTORY_COMPLETIONS;
@@ -964,25 +969,30 @@ let Ymacs_Keymap_Mexp = Ymacs_Keymap.define(null, {
     "q" : "delete_frame",
 });
 
-function get_macroexpand_buffer(pak) {
+function popup_buffer(name) {
     let ed = THE_EDITOR;
-    let mb = ed.getBuffer("*macroexpand*");
-    if (!mb) {
-        mb = ed.createBuffer({ name: "*macroexpand*" });
-        mb.dirty = () => false;
-        mb.cmd("sl_mode");
-        mb.pushKeymap(Ymacs_Keymap_Mexp);
+    let buf = ed.getBuffer(name);
+    if (!buf) {
+        buf = ed.createBuffer({ name: name });
+        buf.dirty = () => false;
+        buf.cmd("sl_mode");
     }
-    mb.setq("sl_package", pak);
     let current = ed.getActiveFrame();
-    let frame = ed.getBufferFrames(mb)[0];
+    let frame = ed.getBufferFrames(buf)[0];
     if (!frame) {
         frame = current.split();
-        frame.setBuffer(mb);
+        frame.setBuffer(buf);
         ed.setActiveFrame(frame);
         current.recenterTopBottom(0);
     }
-    return mb;
+    return buf;
+}
+
+function get_macroexpand_buffer(pak) {
+    let buf = popup_buffer("*macroexpand*");
+    buf.setq("sl_package", pak);
+    buf.pushKeymap(Ymacs_Keymap_Mexp);
+    return buf;
 }
 
 function get_repl_buffer() {
