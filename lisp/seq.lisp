@@ -94,7 +94,7 @@
   (%delete-duplicates list (make-subject-test test test-not key t))
   (if from-end list (nreverse list)))
 
-(defconstant +no-value+ (list 'done))
+(defconstant +no-value+ '(done))
 
 (defun seq-iterator (seq)
   (cond
@@ -103,12 +103,11 @@
        (if seq (pop seq) +no-value+)))
     ((or (vectorp seq)
          (stringp seq))
-     (let ((i 0)
+     (let ((i -1)
            (len (length seq)))
        (lambda ()
-         (if (< i len)
-             (prog1 (svref seq i)
-               (incf i))
+         (if (< (incf i) len)
+             (svref seq i)
              +no-value+))))
     (t
      (error "SEQ-ITERATOR: unknown sequence"))))
