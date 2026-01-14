@@ -199,7 +199,6 @@
 (defvar *delay-eval* nil)
 
 (defvar *compiler-macros* (make-hash))
-(defvar *macroexpand-cache* nil)
 
 (defvar *standard-output* (%make-text-memory-output-stream))
 (defvar *error-output* (%make-text-memory-output-stream))
@@ -354,7 +353,7 @@
                       (t
                        (when errorp
                          (push (caar cases) exps))
-                       `(if (eq ,vexpr ',(caaar cases))
+                       `(if (eql ,vexpr ',(caaar cases))
                             (progn ,@(cdar cases))
                             ,(recur (cdr cases))))))
                    ((and (not (cdr cases))
@@ -365,7 +364,7 @@
                    (t
                     (when errorp
                       (push (caar cases) exps))
-                    `(if (eq ,vexpr ',(caar cases))
+                    `(if (eql ,vexpr ',(caar cases))
                          (progn ,@(cdar cases))
                          ,(recur (cdr cases))))))))
     (if safe
@@ -454,24 +453,69 @@
              (make-regexp str (downcase mods))))
 
          (skip-comment ()
-           (read-while (lambda (ch) (not (eq ch #\Newline)))))
+           (let rec ()
+             (when (and (peek) (not (eql (next) #\Newline)))
+               (rec))))
+
+         (skip-multiline-comment ()
+           (let rec ()
+             (case (peek)
+               ((nil)
+                (croak "Unfinished multiline comment"))
+               (#\|
+                (next)
+                (cond
+                  ((eql (peek) #\#)
+                   (next))
+                  (t (rec))))
+               (t
+                (next)
+                (rec)))))
+
+         (symbol-char-p (ch)
+           (not (%memq ch '(#\( #\) #\[ #\] #\{ #\}
+                            #\# #\; #\` #\' #\" #\|
+                            #\SPACE
+                            #\NEWLINE
+                            #\RETURN
+                            #\TAB
+                            #\PAGE
+                            #\NO-BREAK_SPACE
+                            #\PARAGRAPH_SEPARATOR
+                            #\LINE_SEPARATOR))))
 
          (read-symbol-name ()
-           (read-while
-            (lambda (ch)
-              (or
-               (letterp ch)
-               (digitp ch)
-               (%memq ch
-                      ;; XXX: this list should be greatly enlarged.. or better
-                      ;; said, our reader should be greatly rewritten.
-                      '(#\% #\$ #\_ #\- #\: #\. #\+ #\*
-                        #\@ #\! #\? #\& #\= #\< #\>
-                        #\[ #\] #\{ #\} #\/ #\^ #\#
-                        #\« #\» #\❰ #\❱ #\♥ #\▪ #\§ #\✱))))))
+           (let ((esc nil)
+                 (ch nil)
+                 (out (%make-text-memory-output-stream)))
+             (let rec ()
+               (setq ch (peek))
+               (cond
+                 ((not ch)
+                  (if esc
+                      (croak "Unterminated escaped symbol")
+                      (%get-output-stream-string out)))
+                 ((eql ch #\\)
+                  (next)
+                  (unless (peek)
+                    (croak "EOF after backslash in symbol"))
+                  (%stream-put out (next))
+                  (rec))
+                 ((eql ch #\|)
+                  (setq esc (not esc))
+                  (next)
+                  (rec))
+                 (esc
+                  (%stream-put out (next))
+                  (rec))
+                 ((symbol-char-p ch)
+                  (%stream-put out (upcase (next)))
+                  (rec))
+                 (t
+                  (%get-output-stream-string out))))))
 
          (read-symbol ()
-           (let ((str (upcase (read-symbol-name))))
+           (let ((str (read-symbol-name)))
              (when (zerop (length str))
                (croak (strcat "Bad character (or reader bug) in read-symbol: " (peek))))
              (aif (and (regexp-test #/^[+-]?[0-9]*\.?[0-9]*$/ str)
@@ -516,8 +560,9 @@
              (#\/ (read-regexp))
              (#\( (apply #'vector (read-list)))
              (#\' (next) (list 'function (read-token)))
-             (#\: (next) (make-symbol (upcase (read-symbol-name))))
+             (#\: (next) (make-symbol (read-symbol-name)))
              (#\. (next) (eval (read-token)))
+             (#\| (next) (skip-multiline-comment) (read-token))
              ((#\b #\B) (next) (read-base2-number))
              ((#\o #\O) (next) (read-base8-number))
              ((#\x #\X) (next) (read-base16-number))
@@ -577,11 +622,12 @@
                (case (peek)
                  (#\) (next) (cdr ret))
                  (#\; (skip-comment) (rec))
-                 (#\. (next)
-                      (%rplacd p (read-token))
-                      (skip-ws)
-                      (skip #\))
-                      (cdr ret))
+                 (#\.
+                  (next)
+                  (%rplacd p (read-token))
+                  (skip-ws)
+                  (skip #\))
+                  (cdr ret))
                  ((nil) (croak "Unterminated list"))
                  (otherwise
                   (setq p (%rplacd p (cons (read-token) nil)))
@@ -1553,6 +1599,10 @@
             (when more?
               (vector end-addr)))))))
 
+(defparameter *tagbody-dynest* 0
+  "Will keep track of dynamic environment nesting while compiling a TAGBODY
+  (specifically, UNWIND-PROTECT and CATCH forms surrounding GO)")
+
 (labels
     ((assert (p msg)
        (if p p (error/wp msg)))
@@ -1963,10 +2013,11 @@
                   (comp-const nil val? more?)))
              ((with-extenv (:tags (as-vector tags) :lex (vector (list tbody :tagbody)))
                 (<< (gen "BLOCK"))           ; define the tagbody entry
-                (foreach forms (lambda (x)
-                                 (if (atom x)
-                                     (<< (vector (cadddr (pop tags)))) ; label
-                                     (<< (comp x env nil t)))))
+                (let ((*tagbody-dynest* 0))
+                  (foreach forms (lambda (x)
+                                   (if (atom x)
+                                       (<< (vector (cadddr (pop tags)))) ; label
+                                       (<< (comp x env nil t))))))
                 (when val? (<< (gen "NIL"))) ; tagbody returns NIL
                 (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
                 (unless more? (<< (gen "RET")))))))))
@@ -1976,7 +2027,12 @@
          (assert pos (strcat "TAG " tag " not found"))
          (let* ((tbody (find-tagbody (caddr pos) env))
                 (i (car tbody)))
-           (gen "LJUMP" (cadddr pos) i))))
+           (cond
+             ((and (zerop i)
+                   (zerop *tagbody-dynest*))
+              (gen "JUMP" (cadddr pos)))
+             (t
+              (gen "LJUMP" (cadddr pos) i))))))
 
      (comp-if (pred then else env val? more?)
        (cond
@@ -2044,7 +2100,6 @@
                      (gen (if val? "TJUMPK" "TJUMP") l1)
                      (comp-or (cdr exps) env val? more? l1)
                      (vector l1)
-                     (gen "VALUES" 1)
                      (unless more? (gen "RET")))))))
          (t
           (comp (car exps) env val? more?))))
@@ -2272,7 +2327,10 @@
                                 body env val? more?)))))
 
      (comp-lambda (name args body env)
-       (gen "FN" (comp-inner-lambda name args body env t nil) name))
+       (prog2
+           (incf *tagbody-dynest*)
+           (gen "FN" (comp-inner-lambda name args body env t nil) name)
+         (decf *tagbody-dynest*)))
 
      (comp-lambda-body (name body env val? more?)
        (if name
@@ -2351,12 +2409,10 @@
        (with-env (comp-decl-seq body env val? more?)))
 
      (comp-macroexpand (expander form env val? more?)
-       (let ((expansion (gethash form *macroexpand-cache*)))
-         (unless expansion
-           (setq expansion
-                 (%hash-set (funcall expander form)
-                            form
-                            *macroexpand-cache*)))
+       ;; Do not attempt to cache the expansion by form. The same form might
+       ;; be legitimately expanded multiple times in different environments
+       ;; (e.g. symbol-macros or macrolet).
+       (let ((expansion (funcall expander form)))
          (with-env (comp expansion env val? more?))))
 
      (comp-mvb (names values-form body env val? more?)
@@ -2479,24 +2535,27 @@
 
      (comp-catch (tag body env val? more?)
        (if body
-           (let ((k1 (mklabel)))
-             (cond
-               ((not val?)
-                (%seq (comp tag env t t)
-                      (gen "CATCH" k1)
-                      ;; we still want body to leave the value on the stack,
-                      ;; so in normal termination it wouldn't be popped twice.
-                      (comp-seq body env t more?)
-                      (vector k1)
-                      (gen "POP")))
-               (t
-                (%seq (comp tag env t t)
-                      (gen "CATCH" k1)
-                      (comp-seq body env t more?)
-                      (vector k1)
-                      (if more?
-                          (gen "UNFR" 0 1)
-                          (gen "RET"))))))
+           (prog2
+               (incf *tagbody-dynest*)
+               (let ((k1 (mklabel)))
+                 (cond
+                   ((not val?)
+                    (%seq (comp tag env t t)
+                          (gen "CATCH" k1)
+                          ;; we still want body to leave the value on the stack,
+                          ;; so in normal termination it wouldn't be popped twice.
+                          (comp-seq body env t more?)
+                          (vector k1)
+                          (gen "POP")))
+                   (t
+                    (%seq (comp tag env t t)
+                          (gen "CATCH" k1)
+                          (comp-seq body env t more?)
+                          (vector k1)
+                          (if more?
+                              (gen "UNFR" 0 1)
+                              (gen "RET"))))))
+             (decf *tagbody-dynest*))
            (comp-const nil val? more?)))
 
      (comp-throw (tag ret env)
@@ -2506,22 +2565,24 @@
 
      (comp-unwind-protect (form cleanup env val? more?)
        (if cleanup
-           (let ((k (mklabel)))
-             (%seq (gen "UPOPEN" k)
-                   (comp form env val? t) ; if val? is T, this leaves it on the stack
-                   (gen "UPEXIT")
-                   (vector k)
-                   (comp-seq cleanup env nil t) ; result of cleanup code not needed
-                   (gen "UPCLOSE")
-                   (if more? nil (gen "RET"))))
+           (prog2
+               (incf *tagbody-dynest*)
+               (let ((k (mklabel)))
+                 (%seq (gen "UPOPEN" k)
+                       (comp form env val? t) ; if val? is T, this leaves it on the stack
+                       (gen "UPEXIT")
+                       (vector k)
+                       (comp-seq cleanup env nil t) ; result of cleanup code not needed
+                       (gen "UPCLOSE")
+                       (if more? nil (gen "RET"))))
+             (decf *tagbody-dynest*))
            (comp form env val? more?)))
 
      (compile (exp)
        (assert (and (consp exp)
                     (%memq (car exp) *lambda-syms*))
                "Expecting (LAMBDA (...) ...) in COMPILE")
-       (let ((*macroexpand-cache* (make-hash)))
-         (%eval-opcode (comp exp (make-environment) t nil))))
+       (%eval-opcode (comp exp (make-environment) t nil)))
 
      (compile-string (str &optional (filename *current-file*))
        (let ((*current-file* filename)
@@ -2547,7 +2608,6 @@
                            (form (cdr token)))
                       (unless (eq form 'EOF)
                         (let ((*current-pos* (car token))
-                              (*macroexpand-cache* (make-hash))
                               (*delay-eval* nil))
                           (comp1 form))
                         (rec)))))

@@ -94,11 +94,30 @@
   (%delete-duplicates list (make-subject-test test test-not key t))
   (if from-end list (nreverse list)))
 
+(defconstant +no-value+ '(done))
+
+(defun seq-iterator (seq)
+  (cond
+    ((listp seq)
+     (lambda ()
+       (if seq (pop seq) +no-value+)))
+    ((or (vectorp seq)
+         (stringp seq))
+     (let ((i -1)
+           (len (length seq)))
+       (lambda ()
+         (if (< (incf i) len)
+             (svref seq i)
+             +no-value+))))
+    (t
+     (error "SEQ-ITERATOR: unknown sequence"))))
+
 (defmacro with-list-frobnicator ((&key replace (from-end t) alt) &body body)
-  (let* ((tail (when replace (gensym "tail")))
-         (reverse (if tail 'nreverse 'reverse))
-         (alt-el (when alt (intern (strcat alt "-EL")))))
-    `(macrolet (,@(when tail
+  (let ((tail (when replace (gensym "tail")))
+        (reverse (if replace 'nreverse 'reverse))
+        (alt-it (when alt (intern (strcat alt "-ITER"))))
+        (alt-el (when alt (intern (strcat alt "-EL")))))
+    `(macrolet (,@(when replace
                     `((replace-with (val)
                                     `(setf (car ,',tail) ,val)))))
        (cond
@@ -126,26 +145,63 @@
           (cond
             (end
              (loop with froblist = (nthcdr start list)
+                   ,@(when alt
+                       `(with ,alt-it = (seq-iterator ,alt)))
                    ,@(if tail
                          `(for ,tail on froblist for el = (car ,tail))
                          `(for el in froblist))
                    ,@(when alt
-                       `(for ,alt-el in ,alt))
+                       `(for ,alt-el = (funcall ,alt-it) until (eq ,alt-el +no-value+)))
                    for index from start below end
                    ,@body))
             (t
              (loop with froblist = (nthcdr start list)
+                   ,@(when alt
+                       `(with ,alt-it = (seq-iterator ,alt)))
                    ,@(if tail
                          `(for ,tail on froblist for el = (car ,tail))
                          `(for el in froblist))
                    ,@(when alt
-                       `(for ,alt-el in ,alt))
+                       `(for ,alt-el = (funcall ,alt-it) until (eq ,alt-el +no-value+)))
                    for index from start
                    ,@body))))))))
 
+(defmacro with-vector-frobnicator ((&key replace (from-end t) alt) &body body)
+  (let ((alt-it (when alt (intern (strcat alt "-ITER"))))
+        (alt-el (when alt (intern (strcat alt "-EL")))))
+    `(macrolet (,@(when replace
+                    `((replace-with (val)
+                                    `(setf (svref list index) ,val)))))
+       (unless end
+         (setf end (length list)))
+       (cond
+         ,(when from-end
+            `(from-end
+              (loop for index downfrom (1- end) to start
+                    for el = (svref list index)
+                    ,@body)))
+         (t
+          (loop ,@(when alt
+                    `(with ,alt-it = (seq-iterator ,alt)))
+                for index from start below end
+                for el = (svref list index)
+                ,@(when alt
+                    `(for ,alt-el = (funcall ,alt-it) until (eq ,alt-el +no-value+)))
+                ,@body))))))
+
+(defmacro with-seq-frobnicator (args &body body)
+  `(cond
+     ((listp list)
+      (with-list-frobnicator ,args ,@body))
+     ((or (vectorp list)
+          (stringp list))
+      (with-vector-frobnicator ,args ,@body))
+     (t
+      (error "TODO: sequence functions only operate on lists for now"))))
+
 (defun find-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (with-list-frobnicator ()
+  (with-seq-frobnicator ()
     :when (funcall predicate el) :do (return el)))
 
 (defun find-if-not (predicate list &rest args)
@@ -153,12 +209,12 @@
 
 (defun find (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (with-list-frobnicator ()
+  (with-seq-frobnicator ()
     :when (funcall test item el) :do (return el)))
 
 (defun position-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (with-list-frobnicator ()
+  (with-seq-frobnicator ()
     :when (funcall predicate el) :do (return index)))
 
 (defun position-if-not (predicate list &rest args)
@@ -166,12 +222,12 @@
 
 (defun position (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (with-list-frobnicator ()
+  (with-seq-frobnicator ()
     :when (funcall test item el) :do (return index)))
 
 (defun count-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
-  (with-list-frobnicator ()
+  (with-seq-frobnicator ()
     :count (funcall predicate el)))
 
 (defun count-if-not (predicate list &rest args)
@@ -179,7 +235,7 @@
 
 (defun count (item list &key key test test-not (start 0) end from-end)
   (setf test (make-subject-test test test-not key nil))
-  (with-list-frobnicator ()
+  (with-seq-frobnicator ()
     :count (funcall test item el)))
 
 (defun substitute-if (newitem predicate list &key key (start 0) end from-end count destructive)
@@ -187,7 +243,7 @@
   (unless destructive
     ;; the frobnicator is destructive
     (setf list (copy-seq list)))
-  (with-list-frobnicator (:replace t)
+  (with-seq-frobnicator (:replace t)
     :when (and (or (not count)
                    (plusp count))
                (funcall predicate el))
@@ -206,7 +262,7 @@
   (unless destructive
     ;; the frobnicator is destructive
     (setf list (copy-seq list)))
-  (with-list-frobnicator (:replace t)
+  (with-seq-frobnicator (:replace t)
     :when (and (or (not count)
                    (plusp count))
                (funcall test item el))
@@ -227,10 +283,10 @@
   (apply #'substitute newitem item list :destructive t args))
 
 (defun subseq (list start &optional end)
-  (with-list-frobnicator (:from-end nil)
+  (with-seq-frobnicator (:from-end nil)
     :collect el))
 
 (defun (setf subseq) (newseq list start &optional end)
-  (with-list-frobnicator (:from-end nil :alt newseq :replace t)
+  (with-seq-frobnicator (:from-end nil :alt newseq :replace t)
     :do (replace-with newseq-el)
     :finally (return newseq)))

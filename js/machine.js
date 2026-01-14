@@ -384,12 +384,25 @@ var optimize = (function(){
             }
             return false;
         }
+        if (i < code.length && code[i][0] == "TJUMPK") {
+            let tgt = find_target(code, code[i][1]);
+            if (tgt && code[tgt][0] == "FJUMP") {
+                let nt = new LispSymbol();
+                code[i] = [ "TJUMP", nt ];
+                code.splice(tgt+1, 0, nt);
+                return true;
+            }
+            if (tgt && code[tgt][0] == "TJUMP") {
+                code[i] = code[tgt];
+                return true;
+            }
+        }
         if (i+2 < code.length && (code[i][0] == "TJUMPK" || code[i][0] == "FJUMPK")
             && code[i+1][0] == "NIL"
             && code[i+2] === code[i][1])
         {
             // [[TF]JUMPK L1] [NIL] L1 -> (nothing)
-            code.splice(i, 2);
+            code.splice(i, 2, [ "VALUES", 1 ]); // must keep only one value, as would TJUMPK.
             return true;
         }
         if (i+2 < code.length && code[i][0] == "TJUMP" && code[i+1][0] == "JUMP" && code[i+2] === code[i][1]) {
@@ -745,6 +758,17 @@ var optimize = (function(){
             code.splice(i+1, 1);
             return true;
         }
+
+        // this seems pointless... but is it?
+        // if (i+1 < code.length && (code[i+0][0] === "LSETPS" &&
+        //                           code[i+1][0] === "LGET" &&
+        //                           code[i+1][1] === code[i+0][1] &&
+        //                           code[i+1][2] === code[i+0][2])) {
+        //     code[i+0][0] = "LSET";
+        //     code.splice(i+1, 1);
+        //     return true;
+        // }
+
     }
     return function optimize(code) {
         let pass = 0;
@@ -953,7 +977,7 @@ export function disassemble(code) {
             let opcode = OP_REV[op];
             switch (op) {
               case OP.FN:
-                opcode = "FN " + code[i + 1];
+                opcode = "FN " + dump(code[i + 1]);
                 data = "\n" + disassemble(code[i], level + 1);
                 break;
               case OP.CONST:

@@ -194,7 +194,10 @@
          nil)))))
 
 (define-handler :list-packages ()
-  (apply #'vector (sort (mapcar #'package-name (%list-packages)) #'string<)))
+  (apply #'vector (sort (remove "%"
+                                (mapcar #'package-name (%list-packages))
+                                :test #'string=)
+                        #'string<)))
 
 (define-handler :set-package (name)
   (let ((pak (find-package name)))

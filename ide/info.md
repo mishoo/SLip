@@ -72,7 +72,9 @@ bindings; to get a crude list of all of them, press `C-h m`):
 
 - `C-c Enter` or `s-m` (Super-m, that's generally the Windows key) —
   `macroexpand-1` the current expression (the cursor must be on the opening
-  paren). The output goes to the REPL.
+  paren). The output goes to a separate `*macroexpand*` buffer, which pops up
+  in a new frame (if not already visible). If you macroexpand in this very
+  buffer, then the expansion will replace the current expression, as in SLIME.
 
 - `C-c M-m` or `S-s-m` — `macroexpand-all` the current expression. Use a
   prefix argument (`C-u`) if you'd like to expand compiler macros as well
@@ -89,6 +91,9 @@ You can load and save files (see the section about the “filesystem” below):
 - `C-x C-s` — save the current buffer.
 
 In addition to the above, the following key bindings are available in the REPL:
+
+- `,` (comma) — when used at prompt, it'll open a quick menu with some useful
+  commands, like change package, defparameter or run tests.
 
 - `C-c M-p` — change REPL package. Note that `%` is the bootstrap package,
   where primitives are defined. It's unfortunate that it shows up first, due

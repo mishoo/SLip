@@ -273,7 +273,7 @@ function find_package(buffer, start) {
         if (typeof pak === "string") return pak;
         if (LispSymbol.is(pak)) return pak.name;
     } catch(ex) {};
-    return false;
+    return buffer.getq("sl_package") || false;
 };
 
 function sl_log(txt, { newline = true } = {}) {
@@ -297,6 +297,30 @@ function sl_log(txt, { newline = true } = {}) {
     output.resumeUpdates();
     output.tokenizer.start();
 };
+
+function macroexpand(mexp_func, compmacs, point) {
+    var code = this._bufferSubstring(point);
+    var pak = find_package(this);
+    try {
+        var tmp = MACHINE().read(pak, code);
+    } catch (ex) {
+        throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
+    }
+    let expr = this.cmd("buffer_substring", point, point + tmp[1]);
+    this.ymacs.run_lisp(mexp_func, pak, expr, !!compmacs, (ret) => {
+        let buf = get_macroexpand_buffer(pak);
+        if (buf === this) {
+            buf.cmd("save_excursion", () => {
+                buf.cmd("kill_sexp");
+                let begin = buf.point();
+                buf.cmd("insert", ret);
+                buf.cmd("indent_region", begin, buf.point());
+            }, true);
+        } else {
+            buf.setCode(ret);
+        }
+    });
+}
 
 Ymacs_Buffer.newCommands({
     mode_from_name: function(name) {
@@ -423,30 +447,10 @@ Ymacs_Buffer.newCommands({
         buf.cmd("sl_repl_prompt");
     }),
     sl_macroexpand_1: Ymacs_Interactive("P\nd", function(compmacs, point){
-        var code = this._bufferSubstring(point);
-        var pak = find_package(this);
-        try {
-            var tmp = MACHINE().read(pak, code);
-        } catch(ex) {
-            throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
-        }
-        let expr = this.cmd("buffer_substring", point, point + tmp[1]);
-        this.ymacs.run_lisp("MACROEXPAND-1", pak, expr, !!compmacs, (ret) => {
-            sl_log(ret);
-        });
+        macroexpand.call(this, "MACROEXPAND-1", compmacs, point);
     }),
     sl_macroexpand_all: Ymacs_Interactive("P\nd", function(compmacs, point){
-        var code = this._bufferSubstring(point);
-        var pak = find_package(this);
-        try {
-            var tmp = MACHINE().read(pak, code);
-        } catch(ex) {
-            throw new Ymacs_Exception(`Couldn't read Lisp expression starting at point`);
-        }
-        let expr = this.cmd("buffer_substring", point, point + tmp[1]);
-        this.ymacs.run_lisp("MACROEXPAND-ALL", pak, expr, !!compmacs, (ret) => {
-            sl_log(ret);
-        });
+        macroexpand.call(this, "MACROEXPAND-ALL", compmacs, point);
     }),
     sl_eval_buffer: Ymacs_Interactive(function(){
         compile_lisp(this, this.getCode());
@@ -717,8 +721,25 @@ Ymacs_Buffer.newCommands({
             "Recompile all": () => {
                 repl.cmd("sl_recompile_everything");
             },
+            "Clear output": () => {
+                repl.cmd("sl_clear_output");
+            },
+            "Color theme": () => {
+                repl.cmd("set_color_theme");
+            },
+            "DEMO: clock": () => {
+                set_repl_input(repl, `(sl:load "examples/clock.lisp")`);
+                repl.cmd("sl_repl_eval");
+            },
+            "DEMO: chess viewer": () => {
+                repl.ymacs.run_lisp("READ-EVAL", false, `(unless (ignore-errors (find-package :pgn-viewer))
+                                                           (sl:load "examples/pgn-viewer.lisp"))`, () => {
+                    set_repl_input(repl, `(pgn-viewer::lichess "vlbz")`);
+                    repl.cmd("sl_repl_eval");
+                });
+            },
             "Load/run test suite": () => {
-                repl.ymacs.run_lisp("READ-EVAL", false, `(%::load "test/all.lisp")`, () => {
+                repl.ymacs.run_lisp("READ-EVAL", false, `(sl:load "test/all.lisp")`, () => {
                     set_repl_input(repl, `(sl-user::run-tests :log nil :all t)`);
                     repl.cmd("sl_repl_eval");
                 });
@@ -766,6 +787,11 @@ Ymacs_Buffer.newCommands({
                 repl.tokenizer.start();
             }
         });
+    }),
+    sl_show_history: Ymacs_Interactive(function(){
+        let buf = popup_buffer("*sl-repl-history*");
+        let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+        buf.setCode(history.join("\n\n"));
     }),
 });
 
@@ -875,10 +901,14 @@ Ymacs_Buffer.newMode("sl_mode", function(){
                 pak = false;
             }
         } else {
-            pak = MACHINE().eval_string(false, "%::*PACKAGE*");
+            pak = this.getq("sl_package") || MACHINE().eval_string(false, "%::*PACKAGE*");
         }
-        if (pak) pak = pak.name;
-        else pak = "<span style='color:red'>(package not defined)</span>";
+        if (pak && typeof pak != "string") {
+            pak = pak.name;
+        }
+        if (!pak) {
+            pak = "<span style='color:red'>(package not defined)</span>";
+        }
         ret.push(pak);
         this.resumeUpdates();
         return ret.join(" ");
@@ -935,6 +965,36 @@ function list_local_fasls() {
     return fasls;
 }
 
+let Ymacs_Keymap_Mexp = Ymacs_Keymap.define(null, {
+    "q" : "delete_frame",
+});
+
+function popup_buffer(name) {
+    let ed = THE_EDITOR;
+    let buf = ed.getBuffer(name);
+    if (!buf) {
+        buf = ed.createBuffer({ name: name });
+        buf.dirty = () => false;
+        buf.cmd("sl_mode");
+    }
+    let current = ed.getActiveFrame();
+    let frame = ed.getBufferFrames(buf)[0];
+    if (!frame) {
+        frame = current.split();
+        frame.setBuffer(buf);
+        ed.setActiveFrame(frame);
+        current.recenterTopBottom(0);
+    }
+    return buf;
+}
+
+function get_macroexpand_buffer(pak) {
+    let buf = popup_buffer("*macroexpand*");
+    buf.setq("sl_package", pak);
+    buf.pushKeymap(Ymacs_Keymap_Mexp);
+    return buf;
+}
+
 function get_repl_buffer() {
     var ed = THE_EDITOR;
     var repl = ed.getBuffer("*sl-repl*");
@@ -945,6 +1005,7 @@ function get_repl_buffer() {
         repl.setCode(`\
 ;; SLip build ${window.SLIP_COMMIT ?? '(unavailable)'} ${window.SLIP_DATE ?? ''}
 ;; Hacks and glory await!
+;; NEW: type comma at prompt for a quick menu.
 \n`);
         repl.cmd("end_of_buffer");
 
