@@ -3,14 +3,12 @@ import { LispPrimitiveError } from "./error.js";
 export class Values {
     constructor(vals) {
         this.vals = vals;
-    }
-    first() {
-        return this.vals.length > 0 ? this.vals[0] : false;
+        this.one_value = vals.length === 0 ? false : vals[0];
     }
 }
 
 export function value(el) {
-    return el instanceof Values ? el.first() : el;
+    return el instanceof Values ? el.one_value : el;
 }
 
 export class LispStack {
