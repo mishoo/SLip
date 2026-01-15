@@ -240,7 +240,7 @@ function find_toplevel_sexp(buffer, blink, noerror) {
     if (blink) {
         flash_region(buffer, exp.start, exp.end);
     }
-    return [ exp.start, exp.end ];
+    return [ exp.start, exp.end, exp ];
 };
 
 function find_in_package(buffer, start) {
@@ -364,13 +364,15 @@ Ymacs_Buffer.newCommands({
         if (point >= m) {
             this.cmd("sl_repl_eval");
         } else if (point < m) {
-            var exp = find_toplevel_sexp(this, false, true);
-            if (exp && point >= exp[0] && point <= exp[1]) {
-                set_repl_input(this, this.cmd("buffer_substring", exp[0], exp[1]));
-                this.cmd("goto_char", m + exp[1] - exp[0]);
+            let rc = this._positionToRowCol(point);
+            let mc = this._positionToRowCol(m);
+            if (rc.row < mc.row) {
+                let [begin, end, exp] = find_toplevel_sexp(this, false, true);
+                if (exp?.type !== "comment" && point >= begin && point <= end) {
+                    set_repl_input(this, this.cmd("buffer_substring", begin, end));
+                    this.cmd("goto_char", m + end - begin);
+                }
             }
-            else
-                this.cmd("newline_and_indent");
         }
     }),
     sl_repl_beginning_of_input: Ymacs_Interactive("d", function(point){
@@ -733,10 +735,11 @@ Ymacs_Buffer.newCommands({
             },
             "DEMO: chess viewer": () => {
                 repl.ymacs.run_lisp("READ-EVAL", false, `(unless (ignore-errors (find-package :pgn-viewer))
-                                                           (sl:load "examples/pgn-viewer.lisp"))`, () => {
-                    set_repl_input(repl, `(pgn-viewer::lichess "vlbz")`);
-                    repl.cmd("sl_repl_eval");
-                });
+                                                           (sl:load "examples/pgn-viewer.lisp"))`,
+                                    () => {
+                                        set_repl_input(repl, `(pgn-viewer::lichess "vlbz")`);
+                                        repl.cmd("sl_repl_eval");
+                                    });
             },
             "Load/run test suite": () => {
                 repl.ymacs.run_lisp("READ-EVAL", false, `(sl:load "test/all.lisp")`, () => {
