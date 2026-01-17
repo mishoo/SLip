@@ -28,6 +28,7 @@
          (thread nil)
          (start-fen (get-header pgn "FEN" q:+fen-start+))
          (current-fen start-fen)
+         (current-move nil)
          (el-board (dom:query dlg "._board"))
          (el-pieces (dom:query dlg "._pieces"))
          (el-moves (dom:query dlg "._moves-list"))
@@ -46,6 +47,7 @@
            (dom:query el-pieces (piece-selector index)))
 
          (goto-move (move fen-before fen-after)
+           (highlight-move move)
            (cond
              ((string= current-fen fen-before)
               (let* ((from (q:move-from move))
@@ -90,7 +92,8 @@
                       (dom:style piece :z-index) (+ 10 (incf transitions)))))
              (t
               (morph-to-fen el-pieces fen-after)))
-           (setf current-fen fen-after))
+           (setf current-fen fen-after
+                 current-move move))
 
          (on-move-click (target event)
            (highlight-clear)
@@ -107,11 +110,18 @@
                (q:reset-from-fen g current-fen)
                (setf (dom:inner-html el-pieces)
                      (pieces-html (q:game-board g)))
-               (highlight-check))))
+               (highlight-check g)
+               (highlight-move))))
 
          (highlight-clear ()
            (dom:do-query (el el-pieces ".piece.highlight")
              (dom:remove-element el)))
+
+         (highlight-move (&optional (move current-move))
+           (when move
+             (highlight-fields (list (q:move-from move)
+                                     (q:move-to move))
+                               "target")))
 
          (highlight-fields (indexes classes)
            (dolist (idx indexes)
@@ -121,13 +131,13 @@
                (format nil "<div class='piece highlight ~A' data-index='~D'></div>"
                        classes idx)))))
 
-         (highlight-check ()
-           (let* ((g (q:reset-from-fen (q:make-game) current-fen)))
-             (when (q:attacked? g)
-               (highlight-fields (list (q:king-index g)) "check"))))
+         (highlight-check (g)
+           (when (q:attacked? g)
+             (highlight-fields (list (q:king-index g)) "check")))
 
          (reset ()
-           (setf current-fen start-fen)
+           (setf current-fen start-fen
+                 current-move nil)
            (highlight-clear)
            (morph-to-fen el-pieces current-fen)
            (dom:do-query (el dlg "input[name='move']")
@@ -404,7 +414,8 @@
                                         (q:game-san g move all-moves)))
                                  (fen-before current-fen))
                             (q:game-move g move)
-                            (setf current-fen (q:game-fen g))
+                            (setf current-fen (q:game-fen g)
+                                  current-move move)
                             (setf (dom:dataset piece :index) target-field
                                   (dom:style piece :z-index) 10)
                             (morph-to-fen el-pieces current-fen)
