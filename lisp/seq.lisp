@@ -119,7 +119,9 @@
         (alt-el (when alt (intern (strcat alt "-EL")))))
     `(macrolet (,@(when replace
                     `((replace-with (val)
-                                    `(setf (car ,',tail) ,val)))))
+                                    `(setf (car ,',tail) ,val))))
+                (return-sequence ()
+                  `(return (if from-end (nreverse list) list))))
        (cond
          ,(when from-end
             `(from-end
@@ -171,7 +173,9 @@
         (alt-el (when alt (intern (strcat alt "-EL")))))
     `(macrolet (,@(when replace
                     `((replace-with (val)
-                                    `(setf (svref list index) ,val)))))
+                                    `(setf (svref list index) ,val))))
+                (return-sequence ()
+                  `(return list)))
        (unless end
          (setf end (length list)))
        (cond
@@ -251,8 +255,8 @@
           (replace-with newitem)
           (when count
             (unless (plusp (decf count))
-              (return (if from-end (nreverse list) list)))))
-    :finally (return (if from-end (nreverse list) list))))
+              (return-sequence))))
+    :finally (return-sequence)))
 
 (defun substitute-if-not (newitem predicate list &rest args)
   (apply #'substitute-if newitem (complement predicate) list args))
@@ -270,8 +274,8 @@
           (replace-with newitem)
           (when count
             (unless (plusp (decf count))
-              (return (if from-end (nreverse list) list)))))
-    :finally (return (if from-end (nreverse list) list))))
+              (return-sequence))))
+    :finally (return-sequence)))
 
 (defun nsubstitute-if (newitem predicate list &rest args)
   (apply #'substitute-if newitem predicate list :destructive t args))

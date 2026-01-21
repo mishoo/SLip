@@ -391,3 +391,6 @@
                                (not (member e z :key key :test test))
                              (member e z :key key :test test)))
    t))
+
+(defun break ()
+  (error "BREAK has been called"))
