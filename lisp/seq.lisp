@@ -60,7 +60,7 @@
   (remove-if (lambda (el) (funcall test item el)) list
              :start start :end end :count count :from-end from-end))
 
-(defun %erase-if (list predicate)
+(defun %list-delete-if (predicate list)
   (let* ((ret (cons nil list))
          (p ret))
     (tagbody
@@ -72,26 +72,24 @@
          (go :loop)))
     (cdr ret)))
 
-(defun %delete-duplicates (list test)
-  (tagbody
-   :loop
-     (when list
-       (let ((current (car list)))
-         (setf list
-               (setf (cdr list)
-                     (%erase-if (cdr list)
-                                (lambda (x)
-                                  (funcall test current x)))))
+(defun %list-delete-duplicates (list test)
+  (flet ((same-as-first (x)
+           (funcall test (car list) x)))
+    (tagbody
+     :loop
+       (when list
+         (setf list (setf (cdr list)
+                          (%list-delete-if #'same-as-first (cdr list))))
          (go :loop)))))
 
 (defun remove-duplicates (list &key key test test-not from-end)
   (setf list (if from-end (copy-seq list) (reverse list)))
-  (%delete-duplicates list (make-subject-test test test-not key t))
+  (%list-delete-duplicates list (make-subject-test test test-not key t))
   (if from-end list (nreverse list)))
 
 (defun delete-duplicates (list &key key test test-not from-end)
   (unless from-end (setf list (nreverse list)))
-  (%delete-duplicates list (make-subject-test test test-not key t))
+  (%list-delete-duplicates list (make-subject-test test test-not key t))
   (if from-end list (nreverse list)))
 
 (defconstant +no-value+ '(done))

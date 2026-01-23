@@ -95,7 +95,9 @@
           ((or (numberp x)
                (stringp x)
                (regexpp x)
-               (vectorp x))
+               (characterp x)
+               (vectorp x)
+               (hash-table-p x))
            x)
           ((not (consp x))
            (if x (list 'quote x)))
@@ -311,14 +313,15 @@
     value))
 
 (defun filter (lst pred)
-  (let rec ((lst lst)
-            (ret nil))
-    (if lst
-        (rec (cdr lst)
-             (if (funcall pred (car lst))
-                 (cons (car lst) ret)
-                 ret))
-        (nreverse ret))))
+  (let ((ret nil))
+    (tagbody
+     :loop
+       (when lst
+         (when (funcall pred (car lst))
+           (setq ret (cons (car lst) ret)))
+         (setq lst (cdr lst))
+         (go :loop)))
+    (nreverse ret)))
 
 (defmacro prog2 (exp1 exp2 . body)
   `(progn
@@ -1397,7 +1400,7 @@
          (stringp form)
          (keywordp form)
          (regexpp form)
-         (charp form)
+         (characterp form)
          (vectorp form)
          (functionp form)
          (%:%std-instance-p form)
@@ -1660,7 +1663,7 @@
                               (%get-symbol-prop name :constant))
                      (let ((val (symbol-value name)))
                        (when (or (numberp val)
-                                 (charp val))
+                                 (characterp val))
                          (gen "CONST" val)))))
                   (t
                    (gen "GVAR" (unknown-variable name env)))))))
@@ -2158,8 +2161,9 @@
            ((or (numberp f)
                 (stringp f)
                 (regexpp f)
-                (charp f)
-                (vectorp f))
+                (characterp f)
+                (vectorp f)
+                (hash-table-p f))
             (error/wp (strcat f " is not a function")))
            ((and local (symbolp f))
             (let ((localfun (find-func f env)))
