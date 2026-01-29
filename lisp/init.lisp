@@ -72,8 +72,8 @@
 (in-package :sl)
 "
 
-(defun assert (test . arguments)
-  (unless test (apply #'error arguments)))
+(defmacro assert (test . arguments)
+  `(unless ,test (error ,@arguments)))
 
 (defun package-local-nicknames (&optional (package *package*))
   (%:%get-package-prop package '%:local-nicknames))

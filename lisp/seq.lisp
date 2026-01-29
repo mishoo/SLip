@@ -199,7 +199,7 @@
           (stringp list))
       (with-vector-frobnicator ,args ,@body))
      (t
-      (error "TODO: sequence functions only operate on lists for now"))))
+      (error (error "WITH-SEQ-FROBNICATOR: unknown sequence")))))
 
 (defun find-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)

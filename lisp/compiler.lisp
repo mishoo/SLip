@@ -720,6 +720,9 @@
       (t
        (dig (cdr args) seen)))))
 
+(defmacro assert (p msg)
+  `(or ,p (error/wp ,msg)))
+
 (defun parse-lambda-list (args)
   (let ((all nil)
         (required nil)
@@ -730,10 +733,7 @@
         (aux nil)
         (allow-other-keys nil))
     (labels
-        ((assert (p msg)
-           (if p p (error/wp msg)))
-
-         (symp (x)
+        ((symp (x)
            (and x (symbolp x)
                 (not (eq x t))
                 (not (lambda-keyword-p x))))
