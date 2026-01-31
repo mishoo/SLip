@@ -299,20 +299,20 @@
   (macrolet ((doit (add)
                `(loop for seq in sequences
                       for it = (seq-iterator seq)
-                      do (loop for el = (funcall it)
-                               until (eq el +no-value+)
+                      do (loop for val = (funcall it)
+                               until (eq val +no-value+)
                                do ,add))))
     (ecase result-type
       ((string simple-string)
        (with-output-to-string (out)
-         (doit (%stream-put out el))))
+         (doit (%stream-put out val))))
       ((array vector simple-vector)
        (let ((out (make-array 0 :fill-pointer 0 :adjustable t)))
-         (doit (vector-push-extend el out))
+         (doit (vector-push-extend val out))
          out))
       ((list cons)
        (with-collectors (out)
-         (doit (out el))
+         (doit (out val))
          out))
       (null
        (loop for seq in sequences
