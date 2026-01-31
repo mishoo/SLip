@@ -83,3 +83,9 @@
 
 (define-compiler-macro vector-push-extend (obj vector)
   `(vector-push ,obj ,vector))
+
+(defun (setf fill-pointer) (new-value array)
+  (%:%set-fill-pointer new-value array))
+
+(define-compiler-macro (setf fill-pointer) (new-value array)
+  `(%:%set-fill-pointer ,new-value ,array))
