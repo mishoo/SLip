@@ -293,37 +293,40 @@
     :do (replace-with newseq-el)
     :finally (return newseq)))
 
+;; this macro simply serves the role of copy/paste. indeed, it is horrible.
+(defmacro concafrob ()
+  `(progn
+     (when (consp result-type)
+       (setf result-type (car result-type)))
+     (ecase result-type
+       ((string simple-string)
+        (with-output-to-string (out)
+          (doit (%stream-put out val))))
+       ((array vector simple-vector)
+        (let ((out (make-array 0 :fill-pointer 0 :adjustable t)))
+          (doit (vector-push-extend val out))
+          out))
+       ((list cons)
+        (with-collectors (out)
+          (doit (out val))
+          out))
+       (null
+        (loop for seq in sequences
+              do (assert (zerop (length seq))
+                         "CONCATENATE: non-empty sequence with NULL output type"))
+        nil))))
+
 (defun concatenate (result-type &rest sequences)
-  (when (consp result-type)
-    (setf result-type (car result-type)))
   (macrolet ((doit (add)
                `(loop for seq in sequences
                       for it = (seq-iterator seq)
                       do (loop for val = (funcall it)
                                until (eq val +no-value+)
                                do ,add))))
-    (ecase result-type
-      ((string simple-string)
-       (with-output-to-string (out)
-         (doit (%stream-put out val))))
-      ((array vector simple-vector)
-       (let ((out (make-array 0 :fill-pointer 0 :adjustable t)))
-         (doit (vector-push-extend val out))
-         out))
-      ((list cons)
-       (with-collectors (out)
-         (doit (out val))
-         out))
-      (null
-       (loop for seq in sequences
-             do (assert (zerop (length seq))
-                        "CONCATENATE: non-empty sequence with NULL output type"))
-       nil))))
+    (concafrob)))
 
-;; XXX: in terms of performance, this is, of course, horrible.
+;; XXX: in terms of performance, this is, of course, horrendous.
 (defun map (result-type function &rest sequences)
-  (when (consp result-type)
-    (setf result-type (car result-type)))
   (let ((iterators (mapcar #'seq-iterator sequences)))
     (macrolet ((doit (add)
                  `(tagbody
@@ -335,20 +338,4 @@
                            for val = (apply function args)
                            do ,add)
                    :end)))
-      (ecase result-type
-        ((string simple-string)
-         (with-output-to-string (out)
-           (doit (%stream-put out val))))
-        ((array vector simple-vector)
-         (let ((out (make-array 0 :fill-pointer 0 :adjustable t)))
-           (doit (vector-push-extend val out))
-           out))
-        ((list cons)
-         (with-collectors (out)
-           (doit (out val))
-           out))
-        (null
-         (loop for seq in sequences
-               do (assert (zerop (length seq))
-                          "MAP: non-empty sequence with NULL output type"))
-         nil)))))
+      (concafrob))))
