@@ -108,6 +108,7 @@
                        "test/seq/nsubstitute-if-not.lisp"
                        "test/seq/subseq.lisp"
                        "test/seq/remove.lisp"
+                       "test/seq/concatenate.lisp"
                        "test/struct/structures-01.lisp")))
 
      (loop for count = (length files)

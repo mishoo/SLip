@@ -1,6 +1,6 @@
 (in-package :sl)
 
-(export '(make-array aref arrayp array-dimension array-dimensions
+(export '(array make-array aref arrayp array-dimension array-dimensions
           array-rank array-element-type fill-pointer
           vector-push vector-push-extend))
 
@@ -18,12 +18,11 @@
                               displaced-to
                               displaced-index-offset)
   (cond
-    ((and (not element-type)
-          (or (numberp dimensions)
-              (and (consp dimensions)
-                   (not (cdr dimensions)))))
+    ((or (numberp dimensions)
+         (and (consp dimensions)
+              (not (cdr dimensions))))
      (make-vector (if (consp dimensions) (car dimensions) dimensions)
-                  initial-element initial-contents))
+                  initial-element initial-contents fill-pointer))
     (t
      (%:%make-array dimensions element-type initial-element initial-contents))))
 
@@ -32,13 +31,14 @@
                                           initial-element
                                           initial-contents
                                           element-type
+                                          fill-pointer
                                           &allow-other-keys)
   (cond
     ((or element-type
          (consp dimensions))
      form)
     (t
-     `(make-vector ,dimensions ,initial-element ,initial-contents))))
+     `(make-vector ,dimensions ,initial-element ,initial-contents ,fill-pointer))))
 
 (defun aref (array &rest subscripts)
   (cond

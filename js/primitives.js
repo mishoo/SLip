@@ -12,6 +12,7 @@ import {
     LispArray,
     LispStruct,
     LispStdInstance,
+    forEach,
 } from "./types.js";
 import {
     LispInputStream,
@@ -736,15 +737,19 @@ defp("vector", false, function(m, nargs){
 });
 
 defp("make-vector", false, function(m, nargs){
-    checknargs(nargs, 2, 3);
-    let contents = nargs === 3 ? m.pop() : false;
+    checknargs(nargs, 2, 4);
+    let fill_pointer = nargs >= 4 ? m.pop() : false;
+    let contents = nargs >= 3 ? m.pop() : false;
     let init = m.pop();
     let n = m.pop();
     checktype(n, LispNumber);
+    if (fill_pointer !== false) {
+        checktype(fill_pointer, LispInteger);
+        if (fill_pointer < n) n = fill_pointer;
+    }
     var a = new Array(n).fill(init);
     if (contents) {
-        LispCons.forEach(contents, (value, i, dot) => {
-            if (dot) error("Improper initial-contents in make-vector");
+        forEach(contents, (value, i) => {
             if (i < n) a[i] = value;
         });
     }

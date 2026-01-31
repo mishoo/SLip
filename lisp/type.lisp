@@ -2,7 +2,9 @@
 
 (export '(type-of typep deftype typecase etypecase
           fixnum float input-stream output-stream satisfies mod
-          string-designator))
+          string-designator
+          simple-string simple-vector
+          simple-string-p simple-vector-p))
 
 (defpackage :sl-type
   (:use :sl :%)
@@ -10,6 +12,8 @@
            #:type-of-structure #:type-of-object))
 
 (in-package :sl-type)
+
+;; (setf %:*enable-inline* t)
 
 (defun integer-predicate (obj &optional (min '*) (max '*))
   (and (integerp obj)
@@ -327,3 +331,11 @@
 
 ;; we no longer touch *built-in-types* from this point on
 (setq *ext-types* (%:hash-copy *ext-types*))
+
+(declaim (inline simple-string-p))
+(defun simple-string-p (thing)
+  (typep thing 'string))
+
+(declaim (inline simple-vector-p))
+(defun simple-vector-p (thing)
+  (typep thing 'vector))

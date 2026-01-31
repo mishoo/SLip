@@ -7,7 +7,7 @@
           substitute substitute-if substitute-if-not
           nsubstitute nsubstitute-if nsubstitute-if-not
           remove-duplicates delete-duplicates
-          subseq))
+          subseq concatenate))
 
 (defpackage :sl-seq
   (:use :sl :%))
@@ -292,3 +292,30 @@
   (with-seq-frobnicator (:from-end nil :alt newseq :replace t)
     :do (replace-with newseq-el)
     :finally (return newseq)))
+
+(defun concatenate (result-type &rest sequences)
+  (when (consp result-type)
+    (setf result-type (car result-type)))
+  (macrolet ((doit (add)
+               `(loop for seq in sequences
+                      for it = (seq-iterator seq)
+                      do (loop for el = (funcall it)
+                               until (eq el +no-value+)
+                               do ,add))))
+    (ecase result-type
+      ((string simple-string)
+       (with-output-to-string (out)
+         (doit (%stream-put out el))))
+      ((array vector simple-vector)
+       (let ((out (make-array 0 :fill-pointer 0 :adjustable t)))
+         (doit (vector-push-extend el out))
+         out))
+      ((list cons)
+       (with-collectors (out)
+         (doit (out el))
+         out))
+      (null
+       (loop for seq in sequences
+             do (assert (zerop (length seq))
+                        "CONCATENATE: non-empty sequence with NULL output type"))
+       nil))))

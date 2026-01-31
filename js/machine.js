@@ -1495,6 +1495,10 @@ export class LispMachine {
         ];
     }
 
+    fn_name(def) {
+        return this.f?.name || def;
+    }
+
 }
 
 function frame(env, i) {
@@ -1877,10 +1881,10 @@ let OP_RUN = [
         let min = required;
         let max = rest || key || allow_other_keys ? false : required + optional;
         if (n < required) {
-            error(`XARGS: Expecting at least ${min} arguments`);
+            error(`${dump(m.fn_name('XARGS'))}: Expecting at least ${min} arguments`);
         }
         if (max !== false && n > max) {
-            error(`XARGS: Expecting at most ${max} arguments`);
+            error(`${dump(m.fn_name('XARGS'))}: Expecting at most ${max} arguments`);
         }
         let frame = new Array(frame_len).fill(false);
         let stack = m.stack.pop_frame(n);
@@ -1899,7 +1903,7 @@ let OP_RUN = [
             }
             if (kl) {
                 if ((n - i) & 1) {
-                    error("XARGS: Uneven number of &key arguments");
+                    error(`${dump(m.fn_name('XARGS'))}: Odd number of &key arguments`);
                 }
                 let unknown = false, s_aok_seen = false;
                 for (let s = i; s < n; s += 2) {
