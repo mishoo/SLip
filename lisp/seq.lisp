@@ -7,7 +7,7 @@
           substitute substitute-if substitute-if-not
           nsubstitute nsubstitute-if nsubstitute-if-not
           remove-duplicates delete-duplicates
-          subseq concatenate))
+          subseq concatenate map))
 
 (defpackage :sl-seq
   (:use :sl :%))
@@ -319,3 +319,36 @@
              do (assert (zerop (length seq))
                         "CONCATENATE: non-empty sequence with NULL output type"))
        nil))))
+
+;; XXX: in terms of performance, this is, of course, horrible.
+(defun map (result-type function &rest sequences)
+  (when (consp result-type)
+    (setf result-type (car result-type)))
+  (let ((iterators (mapcar #'seq-iterator sequences)))
+    (macrolet ((doit (add)
+                 `(tagbody
+                   :next
+                     (loop for args = (loop for it in iterators
+                                            for arg = (funcall it)
+                                            if (eq arg +no-value+) do (go :end)
+                                            else collect arg)
+                           for val = (apply function args)
+                           do ,add)
+                   :end)))
+      (ecase result-type
+        ((string simple-string)
+         (with-output-to-string (out)
+           (doit (%stream-put out val))))
+        ((array vector simple-vector)
+         (let ((out (make-array 0 :fill-pointer 0 :adjustable t)))
+           (doit (vector-push-extend val out))
+           out))
+        ((list cons)
+         (with-collectors (out)
+           (doit (out val))
+           out))
+        (null
+         (loop for seq in sequences
+               do (assert (zerop (length seq))
+                          "MAP: non-empty sequence with NULL output type"))
+         nil)))))

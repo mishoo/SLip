@@ -2,7 +2,7 @@
 
 (export '(ash byte byte-size byte-position ldb ldb-test dpb logand logandc1
           logandc2 logeqv logior lognand lognor lognot logorc1 logorc2 logxor
-          logtest logcount))
+          logtest logcount integer-length))
 
 (defpackage :sl-byte
   (:use :sl :%))
@@ -227,3 +227,9 @@
                  ,store)               ;Storing form.
               `(ldb ,btemp ,access-form) ;Accessing form.
               ))))
+
+(defun integer-length (integer)
+  (values (ceiling (log (if (minusp integer)
+                            (- integer)
+                            (1+ integer))
+                        2))))

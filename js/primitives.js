@@ -416,15 +416,21 @@ defp("mod", false, function(m, nargs){
     [ "tan", Math.tan ],
     [ "atan", Math.atan ],
     [ "exp", Math.exp ],
-    [ "log", Math.log ],
     [ "sqrt", Math.sqrt ]
-
 ].forEach(function(f){
     var func = f[1];
     defp(f[0], false, function(m, nargs){
         checknargs(nargs, 1, 1);
         return func(m.pop_number());
     });
+});
+
+defp("log", false, function(m, nargs){
+    checknargs(nargs, 1, 2);
+    let base = nargs >= 2 ? m.pop_number() : false;
+    let number = m.pop_number();
+    if (base === false) return Math.log(number);
+    return Math.log(number) / Math.log(base);
 });
 
 defp("expt", false, function(m, nargs){
