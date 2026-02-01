@@ -330,7 +330,6 @@
   (let ((iterators (mapcar #'seq-iterator sequences)))
     (macrolet ((doit (add)
                  `(tagbody
-                   :next
                      (loop for args = (loop for it in iterators
                                             for arg = (funcall it)
                                             if (eq arg +no-value+) do (go :end)

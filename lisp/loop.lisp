@@ -115,53 +115,47 @@
               (iskw x (cdr name)))
           (string= (symbol-name x) (symbol-name name)))))
 
-(defun parse-for-in (kind var args)
+(defun parse-for-in (is-on var args)
   (let ((seq (gensym "list"))
         (next nil))
-    (list-add *loop-variables* seq)
-    (list-add *loop-start* `(unless (setf ,seq ,(pop args))
-                              (go $loop-end)))
+    (list-add *loop-variables* `(,seq ,(pop args)))
     (when (iskw (car args) 'by)
       (pop args)
-      (list-add *loop-variables*
-                (setf next (gensym "next")))
-      (list-add *loop-start* `(setf ,next ,(pop args))))
+      (setf next (gensym "next"))
+      (list-add *loop-variables* `(,next ,(pop args))))
     (list-add *loop-body*
-              `(unless (consp (setf ,seq ,(if next
-                                              `(funcall ,next ,seq)
-                                              `(cdr ,seq))))
+              `(unless ,(if is-on `(consp ,seq) seq)
                  (go $loop-end)))
-    (let ((setvar (dsetq var (case kind
-                               ((in :in) `(car ,seq))
-                               ((on :on) seq)))))
-      (list-nconc *loop-start* (copy-list setvar))
-      (list-nconc *loop-body* (copy-list setvar))))
+    (let ((setvar (dsetq var (if is-on seq `(car ,seq)))))
+      (list-nconc *loop-body* setvar))
+    (list-add *loop-iterate*
+              `(setf ,seq ,(if next
+                               `(funcall ,next ,seq)
+                               `(cdr ,seq)))))
   args)
 
 (defun parse-for-across (var args)
   (let ((seq (gensym "array"))
         (index (gensym "index"))
         (length (gensym "length")))
-    (list-nconc *loop-variables* `(,seq (,index 0) ,length))
-    (list-add *loop-start* `(when (zerop (setf ,seq ,(pop args)
-                                               ,length (length ,seq)))
-                              (go $loop-end)))
+    (list-nconc *loop-variables* `((,seq ,(pop args))
+                                   (,index -1)
+                                   (,length (length ,seq))))
+    (list-add *loop-body* `(when (>= (incf ,index) ,length)
+                             (go $loop-end)))
     (let ((setvar (dsetq var `(svref ,seq ,index))))
-      (list-add *loop-body* `(when (>= (incf ,index) ,length)
-                               (go $loop-end)))
-      (list-nconc *loop-start* (copy-list setvar))
-      (list-nconc *loop-body* (copy-list setvar))))
+      (list-nconc *loop-body* setvar)))
   args)
 
 (defun parse-for-equal (var args)
   (let ((init (dsetq var (pop args))))
-    (list-nconc *loop-start* (copy-list init))
     (cond
       ((iskw (car args) 'then)
        (pop args)
-       (list-nconc *loop-body* (dsetq var (pop args))))
+       (list-nconc *loop-start* init)
+       (list-nconc *loop-iterate* (dsetq var (pop args))))
       (t
-       (list-nconc *loop-body* (copy-list init))))
+       (list-nconc *loop-body* init)))
     args))
 
 (defun %check-positive-loop-step (step)
@@ -240,18 +234,17 @@
             (unless step-form
               (error "Downward LOOP requires init form"))))
 
-      (list-add *loop-body*
-                `(setf ,var ,(if step-form
-                                 `(,(if upwards '+ '-) ,var ,step)
-                                 `(,(if upwards '1+ '1-) ,var))))
-
       (when limit-form
         (let ((end-cond `(when (,(if noteq
                                      (if upwards '>= '<=)
                                      (if upwards '> '<)) ,var ,limit)
                            (go $loop-end))))
-          (list-add *loop-start* end-cond)
-          (list-add *loop-body* end-cond)))))
+          (list-add *loop-body* end-cond)))
+
+      (list-add *loop-iterate*
+                `(setf ,var ,(if step-form
+                                 `(,(if upwards '+ '-) ,var ,step)
+                                 `(,(if upwards '1+ '1-) ,var))))))
   args)
 
 (defun parse-for-being-symbols (var args)
@@ -270,11 +263,10 @@
     (setf next (pop args))
     (assert (iskw next '(in of)) "Bad LOOP for-being syntax: ~A" next)
     (push `(find-package ,(pop args)) get-symbols)
-    (list-nconc *loop-variables* `((,index 0) ,length ,symbols ,var))
-    (list-nconc *loop-start* `((setf ,symbols ,(nreverse get-symbols))
-                               (when (zerop (setf ,length (length ,symbols)))
-                                 (go $loop-end))
-                               (setf ,var (svref ,symbols 0))))
+    (list-nconc *loop-variables* `((,index -1)
+                                   (,symbols ,(nreverse get-symbols))
+                                   (,length (length ,symbols))
+                                   ,var))
     (list-nconc *loop-body* `((when (>= (incf ,index) ,length)
                                 (go $loop-end))
                               (setf ,var (svref ,symbols ,index)))))
@@ -307,7 +299,6 @@
          (let ((iter (gensym "hash-iterator"))
                (itval (gensym "hash-current"))
                (hash-form nil)
-               (hash-var (gensym "hash"))
                (vkey nil)
                (vval nil))
            (dig-var)
@@ -319,7 +310,7 @@
              (let* ((args (pop args))
                     (var (cadr args)))
                (dig-var)))
-           (list-nconc *loop-variables* (list iter hash-var))
+           (list-add *loop-variables* `(,iter (hash-iterator ,hash-form)))
            (when vkey (list-add *loop-variables* vkey))
            (when vval (list-add *loop-variables* vval))
            (let ((next-item `((multiple-value-bind ($more $entry) (iterator-next ,iter)
@@ -328,18 +319,14 @@
                                     `((setf ,vkey (svref $entry 0))))
                                 ,@(when vval
                                     `((setf ,vval (svref $entry 1))))))))
-             (list-nconc *loop-start*
-                         `((setf ,hash-var ,hash-form)
-                           (setf ,iter (hash-iterator ,hash-var))
-                           ,@(copy-list next-item)))
-             (list-nconc *loop-body* (copy-list next-item)))))
+             (list-nconc *loop-body* next-item))))
        args))))
 
 (defparser (for as) (var . args)
   (let ((kind (pop args)))
     (cond
       ((iskw kind '(in on))
-       (parse-for-in kind var args))
+       (parse-for-in (iskw kind 'on) var args))
       ((iskw kind '=)
        (parse-for-equal var args))
       ((iskw kind 'across)
@@ -352,21 +339,20 @@
 
 (defparser repeat args
   (let ((count (gensym "repeat")))
-    (list-add *loop-variables* count)
-    (list-add *loop-start* `(when (< (setf ,count (1- ,(pop args))) 0)
-                              (go $loop-end)))
-    (list-add *loop-body* `(when (< (decf ,count) 0) (go $loop-end))))
+    (list-add *loop-variables* `(,count ,(pop args)))
+    (list-add *loop-body* `(when (< (decf ,count) 0)
+                             (go $loop-end))))
   args)
 
 (defparser (do doing) args
   (cond
     ((and args (consp (car args)))
-     (list-add *loop-iterate* (car args))
+     (list-add *loop-body* (car args))
      (apply #'parser (cdr args)))
     (t args)))
 
 (defparser return args
-  (list-add *loop-iterate* `(return-from ,*loop-block-name* ,(pop args)))
+  (list-add *loop-body* `(return-from ,*loop-block-name* ,(pop args)))
   args)
 
 (defparser named args
@@ -426,7 +412,7 @@
          (vars (make-list-collect-vars args))
          (name (cadr vars)))
     (setf args (car vars))
-    (list-add *loop-iterate* `(,name ,form)))
+    (list-add *loop-body* `(,name ,form)))
   args)
 
 (defparser (append appending) args
@@ -435,7 +421,7 @@
          (name (cadr vars))
          (tail (caddr vars)))
     (setf args (car vars))
-    (list-add *loop-iterate* `(,tail (copy-list ,form))))
+    (list-add *loop-body* `(,tail (copy-list ,form))))
   args)
 
 (defparser (nconc nconcing) args
@@ -444,14 +430,14 @@
          (name (cadr vars))
          (tail (caddr vars)))
     (setf args (car vars))
-    (list-add *loop-iterate* `(,tail ,form)))
+    (list-add *loop-body* `(,tail ,form)))
   args)
 
 (defparser (sum summing) args
   (let ((form (pop args))
         (name (maybe-into "sum")))
     (list-add *loop-variables* `(,name 0))
-    (list-add *loop-iterate* `(setf ,name (+ ,name ,form)))
+    (list-add *loop-body* `(setf ,name (+ ,name ,form)))
     (unless (symbol-package name)
       (list-add *loop-finish* name)))
   args)
@@ -460,7 +446,7 @@
   (let ((form (pop args))
         (name (maybe-into "count")))
     (list-add *loop-variables* `(,name 0))
-    (list-add *loop-iterate* `(when ,form (incf ,name)))
+    (list-add *loop-body* `(when ,form (incf ,name)))
     (unless (symbol-package name)
       (list-add *loop-finish* name)))
   args)
@@ -469,9 +455,9 @@
   (let ((form (pop args))
         (name (maybe-into name)))
     (list-add *loop-variables* name)
-    (list-add *loop-iterate* `(setf ,name (if ,name
-                                              (,op ,name ,form)
-                                              ,form)))
+    (list-add *loop-body* `(setf ,name (if ,name
+                                           (,op ,name ,form)
+                                           ,form)))
     (unless (symbol-package name)
       (list-add *loop-finish* name)))
   args)
@@ -490,21 +476,21 @@
 
 (defun parse-conditional (args negated)
   (let ((condition (pop args))
-        (then-body (let* ((loop-iterate (cons nil nil))
-                          (*loop-iterate* loop-iterate))
+        (then-body (let* ((body (cons nil nil))
+                          (*loop-body* body))
                      (setf args (maybe-more-clauses args))
-                     (cdr loop-iterate)))
+                     (cdr body)))
         (else-body (when (iskw (car args) 'else)
-                     (let* ((loop-iterate (cons nil nil))
-                            (*loop-iterate* loop-iterate))
+                     (let* ((body (cons nil nil))
+                            (*loop-body* body))
                        (setf args (maybe-more-clauses (cdr args)))
-                       (cdr loop-iterate)))))
+                       (cdr body)))))
     (let ((form `(if ,(if negated
                           `(not ,condition)
                           condition)
                      (progn ,@then-body)
                      (progn ,@else-body))))
-      (list-add *loop-iterate* form)))
+      (list-add *loop-body* form)))
   args)
 
 (defparser when args
@@ -519,26 +505,26 @@
 (defparser while args
   (let ((condition (pop args)))
     (let ((form `(unless ,condition (go $loop-end))))
-      (list-add *loop-iterate* form)))
+      (list-add *loop-body* form)))
   args)
 
 (defparser until args
   (let ((condition (pop args)))
     (let ((form `(when ,condition (go $loop-end))))
-      (list-add *loop-iterate* form)))
+      (list-add *loop-body* form)))
   args)
 
 (defparser always args
   (let ((form `(unless ,(pop args)
                  (return-from ,*loop-block-name* nil))))
-    (list-add *loop-iterate* form))
+    (list-add *loop-body* form))
   (list-add *loop-finish* t)
   args)
 
 (defparser never args
   (let ((form `(when ,(pop args)
                  (return-from ,*loop-block-name* nil))))
-    (list-add *loop-iterate* form))
+    (list-add *loop-body* form))
   (list-add *loop-finish* t)
   args)
 
@@ -546,7 +532,7 @@
   (let ((form `(let (($obj ,(pop args)))
                  (when $obj
                    (return-from ,*loop-block-name* $obj)))))
-    (list-add *loop-iterate* form))
+    (list-add *loop-body* form))
   args)
 
 ;; Wish CL LOOP had something like this:
@@ -577,11 +563,11 @@
                       (setf name (car name)))
                     (gensym "best"))))
       (list-nconc *loop-variables* (list best name))
-      (list-add *loop-iterate* `(let (($val ,form))
-                                  (when (or (not ,best)
-                                            (,op $val ,best))
-                                    (setf ,best $val
-                                          ,name ,el)))))
+      (list-add *loop-body* `(let (($val ,form))
+                               (when (or (not ,best)
+                                         (,op $val ,best))
+                                 (setf ,best $val
+                                       ,name ,el)))))
     (unless (symbol-package name)
       (list-add *loop-finish* name)))
   args)
@@ -610,8 +596,8 @@
            (tagbody
             ,@(cdr @loop-start)
             $loop-next
-            ,@(cdr @loop-iterate)
             ,@(cdr @loop-body)
+            ,@(cdr @loop-iterate)
               (go $loop-next)
             $loop-end)
            ,@(cdr @loop-finish))))))
