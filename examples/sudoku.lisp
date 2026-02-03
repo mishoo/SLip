@@ -5,15 +5,6 @@
 
 (in-package :sudoku)
 
-(deftype digit ()
-  '(integer 0 16383))
-
-(deftype index ()
-  '(integer 0 80))
-
-(deftype board ()
-  'vector)
-
 (defun sudoku-from-string (str)
   (map 'list (lambda (c)
                (ecase c
@@ -29,26 +20,6 @@
                  (#\9 9)))
        str))
 
-(defun dec-to-digit (dec)
-  (if (zerop dec) 0 (ash 1 (1- dec))))
-
-(defun dec-to-digit (dec)
-  (if (zerop dec) 0 (ash 1 (1- dec))))
-
-(defun digits-to-dec (digits)
-  (if (zerop digits)
-      '()
-      (loop for dec from 1
-            for digit = digits then (ash digit -1)
-            until (zerop digit)
-            when (logtest digit 1) collect dec)))
-
-(defun digit-to-dec (digit)
-  (integer-length digit))
-
-(defun digit-to-char (digit)
-  (aref "0123456789" (digit-to-dec digit)))
-
 (defun block-index (row col)
   (+ (* 3 (floor row 3)) (floor col 3)))
 
@@ -61,11 +32,11 @@
 (defun make-board (&optional contents)
   (typecase contents
     (string
-     (make-array 81 :initial-contents (map 'list #'dec-to-digit (sudoku-from-string contents))))
-    (board
+     (make-array 81 :initial-contents (sudoku-from-string contents)))
+    (vector
      (copy-seq contents))
     (cons
-     (make-array 81 :initial-contents (map 'list #'dec-to-digit contents)))
+     (make-array 81 :initial-contents contents))
     (t
      (make-array 81 :initial-element 0))))
 
@@ -106,7 +77,7 @@
                       for pos = (rc2i row col)
                       for digit = (aref board pos)
                       unless (zerop digit) do
-                      (setf digit (1- (digit-to-dec digit)))
+                      (setf digit (1- digit))
                       (let ((constraint-row (+ 81 digit (* 9 row)))
                             (constraint-col (+ 162 digit (* 9 col)))
                             (constraint-blk (+ 243 digit (* 9 (block-index row col)))))
@@ -138,7 +109,7 @@
     (loop for idx from 0 to 80
           for digit across board
           unless (zerop digit)
-          do (setf (aref b idx) (digit-to-dec digit)))
+          do (setf (aref b idx) digit))
     (concatenate 'list b)))
 
 (defun print-board (board &optional (out t))

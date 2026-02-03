@@ -28,6 +28,8 @@
 
 (in-package #:dlx)
 
+(setf %:*enable-inline* t)
+
 (defparameter *optimize* '(optimize (speed 3) (safety 1) (space 0) (debug 0)))
 
 (defstruct (dlx-node
