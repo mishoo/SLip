@@ -1842,9 +1842,9 @@ defp("%struct", false, function(m, nargs){
     checknargs(nargs, 1);
     let data = [];
     while (--nargs > 0) data[nargs - 1] = m.pop();
-    let struct = m.pop();
-    if (struct !== false) checktype(struct, LispStruct);
-    return new LispStruct(struct, data);
+    let name = m.pop();
+    checktype(name, LispSymbol);
+    return new LispStruct(name, data);
 });
 
 defp("%struct-vector", false, function(m, nargs){
@@ -1852,9 +1852,9 @@ defp("%struct-vector", false, function(m, nargs){
     return checktype(m.pop(), LispStruct).data;
 });
 
-defp("%struct-struct", false, function(m, nargs){
+defp("%struct-name", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return checktype(m.pop(), LispStruct).struct;
+    return checktype(m.pop(), LispStruct).name;
 });
 
 defp("%struct-ref", false, function(m, nargs){
@@ -1866,10 +1866,9 @@ defp("%struct-ref", false, function(m, nargs){
 
 defp("%struct-set", true, function(m, nargs){
     checknargs(nargs, 3, 3);
-    let value = m.pop();
     let index = m.pop_number();
     let struct = checktype(m.pop(), LispStruct);
-    return struct.data[index] = value;
+    return struct.data[index] = m.pop();
 });
 
 defp("%structp", false, function(m, nargs){
@@ -1880,7 +1879,7 @@ defp("%structp", false, function(m, nargs){
 defp("copy-structure", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     let struct = checktype(m.pop(), LispStruct);
-    return new LispStruct(struct.struct, [ ...struct.data ]);
+    return new LispStruct(struct.name, [ ...struct.data ]);
 });
 
 /* -----[ object allocation utils ]----- */

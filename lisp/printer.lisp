@@ -3,8 +3,7 @@
 
 (in-package :sl-print)
 
-(import '(sl-struct::find-structure
-          sl-struct::structure-name
+(import '(sl-struct::structure-name
           sl-struct::structure-slots
           sl-struct::structure-print-object
           sl-struct::structure-print-function

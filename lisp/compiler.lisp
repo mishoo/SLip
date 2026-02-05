@@ -1663,7 +1663,9 @@
                               (%get-symbol-prop name :constant))
                      (let ((val (symbol-value name)))
                        (when (or (numberp val)
-                                 (characterp val))
+                                 (characterp val)
+                                 (symbolp val)
+                                 (stringp val))
                          (gen "CONST" val)))))
                   (t
                    (gen "GVAR" (unknown-variable name env)))))))

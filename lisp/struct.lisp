@@ -9,32 +9,9 @@
 
 ;; (setf %:*enable-inline* t)
 
-(defconstant *structures* (make-hash-table))
-
-(declaim (inline substructp))
-(defun substructp (tgt struct)
-  (if (member tgt (structure-include struct)) t nil))
-
-(declaim (inline structurep))
-(defun structurep (thing &optional name)
-  (cond
-    ((not name) (%structp thing))
-    ((%structp thing)
-     (let ((ctor (%struct-struct thing))
-           (tgt (find-structure name)))
-       (or (eq ctor tgt)
-           (substructp tgt ctor))))))
-
-(declaim (inline assert-struct))
-(defun assert-struct (thing &optional name)
-  (unless (structurep thing name)
-    (if name
-        (error "Expected structure ~S." name)
-        (error "Expected structure."))))
-
 (declaim (inline find-structure))
 (defun find-structure (name &optional (errorp t))
-  (or (gethash name *structures*)
+  (or (%:%get-symbol-prop name '$struct)
       (when errorp
         (error "No such structure ~S." name))))
 
@@ -43,57 +20,64 @@
     ((and (consp name)
           (eq 'quote (car name))
           (symbolp (cadr name))
-          (gethash (cadr name) *structures*))
-     `(gethash ,name *structures*))
+          (%:%get-symbol-prop (cadr name) '$struct))
+     `(%:%get-symbol-prop ,name '$struct))
     (t form)))
 
-(defun structure-of (x)
-  (assert-struct x)
-  (%struct-struct x))
-
 (defun (setf find-structure) (struct name)
-  (setf (gethash name *structures*) struct))
+  (%:%set-symbol-prop name '$struct struct))
 
-(defglobal *structure* nil)
+(declaim (inline substructp))
+(defun substructp (tgt struct)
+  (if (member tgt (structure-include struct)) t nil))
+
+(declaim (inline structurep))
+(defun structurep (thing struct-name)
+  (when (%structp thing)
+    (let ((thing-name (%struct-name thing)))
+      (or (eq thing-name struct-name)
+          (substructp struct-name
+                      (find-structure thing-name))))))
+
+(declaim (inline assert-struct))
+(defun assert-struct (thing name)
+  (assert (structurep thing name)
+          "Expected structure ~S." name))
+
+(defun structure-of (x)
+  (find-structure (%struct-name x)))
+
+(define-compiler-macro structure-of (x)
+  `(find-structure (%struct-name ,x)))
 
 (declaim (inline make-structure))
 (defun make-structure (name &key slots include print-object print-function)
   (when (find-structure name nil)
     (warn "Redefining structure ~S." name))
   (when include
-    (setf include (find-structure include))
-    (setf include (cons include (structure-include include))))
+    (setf include (cons include (structure-include (find-structure include)))))
   (setf (find-structure name)
-        (%struct *structure* name slots include print-object print-function)))
-
-(setf *structure*
-      (make-structure
-       'structure
-       :slots '((:name name :read-only t :type symbol)
-                (:name slots :read-only t :type list)
-                (:name include :read-only t :type symbol)
-                (:name print-object :read-only t :type function)
-                (:name print-function :read-only t :type function))))
+        (vector name slots include print-object print-function)))
 
 (declaim (inline structure-name))
 (defun structure-name (struct)
-  (%struct-ref struct 0))
+  (svref struct 0))
 
 (declaim (inline structure-slots))
 (defun structure-slots (struct)
-  (%struct-ref struct 1))
+  (svref struct 1))
 
 (declaim (inline structure-include))
 (defun structure-include (struct)
-  (%struct-ref struct 2))
+  (svref struct 2))
 
 (declaim (inline structure-print-object))
 (defun structure-print-object (struct)
-  (%struct-ref struct 3))
+  (svref struct 3))
 
 (declaim (inline structure-print-function))
 (defun structure-print-function (struct)
-  (%struct-ref struct 4))
+  (svref struct 4))
 
 (defun parse-slot (args)
   (when (atom args)
@@ -208,15 +192,36 @@
              (let ((idx (prog1 index (incf index)))
                    (name (accessor (getf slot :name))))
                `(progn
+                  ;; getter
                   (declaim (inline ,name))
                   (defun ,name (obj)
                     (assert-struct obj ',struct-name)
                     (%struct-ref obj ,idx))
+
+                  ;; compiler macro will help while I figure out proper inlining
+                  (define-compiler-macro ,name (&whole form obj)
+                    (cond
+                      ((%:safe-atom-p obj)
+                       `(progn
+                          (assert-struct ,obj ',',struct-name)
+                          (%struct-ref ,obj ,,idx)))
+                      (t form)))
+
+                  ;; setter
                   ,@(unless (getf slot :read-only)
                       `((declaim (inline (setf ,name)))
                         (defun (setf ,name) (value obj)
                           (assert-struct obj ',struct-name)
-                          (%struct-set obj ,idx value))))))))
+                          (%struct-set value obj ,idx))
+
+                        ;; setter compiler macro.
+                        (define-compiler-macro (setf ,name) (&whole form value obj)
+                          (cond
+                            ((%:safe-atom-p obj)
+                             `(progn
+                                (assert-struct ,obj ',',struct-name)
+                                (%struct-set ,value ,obj ,,idx)))
+                            (t form)))))))))
         (unless predicate
           (setf predicate (make-symbol (strcat struct-name "-P"))))
         `(progn
@@ -247,7 +252,7 @@
                          (constructor-arglist (insert-defaults parsed slots)))
                     `((declaim (inline ,constructor))
                       (defun ,constructor ,constructor-arglist
-                        (%struct (find-structure ',struct-name)
+                        (%struct ',struct-name
                                  ,@(mapcar (lambda (slot)
                                              (let ((name (getf slot :name)))
                                                (cond
@@ -267,10 +272,10 @@
                                                `(,name ,initform))
                                               (t name))))
                                         slots))
-                      (%struct (find-structure ',struct-name)
+                      (%struct ',struct-name
                                ,@(mapcar (lambda (slot) (getf slot :name)) slots)))))))
            ',struct-name)))))
 
 (defun sl-type:type-of-structure (x)
   ;; we already know it's a struct at this point.
-  (structure-name (%struct-struct x)))
+  (%struct-name x))

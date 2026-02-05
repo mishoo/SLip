@@ -273,8 +273,8 @@ export class LispArray extends Array {
 export class LispStruct {
     static type = "struct";
     static is(x) { return x instanceof LispStruct }
-    constructor(struct, data) {
-        this.struct = struct === false ? this : struct;
+    constructor(name, data) {
+        this.name = name;
         this.data = data;
     }
 }
