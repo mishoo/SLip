@@ -77,7 +77,7 @@
             (*log* log))
         (loop with ok
               for (test name) on (reverse *tests*) by #'cddr
-              for index from 1
+              for index from 0
               for notes = (gethash :notes test)
               for this-slow = (getf notes :slow)
               when (or (and all allp (not match))

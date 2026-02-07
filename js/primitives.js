@@ -145,7 +145,6 @@ function defp(name, seff, func) {
 /// utilities
 
 function error(msg) {
-    console.error(msg);
     throw new LispPrimitiveError(msg);
 };
 

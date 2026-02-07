@@ -298,11 +298,7 @@
 
 (def-pretty-print quote (&rest forms)
   (<< "'")
-  (cond
-    ((consp (car forms))
-     (%pp-list (car forms)))
-    (t
-     (%pp-object (car forms)))))
+  (%pp-object (car forms)))
 
 (def-pretty-print quasiquote (&rest forms)
   (<< "`")
