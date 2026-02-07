@@ -604,10 +604,15 @@ Ymacs_Buffer.newCommands({
             this.cmd("indent_line");
     }),
     sl_get_symbol_completions: function(query) {
-        return LispCons.toArray(MACHINE().eval_string(
-            find_package(this),
-            "(ymacs::exec-list-symbol-completions " + JSON.stringify(query) + ")"
-        ));
+        let pak = find_package(this);
+        let cmpl = MACHINE().eval_string(
+            pak,
+            "(ignore-errors (ymacs::exec-list-symbol-completions " + JSON.stringify(query) + "))"
+        );
+        if (!LispCons.isList(cmpl)) {
+            return [];          // XXX: why's that?
+        }
+        return LispCons.toArray(cmpl);
     },
     sl_compile_file: Ymacs_Interactive(function() {
         var self = this;
@@ -898,6 +903,7 @@ Ymacs_Buffer.newMode("sl_mode", function(){
         var pak = find_in_package(this, this.point());
         if (pak) {
             pak = pak.replace(/^\(in-package\s*/, "(%::find-package '"); // that's a pervert hack
+            pak = `(ignore-errors ${pak})`;
             try {
                 pak = MACHINE().eval_string(false, pak);
             } catch(ex) {

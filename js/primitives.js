@@ -657,21 +657,21 @@ defp("%dump", false, function(m, nargs){
 defp("console.log", true, function(m, nargs){
     var a = [];
     while (nargs-- > 0) a.unshift(m.pop());
-    console.log(a.map(LispMachine.dump).join(" "));
+    console.log(a.map(el => LispMachine.dump(el)).join(" "));
     return false;
 });
 
 defp("console.dir", true, function(m, nargs){
     var a = [];
     while (nargs-- > 0) a.unshift(m.pop());
-    console.log.apply(console, a);
+    console.log(...a);
     return false;
 });
 
 defp("console.error", true, function(m, nargs){
     var a = [];
     while (nargs-- > 0) a.unshift(m.pop());
-    console.error.apply(console, a);
+    console.error(...a);
     return false;
 });
 

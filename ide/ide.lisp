@@ -66,7 +66,7 @@
                         ret))))))))))
 
 (define-handler :read (pak str)
-  (let ((*package* (or (and pak (find-package pak))
+  (let ((*package* (or (and pak (ignore-errors (find-package pak)))
                        *package*)))
     (read1-from-string str)))
 
@@ -75,7 +75,7 @@
     ret))
 
 (define-handler :read-eval (pak str)
-  (let ((*package* (or (and pak (find-package pak))
+  (let ((*package* (or (and pak (ignore-errors (find-package pak)))
                        *package*)))
     (eval (svref (read1-from-string str) 0))))
 
@@ -117,7 +117,7 @@
                                  (number-fixed (/ (- (get-internal-run-time) t1) 1000) 3) " s")))))
 
 (define-handler :eval-string (pak str &optional save)
-  (let ((*package* (or (and pak (find-package pak))
+  (let ((*package* (or (and pak (ignore-errors (find-package pak)))
                        *package*)))
     (let ((val (eval-string str)))
       (when save (save-result val))
@@ -200,20 +200,22 @@
                         #'string<)))
 
 (define-handler :set-package (name)
-  (let ((pak (find-package name)))
+  (let ((pak (ignore-errors (find-package name))))
     (unless pak (error "There's no package named ~S" name))
     (setf *package* (find-package name))))
 
 (define-handler :macroexpand-1
     (package expstring &optional sl-mexp::*expand-compiler-macros*)
-  (let* ((*package* (find-package package))
+  (let* ((*package* (or (ignore-errors (find-package package))
+                        *package*))
          (reader (%:lisp-reader expstring nil))
          (exp (cdr (funcall reader '%:next))))
     (print-object-to-string (macroexpand-1 exp))))
 
 (define-handler :macroexpand-all
     (package expstring &optional sl-mexp::*expand-compiler-macros*)
-  (let* ((*package* (find-package package))
+  (let* ((*package* (or (ignore-errors (find-package package))
+                        *package*))
          (reader (%:lisp-reader expstring nil))
          (exp (cdr (funcall reader '%:next))))
     (print-object-to-string (macroexpand-all exp))))
