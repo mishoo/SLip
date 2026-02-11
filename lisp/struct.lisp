@@ -39,15 +39,11 @@
           (substructp struct-name
                       (find-structure thing-name))))))
 
-(declaim (inline assert-struct))
-(defun assert-struct (thing name)
-  (assert (structurep thing name)
-          "Expected structure ~S." name))
+(defmacro assert-struct (thing name)
+  `(assert (structurep ,thing ',name)
+           "Expected structure ~S." ',name))
 
-(defun structure-of (x)
-  (find-structure (%struct-name x)))
-
-(define-compiler-macro structure-of (x)
+(defmacro structure-of (x)
   `(find-structure (%struct-name ,x)))
 
 (declaim (inline make-structure))
@@ -195,7 +191,7 @@
                   ;; getter
                   (declaim (inline ,name))
                   (defun ,name (obj)
-                    (assert-struct obj ',struct-name)
+                    (assert-struct obj ,struct-name)
                     (%struct-ref obj ,idx))
 
                   ;; compiler macro will help while I figure out proper inlining
@@ -203,7 +199,7 @@
                     (cond
                       ((%:safe-atom-p obj)
                        `(progn
-                          (assert-struct ,obj ',',struct-name)
+                          (assert-struct ,obj ,',struct-name)
                           (%struct-ref ,obj ,,idx)))
                       (t form)))
 
@@ -211,7 +207,7 @@
                   ,@(unless (getf slot :read-only)
                       `((declaim (inline (setf ,name)))
                         (defun (setf ,name) (value obj)
-                          (assert-struct obj ',struct-name)
+                          (assert-struct obj ,struct-name)
                           (%struct-set value obj ,idx))
 
                         ;; setter compiler macro.
@@ -219,7 +215,7 @@
                           (cond
                             ((%:safe-atom-p obj)
                              `(progn
-                                (assert-struct ,obj ',',struct-name)
+                                (assert-struct ,obj ,',struct-name)
                                 (%struct-set ,value ,obj ,,idx)))
                             (t form)))))))))
         (unless predicate
@@ -242,7 +238,7 @@
            ,@(when copier
                `((declaim (inline ,copier))
                  (defun ,copier (obj)
-                   (assert-struct obj ',struct-name)
+                   (assert-struct obj ,struct-name)
                    (copy-structure obj))))
            ,@(when constructor
                (cond

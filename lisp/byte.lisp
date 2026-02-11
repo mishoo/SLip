@@ -202,8 +202,11 @@
             (tmask (ash mask pos)))
        (cond
          ((integerp newbyte)
-          `(logior (logand ,integer ,(lognot tmask))
-                   ,(ash (logand newbyte mask) pos)))
+          (let ((dep (ash (logand newbyte mask) pos)))
+            (if (= (logcount dep) size)
+                `(logior ,integer ,dep)
+                `(logior (logand ,integer ,(lognot tmask))
+                         ,dep))))
          (t
           `(logior (logand ,integer ,(lognot tmask))
                    (ash (logand ,newbyte ,mask) ,pos))))))
