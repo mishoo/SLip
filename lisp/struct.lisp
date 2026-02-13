@@ -232,6 +232,8 @@
            (declaim (inline ,predicate))
            (defun ,predicate (obj)
              (structurep obj ',struct-name))
+           (define-compiler-macro ,predicate (obj)
+             `(structurep ,obj ',',struct-name))
            (deftype ,struct-name ()
              '(satisfies ,predicate))
            ,@(mapcar #'make-slot slots)

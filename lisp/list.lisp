@@ -50,8 +50,9 @@
      (when test
        (error "Both TEST and TEST-NOT are supplied"))
      (setf test (complement test-not)))
-    ((member test *default-test*)
-     (setf test nil)))
+    (test
+     (when (member test *default-test*)
+       (setf test nil))))
   (when (member key *default-key*)
     (setf key nil))
   (if key

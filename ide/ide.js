@@ -517,7 +517,7 @@ Ymacs_Buffer.newCommands({
         var h = self.getq("sl_repl_history");
         if (h[0] != code) {
             h.unshift(code);
-            localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 1000)));
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 5000)));
         }
         self.cmd("goto_char", expr.end);
         self.cmd("sl_repl_prompt");

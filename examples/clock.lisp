@@ -70,7 +70,6 @@
       (save-excursion
        (incf sec0 (ease-elastic anim-pos))
        (right (* sec0 6))
-       (set-thickness 2)
        (without-pen (backward (* r 0.08)))
        (set-thickness 1)
        (set-color "#46d")

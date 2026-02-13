@@ -1096,11 +1096,15 @@ defp("char-upcase", false, function(m, nargs){
     return checktype(m.pop(), LispChar).toUpperCase();
 });
 
-defp("string-capitalize", false, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    return as_string(m.pop()).replace(/\w+/gu, str =>
+function capitalize(str) {
+    return as_string(str).replace(/\w+/gu, str =>
         str.charAt(0).toUpperCase() + str.substr(1).toLowerCase()
     );
+}
+
+defp("string-capitalize", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    return capitalize(m.pop());
 });
 
 defp("string-capitalize-1", false, function(m, nargs){
@@ -1635,6 +1639,26 @@ defp("%get-file-contents", false, function (m, nargs) {
     xhr.open("GET", url, false); // XXX: synchronous is deprecated
     xhr.send(null);
     return xhr.status == 200 ? xhr.responseText : false;
+});
+
+/* -----[ JSON ]----- */
+
+function json_to_lisp(obj) {
+    if (obj == null) return false;
+    if (Array.isArray(obj)) return obj.map(json_to_lisp);
+    if (typeof obj === "object") {
+        return new LispHash(
+            Object.entries(obj).map(([ key, val ]) =>
+                [ key, json_to_lisp(val) ]));
+    }
+    return obj;
+}
+
+defp("json-parse", false, function(m, nargs) {
+    checknargs(nargs, 1, 1);
+    let string = checktype(m.pop(), LispString);
+    let obj = JSON.parse(string);
+    return json_to_lisp(obj);
 });
 
 /* -----[ local storage ]----- */
@@ -2951,9 +2975,20 @@ defp("%text-output-stream-p", false, function(m, nargs){
 });
 
 defp("%http-input-stream", true, async function(m, nargs){
-    checknargs(nargs, 1, 2);
+    checknargs(nargs, 1, 3);
+    let headers = nargs > 2 ? m.pop() : false;
     let binary = nargs > 1 ? m.pop() : false;
     let url = checktype(m.pop(), LispString);
+    let options = {};
+
+    if (headers) {
+        let p = checktype(headers, LispCons);
+        options.headers = {};
+        while (p) {
+            options.headers[capitalize(p.car)] = checktype(p.cdr, LispCons).car;
+            p = checktype(p.cdr.cdr, LispList);
+        }
+    }
 
     // Since the primitive is async (always returns a Promise), the
     // LispMachine will automatically pause the process, so we don't
@@ -2963,7 +2998,7 @@ defp("%http-input-stream", true, async function(m, nargs){
     // function. Note the emphasis on *after* — process.resume() kicks
     // in immediately, not async.
     try {
-        let response = await fetch(url);
+        let response = await fetch(url, options);
         if (response.ok) {
             let body = response.body;
             let stream = binary ? new LispReaderInputStream(body) : new LispTextReaderInputStream(body);

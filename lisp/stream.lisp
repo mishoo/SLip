@@ -104,8 +104,8 @@
 (defun file-position (stream &optional position)
   (%stream-pos stream position))
 
-(defun open-url (url &optional binary)
-  (%:%http-input-stream url binary))
+(defun open-url (url &key binary headers)
+  (%:%http-input-stream url binary headers))
 
 (defun finish-output (&optional (output-stream *standard-output*))
   ;; XXX: implement this.

@@ -103,7 +103,7 @@ export const OP = {
     FJUMPK: 79,
     VALUES: 80,
     MVB: 81,
-    POPBACK: 82,
+    POPBACK: 82,                // XXX: unused
     ADD: 83,
     SUB: 84,
     INC: 85,
@@ -124,7 +124,9 @@ export const OP = {
     BASH: 100,
     BCNT: 101,
     BNOT: 102,
-    CASE: 103,
+    LDB: 103,
+    DPB: 104,
+    CASE: 105,
 };
 
 const OP_LEN = [
@@ -231,6 +233,8 @@ const OP_LEN = [
     0 /* BASH */,
     0 /* BCNT */,
     0 /* BNOT */,
+    2 /* LDB */,
+    2 /* DPB */,
     1 /* CASE */,
 ];
 
@@ -468,6 +472,17 @@ var optimize = (function(){
                 code.splice(i + 1, len);
                 return true;
             }
+        }
+        if (i + 3 < code.length
+            && code[i][0] == "CONST"
+            && typeof code[i][1] == "number"
+            && code[i][1] < 0
+            && code[i+1][0] == "BASH"
+            && code[i+2][0] == "CONST"
+            && code[i+3][0] == "BAND")
+        {
+            code.splice(i, 4, [ "LDB", -code[i][1], code[i+2][1] ]);
+            return true;
         }
         switch (el[0]) {
           case "VARS":
@@ -901,6 +916,7 @@ function dump(thing, dumped = new Map()) {
         if (thing === false) return "NIL";
         if (thing === true) return "T";
         if (typeof thing === "string") return JSON.stringify(LispChar.sanitize(thing));
+        if (thing instanceof RegExp) return "#" + thing;
         if (LispSymbol.is(thing)) {
             if (thing.pak === KEYWORD_PACK) return ":" + thing.name;
             if (thing.pak && thing.pak !== LispPackage.BASE_PACK)
@@ -1566,7 +1582,7 @@ let OP_RUN = [
         name.function = m.top();
     },
     /*OP.POP*/ (m) => {
-        m.pop();
+        --m.stack.sp;
     },
     /*OP.CONST*/ (m) => {
         let val = m.code[m.pc++];
@@ -1982,12 +1998,7 @@ let OP_RUN = [
         frame.length = n;
     },
     /*OP.POPBACK*/ (m) => {
-        let n = m.code[m.pc++];
-        if (n < 0) {
-            m.stack.push(m.stack.remove(n));
-        } else {
-            m.stack.replace(-n-1, m.stack.pop_ret());
-        }
+        // XXX: unused.
     },
     /*OP.ADD*/ (m) => {
         m.push(m.pop_number() + m.pop_number());
@@ -2087,6 +2098,18 @@ let OP_RUN = [
     /*OP.BNOT*/ (m) => {
         m.push(~m.pop_integer());
     },
+    /*OP.LDB*/ (m) => {
+        let shift = m.code[m.pc++];
+        let mask = m.code[m.pc++];
+        m.push((m.pop_integer() >> shift) & mask);
+    },
+    /*OP.DPB*/ (m) => {
+        let shift = m.code[m.pc++];
+        let mask = m.code[m.pc++];
+        let integer = m.pop_integer();
+        let newbyte = m.pop_integer();
+        m.push((integer & ~(mask << shift)) | ((newbyte & mask) << shift));
+    },
     /*OP.CASE*/ (m) => {
         let jumptable = m.code[m.pc++];
         let cases = m.pop();
@@ -2101,5 +2124,5 @@ let OP_RUN = [
 ];
 
 function vmrun(m) {
-    OP_RUN[m.code[m.pc++]](m);
+    return OP_RUN[m.code[m.pc++]](m);
 }

@@ -1,3 +1,7 @@
+;;; XXX: inlining structure accessors and disabling type checking
+(setf %:*enable-inline* t)
+(defmacro sl-struct::assert-struct (_thing _name))
+
 (load "lib/dlx.lisp")
 
 (defpackage :sudoku

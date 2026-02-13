@@ -7,7 +7,7 @@ export class Values {
     }
 }
 
-export function value(el) {
+function value(el) {
     return el instanceof Values ? el.one_value : el;
 }
 
@@ -38,20 +38,10 @@ export class LispStack {
             throw new LispPrimitiveError("top() with an empty stack");
         }
     }
-    at(index) {
-        if (index < 0) index += this.sp;
-        return value(this.data.at(index));
-    }
     replace(index, newval) {
         if (index < 0) index += this.sp;
         let val = value(this.data[index]);
         this.data[index] = newval;
-        return val;
-    }
-    remove(index) {
-        if (index < 0) index += this.sp;
-        let val = this.data[index];
-        this.data.copyWithin(index, index + 1, this.sp--);
         return val;
     }
     push(val) {

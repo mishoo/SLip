@@ -1,5 +1,10 @@
+;;; XXX: inlining structure accessors and disabling type checking
+(setf %:*enable-inline* t)
+(defmacro sl-struct::assert-struct (_thing _name))
+
 (load "lib/queen.lisp")
 (load "lib/dom.lisp")
+(load "lib/datetime.lisp")
 
 (defpackage :pgn-viewer
   (:use :sl)
@@ -763,6 +768,21 @@
 
 (defun lichess (&optional (user "vlbz"))
   (display-game (sl-stream:open-url (format nil "https://lichess.org/api/games/user/~A?max=1" user))))
+
+(defun lichess-game (game-id)
+  (display-game (sl-stream:open-url (format nil "https://lichess.org/game/export/~A" game-id))))
+
+(defun lichess-test-json (&key (user "vlbz") (max 20))
+  (let ((in
+         (sl-stream:open-url (format nil "https://lichess.org/api/games/user/~A?max=~D&moves=0" user max)
+                             :headers '(:accept "application/x-ndjson"))))
+    (loop for line = (read-line in nil)
+          while line do (format t "~A~%" line))))
+
+(defun lichess-list-user-games (&key (user "vlbz") (count 20))
+  (let* ((cont (dom:from-html "<div class='game-list'></div>"))
+         (dlg (dom:make-dialog 500 600 :content cont)))
+    ))
 
 (defun make-pieces-css ()
   (with-output-to-string (out)

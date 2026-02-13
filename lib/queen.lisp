@@ -1,4 +1,5 @@
-;;;; FILE: package.lisp
+;;;; QUEEN (chess utlities for Common Lisp)
+;;;; https://github.com/mishoo/queen.lisp
 
 (defpackage #:queen
   (:use #:sl)
@@ -96,8 +97,6 @@
 
 (defparameter *queen-read-table* (make-hash-table))
 (setf *read-table* *queen-read-table*)
-
-(setf %:*enable-inline* t)
 
 (defmacro once-only (names . body)
   (let ((gensyms (mapcar (lambda (_) (gensym)) names)))
@@ -510,12 +509,18 @@ by STRING-DESIGNATOR being its first argument."
            (type board-index index))
   (aref board index))
 
+(define-compiler-macro board-get (board index)
+  `(aref ,board ,index))
+
 (defun board-set (board index val)
   (declare (optimize speed)
            (type board board)
            (type board-index index)
            (type piece val))
   (setf (aref board index) val))
+
+(define-compiler-macro board-set (board index val)
+  `(setf (aref ,board ,index) ,val))
 
 (defsetf board-get board-set)
 

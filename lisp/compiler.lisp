@@ -1823,7 +1823,11 @@
              (cond
                ((aif (and (symbolp (car x))
                           (%get-symbol-prop (car x) 'compiler))
-                     (funcall it x env val? more? :compile-expr #'comp)))
+                     (let ((code (funcall it x env val? more? :compile-expr #'comp)))
+                       (if (listp code)
+                           (comp code env val? more?) ;; like define-compiler-macro
+                           code ;; otherwise it's direct assembly
+                           ))))
                ((aif (and (symbolp (car x))
                           (compiler-macro-function (car x)))
                      (let ((form (funcall it x)))
@@ -1845,7 +1849,9 @@
           (comp-seq args env nil t))
          (t
           (%seq (comp-arguments args env)
-                (gen (strcat opname))
+                (if (vectorp opname)
+                    opname
+                    (gen (strcat opname)))
                 (unless more? (gen "RET"))))))
 
      (comp-one-setq (name value env val? more?)
@@ -2731,12 +2737,12 @@
 (defun macroexpand-1 (form &optional (*compiler-env* *compiler-env*))
   (cond
     ((atom form)
-     (or (%:find-symbol-macrolet-in-compiler-env form) form))
+     (or (find-symbol-macrolet-in-compiler-env form) form))
     ((and (eq 'progn (car form))
           (null (cdr form)))
      nil)
     (t
-     (aif (or (%:find-macrolet-in-compiler-env (car form))
+     (aif (or (find-macrolet-in-compiler-env (car form))
               (%macro (car form)))
           (funcall it form)
           form))))
