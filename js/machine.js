@@ -660,11 +660,27 @@ var optimize = (function(){
                     code.splice(i, 1);
                     return true;
                 }
-                if ([ "LRET", "LJUMP" ].includes(code[i+1][0]) && el[2] === 0) {
+                if (el[2] === 0 && [ "LRET", "LJUMP" ].includes(code[i+1][0])) {
                     code[i+1][2] += el[1];
                     code.splice(i, 1);
                     return true;
                 }
+                if ([ "NIL", "T", "CONST", "VALUES", "PRIM", "POP", "CALL", "APPLY",
+                      "CONS", "LIST", "LIST_" ].includes(code[i+1][0])
+                    || /^(?:C[AD]+R)$/.test(code[i+1][0]))
+                {
+                    [ code[i], code[i+1] ] = [ code[i+1], code[i] ];
+                    return true;
+                }
+                if (el[2] === 0 && [ "GVAR" ].includes(code[i+1][0])) {
+                    [ code[i], code[i+1] ] = [ code[i+1], code[i] ];
+                    return true;
+                }
+                // if ([ "LVAR" ].includes(code[i+1][0])) {
+                //     code[i+1][1] += el[1];
+                //     [ code[i], code[i+1] ] = [ code[i+1], code[i] ];
+                //     return true;
+                // }
             }
             break;
         }
@@ -1954,8 +1970,14 @@ let OP_RUN = [
         let j = m.code[m.pc++];
         let fr = frame(m.env, i);
         let lst = fr[j];
-        fr[j] = LispCons.cdr(lst);
-        m.push(LispCons.car(lst));
+        if (lst === false) {
+            m.push(false);
+        } else if (lst instanceof LispCons) {
+            fr[j] = lst.cdr;
+            m.push(lst.car);
+        } else {
+            error(`Expecting cons cell in LPOP`);
+        }
     },
     /*OP.EQ*/ (m) => {
         m.push(eq(m.pop(), m.pop()));
@@ -1964,13 +1986,19 @@ let OP_RUN = [
         let sym = m.code[m.pc++];
         let binding = m.find_dvar(sym);
         let lst = want_bound(sym, binding.value);
-        m.push(LispCons.car(lst));
-        binding.value = LispCons.cdr(lst);
+        if (lst === false) {
+            m.push(false);
+        } else if (lst instanceof LispCons) {
+            binding.value = lst.cdr;
+            m.push(lst.car);
+        } else {
+            error(`Expecting cons cell in GLPOP`);
+        }
     },
     /*OP.TJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
         if (m.top() === false) {
-            m.pop();
+            --m.stack.sp;
         } else {
             m.pc = addr;
         }
@@ -1978,14 +2006,14 @@ let OP_RUN = [
     /*OP.FJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
         if (m.top() === false) {
-            m.pop();
+            --m.stack.sp;
             m.pc = addr;
         }
     },
     /*OP.VALUES*/ (m) => {
         let nargs = m.code[m.pc++];
         if (nargs === 1) {
-            m.stack.push(m.stack.pop());
+            m.top();            // converts to one_value
         } else {
             m.stack.set_values(nargs);
         }
