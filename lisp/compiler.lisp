@@ -641,9 +641,11 @@
            (let ((reader (and *read-table* (gethash (peek) *read-table*))))
              (cond
                (reader
-                (let ((tok (multiple-value-list
-                            (funcall reader input (next) #'the-reader))))
-                  (if tok (car tok) (read-token))))
+                (multiple-value-bind (token decline)
+                    (funcall reader input (next) #'the-reader)
+                  (if decline
+                      (read-token)
+                      token)))
                (t
                 (case (peek)
                   (#\; (skip-comment) (read-token))
