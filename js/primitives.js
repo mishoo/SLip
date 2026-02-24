@@ -68,7 +68,7 @@ const LispList = {
 };
 
 const LispVector = {
-    is(x) { return LispArray.is(x) ? x.dimensions().length === 1 : Array.isArray(x) },
+    is(x) { return Array.isArray(x) || LispArray.is(x) && x.dimensions().length === 1 },
     type: "array"
 };
 
@@ -752,7 +752,8 @@ defp("make-vector", false, function(m, nargs){
         checktype(fill_pointer, LispInteger);
         if (fill_pointer < n) n = fill_pointer;
     }
-    var a = new Array(n).fill(init);
+    let a = [];
+    for (let i = n; i > 0; --i) a.push(init);
     if (contents) {
         forEach(contents, (value, i) => {
             if (i < n) a[i] = value;
@@ -1863,10 +1864,8 @@ defp("%ls-webdav-save-all", true, function(m, nargs){
 
 defp("%struct", false, function(m, nargs){
     checknargs(nargs, 1);
-    let data = [];
-    while (--nargs > 0) data[nargs - 1] = m.pop();
-    let name = m.pop();
-    checktype(name, LispSymbol);
+    let data = m.pop_frame(nargs - 1);
+    let name = checktype(m.pop(), LispSymbol);
     return new LispStruct(name, data);
 });
 

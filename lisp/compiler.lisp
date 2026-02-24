@@ -208,7 +208,7 @@
 (defvar *standard-input*)
 
 ;; XXX: only for global functions for now, and it's risky if they use globals
-;; which are not special (introduced with defvar or defglobal).
+;; which are not special (introduced with defconstant or defglobal).
 (defparameter *enable-inline* nil)
 
 (defvar *build-count* 0)
@@ -348,8 +348,9 @@
                     (cond
                       ((cdaar cases)
                        (when errorp
-                         (foreach (caar cases) (lambda (x)
-                                                 (push x exps))))
+                         (foreach (caar cases)
+                           (lambda (x)
+                             (push x exps))))
                        `(if (%memq ,vexpr ',(caar cases))
                             (progn ,@(cdar cases))
                             ,(recur (cdr cases))))
@@ -1355,11 +1356,15 @@
     ((eq value 0) t)
     (t `(= 0 ,value))))
 
-(define-compiler-macro eq (&whole form a b)
-  (cond
-    ((not a) `(not ,b))
-    ((not b) `(not ,a))
-    (t form)))
+(flet ((eq-cm (form a b)
+         (cond
+           ((not a) `(not ,b))
+           ((not b) `(not ,a))
+           (t form))))
+  (define-compiler-macro eq (&whole form a b)
+    (eq-cm form a b))
+  (define-compiler-macro eql (&whole form a b)
+    (eq-cm form a b)))
 
 (define-compiler-macro endp (lst)
   `(not ,lst))
@@ -1889,9 +1894,10 @@
                                   (value (cadr exps)))
                               (<< (comp value env t t))
                               (rec (cddr exps) (cons name ret)))))))
-           (foreach names (lambda (name)
-                            (<< (gen-set name env)
-                                (gen "POP")))))
+           (foreach names
+             (lambda (name)
+               (<< (gen-set name env)
+                   (gen "POP")))))
          (<< (comp-const nil val? more?))))
 
      (comp-const (x val? more?)
@@ -2027,10 +2033,11 @@
              ((with-extenv (:tags (as-vector tags) :lex (vector (list tbody :tagbody)))
                 (<< (gen "BLOCK"))           ; define the tagbody entry
                 (let ((*tagbody-dynest* 0))
-                  (foreach forms (lambda (x)
-                                   (if (atom x)
-                                       (<< (vector (cadddr (pop tags)))) ; label
-                                       (<< (comp x env nil t))))))
+                  (foreach forms
+                    (lambda (x)
+                      (if (atom x)
+                          (<< (vector (cadddr (pop tags)))) ; label
+                          (<< (comp x env nil t))))))
                 (when val? (<< (gen "NIL"))) ; tagbody returns NIL
                 (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
                 (unless more? (<< (gen "RET")))))))))
@@ -2353,19 +2360,20 @@
 
      (get-bindings (bindings vars?)
        (let (names vals)
-         (foreach bindings (lambda (x)
-                             (if (consp x)
-                                 (progn (push (if vars? (cadr x) (cdr x)) vals)
-                                        (setq x (car x)))
-                                 (if vars?
-                                     (push nil vals)
-                                     (error/wp "Malformed LABELS/FLET/MACROLET")))
-                             (unless vars?
-                               (setq x (function-name x)))
-                             (when (and (not vars?)
-                                        (%memq x names))
-                               (error/wp "Duplicate name in LABELS/FLET/MACROLET"))
-                             (push x names)))
+         (foreach bindings
+           (lambda (x)
+             (if (consp x)
+                 (progn (push (if vars? (cadr x) (cdr x)) vals)
+                        (setq x (car x)))
+                 (if vars?
+                     (push nil vals)
+                     (error/wp "Malformed LABELS/FLET/MACROLET")))
+             (unless vars?
+               (setq x (function-name x)))
+             (when (and (not vars?)
+                        (%memq x names))
+               (error/wp "Duplicate name in LABELS/FLET/MACROLET"))
+             (push x names)))
          (list (nreverse names) (nreverse vals))))
 
      (comp-flets (bindings body env labels? val? more?)

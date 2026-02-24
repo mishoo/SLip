@@ -3,7 +3,7 @@ import { LispMachine,
          STATUS_WAITING,
          STATUS_LOCKED,
          STATUS_HALTED,
-         LispRet,
+         LispRetNoVal,
        } from "./machine.js";
 import { LispCons } from "./list.js";
 import { LispPrimitiveError } from "./error.js";
@@ -682,7 +682,7 @@ export class LispProcess {
             if (!tt) {
                 LispProcess.timer_thread = new LispProcess(new LispMachine(), closure);
             } else {
-                tt.m.push(new LispRet(tt.m, tt.m.pc, true));
+                tt.m.push(new LispRetNoVal(tt.m, tt.m.pc));
                 tt.m.n_args = 0;
                 tt.m._callnext(closure);
                 tt.resume();

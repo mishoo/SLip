@@ -245,13 +245,12 @@ export function want_bound(name, val) {
 
 // normal RET context
 export class LispRet {
-    constructor(m, pc, noretval) {
+    constructor(m, pc) {
         this.f = m.f;
         this.code = m.code;
         this.pc = pc;
         this.env = m.env;
         this.denv = m.denv;
-        this.noretval = noretval;
         //if (m.trace) this.trace = m.trace.slice();
     }
     run(m, retval) {
@@ -260,10 +259,18 @@ export class LispRet {
         m.pc = this.pc;
         m.env = this.env;
         m.denv = this.denv;
-        if (!this.noretval) {
-            m.push(retval);
-        }
+        m.push(retval);
         //if (this.trace) m.trace = this.trace;
+    }
+}
+
+export class LispRetNoVal extends LispRet {
+    run(m) {
+        m.f = this.f;
+        m.code = this.code;
+        m.pc = this.pc;
+        m.env = this.env;
+        m.denv = this.denv;
     }
 }
 
@@ -1433,7 +1440,7 @@ export class LispMachine {
         //var save_trace = this.trace;
         this.code = closure.code;
         this.env = closure.env;
-        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
+        this.stack = new LispStack().restore([ this.mkret(-1) ].concat(args));
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
@@ -1481,7 +1488,7 @@ export class LispMachine {
     }
 
     set_closure(closure, ...args) {
-        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
+        this.stack = new LispStack().restore([ this.mkret(-1) ].concat(args));
         this.code = closure.code;
         this.env = closure.env;
         this.n_args = args.length;

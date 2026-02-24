@@ -250,7 +250,7 @@
   `(eql nil))
 
 (deftype boolean ()
-  `(or (eql t) (eql nil)))
+  `(or (eql t) null))
 
 (deftype mod (n)
   `(integer 0 ,(1- n)))
