@@ -36,17 +36,17 @@
      getf gethash go hash-copy hash-iterator hash-keys hash-table hash-table-p
      hash-values identity if ignore import in-package incf integer integerp
      intern it iterator-next keywordp labels lambda lambda-list-keywords last
-     length let let* letterp list list* listp load locally log macroexpand
-     macroexpand-1 macrolet make-array make-hash make-list make-package
-     make-regexp make-symbol make-thread make-vector makunbound mapc mapcar
-     mapcan maplist max member min minusp mod most-negative-fixnum
+     length let let* letterp list list* listp load locally log macro-function
+     macroexpand macroexpand-1 macrolet make-array make-hash make-list
+     make-package make-regexp make-symbol make-thread make-vector makunbound
+     mapc mapcar mapcan maplist max member min minusp mod most-negative-fixnum
      most-positive-fixnum multiple-value-bind multiple-value-call
      multiple-value-list multiple-value-prog1 multiple-value-setq name-char
      nconc nil not notany notevery nreconc nreverse nth nthcdr null endp
      number-fixed number-string number numberp oddp optimize or otherwise
-     package-name package packagep parse-integer parse-number pi plusp pop prog
-     prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
-     quote-regexp random regexp regexp-exec regexp-test regexpp remhash
+     package-name package packagep parse-integer parse-number pi plusp pop
+     prog prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote
+     quote quote-regexp random regexp regexp-exec regexp-test regexpp remhash
      replace-regexp rest return return-from revappend reverse rotatef round
      rplaca rplacd schar second set-timeout setf setq shadow shiftf sin sleep
      some space special speed sqrt standard-object string string-capitalize
@@ -1102,6 +1102,12 @@
                (let (,@store-other-vars)
                  ,@setters
                  ,oldvalue))))))))
+
+(defun macro-function (symbol)
+  (%:%macro symbol))
+
+(defun (setf macro-function) (func symbol)
+  (%:%macro! symbol func))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
 
