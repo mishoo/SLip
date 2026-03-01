@@ -123,8 +123,8 @@
 
 (defpredicate %cons (obj &optional (left '*) (right '*))
   (and (consp obj)
-       (if (eq left '*) t (typep (car obj) left))
-       (if (eq right '*) t (typep (cdr obj) right))))
+       (or (eq left '*) (typep (car obj) left))
+       (or (eq right '*) (typep (cdr obj) right))))
 
 (defun %typep (object typespec)
   (cond
