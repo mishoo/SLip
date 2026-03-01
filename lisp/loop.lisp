@@ -43,7 +43,7 @@
     (let ((parser (gethash (symbol-name sym) *clause-parsers*)))
       (unless parser
         (error "Unknown loop clause ~A" sym))
-      (apply parser (cdr args)))))
+      (funcall parser (cdr args)))))
 
 (defmacro list-add (ls thing)
   `(setf ,ls (setf (cdr ,ls) (cons ,thing nil))))
@@ -322,8 +322,9 @@
              (list-nconc *loop-body* next-item))))
        args))))
 
-(defparser (for as) (var . args)
-  (let ((kind (pop args)))
+(defparser (for as) (args)
+  (let ((var (pop args))
+        (kind (pop args)))
     (cond
       ((iskw kind '(in on))
        (parse-for-in (iskw kind 'on) var args))
@@ -337,43 +338,43 @@
        (parse-for-being var args))
       (t (error "Unknown token in LOOP FOR: ~A" kind)))))
 
-(defparser repeat args
+(defparser repeat (args)
   (let ((count (gensym "repeat")))
     (list-add *loop-variables* `(,count ,(pop args)))
     (list-add *loop-body* `(when (< (decf ,count) 0)
                              (go $loop-end))))
   args)
 
-(defparser (do doing) args
+(defparser (do doing) (args)
   (cond
     ((and args (consp (car args)))
      (list-add *loop-body* (car args))
-     (apply #'parser (cdr args)))
+     (parser (cdr args)))
     (t args)))
 
-(defparser return args
+(defparser return (args)
   (list-add *loop-body* `(return-from ,*loop-block-name* ,(pop args)))
   args)
 
-(defparser named args
+(defparser named (args)
   (setf *loop-block-name* (car args))
   (cdr args))
 
-(defparser finally args
+(defparser finally (args)
   (cond
     ((and args (consp (car args)))
      (list-add *loop-finish* (car args))
-     (apply #'parser (cdr args)))
+     (parser (cdr args)))
     (t args)))
 
-(defparser initially args
+(defparser initially (args)
   (cond
     ((and args (consp (car args)))
      (list-add *loop-start* (car args))
-     (apply #'parser (cdr args)))
+     (parser (cdr args)))
     (t args)))
 
-(defparser with args
+(defparser with (args)
   (let ((variable (pop args))
         (value (when (iskw (car args) '=)
                  (pop args)
@@ -384,7 +385,7 @@
       ;;  ;; XXX: this is incorrect, AND should produce "parallel" bindings, but
       ;;  ;; it's kinda tricky to implement; I won't bother, at the moment, so
       ;;  ;; just recurse and compile it as WITH.
-      ;;  (apply #'parser (cdr args)))
+      ;;  (parser (cdr args)))
       (t
        args))))
 
@@ -407,7 +408,7 @@
                                       *loop-collect*))
            (list args name tail)))))
 
-(defparser (collect collecting) args
+(defparser (collect collecting) (args)
   (let* ((form (pop args))
          (vars (make-list-collect-vars args))
          (name (cadr vars)))
@@ -415,7 +416,7 @@
     (list-add *loop-body* `(,name ,form)))
   args)
 
-(defparser (append appending) args
+(defparser (append appending) (args)
   (let* ((form (pop args))
          (vars (make-list-collect-vars args))
          (name (cadr vars))
@@ -424,7 +425,7 @@
     (list-add *loop-body* `(,tail (copy-list ,form))))
   args)
 
-(defparser (nconc nconcing) args
+(defparser (nconc nconcing) (args)
   (let* ((form (pop args))
          (vars (make-list-collect-vars args))
          (name (cadr vars))
@@ -433,7 +434,7 @@
     (list-add *loop-body* `(,tail ,form)))
   args)
 
-(defparser (sum summing) args
+(defparser (sum summing) (args)
   (let ((form (pop args))
         (name (maybe-into "sum")))
     (list-add *loop-variables* `(,name 0))
@@ -442,7 +443,7 @@
       (list-add *loop-finish* name)))
   args)
 
-(defparser (count counting) args
+(defparser (count counting) (args)
   (let ((form (pop args))
         (name (maybe-into "count")))
     (list-add *loop-variables* `(,name 0))
@@ -462,10 +463,10 @@
       (list-add *loop-finish* name)))
   args)
 
-(defparser (maximize maximizing) args
+(defparser (maximize maximizing) (args)
   (extremizing "max" 'max args))
 
-(defparser (minimize minimizing) args
+(defparser (minimize minimizing) (args)
   (extremizing "min" 'min args))
 
 (defun maybe-more-clauses (args)
@@ -493,42 +494,42 @@
       (list-add *loop-body* form)))
   args)
 
-(defparser when args
+(defparser when (args)
   (parse-conditional args nil))
 
-(defparser unless args
+(defparser unless (args)
   (parse-conditional args t))
 
-(defparser if args
+(defparser if (args)
   (parse-conditional args nil))
 
-(defparser while args
+(defparser while (args)
   (let ((condition (pop args)))
     (let ((form `(unless ,condition (go $loop-end))))
       (list-add *loop-body* form)))
   args)
 
-(defparser until args
+(defparser until (args)
   (let ((condition (pop args)))
     (let ((form `(when ,condition (go $loop-end))))
       (list-add *loop-body* form)))
   args)
 
-(defparser always args
+(defparser always (args)
   (let ((form `(unless ,(pop args)
                  (return-from ,*loop-block-name* nil))))
     (list-add *loop-body* form))
   (list-add *loop-finish* t)
   args)
 
-(defparser never args
+(defparser never (args)
   (let ((form `(when ,(pop args)
                  (return-from ,*loop-block-name* nil))))
     (list-add *loop-body* form))
   (list-add *loop-finish* t)
   args)
 
-(defparser thereis args
+(defparser thereis (args)
   (let ((form `(let (($obj ,(pop args)))
                  (when $obj
                    (return-from ,*loop-block-name* $obj)))))
@@ -544,7 +545,7 @@
 ;;         finally (return (list best-el best-val)))
 ;;
 ;; Let's just do it, it's simple:
-(defparser find args
+(defparser find (args)
   (when (iskw (car args) 'the)
     (pop args))
   (let ((el (pop args))

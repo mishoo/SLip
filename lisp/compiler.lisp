@@ -251,55 +251,67 @@
       `(%pop ,name)
       (error "POP: we don't have POP yet")))
 
-(defun map1 (func lst)
-  (let rec ((ret nil) (lst lst))
-    (if lst
-        (rec (cons (funcall func (pop lst)) ret)
-             lst)
-        (nreverse ret))))
-
-(defun map1-vector (func lst)
-  (let ((ret (vector)))
-    (let rec ((lst lst))
-      (if lst (progn
-                (%vector-push ret (funcall func (pop lst)))
-                (rec lst))
-          ret))))
-
-(defun map2-vector (func lst1 lst2)
-  (let ((ret (vector)))
-    (let rec ((lst1 lst1)
-              (lst2 lst2))
-      (if (and lst1 lst2)
-          (progn
-            (%vector-push ret (funcall func (pop lst1) (pop lst2)))
-            (rec lst1 lst2))
-          ret))))
-
-(defun map2 (func lst1 lst2)
-  (let rec ((ret nil) (lst1 lst1) (lst2 lst2))
-    (if (and lst1 lst2)
-        (rec (cons (funcall func (pop lst1) (pop lst2)) ret)
-             lst1 lst2)
-        (nreverse ret))))
-
-(defun foreach (lst func)
-  (let rec ((lst lst))
-    (when lst
-      (funcall func (pop lst))
-      (rec lst))))
-
-(defun foreach-index (lst func)
-  (let rec ((lst lst) (index 0))
-    (when lst
-      (funcall func (pop lst) index)
-      (rec lst (1+ index)))))
-
 (defmacro incf (var)
   `(setq ,var (1+ ,var)))
 
 (defmacro decf (var)
   `(setq ,var (1- ,var)))
+
+(defmacro push (obj place)
+  `(setq ,place (cons ,obj ,place)))
+
+(defun map1 (func lst)
+  (let ((ret '()))
+    (tagbody
+     :next
+       (when lst
+         (push (funcall func (pop lst)) ret)
+         (go :next)))
+    (nreverse ret)))
+
+(defun map2 (func lst1 lst2)
+  (let ((ret '()))
+    (tagbody
+     :next
+       (when (and lst1 lst2)
+         (push (funcall func (pop lst1) (pop lst2)) ret)
+         (go :next)))
+    (nreverse ret)))
+
+(defun map1-vector (func lst)
+  (let ((ret (vector)))
+    (tagbody
+     :next
+       (when lst
+         (vector-push (funcall func (pop lst))
+                      ret)
+         (go :next)))
+    ret))
+
+(defun map2-vector (func lst1 lst2)
+  (let ((ret (vector)))
+    (tagbody
+     :next
+       (when (and lst1 lst2)
+         (vector-push (funcall func (pop lst1) (pop lst2))
+                      ret)
+         (go :next)))
+    ret))
+
+(defun foreach (lst func)
+  (tagbody
+   :next
+     (when lst
+       (funcall func (pop lst))
+       (go :next))))
+
+(defun foreach-index (lst func)
+  (let ((index -1))
+    (tagbody
+     :next
+       (when lst
+         (funcall func (pop lst) (incf index))
+         (go :next)))))
 
 (defun identity (x) x)
 
@@ -384,9 +396,6 @@
 (defmacro aif (cond . rest)
   `(let ((it ,cond))
      (if it ,@rest)))
-
-(defmacro push (obj place)
-  `(setq ,place (cons ,obj ,place)))
 
 (defconstant +keyword-package+ (find-package "KEYWORD"))
 
