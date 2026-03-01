@@ -83,7 +83,7 @@ const LispNumber = {
 };
 
 const LispInteger = {
-    is: function(x) { return typeof x == "number" && Math.floor(x) == x },
+    is: function(x) { return Number.isInteger(x) },
     type: "integer"
 };
 
