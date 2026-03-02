@@ -329,12 +329,12 @@
 (defun map (result-type function &rest sequences)
   (let ((iterators (mapcar #'seq-iterator sequences)))
     (macrolet ((doit (add)
-                 `(tagbody
-                     (loop for args = (loop for it in iterators
-                                            for arg = (funcall it)
-                                            if (eq arg +no-value+) do (go :end)
-                                            else collect arg)
-                           for val = (apply function args)
-                           do ,add)
-                   :end)))
+                 `(loop named outer
+                        for args = (loop for it in iterators
+                                         for arg = (funcall it)
+                                         if (eq arg +no-value+)
+                                         do (return-from outer nil)
+                                         else collect arg)
+                        for val = (apply function args)
+                        do ,add)))
       (concafrob))))
