@@ -472,13 +472,16 @@
                  `(,(car form) ,@temps)))))
     ((error (strcat "Invalid SETF place " form)))))
 
+(defun %setf-safe-val (val)
+  (or (safe-atom-p val)
+      (and (consp val)
+           (eq 'quote (car val)))))
+
 (defun %call-default-setter (form value)
   (let ((setter (maybe-setter `(setf ,(car form)))))
     (cond
-      ((or (safe-atom-p value)
-           (and (consp value)
-                (eq 'quote (car value)))
-           (every #'safe-atom-p (cdr form)))
+      ((or (%setf-safe-val value)
+           (every #'%setf-safe-val (cdr form)))
        ;; it's safe to compute the value first.
        `(,setter ,value ,@(cdr form)))
       (t
@@ -502,12 +505,12 @@
             ,(cond
                ((cdr stores)
                 `(multiple-value-bind ,stores ,value ,set))
-               ((safe-atom-p value)
+               ((%setf-safe-val value)
                 `(symbol-macrolet ((,(car stores) ,value)) ,set))
                (t
                 `(let ((,(car stores) ,value)) ,set))))))
       ((let* ((val (%pop vals))
-              (safe? (safe-atom-p val)))
+              (safe? (%setf-safe-val val)))
          (rec (if safe?
                   ;; if safe, we add it to the “simple” list (symbol-macrolet)
                   (cons (list (%pop temps) val) simple)
