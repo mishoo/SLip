@@ -2547,6 +2547,8 @@
        (cond
          ((null bindings)
           (comp-decl-seq body env val? more?))
+         ((null (cdr bindings))
+          (comp-let bindings body env val? more?))
          ((and (null (cdr body))
                (consp (car body))
                (eq 'let* (caar body)))
