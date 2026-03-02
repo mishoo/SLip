@@ -426,7 +426,9 @@
          (croak (msg)
            (when *current-file*
              (setq *current-pos* (%stream-line input)))
-           (error/wp (strcat msg ", line: " (%stream-line input) ", col: " (%stream-col input))))
+           (error/wp (strcat msg
+                             ", line: " (%stream-line input)
+                             ", col: " (%stream-col input))))
 
          (skip-ws ()
            (read-while #'whitespacep))
