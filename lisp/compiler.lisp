@@ -2014,7 +2014,7 @@
                    (gen "LRET" label (car block))
                    (gen "LJUMP" label (car block))))))
 
-     (comp-tagbody (forms env val? more?)
+     (comp-tagbody (forms env val? more? &optional no-long-jumps)
        ;; a TAGBODY introduces a single return point in the lexical
        ;; environment; this is necessary because we can jump to a tag
        ;; from a nested environment, so the runtime will need to save
@@ -2024,7 +2024,8 @@
        ;; specified index.
        (with-seq-output <<
          (let ((tags (list nil))
-               (tbody (gensym "tagbody")))
+               (tbody (gensym "tagbody"))
+               (opts (list :long nil)))
            ;; pass 1: fetch tags
            (let rec ((forms forms)
                      (p tags))
@@ -2039,17 +2040,33 @@
              ((null tags)
               (<< (comp-seq forms env nil t)
                   (comp-const nil val? more?)))
-             ((with-extenv (:tags (as-vector tags) :lex (vector (list tbody :tagbody)))
-                (<< (gen "BLOCK"))           ; define the tagbody entry
-                (let ((*tagbody-dynest* 0))
-                  (foreach forms
-                    (lambda (x)
-                      (if (atom x)
-                          (<< (vector (cadddr (pop tags)))) ; label
-                          (<< (comp x env nil t))))))
-                (when val? (<< (gen "NIL"))) ; tagbody returns NIL
-                (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
-                (unless more? (<< (gen "RET")))))))))
+             ((let ((orig-env env)
+                    (frame (vector (list* tbody :tagbody opts))))
+                (when no-long-jumps
+                  (setq frame (cons '%skip-count frame)))
+                (with-extenv (:tags (as-vector tags) :lex frame)
+                  (unless no-long-jumps
+                    (<< (gen "BLOCK")))           ; define the tagbody entry
+                  (let ((*tagbody-dynest* 0))
+                    (foreach forms
+                      (lambda (x)
+                        (if (atom x)
+                            (<< (vector (cadddr (pop tags)))) ; label
+                            (<< (comp x env nil t))))))
+
+                  ;; When no LJUMP has been compiled for this TAGBODY, redo
+                  ;; everything with long jumps disabled. This is a bit ugly
+                  ;; as we start from scratch, but it's easiest to implement
+                  ;; this way.
+                  (when (and (not no-long-jumps)
+                             (not (getf opts :long)))
+                    (return-from comp-tagbody
+                      (comp-tagbody forms orig-env val? more? t)))
+
+                  (when val? (<< (gen "NIL"))) ; tagbody returns NIL
+                  (unless no-long-jumps
+                    (<< (gen "UNFR" 1 0)))        ; pop the tagbody from the env
+                  (unless more? (<< (gen "RET"))))))))))
 
      (comp-go (tag env)
        (let ((pos (find-tag tag env)))
@@ -2061,6 +2078,7 @@
                    (zerop *tagbody-dynest*))
               (gen "JUMP" (cadddr pos)))
              (t
+              (%putf (cddr tbody) :long t)
               (gen "LJUMP" (cadddr pos) i))))))
 
      (comp-if (pred then else env val? more?)
