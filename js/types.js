@@ -552,6 +552,7 @@ class Message {
 
 let PID = 0;
 let QUEUE = new LispQueue();
+const HAS_SCHEDULER = typeof globalThis.scheduler?.postTask === "function";
 
 const start = () => {
     let count = 0, startTime = Date.now(), process, cell;
@@ -595,7 +596,8 @@ const start = () => {
             console.log(process);
         }
     }
-    setTimeout(start, 0);
+    if (HAS_SCHEDULER) scheduler.postTask(start);
+    else setTimeout(start, 0);
 };
 
 export class LispProcess {
