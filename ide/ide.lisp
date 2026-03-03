@@ -51,7 +51,7 @@
        (setf (symbol-function ',name) #',name)
        (setf (gethash ,(symbol-name what) *handlers*)
              (lambda (req-id . ,pass-args)
-               (make-thread
+               (%:%make-thread
                 (lambda ()
                   (%:%catch-all-errors)
                   (block out
@@ -221,7 +221,7 @@
     (print-object-to-string (macroexpand-all exp))))
 
 (defglobal *thread*
-  (make-thread
+  (%:%make-thread
    (lambda ()
      (let ((*package* (find-package :sl-user))
            (*read-table* *read-table*))

@@ -25,7 +25,7 @@
      char-not-greaterp char-not-lessp char/= char< char<= char= char> char>=
      char-upcase char-downcase charp clear-timeout code-char compile
      compiler-macro-function complement cond cons consp constantly copy-list
-     copy-seq copy-tree cos current-thread debug decf declare declaim inline
+     copy-seq copy-tree cos debug decf declare declaim inline
      defconstant defglobal define-compiler-macro define-modify-macro
      define-setf-expander defmacro defpackage defparameter defsetf defun
      defvar destructuring-bind digitp digit-char-p disassemble do do* dolist
@@ -38,7 +38,7 @@
      intern it iterator-next keywordp labels lambda lambda-list-keywords last
      length let let* letterp list list* listp load locally log macro-function
      macroexpand macroexpand-1 macrolet make-array make-hash make-list
-     make-package make-regexp make-symbol make-thread make-vector makunbound
+     make-package make-regexp make-symbol make-vector makunbound
      mapc mapcar mapcan maplist max member min minusp mod most-negative-fixnum
      most-positive-fixnum multiple-value-bind multiple-value-call
      multiple-value-list multiple-value-prog1 multiple-value-setq name-char

@@ -2405,37 +2405,53 @@ defp("%get-package-prop", false, function(m, nargs){
 
 /* -----[ processes ]----- */
 
-defp("make-thread", true, function(m, nargs){
-    checknargs(nargs, 1, 1);
+defp("%make-thread", true, function(m, nargs){
+    checknargs(nargs, 1, 2);
+    var name = nargs > 1 ? m.pop() : false;
     var func = m.pop();
     checktype(func, LispClosure);
-    var p = new LispProcess(m, func);
+    var p = new LispProcess(m, func, name);
     return p;
 });
 
-defp("current-thread", false, function(m, nargs){
+defp("%current-thread", false, function(m, nargs){
     checknargs(nargs, 0, 0);
     return m.process;
 });
 
-defp("make-mutex", true, function(m, nargs){
+defp("%thread-name", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let thread = checktype(m.pop(), LispProcess);
+    return thread.name;
+});
+
+defp("%make-mutex", true, function(m, nargs){
     checknargs(nargs, 0, 1);
-    var name = nargs == 1 ? m.pop() : false;
+    let name = nargs == 1 ? m.pop() : false;
     return new LispMutex(name);
 });
 
-defp("mutex-acquire", true, function(m, nargs){
-    checknargs(nargs, 1, 1);
-    var mutex = m.pop();
+defp("%mutex-acquire", true, function(m, nargs){
+    checknargs(nargs, 1, 2);
+    let timeout = nargs > 1 ? m.pop() : true;
+    let mutex = m.pop();
     checktype(mutex, LispMutex);
-    return mutex.acquire(m.process);
+    return mutex.acquire(m.process, timeout);
 });
 
-defp("mutex-release", true, function(m, nargs){
+defp("%mutex-release", true, function(m, nargs){
+    checknargs(nargs, 1, 2);
+    let force = nargs > 1 ? m.pop() : false;
+    let mutex = m.pop();
+    checktype(mutex, LispMutex);
+    return mutex.release(m.process, force);
+});
+
+defp("%mutex-owner", false, function(m, nargs){
     checknargs(nargs, 1, 1);
     var mutex = m.pop();
     checktype(mutex, LispMutex);
-    return mutex.release();
+    return mutex.locked;
 });
 
 defp("%sendmsg", true, function(m, nargs){

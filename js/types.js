@@ -483,28 +483,52 @@ export class LispMutex {
         this.name = name || false;
         this.waiters = [];
         this.locked = false;
+        this.count = 0;
     }
-    acquire(process) {
-        if (!this.locked) {
-            this.locked = process;
+    acquire(process, timeout) {
+        if (this.locked === process) {
+            ++this.count;
             return process;
-        } else {
-            this.waiters.push(process);
-            process.m.status = STATUS_LOCKED;
+        } else if (!this.locked) {
+            this.locked = process;
+            this.count = 1;
+            return process;
+        } else if (timeout === false) {
             return false;
+        } else {
+            if (!this.waiters.includes(process)) {
+                this.waiters.push(process);
+            }
+            let timer;
+            if (timeout !== true) {
+                timer = setTimeout(() => {
+                    process.resume(false);
+                }, timeout * 1000);
+            }
+            process.lock((got_lock) => {
+                clearTimeout(timer);
+                if (got_lock) {
+                    this.locked = process;
+                    this.count = 1;
+                }
+                process.m.push(got_lock);
+            });
+            return void 0;      // must return undefined
         }
     }
-    release() {
+    release(process, force) {
         if (!this.locked) return false;
-        if (this.waiters.length > 0) {
-            var process = this.waiters.shift();
-            this.locked = process;
-            process.resume();
-            return process;
-        } else {
-            this.locked = false;
-            return true;
+        if (this.locked !== process) {
+            if (!force) return false;
+            console.warn(`Force release mutex by non-owner thread ${process}`);
         }
+        if (--this.count > 0) return true;
+        this.locked = false;
+        this.count = 0;
+        if (this.waiters.length > 0) {
+            this.waiters.shift().resume(true);
+        }
+        return true;
     }
 }
 
@@ -605,23 +629,29 @@ export class LispProcess {
     static is(x) { return x instanceof LispProcess }
     static timer_thread = null;
 
-    constructor(parent_machine, closure) {
+    constructor(parent_machine, closure, name = false) {
         this.pid = ++PID;
         var m = this.m = new LispMachine(parent_machine);
         this.receivers = false;
         this.mailbox = new LispQueue();
         this.noint = false;
         this.catch_all = false;
+        this.name = name;
         m.process = this;
         m.set_closure(closure);
+        this._lock_callback = null;
         this.resume();
     }
 
     toString() {
-        return "#<PROCESS " + this.pid + ">";
+        return `#<THREAD ${this.pid}${this.name ? ' ' + this.name : ''}>`;
     }
 
-    resume() {
+    resume(arg) {
+        if (this._lock_callback) {
+            this._lock_callback(arg);
+            this._lock_callback = null;
+        }
         this.m.status = STATUS_RUNNING;
         QUEUE.push_front(this);
         start();
@@ -629,6 +659,11 @@ export class LispProcess {
 
     pause() {
         this.m.status = STATUS_WAITING;
+    }
+
+    lock(cb) {
+        this._lock_callback = cb;
+        this.m.status = STATUS_LOCKED;
     }
 
     run(quota) {

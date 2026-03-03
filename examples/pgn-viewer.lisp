@@ -527,9 +527,9 @@
                               (format *error-output* "!ERROR: ~A~%" err)))))
                (format *error-output*
                        "Thread exit ~A~%"
-                       (current-thread)))))
+                       (%:%current-thread)))))
 
-        (setf thread (make-thread #'main))))))
+        (setf thread (%:%make-thread #'main))))))
 
 (defun get-header (pgn name &optional default)
   (let* ((headers (getf pgn :headers))

@@ -2800,6 +2800,7 @@
     "lisp/byte.lisp"
     "lisp/hash.lisp"
     "lisp/type.lisp"
+    "lisp/thread.lisp"
     "lisp/macroexpand.lisp"
     "lisp/format.lisp"
     "lisp/struct.lisp"

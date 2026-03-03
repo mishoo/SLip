@@ -104,7 +104,7 @@
 
 (with-canvas
   (let ((iii 0))
-    (make-thread
+    (%:%make-thread
      (lambda ()
        (init-canvas 500 500)
        (hide-turtle)
