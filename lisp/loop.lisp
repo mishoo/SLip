@@ -172,7 +172,6 @@
 
 (defun parse-for-arithmetic (var args)
   (unless var (setf var (gensym "WAT")))
-  (list-add *loop-variables* var)
   (let ((step nil))
     (let* ((init-form nil)
            (step-form nil)
@@ -192,7 +191,7 @@
                     (error "LOOP for: more than one init form ~A" args))
                   (pop args)
                   (setf init-form (pop args))
-                  (list-add *loop-start* `(setf ,var ,init-form))
+                  (list-add *loop-variables* `(,var ,init-form))
                   t)
 
                  ((iskw (car args) '(to upto downto below above))
@@ -208,8 +207,7 @@
                      (setf limit limit-form))
                     (t
                      (setf limit (gensym "limit"))
-                     (list-add *loop-variables* limit)
-                     (list-add *loop-start* `(setf ,limit ,limit-form))))
+                     (list-add *loop-variables* `(,limit ,limit-form))))
                   t)
 
                  ((iskw (car args) 'by)
@@ -222,15 +220,13 @@
                      (setf step step-form))
                     (t
                      (setf step (gensym "step"))
-                     (list-add *loop-variables* step)
-                     (list-add *loop-start*
-                               `(setf ,step ,(check-positive-loop-step step-form)))))
+                     (list-add *loop-variables* `(,step ,(check-positive-loop-step step-form)))))
                   t))))
         (when (dig) (when (dig) (dig))))
 
       (unless init-form
         (if upwards
-            (list-add *loop-start* `(setf ,var 0))
+            (list-add *loop-variables* `(,var 0))
             (unless step-form
               (error "Downward LOOP requires init form"))))
 
