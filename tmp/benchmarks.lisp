@@ -42,7 +42,7 @@
         (setf finished 'done)))))
 
 (defparameter x
-  (loop repeat 3000 collect (random 10000)))
+  (loop repeat 5000 collect (random 10000)))
 
 (defun test-fn (fn &rest args)
   (loop repeat 500 do (apply fn args)))
@@ -61,10 +61,10 @@
   (let ((count 0))
     (tagbody
      :loop
-     (when list
-       (incf count)
-       (setf list (cdr list))
-       (go :loop)))
+       (when list
+         (setf list (cdr list))
+         (incf count)
+         (go :loop)))
     count))
 
 (defun len3 (list)

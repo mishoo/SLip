@@ -25,40 +25,39 @@
      char-not-greaterp char-not-lessp char/= char< char<= char= char> char>=
      char-upcase char-downcase charp clear-timeout code-char compile
      compiler-macro-function complement cond cons consp constantly copy-list
-     copy-seq copy-tree cos debug decf declare declaim inline
-     defconstant defglobal define-compiler-macro define-modify-macro
-     define-setf-expander defmacro defpackage defparameter defsetf defun
-     defvar destructuring-bind digitp digit-char-p disassemble do do* dolist
-     dotimes downcase ecase elt eq eql equal equalp error eval evenp every exp
-     export expt fboundp fdefinition fifth find-package find-symbol first
-     fixnum flet float floatp floor fmakunbound foreach fourth funcall
-     function functionp gensym get get-internal-run-time get-setf-expansion
-     getf gethash go hash-copy hash-iterator hash-keys hash-table hash-table-p
-     hash-values identity if ignore import in-package incf integer integerp
-     intern it iterator-next keywordp labels lambda lambda-list-keywords last
-     length let let* letterp list list* listp load locally log macro-function
-     macroexpand macroexpand-1 macrolet make-array make-hash make-list
-     make-package make-regexp make-symbol make-vector makunbound
-     mapc mapcar mapcan maplist max member min minusp mod most-negative-fixnum
-     most-positive-fixnum multiple-value-bind multiple-value-call
-     multiple-value-list multiple-value-prog1 multiple-value-setq name-char
-     nconc nil not notany notevery nreconc nreverse nth nthcdr null endp
-     number-fixed number-string number numberp oddp optimize or otherwise
-     package-name package packagep parse-integer parse-number pi plusp pop
-     prog prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote
-     quote quote-regexp random regexp regexp-exec regexp-test regexpp remhash
-     replace-regexp rest return return-from revappend reverse rotatef round
-     rplaca rplacd schar second set-timeout setf setq shadow shiftf sin sleep
-     some space special speed sqrt standard-object string string-capitalize
-     string-downcase string-equal string-greaterp string-lessp
-     string-not-equal string-not-greaterp string-not-lessp string-upcase
-     string/= string< string<= string= string> string>= stringp structure
-     svref sxhash symbol symbol-function symbol-macrolet symbol-name
-     symbol-package symbol-plist symbol-value symbolp t tagbody tan third
-     thread threadp throw type type-of typep unintern unless unsigned-byte
-     unwind-protect upcase use-package values values-list vector vector-pop
-     vector-push vectorp warn when with-output-to-string without-interrupts
-     zerop λ
+     copy-seq copy-tree cos debug decf declare declaim inline defconstant
+     defglobal define-compiler-macro define-modify-macro define-setf-expander
+     defmacro defpackage defparameter defsetf defun defvar destructuring-bind
+     digitp digit-char-p disassemble do do* dolist dotimes downcase ecase elt
+     eq eql equal equalp error eval evenp every exp export expt fboundp
+     fdefinition fifth find-package find-symbol first fixnum flet float floatp
+     floor fmakunbound foreach fourth funcall function functionp gensym get
+     get-internal-run-time get-setf-expansion getf gethash go hash-copy
+     hash-iterator hash-keys hash-table hash-table-p hash-values identity if
+     ignore import in-package incf integer integerp intern it iterator-next
+     keywordp labels lambda lambda-list-keywords last length let let* letterp
+     list list* listp load locally log macro-function macroexpand
+     macroexpand-1 macrolet make-array make-hash make-list make-package
+     make-regexp make-symbol make-vector makunbound mapc mapcar mapcan maplist
+     max member min minusp mod most-negative-fixnum most-positive-fixnum
+     multiple-value-bind multiple-value-call multiple-value-list
+     multiple-value-prog1 multiple-value-setq name-char nconc nil not notany
+     notevery nreconc nreverse nth nthcdr null endp number-fixed number-string
+     number numberp oddp optimize or otherwise package-name package packagep
+     parse-integer parse-number pi plusp pop prog prog* prog1 prog2 progn
+     progv psetf psetq push pushnew quasiquote quote quote-regexp random
+     regexp regexp-exec regexp-test regexpp remhash replace-regexp rest return
+     return-from revappend reverse rotatef round rplaca rplacd schar second
+     set-timeout setf setq shadow shiftf sin sleep some space special speed
+     sqrt standard-object string string-capitalize string-downcase
+     string-equal string-greaterp string-lessp string-not-equal
+     string-not-greaterp string-not-lessp string-upcase string/= string<
+     string<= string= string> string>= stringp structure svref sxhash symbol
+     symbol-function symbol-macrolet symbol-name symbol-package symbol-plist
+     symbol-value symbolp t tagbody tan third thread threadp throw type
+     type-of typep unintern unless unsigned-byte unwind-protect upcase
+     use-package values values-list vector vector-pop vector-push vectorp warn
+     when with-output-to-string without-interrupts zerop λ
 
      stream input-stream output-stream text-input-stream text-output-stream
 
@@ -68,9 +67,7 @@
   (export exported main)
   (setq *package* main))
 
-"
-(in-package :sl)
-"
+;; (setq %:*enable-inline* t)
 
 (defmacro assert (test . arguments)
   `(unless ,test (error ,@arguments)))
@@ -129,11 +126,17 @@
 (defmacro in-package (name)
   `(setq *package* (find-package ',name)))
 
+(declaim (inline some1))
 (defun some1 (test list)
-  (let rec ((list list))
-    (when list
-      (or (funcall test (%pop list))
-          (rec list)))))
+  (let (val)
+    (tagbody
+     :next
+       (when list
+         (when (setq val (funcall test (%pop list)))
+           (go :end))
+         (go :next))
+     :end)
+    val))
 
 (defun finished (tails)
   (some1 #'null tails))
@@ -158,20 +161,26 @@
      `(map2 ,func ,@lists))
     (form)))
 
+(declaim (inline mapc1))
 (defun mapc1 (f list)
-  (let rec ((p list))
-    (if (not p) list
-        (progn
-          (funcall f (%pop p))
-          (rec p)))))
+  (let ((p list))
+    (tagbody
+     :next
+       (when p
+         (funcall f (%pop p))
+         (go :next)))
+    list))
 
+(declaim (inline mapc2))
 (defun mapc2 (f list1 list2)
-  (let rec ((p list1)
-            (q list2))
-    (if (not (and p q)) list1
-        (progn
-          (funcall f (%pop p) (%pop q))
-          (rec p q)))))
+  (let ((p list1)
+        (q list2))
+    (tagbody
+     :next
+       (when (and p q)
+         (funcall f (%pop p) (%pop q))
+         (go :next)))
+    list1))
 
 (defun mapc (f . lists)
   (let ((first (car lists)))
@@ -191,19 +200,28 @@
      `(mapc2 ,func ,@lists))
     (form)))
 
+(declaim (inline maplist1))
 (defun maplist1 (func lst)
-  (let rec ((ret nil) (lst lst))
-    (if lst
-        (rec (cons (funcall func lst) ret)
-             (cdr lst))
-        (nreverse ret))))
+  (let ((ret '()))
+    (tagbody
+     :next
+       (when lst
+         (setq ret (cons (funcall func lst) ret)
+               lst (cdr lst))
+         (go :next)))
+    (nreverse ret)))
 
+(declaim (inline maplist2))
 (defun maplist2 (func lst1 lst2)
-  (let rec ((ret nil) (lst1 lst1) (lst2 lst2))
-    (if (and lst1 lst2)
-        (rec (cons (funcall func lst1 lst2) ret)
-             (cdr lst1) (cdr lst2))
-        (nreverse ret))))
+  (let ((ret '()))
+    (tagbody
+     :next
+       (when (and lst1 lst2)
+         (setq ret (cons (funcall func lst1 lst2) ret)
+               lst1 (cdr lst1)
+               lst2 (cdr lst2))
+         (go :next)))
+    (nreverse ret)))
 
 (defun maplist (f . lists)
   (let rec (ret (tails lists))
@@ -233,10 +251,10 @@
              (scan (mapcar #'cdr tails))))))
 
 (defun every1 (test list)
-  (let rec ((list list))
+  (let rec ()
     (if (not list) t
         (when (funcall test (%pop list))
-          (rec list)))))
+          (rec)))))
 
 (define-compiler-macro every (&whole form func &rest lists)
   (cond
@@ -277,11 +295,11 @@
             (scan (mapcar #'cdr tails))))))
 
 (defun notany1 (test list)
-  (let rec ((list list))
+  (let rec ()
     (if (not list) t
         (if (funcall test (%pop list))
             nil
-            (rec list)))))
+            (rec)))))
 
 (define-compiler-macro notany (&whole form func &rest lists)
   (cond
@@ -303,10 +321,10 @@
             t))))
 
 (defun notevery1 (test list)
-  (let rec ((list list))
+  (let rec ()
     (when list
       (if (funcall test (%pop list))
-          (rec list)
+          (rec)
           t))))
 
 (define-compiler-macro notevery (&whole form func &rest lists)
@@ -336,7 +354,8 @@
                  (push `(,vconc (lst)
                          `(let ((tmp ,lst))
                             (when tmp
-                              (setq ,',vtail (last (%rplacd ,',vtail tmp))))))
+                              (when (consp (setq ,',vtail (%rplacd ,',vtail tmp)))
+                                (setq ,',vtail (last ,',vtail))))))
                        adders)))))
       (foreach names #'mk-collector)
       `(let (,@(mapcar (lambda (name) `(,name (list nil))) lists))
