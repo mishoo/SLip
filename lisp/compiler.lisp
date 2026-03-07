@@ -2250,31 +2250,14 @@
                        (comp-inner-lambda name args body env val? more?))))))
            (t (mkret (comp f env t t))))))
 
-     (gen-simple-args (args n names)
-       (cond
-         ((null args) (gen "ARGS" n))
-         ((symbolp args)
-          (when (%memq args names)
-            (error/wp (strcat "Duplicate function argument " args)))
-          (gen "ARG_" n))
-         ((%memq (car args) names)
-          (error/wp (strcat "Duplicate function argument " (car args))))
-         (t
-          (gen-simple-args (cdr args)
-                           (1+ n)
-                           (cons (car args) names)))))
-
-     (make-true-list (lst)
-       (when lst
-         (if (atom lst)
-             (list lst)
-             (cons (car lst) (make-true-list (cdr lst))))))
-
-     (comp-simple-lambda (name args body env val? more?)
+     (comp-simple-lambda (name required rest body env val? more?)
        (with-seq-output <<
          (with-declarations body
-           (<< (gen-simple-args args 0 nil))
-           (let ((args (make-true-list args))
+           (<< (gen (if rest "ARG_" "ARGS")
+                    (length required)))
+           (let ((args (if rest
+                           (nconc required (list rest))
+                           required))
                  (specials 0))
              (foreach-index args
                (lambda (name index)
@@ -2363,12 +2346,7 @@
                 (getf parsed :aux))
             (apply #'comp-extended-lambda name body env val? more? parsed))
            (t
-            (comp-simple-lambda name (cond
-                                       ((and required rest)
-                                        `(,@required . ,rest))
-                                       (required)
-                                       (rest))
-                                body env val? more?)))))
+            (comp-simple-lambda name required rest body env val? more?)))))
 
      (comp-lambda (name args body env)
        (prog2
