@@ -3,6 +3,7 @@ import { LispMachine,
          STATUS_WAITING,
          STATUS_LOCKED,
          STATUS_HALTED,
+         STATUS_FINISHED,
          LispRetNoVal,
        } from "./machine.js";
 import { LispCons } from "./list.js";
@@ -637,6 +638,7 @@ export class LispProcess {
         this.noint = false;
         this.catch_all = false;
         this.name = name;
+        this.watchers = [];
         m.process = this;
         m.set_closure(closure);
         this._lock_callback = null;
@@ -647,9 +649,9 @@ export class LispProcess {
         return `#<THREAD ${this.pid}${this.name ? ' ' + this.name : ''}>`;
     }
 
-    resume(arg) {
+    resume(...args) {
         if (this._lock_callback) {
-            this._lock_callback(arg);
+            this._lock_callback(...args);
             this._lock_callback = null;
         }
         this.m.status = STATUS_RUNNING;
@@ -666,10 +668,27 @@ export class LispProcess {
         this.m.status = STATUS_LOCKED;
     }
 
+    join(thread) {
+        if (thread.m.status === STATUS_FINISHED) {
+            return thread.result;
+        } else {
+            thread.watchers.push(this);
+            this.lock(result => this.m.push(result));
+            return void 0; // must return undefined.
+        }
+    }
+
     run(quota) {
         do {
             this.m.run(quota);
         } while (this.noint && this.m.status === STATUS_RUNNING);
+        switch (this.m.status) {
+          case STATUS_FINISHED:
+            let result = this.result = this.m.stack.pop_ret();
+            this.watchers.forEach(thread => thread.resume(result));
+            this.watchers = [];
+            break;
+        }
     }
 
     static sendmsg(target, signal, args) {

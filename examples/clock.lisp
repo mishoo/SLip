@@ -96,7 +96,7 @@
 
 (defun animate-clock ()
   (when *canvas*
-    (without-interrupts (draw-clock-frame))
+    (sl-thread:without-interrupts (draw-clock-frame))
     ;; this also works:
     ;;   (sleep 0.016)
     ;;   (animate-clock)

@@ -2,7 +2,9 @@
   (:use :sl)
   (:export #:make-thread #:current-thread #:thread-name
            #:make-lock #:acquire-lock #:release-lock
-           #:with-lock-held))
+           #:with-lock-held #:join-thread
+           #:without-interrupts
+           #:send #:receive))
 
 (in-package :sl-thread)
 
@@ -26,6 +28,18 @@
 (defun release-lock (mutex)
   (%:%mutex-release mutex))
 
+(defun join-thread (thread)
+  (%:%thread-join thread))
+
+(defun send (thread message &rest args)
+  (apply #'%:%sendmsg thread message args))
+
+(define-compiler-macro send (thread message &rest args)
+  `(%:%sendmsg ,thread ,message ,@args))
+
+(defun receive (receivers)
+  (%:%receive receivers))
+
 (defmacro with-lock-held ((mutex) &body body)
   (let ((_mutex (gensym "LOCK")))
     `(let ((,_mutex ,mutex))
@@ -33,3 +47,9 @@
          (unwind-protect
              (locally ,@body)
            (release-lock ,_mutex))))))
+
+(defmacro without-interrupts (&body body)
+  `(let (($old (%:%no-interrupts t)))
+     (unwind-protect
+         (progn ,@body)
+       (%:%no-interrupts $old))))

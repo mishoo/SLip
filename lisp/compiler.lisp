@@ -699,12 +699,6 @@
          nil)
        ,seq)))
 
-(defmacro without-interrupts body
-  `(let ((old (%no-interrupts t)))
-     (unwind-protect
-         (progn ,@body)
-       (%no-interrupts old))))
-
 (defmacro return (&optional val)
   `(return-from nil ,val))
 
@@ -2800,7 +2794,6 @@
     "lisp/byte.lisp"
     "lisp/hash.lisp"
     "lisp/type.lisp"
-    "lisp/thread.lisp"
     "lisp/macroexpand.lisp"
     "lisp/format.lisp"
     "lisp/struct.lisp"
@@ -2810,6 +2803,7 @@
     "lisp/closette.lisp"
     "lisp/printer.lisp"
     "lisp/conditions.lisp"
+    "lisp/thread.lisp"
     "lisp/stream.lisp"
     "lisp/ffi.lisp"
     "ide/ide.lisp"))

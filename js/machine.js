@@ -1342,8 +1342,7 @@ export class LispMachine {
         this.env = false;
         this.denv = pm ? pm.denv : false;
         this.n_args = null;
-        this.status = STATUS_FINISHED;
-        this.error = null;
+        this.status = STATUS_RUNNING;
         this.process = null;
         this.f = null;
         //this.trace = [];

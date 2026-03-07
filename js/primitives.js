@@ -2454,6 +2454,12 @@ defp("%mutex-owner", false, function(m, nargs){
     return mutex.locked;
 });
 
+defp("%thread-join", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var thread = checktype(m.pop(), LispProcess);
+    return m.process.join(thread);
+});
+
 defp("%sendmsg", true, function(m, nargs){
     checknargs(nargs, 2);
     var args = false;

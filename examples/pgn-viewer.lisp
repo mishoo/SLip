@@ -209,7 +209,7 @@
                                  ("keydown" :signal :play-keydown))
                  (labels
                      ((signal ()
-                        (%:%sendmsg thread :play-next))
+                        (sl-thread:send thread :play-next))
                       (restart-timer ()
                         (clear-timeout timer)
                         (setf timer (set-timeout *autoplay-timeout* #'signal)))
@@ -264,7 +264,7 @@
                                      :move           #'on-move
                                      :animation-end  #'on-animation-end)))
                      (restart-timer)
-                     (loop until (eq 'play-done (%:%receive receivers)))
+                     (loop until (eq 'play-done (sl-thread:receive receivers)))
                      (toggle-play button)))))))
 
          (active-blink (el)
@@ -445,7 +445,7 @@
                      (loop with drag-receivers = (make-hash
                                                   :drag-move #'on-move
                                                   :drag-done #'on-done)
-                           until (eq 'drag-done (%:%receive drag-receivers)))))))))
+                           until (eq 'drag-done (sl-thread:receive drag-receivers)))))))))
 
          (select-promotion (dragged-piece moves)
            (let* ((*unicode* nil)
@@ -494,7 +494,7 @@
                                        (dom:stop-immediate-propagation event)
                                        (dom:prevent-default event)
                                        '(done-promo nil))))))
-                 (loop for result = (%:%receive receivers)
+                 (loop for result = (sl-thread:receive receivers)
                        do (when (and (consp result)
                                      (eq 'done-promo (car result)))
                             (dom:remove-element cont)
@@ -522,14 +522,15 @@
                                          :keydown          #'on-keydown
                                          :piece-mousedown  #'on-piece-mousedown)
                        do (handler-case
-                              (without-interrupts (%:%receive receivers))
+                              (sl-thread:without-interrupts
+                                (sl-thread:receive receivers))
                             (error (err)
                               (format *error-output* "!ERROR: ~A~%" err)))))
                (format *error-output*
                        "Thread exit ~A~%"
-                       (%:%current-thread)))))
+                       (sl-thread:current-thread)))))
 
-        (setf thread (%:%make-thread #'main))))))
+        (setf thread (sl-thread:make-thread #'main))))))
 
 (defun get-header (pgn name &optional default)
   (let* ((headers (getf pgn :headers))
