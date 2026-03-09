@@ -220,7 +220,8 @@
                      (setf step step-form))
                     (t
                      (setf step (gensym "step"))
-                     (list-add *loop-variables* `(,step ,(check-positive-loop-step step-form)))))
+                     (list-add *loop-variables*
+                               `(,step ,(check-positive-loop-step step-form)))))
                   t))))
         (when (dig) (when (dig) (dig))))
 

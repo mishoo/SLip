@@ -496,7 +496,7 @@
 (defun warn args
   (%warn (apply #'format nil args)))
 
-;;; %:EOF - compiler macros. uncomment this to disable.
+;;; %:EOF ;; compiler macros. uncomment this to disable.
 
 ;;; I'm leaving them for now, they seem to help a little in runtime speed,
 ;;; although compilation time increases significantly (e.g. for the test

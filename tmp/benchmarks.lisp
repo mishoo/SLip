@@ -73,3 +73,21 @@
     (if p
         (rec (cdr p) (1+ count))
         count)))
+
+(defun sum-rec (n &optional (sum 0))
+  (if (zerop n)
+      sum
+      (sum-rec (1- n) (+ sum n))))
+
+(defun sum-lret (n &optional (sum 0))
+  (if (zerop n)
+      sum
+      (return-from sum-lret
+        (sum-lret (1- n) (+ sum n)))))
+
+(defun %:%load (url)
+  (format *trace-output* ";; Loading ~A~%" url)
+  (%:with-load-timings
+   (let ((code (sl-stream:open-url (%:make-url url))))
+     (%:with-undefined-warnings
+      (%:compile-string code url)))))

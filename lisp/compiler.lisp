@@ -2256,7 +2256,7 @@
            (<< (gen (if rest "ARG_" "ARGS")
                     (length required)))
            (let ((args (if rest
-                           (nconc required (list rest))
+                           (append required (list rest))
                            required))
                  (specials 0))
              (foreach-index args
@@ -2378,30 +2378,32 @@
          (list (nreverse names) (nreverse vals))))
 
      (comp-flets (bindings body env labels? val? more?)
-       (if bindings
-           (with-seq-output <<
-             (let* ((bindings (get-bindings bindings nil))
-                    (names (car bindings))
-                    (funcs (cadr bindings))
-                    (len (length names)))
-               (flet ((extenv ()
-                        (setq env (extenv env :lex (map1-vector (lambda (name)
-                                                                  (list name :func))
-                                                                names)))
-                        (<< (gen "FRAME"))))
-                 (when labels? (extenv))
-                 (map2 (lambda (name func)
-                         (<< (with-env (comp-lambda name (car func) (cdr func) env))))
-                       names funcs)
-                 (unless labels? (extenv))
-                 (<< (if (> len 1) (gen "VARS" len) (gen "VAR")))
-                 (cond
-                   (more?
-                    (<< (with-env (comp-decl-seq body env val? t))
-                        (gen "UNFR" 1 0)))
-                   (t
-                    (<< (with-env (comp-decl-seq body env val? nil))))))))
-           (comp-decl-seq body env val? more?)))
+       (cond
+         (bindings
+          (with-seq-output <<
+            (let* ((bindings (get-bindings bindings nil))
+                   (names (car bindings))
+                   (funcs (cadr bindings))
+                   (len (length names)))
+              (flet ((extenv ()
+                       (setq env (extenv env :lex (map1-vector (lambda (name)
+                                                                 (list name :func))
+                                                               names)))
+                       (<< (gen "FRAME"))))
+                (when labels? (extenv))
+                (map2 (lambda (name func)
+                        (<< (with-env (comp-lambda name (car func) (cdr func) env))))
+                      names funcs)
+                (unless labels? (extenv))
+                (<< (if (> len 1) (gen "VARS" len) (gen "VAR")))
+                (cond
+                  (more?
+                   (<< (with-env (comp-decl-seq body env val? t))
+                       (gen "UNFR" 1 0)))
+                  (t
+                   (<< (with-env (comp-decl-seq body env val? nil)))))))))
+         (t
+          (comp-decl-seq body env val? more?))))
 
      (comp-macrolet-function (def)
        (let ((name (car def))
