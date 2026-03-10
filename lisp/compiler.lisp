@@ -313,17 +313,6 @@
          (funcall func (pop lst) (incf index))
          (go :next)))))
 
-(defun identity (x) x)
-
-(defun complement (f)
-  (lambda args
-    (not (apply f args))))
-
-(defun constantly (value)
-  (lambda args
-    (declare (ignore args))
-    value))
-
 (defun filter (lst pred)
   (let ((ret nil))
     (tagbody
@@ -1354,7 +1343,27 @@
   (define-compiler-macro minusp (val)
     `(%op MINUSP ,(reduce-form val))))
 
+(defun identity (x) x)
+
 (define-compiler-macro identity (x) x)
+
+(defun complement (f)
+  (lambda args
+    (not (apply f args))))
+
+(define-compiler-macro complement (f)
+  `(lambda $_
+     (not (apply ,f $_))))
+
+(defun constantly (value)
+  (lambda args
+    (declare (ignore args))
+    value))
+
+(define-compiler-macro constantly (value)
+  `(lambda $_
+     (declare (ignore $_))
+     ,value))
 
 (define-compiler-macro zerop (value)
   (cond
@@ -2611,9 +2620,8 @@
                "Expecting (LAMBDA (...) ...) in COMPILE")
        (%eval-opcode (comp exp (make-environment) t nil)))
 
-     (compile-string (str &optional (filename *current-file*))
-       (let ((*current-file* filename)
-             (reader (lisp-reader str 'EOF))
+     (compile-string (str &optional (*current-file* *current-file*) progress)
+       (let ((reader (lisp-reader str 'EOF))
              (all-code (vector))
              (link-addr 0)
              (*xref-info* (vector))
@@ -2633,7 +2641,13 @@
                   (rec ()
                     (let* ((token (funcall reader 'next))
                            (form (cdr token)))
+                      (when (or (eq form 'EOF)
+                                (zerop (mod (%stream-col *trace-output*) 70)))
+                        (when progress
+                          (%stream-put *trace-output* #\Newline)))
                       (unless (eq form 'EOF)
+                        (when progress
+                          (%stream-put *trace-output* "."))
                         (let ((*current-pos* (car token))
                               (*delay-eval* nil))
                           (comp1 form))
@@ -2645,10 +2659,55 @@
                (comp1 `(%grok-xref-info ,*current-file* ,xref))))
            (unwind-protect
                (%serialize-code all-code (make-hash))
-             (foreach (nreverse delayed) #'%eval-code))))))
+             (foreach (nreverse delayed) #'%eval-code)))))
+
+     (compile-bundle (files output)
+       (let ((all-code (vector))
+             (link-addr 0)
+             (env (make-environment)))
+         (labels
+             ((comp-one-form (form)
+                (let ((code (with-env (comp form env nil t))))
+                  (when code
+                    (setq code (%assemble-and-exec-opcode code))
+                    (setq code (copy-seq code))
+                    (%relocate-code code link-addr)
+                    (setq link-addr (+ link-addr (length code)))
+                    (%seq-cat all-code (list code)))))
+
+              (comp-forms (reader)
+                (let* ((token (funcall reader 'next))
+                       (form (cdr token)))
+                  (unless (eq form 'EOF)
+                    (let ((*current-pos* (car token)))
+                      (comp-one-form form))
+                    (comp-forms reader)))))
+
+           (foreach files
+             (lambda (file)
+               (%stream-put *trace-output* (strcat ";; Compiling " file "..." #\Newline))
+               (%gensym-reset)
+               (let* ((*package* *package*)
+                      (*read-table* *read-table*)
+                      (*enable-inline* *enable-inline*)
+                      (*current-file* file)
+                      (*xref-info* (vector))
+                      (input (%:%http-request (make-url file)))
+                      (reader (lisp-reader input 'EOF)))
+                 (comp-forms reader)
+                 (when (plusp (length *xref-info*))
+                   (comp-one-form `(%grok-xref-info ,*current-file* ,*xref-info*))))))
+
+           (let ((serial (%:%serialize-code all-code (make-hash))))
+             (when output
+               (%:%http-request output nil nil "PUT" serial))
+             (%stream-put *trace-output* ";; writing " (length serial)
+                          " characters to " output #\Newline)
+             nil)))))
 
   (set-symbol-function! 'compile #'compile)
-  (set-symbol-function! '%compile-string #'compile-string))
+  (set-symbol-function! '%compile-string #'compile-string)
+  (set-symbol-function! 'compile-bundle #'compile-bundle))
 
 ;; (if (if *xref-info*
 ;;         (< (setq *build-count* (1+ *build-count*)) 3))
@@ -2699,33 +2758,13 @@
                           (cdr (funcall reader 'next))))))
         (rec nil (cdr (funcall reader 'next)))))))
 
-(defmacro with-load-timings body
-  `(cond
-     (*load-timing*
-      ,(let ((t-load (gensym))
-             (t-comp (gensym)))
-         `(flet ((%get-file-contents args
-                   (let ((,t-load (get-internal-run-time)))
-                     (prog1 (apply #'%get-file-contents args)
-                       (%rplaca *load-timing*
-                                (+ (car *load-timing*)
-                                   (- (get-internal-run-time) ,t-load))))))
-                 (compile-string args
-                   (let ((,t-comp (get-internal-run-time)))
-                     (prog1 (apply #'compile-string args)
-                       (%rplaca (cdr *load-timing*)
-                                (+ (cadr *load-timing*)
-                                   (- (get-internal-run-time) ,t-comp)))))))
-            ,@body)))
-     (t ,@body)))
-
 (defun %load (url)
   (%stream-put *trace-output* (strcat ";; Loading " url #\Newline))
-  (with-load-timings
-    (let ((code (%get-file-contents (make-url url))))
-      (unless code (error (strcat "Unable to load file: " url)))
-      (with-undefined-warnings
-        (compile-string code url)))))
+  (let ((code (%:%http-request (make-url url))))
+    (unless code (error (strcat "Unable to load file: " url)))
+    (with-undefined-warnings
+      (%gensym-reset)
+      (compile-string code url))))
 
 (defun make-url (url)
   (if *url-prefix*
@@ -2768,6 +2807,12 @@
         result
         (macroexpand result))))
 
+(defcompiler case (&rest args)
+  (apply #'compile-case args))
+
+(defcompiler ecase (&rest args)
+  (apply #'compile-case args))
+
 (defconstant *core-files*
   '("lisp/init.lisp"
     "lisp/array.lisp"
@@ -2788,11 +2833,30 @@
     "lisp/ffi.lisp"
     "ide/ide.lisp"))
 
-(defcompiler case (&rest args)
-  (apply #'compile-case args))
+(defun make-fasl-bundle (&optional (output "slip-bundle.fasl"))
+  (%gensym-reset)
+  (with-undefined-warnings
+    (compile-bundle (list* "lisp/compiler.lisp" *core-files*) output)))
 
-(defcompiler ecase (&rest args)
-  (apply #'compile-case args))
+(defun recompile-everything ()
+  (let ((files (list* "lisp/compiler.lisp" *core-files*)))
+    ;; generate individual fasl-s
+    (foreach files
+      (lambda (file)
+        (let* ((file (make-url file))
+               (input (%:%http-request file))
+               (code (with-undefined-warnings
+                       (%stream-put *trace-output* "Compiling " file)
+                       (%gensym-reset)
+                       (let ((*package* *package*)
+                             (*read-table* *read-table*)
+                             (*enable-inline* *enable-inline*))
+                         (compile-string input file t))))
+               (output (%:replace-regexp #/\.lisp$/ file ".fasl")))
+          (%stream-put *trace-output* "✓ " output " (" (length code) " characters)" #\Newline #\Newline)
+          (%:%http-request output nil nil "PUT" code))))
+    (%stream-put *trace-output* #\Newline ";; Making the bundle" #\Newline)
+    (make-fasl-bundle)))
 
 ;;;
 

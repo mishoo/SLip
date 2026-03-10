@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:39:19 2003
 ;;;; Contains: Tests of INTERSECTION
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest intersection.1
   (intersection nil nil)

@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:22:46 2003
 ;;;; Contains: Tests of MAPCAN
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest mapcan.1
   (mapcan #'list nil)

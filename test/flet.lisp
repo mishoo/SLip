@@ -2,7 +2,7 @@
 ;;;; Created:  Tue Oct  8 22:55:02 2002
 ;;;; Contains: Tests of FLET
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest flet.1
   (flet ((%f () 1))

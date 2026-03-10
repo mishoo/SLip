@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Jan  8 07:25:18 2005
 ;;;; Contains: Tests of DO
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest do.1
   (do ((i 0 (1+ i)))

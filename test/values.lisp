@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Oct 19 08:18:50 2002
 ;;;; Contains: Tests of VALUES
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest values.0
   (values))

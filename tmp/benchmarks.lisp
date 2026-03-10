@@ -84,10 +84,3 @@
       sum
       (return-from sum-lret
         (sum-lret (1- n) (+ sum n)))))
-
-(defun %:%load (url)
-  (format *trace-output* ";; Loading ~A~%" url)
-  (%:with-load-timings
-   (let ((code (sl-stream:open-url (%:make-url url))))
-     (%:with-undefined-warnings
-      (%:compile-string code url)))))

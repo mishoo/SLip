@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Oct 18 07:23:48 2002
 ;;;; Contains: Tests for AND
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest and.1
   (and)

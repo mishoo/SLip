@@ -629,9 +629,13 @@ defp("%putf", true, function(m, nargs){
         var name = "SYM";
         if (nargs == 1) {
             name = as_string(m.pop());
-            if (name === "_reset") N = -1;
         }
         return new LispSymbol(name + (++N));
+    });
+    defp("%gensym-reset", true, function(m, nargs){
+        checknargs(nargs, 0, 0);
+        N = -1;
+        return false;
     });
 })(0);
 
@@ -1622,26 +1626,6 @@ defp("iterator-next", true, function(m, nargs){
     m.stack.set_values_array([ true, result.value ]);
 });
 
-defp("%get-file-contents", false, function (m, nargs) {
-    checknargs(nargs, 1, 1);
-    var url = m.pop();
-    checktype(url, LispString);
-
-    if (!/^(?:https?:)?\/\//i.test(url)) {
-        // local storage takes priority
-        let content = ls_get_file_contents(url);
-        if (content != null) {
-            return content;
-        }
-    }
-
-    var xhr = new XMLHttpRequest();
-    url += "?killCache=" + Date.now(); // is this a good idea?
-    xhr.open("GET", url, false); // XXX: synchronous is deprecated
-    xhr.send(null);
-    return xhr.status == 200 ? xhr.responseText : false;
-});
-
 /* -----[ JSON ]----- */
 
 function json_to_lisp(obj) {
@@ -2406,11 +2390,13 @@ defp("%get-package-prop", false, function(m, nargs){
 /* -----[ processes ]----- */
 
 defp("%make-thread", true, function(m, nargs){
-    checknargs(nargs, 1, 2);
+    checknargs(nargs, 1);
+    var args = nargs > 2 ? m.stack.pop_frame(nargs - 2) : [];
     var name = nargs > 1 ? m.pop() : false;
     var func = m.pop();
     checktype(func, LispClosure);
-    var p = new LispProcess(m, func, name);
+    let p = new LispProcess(m, func, name, ...args);
+    p.resume();
     return p;
 });
 
@@ -2995,8 +2981,10 @@ defp("%text-output-stream-p", false, function(m, nargs){
     return LispTextOutputStream.is(m.pop());
 });
 
-defp("%http-input-stream", true, async function(m, nargs){
-    checknargs(nargs, 1, 3);
+defp("%http-request", true, async function(m, nargs){
+    checknargs(nargs, 1, 5);
+    let body = nargs > 4 ? m.pop() : false;
+    let method = nargs > 3 ? m.pop() : false;
     let headers = nargs > 2 ? m.pop() : false;
     let binary = nargs > 1 ? m.pop() : false;
     let url = checktype(m.pop(), LispString);
@@ -3009,6 +2997,12 @@ defp("%http-input-stream", true, async function(m, nargs){
             options.headers[capitalize(p.car)] = checktype(p.cdr, LispCons).car;
             p = checktype(p.cdr.cdr, LispList);
         }
+    }
+    if (method) {
+        options.method = as_string(method);
+    }
+    if (body) {
+        options.body = body;
     }
 
     // Since the primitive is async (always returns a Promise), the
@@ -3037,6 +3031,47 @@ defp("%http-input-stream", true, async function(m, nargs){
         m.process.resume();
     }
 });
+
+defp("%http-get-multiple", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let urls = m.pop();
+    if (LispList.is(urls)) urls = LispCons.toArray(urls);
+    checktype(urls, LispVector);
+    return Promise
+        .all(urls.map(url => fetch(url).then(rsp => rsp.text())))
+        .then(data => {
+            m.push(LispCons.fromArray(data));
+            m.process.resume();
+        });
+});
+
+// This is not really usable at this point. It works in Chrome if the
+// server is HTTP2, but it has a number of caveats. We might never get
+// full-duplex streaming for ordinary HTTP requests. (not that SLip
+// had such streams anyway..)
+//
+// defp("%http-output-stream", true, function(m, nargs){
+//     checknargs(nargs, 1, 3);
+//     let headers = nargs > 2 ? m.pop() : false;
+//     let binary = nargs > 1 ? m.pop() : false;
+//     let url = checktype(m.pop(), LispString);
+//     let stream = new LispTextWriterOutputStream();
+//     let options = {
+//         method: "PUT",
+//         body: stream.readable,
+//         duplex: "half",
+//     };
+//     if (headers) {
+//         let p = checktype(headers, LispCons);
+//         options.headers = {};
+//         while (p) {
+//             options.headers[capitalize(p.car)] = checktype(p.cdr, LispCons).car;
+//             p = checktype(p.cdr.cdr, LispList);
+//         }
+//     }
+//     fetch(url, options);
+//     return stream;
+// });
 
 defp("%stream-close", true, function(m, nargs){
     checknargs(nargs, 1, 1);

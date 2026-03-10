@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Oct 19 09:37:14 2002
 ;;;; Contains: Tests for PROG1
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest prog1.1
   (prog1 'a)

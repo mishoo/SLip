@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Aug 31 18:56:41 2002
 ;;;; Contains: Tests for NSUBSTITUTE-IF
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest nsubstitute-if-list.1
   (nsubstitute-if 'b 'identity nil)

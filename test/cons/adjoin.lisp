@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Mar 28 07:33:20 1998
 ;;;; Contains:  Tests of ADJOIN
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest adjoin.1
   (adjoin 'a nil)

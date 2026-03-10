@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Aug 31 18:17:09 2002
 ;;;; Contains: Tests for SUBSTITUTE-IF-NOT
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest substitute-if-not-list.1
   (let ((x '())) (values (substitute-if-not 'b #'null x) x))

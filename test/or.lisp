@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Oct 18 07:29:27 2002
 ;;;; Contains: Tests of OR
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest or.1
   (or)

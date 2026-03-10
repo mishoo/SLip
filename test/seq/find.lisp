@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Aug 23 07:49:49 2002
 ;;;; Contains: Tests for FIND
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest find-list.1
   (find 'c '(a b c d e c a))

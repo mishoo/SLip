@@ -2,7 +2,7 @@
 ;;;; Created:  Tue Aug 20 08:01:30 2002
 ;;;; Contains: Tests for COUNT-IF
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest count-if-list.1
   (count-if #'identity '(a b nil c d nil e))

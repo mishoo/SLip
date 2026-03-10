@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Nov 28 08:58:06 2003
 ;;;; Contains: Tests of REMHASH
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest remhash.1
   (let ((table (make-hash-table)))

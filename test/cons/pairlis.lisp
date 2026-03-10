@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:30:55 2003
 ;;;; Contains: Tests of PAIRLIS
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 ;; Pairlis has two legal behaviors: the pairs
 ;; can be prepended in the same order, or in the

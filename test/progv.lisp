@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Oct 12 10:00:50 2002
 ;;;; Contains: Tests for PROGV
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest progv.1
   (progv () () t)

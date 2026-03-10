@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Oct 18 08:21:29 2002
 ;;;; Contains: Tests for IF
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest if.1
   (if t 1 2)

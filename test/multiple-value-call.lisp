@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Oct 18 23:35:07 2002
 ;;;; Contains: Tests of MULTIPLE-VALUE-CALL, MULTIPLE-VALUE-LIST
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest multiple-value-call.1
   (multiple-value-call #'+ (values 1 2) (values) 3 (values 4 5 6))

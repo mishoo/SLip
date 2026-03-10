@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Apr 19 22:04:27 2003
 ;;;; Contains: Tests of MAKE-LIST
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest make-list-empty.1
   (make-list 0)

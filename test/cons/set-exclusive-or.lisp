@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:45:46 2003
 ;;;; Contains: Tests of SET-EXCLUSIVE-OR
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest set-exclusive-or.1
   (set-exclusive-or nil nil)

@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Apr 19 22:28:35 2003
 ;;;; Contains: Tests of PUSHNEW
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest pushnew.1
   (let ((x nil))

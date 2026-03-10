@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Nov 28 06:05:21 2003
 ;;;; Contains: Tests of GETHASH
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 ;;; Most testing of GETHASH is in test-hash-table-1 in hash-table-aux.lsp
 

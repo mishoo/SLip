@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Aug 23 07:49:49 2002
 ;;;; Contains: Tests for POSITION
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest position-list.1
   (position 'c '(a b c d e c a))

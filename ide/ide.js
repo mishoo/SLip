@@ -607,7 +607,7 @@ Ymacs_Buffer.newCommands({
         let pak = find_package(this);
         let cmpl = MACHINE().eval_string(
             pak,
-            "(ignore-errors (ymacs::exec-list-symbol-completions " + JSON.stringify(query) + "))"
+            "(sl:ignore-errors (ymacs::exec-list-symbol-completions " + JSON.stringify(query) + "))"
         );
         if (!LispCons.isList(cmpl)) {
             return [];          // XXX: why's that?
@@ -739,7 +739,7 @@ Ymacs_Buffer.newCommands({
                 repl.cmd("sl_repl_eval");
             },
             "DEMO: chess viewer": () => {
-                repl.ymacs.run_lisp("READ-EVAL", false, `(unless (ignore-errors (find-package :pgn-viewer))
+                repl.ymacs.run_lisp("READ-EVAL", false, `(sl:unless (sl:ignore-errors (find-package :pgn-viewer))
                                                            (sl:load "examples/pgn-viewer.lisp"))`,
                                     () => {
                                         set_repl_input(repl, `(pgn-viewer::lichess "vlbz")`);
@@ -748,7 +748,7 @@ Ymacs_Buffer.newCommands({
             },
             "Load/run test suite": () => {
                 repl.ymacs.run_lisp("READ-EVAL", false, `(sl:load "test/all.lisp")`, () => {
-                    set_repl_input(repl, `(sl-user::run-tests :log nil :all t)`);
+                    set_repl_input(repl, `(sl-test:run-tests :log nil :all t)`);
                     repl.cmd("sl_repl_eval");
                 });
             },
@@ -903,7 +903,7 @@ Ymacs_Buffer.newMode("sl_mode", function(){
         var pak = find_in_package(this, this.point());
         if (pak) {
             pak = pak.replace(/^\(in-package\s*/, "(%::find-package '"); // that's a pervert hack
-            pak = `(ignore-errors ${pak})`;
+            pak = `(sl:ignore-errors ${pak})`;
             try {
                 pak = MACHINE().eval_string(false, pak);
             } catch(ex) {

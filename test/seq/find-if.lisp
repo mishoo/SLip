@@ -2,7 +2,7 @@
 ;;;; Created:  Wed Aug 28 18:37:52 2002
 ;;;; Contains: Tests for FIND-IF
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest find-if-list.1
   (find-if #'identity ())

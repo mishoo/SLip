@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 15:43:44 2003
 ;;;; Contains: Tests of SHIFTF
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest shiftf-order.1
   (let ((x (vector 'a 'b 'c 'd 'e))

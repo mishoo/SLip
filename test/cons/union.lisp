@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:41:24 2003
 ;;;; Contains: Tests of UNION
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest union.1
   (union nil nil)

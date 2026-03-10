@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Jan  8 07:27:15 2005
 ;;;; Contains: Tests of DOTIMES
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest dotimes.1
   (dotimes (i 10))

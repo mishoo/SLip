@@ -2,7 +2,7 @@
 ;;;; Created:  Wed Sep  4 22:53:51 2002
 ;;;; Contains: Tests for CONCATENATE
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest concatenate.1
   (concatenate 'list)

@@ -630,7 +630,7 @@ export class LispProcess {
     static is(x) { return x instanceof LispProcess }
     static timer_thread = null;
 
-    constructor(parent_machine, closure, name = false) {
+    constructor(parent_machine, closure, name = false, ...args) {
         this.pid = ++PID;
         var m = this.m = new LispMachine(parent_machine);
         this.receivers = false;
@@ -640,9 +640,8 @@ export class LispProcess {
         this.name = name;
         this.watchers = [];
         m.process = this;
-        m.set_closure(closure);
+        m.set_closure(closure, ...args);
         this._lock_callback = null;
-        this.resume();
     }
 
     toString() {
@@ -737,6 +736,7 @@ export class LispProcess {
             let tt = use_this_thread ? this : LispProcess.timer_thread;
             if (!tt) {
                 LispProcess.timer_thread = new LispProcess(new LispMachine(), closure);
+                LispProcess.timer_thread.resume();
             } else {
                 tt.m.push(new LispRetNoVal(tt.m, tt.m.pc));
                 tt.m.n_args = 0;

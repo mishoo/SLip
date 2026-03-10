@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Oct 19 07:00:57 2002
 ;;;; Contains: Tests of MULTIPLE-VALUE-SETQ
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest multiple-value-setq.1
   (let ((x 1) (y 2))

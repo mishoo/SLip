@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Feb 28 22:07:25 2003
 ;;;; Contains: Tests of HANDLER-BIND
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest handler-bind.1
   (handler-bind ())

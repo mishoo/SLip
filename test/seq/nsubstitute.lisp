@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Aug 31 16:56:48 2002
 ;;;; Contains: Tests for NSUBSTITUTE
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest nsubstitute-list.1
   (nsubstitute 'b 'a nil)

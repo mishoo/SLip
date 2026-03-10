@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 15:38:30 2003
 ;;;; Contains: Tests of PSETF
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest psetf.order.1
   (let ((x (vector nil nil nil nil))

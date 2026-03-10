@@ -96,6 +96,8 @@
 
 (defun seq-iterator (seq)
   (cond
+    ((null seq)
+     (constantly +no-value+))
     ((listp seq)
      (lambda ()
        (if seq (pop seq) +no-value+)))

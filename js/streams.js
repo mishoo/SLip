@@ -183,9 +183,10 @@ export class LispTextWriterOutputStream extends LispTextOutputStream {
     }
     put(str) {
         this.controller.enqueue(str);
+        return false;
     }
     close() {
-        this.controller.close();
+        return this.controller.close();
     }
 }
 

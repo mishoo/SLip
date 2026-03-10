@@ -1,4 +1,4 @@
-(in-package :sl-user)
+(in-package :sl-test)
 
 (defparameter *tests* (list))
 (defparameter *compile-time* 0)
@@ -71,7 +71,7 @@
     (destructuring-bind (&key (all match-name allp)
                               (log t logp)
                               (match match-name))
-                        args
+        args
       (let ((*compile-time* 0)
             (*run-time* 0)
             (*log* log))
@@ -101,8 +101,7 @@
                                  Compile time: ~,2Fms~%~
                                  Run time: ~,2Fms~%"
                               index skipped success failed
-                              compile-time run-time))
-        'done))))
+                              compile-time run-time))))))
 
 ;;;; utils from ansi-test
 

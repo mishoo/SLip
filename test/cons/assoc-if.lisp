@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:27:57 2003
 ;;;; Contains: Tests of ASSOC-IF
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest assoc-if.1
     (let* ((x (copy-list '((1 . a) (3 . b) (6 . c) (7 . d))))

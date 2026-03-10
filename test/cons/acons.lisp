@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:26:48 2003
 ;;;; Contains: Tests of ACONS
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest acons.1
   (let* ((x (copy-tree '((c . d) (e . f))))

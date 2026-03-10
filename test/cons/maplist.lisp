@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:24:00 2003
 ;;;; Contains: Tests of MAPLIST
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest maplist.1
   (maplist #'list nil)

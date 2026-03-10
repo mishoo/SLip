@@ -159,7 +159,8 @@
      `(map1 ,func ,@lists))
     ((null (cddr lists))
      `(map2 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 (declaim (inline mapc1))
 (defun mapc1 (f list)
@@ -198,7 +199,8 @@
      `(mapc1 ,func ,@lists))
     ((null (cddr lists))
      `(mapc2 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 (declaim (inline maplist1))
 (defun maplist1 (func lst)
@@ -238,7 +240,8 @@
      `(maplist1 ,func ,@lists))
     ((null (cddr lists))
      `(maplist2 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;; every returns false as soon as any invocation of predicate
 ;; returns false. If the end of a sequence is reached, every returns
@@ -262,7 +265,8 @@
      (error "Missing list argument to EVERY"))
     ((null (cdr lists))
      `(every1 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;; some returns the first non-nil value which is returned by an
 ;; invocation of predicate. If the end of a sequence is reached
@@ -281,7 +285,8 @@
      (error "Missing list argument to SOME"))
     ((null (cdr lists))
      `(some1 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;; notany returns false as soon as any invocation of predicate
 ;; returns true. If the end of a sequence is reached, notany returns
@@ -307,7 +312,8 @@
      (error "Missing list argument to NOTANY"))
     ((null (cdr lists))
      `(notany1 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;; notevery returns true as soon as any invocation of predicate
 ;; returns false. If the end of a sequence is reached, notevery
@@ -333,7 +339,8 @@
      (error "Missing list argument to NOTEVERY"))
     ((null (cdr lists))
      `(notevery1 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 (defmacro with-collectors ((&rest names) &body body)
   (let (lists tails syms adders)
@@ -397,7 +404,8 @@
      `(mapcan1 ,func ,@lists))
     ((null (cddr lists))
      `(mapcan2 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;;; setf
 
@@ -489,7 +497,8 @@
                  vals
                  store-form
                  `(,(car form) ,@temps)))))
-    ((error (strcat "Invalid SETF place " form)))))
+    (t
+     (error (strcat "Invalid SETF place " form)))))
 
 (defun %setf-safe-val (val)
   (or (safe-atom-p val)
@@ -670,11 +679,6 @@
 
 (defun (setf get) (value symbol indicator &optional default)
   (setf (getf (symbol-plist symbol) indicator default) value))
-
-(defun constantly (value)
-  (lambda args
-    (declare (ignore args))
-    value))
 
 (defun (setf svref) (value vector index)
   (vector-set value vector index))

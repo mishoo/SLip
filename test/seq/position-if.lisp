@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Aug 23 22:08:57 2002
 ;;;; Contains: Tests for POSITION-IF
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest position-if-list.1
   (position-if #'evenp '(1 3 1 4 3 2 1 8 9))

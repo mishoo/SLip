@@ -2,7 +2,7 @@
 ;;;; Created:  Tue Jan 28 21:37:43 2003
 ;;;; Contains: Tests of ERROR
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest error.1
   (let ((fmt "Error"))

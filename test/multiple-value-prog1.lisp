@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Oct 19 06:48:02 2002
 ;;;; Contains: Tests for MULTIPLE-VALUE-PROG1
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest multiple-value-prog1.1
   (multiple-value-prog1 nil)

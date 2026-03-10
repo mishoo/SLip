@@ -2,7 +2,7 @@
 ;;;; Created:  Mon Aug 19 07:31:55 2002
 ;;;; Contains: Tests for COUNT
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest count-list.1
   (count 'a '(a b c d e a e f))

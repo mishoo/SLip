@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Nov 28 09:33:40 2003
 ;;;; Contains: Tests of CLRHASH
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest clrhash.1
   (let ((table (make-hash-table)))

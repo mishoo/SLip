@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Oct 25 19:07:19 2002
 ;;;; Contains: Tests of extended loop, part 1
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 ;;; Tests of variable initialization and stepping clauses
 

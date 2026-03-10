@@ -2,7 +2,7 @@
 ;;;; Created:  Thu Oct 10 23:25:50 2002
 ;;;; Contains: Tests for DESTRUCTURING-BIND
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 ;;; See the page for this in section 5.3
 ;;; Also, see destructuring lambda lists in section 3.4.5

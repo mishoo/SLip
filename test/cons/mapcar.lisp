@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:22:16 2003
 ;;;; Contains: Tests of MAPCAR
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest mapcar.1
   (mapcar #'1+ nil)

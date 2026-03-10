@@ -2,7 +2,7 @@
 ;;;; Created:  Wed Aug 28 20:53:24 2002
 ;;;; Contains: Tests for FIND-IF-NOT
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest find-if-not-list.1
   (find-if-not #'identity ())
