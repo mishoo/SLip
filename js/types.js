@@ -537,11 +537,9 @@ export class LispQueue {
     constructor() {
         this.list = new LispCons(false, false);
         this.tail = this.list;
-        this.size = 0;
     }
     push(el) {
         this.tail = this.tail.cdr = new LispCons(el, false);
-        ++this.size;
     }
     push_front(el) {
         if (!LispCons.find(this.list.cdr, el)) {
@@ -552,7 +550,6 @@ export class LispQueue {
     reenq(cell) {
         this.tail = this.tail.cdr = cell;
         cell.cdr = false;
-        ++this.size;
     }
     pop() {
         let cell = this.list.cdr;
@@ -560,7 +557,6 @@ export class LispQueue {
         if (!(this.list.cdr = cell.cdr)) {
             this.tail = this.list;
         }
-        --this.size;
         return cell;
     }
 }
@@ -580,14 +576,12 @@ let QUEUE = new LispQueue();
 const HAS_SCHEDULER = typeof globalThis.scheduler?.postTask === "function";
 
 const start = () => {
-    let count = 0, startTime = Date.now(), process, cell;
+    let count = 0, startTime = performance.now(), process, cell;
     try {
         while (true) {
-            if ((++count & 255) === 0) {
-                if (Date.now() - startTime > 30) {
+            if ((++count & 15) === 0)
+                if (performance.now() - startTime > 10)
                     break;
-                }
-            }
             cell = QUEUE.pop();
             if (!cell) return;
             process = cell.car;

@@ -453,7 +453,7 @@
                  (mods (read-while
                         (lambda (ch)
                           (%memq (downcase ch)
-                                 '(#\g #\m #\i #\y #\u))))))
+                                 #(#\g #\m #\i #\y #\u))))))
              (make-regexp str (downcase mods))))
 
          (skip-comment ()
@@ -477,7 +477,7 @@
                 (rec)))))
 
          (symbol-char-p (ch)
-           (not (%memq ch '(#\( #\) #\[ #\] #\{ #\}
+           (not (%memq ch #(#\( #\) #\[ #\] #\{ #\}
                             #\# #\; #\` #\' #\" #\|
                             #\SPACE
                             #\NEWLINE
@@ -596,7 +596,7 @@
          (read-quasiquote ()
            (skip #\`)
            (skip-ws)
-           (if (%memq (peek) '(#\( #\` #\' #\,))
+           (if (%memq (peek) #(#\( #\` #\' #\,))
                (let* ((qq (list nil))
                       (in-qq (cons qq in-qq))
                       (token (read-token)))
@@ -692,10 +692,10 @@
   `(return-from nil ,val))
 
 (defun lambda-keyword-p (sym)
-  (%memq sym '(&optional &rest &body &key &aux &allow-other-keys)))
+  (%memq sym #(&optional &rest &body &key &aux &allow-other-keys)))
 
 (defun macro-keyword-p (sym)
-  (%memq sym '(&whole &environment)))
+  (%memq sym #(&whole &environment)))
 
 (defun ordinary-lambda-list-p (args)
   (let dig ((args args)
@@ -707,7 +707,7 @@
       ((listp (car args))
        (when (and seen (symbolp (caar args)))
          (dig (cdr args) t)))
-      ((%memq (car args) '(&rest &body))
+      ((%memq (car args) #(&rest &body))
        (when (symbolp (cadr args))
          (dig (cddr args) seen)))
       ((lambda-keyword-p (car args))
@@ -2093,7 +2093,7 @@
          ((always-false-p pred)
           (comp else env val? more?))
          ((and (consp pred)
-               (%memq (car pred) '(not null)))
+               (%memq (car pred) #(not null)))
           (comp-if (cadr pred) else then env val? more?))
          (t
           (let ((pcode (comp pred env t t))
