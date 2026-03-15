@@ -1,8 +1,4 @@
-(setq *package* (find-package "%"))
-
-"
 (in-package :%)
-" ;; hack for Ymacs
 
 (let ((main (make-package "SL"))
       (boot (find-package "%"))
@@ -67,6 +63,8 @@
   (export exported main)
   (setq *package* main))
 
+(in-package :sl)
+
 ;; (setq %:*enable-inline* t)
 
 (defmacro assert (test . arguments)
@@ -122,9 +120,6 @@
                                (cdr opt))))))
                options)
        ,pak)))
-
-(defmacro in-package (name)
-  `(setq *package* (find-package ',name)))
 
 (declaim (inline some1))
 (defun some1 (test list)

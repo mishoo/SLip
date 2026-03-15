@@ -8,11 +8,10 @@
 ;;;;
 ;;;; Don't customize the reader in this file.
 
-"
-(in-package :%)
-" ;; hack for Ymacs to get the right package
+(defmacro in-package (name)
+  `(setq *package* (find-package ',name)))
 
-(setq %::*package* (find-package "%"))
+(in-package :%)
 
 (defmacro when (pred . body)
   `(if ,pred (progn ,@body)))
@@ -201,6 +200,7 @@
 (defvar *delay-eval* nil)
 
 (defvar *compiler-macros* (make-hash))
+(defvar *compiler-macro-val?*)
 
 (defvar *standard-output* (%make-text-memory-output-stream))
 (defvar *error-output* (%make-text-memory-output-stream))
@@ -1511,25 +1511,6 @@
                              env))))))
          ,@body))))
 
-(defun flatten (sym forms)
-  (let dig ((forms forms)
-            (result nil)
-            (rest nil))
-    (cond
-      ((null forms)
-       (if rest
-           (dig (car rest) result (cdr rest))
-           (nreverse result)))
-      ((and (consp (car forms))
-            (eq sym (caar forms)))
-       (dig (cdar forms)
-            result
-            (cons (cdr forms) rest)))
-      (t
-       (dig (cdr forms)
-            (cons (car forms) result)
-            rest)))))
-
 (defconstant *lambda-syms* '(lambda λ %fn))
 
 (defmacro defcompiler (sym args &body body)
@@ -1763,7 +1744,7 @@
              (arg-count x 2 3)
              (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
             ((or)
-             (comp-or (flatten 'or (cdr x)) env val? more?))
+             (comp-or (cdr x) env val? more?))
             ((not null)
              (arg-count x 1 1)
              (if val?
@@ -1841,23 +1822,27 @@
             ((%op)
              (comp-op (cadr x) (cddr x) env val? more?))
             (otherwise
-             (cond
-               ((aif (and (symbolp (car x))
-                          (%get-symbol-prop (car x) 'compiler))
-                     (let ((code (funcall it x env val? more? :compile-expr #'comp)))
-                       (if (listp code)
-                           (comp code env val? more?) ;; like define-compiler-macro
-                           code ;; otherwise it's direct assembly
-                           ))))
-               ((aif (and (symbolp (car x))
-                          (compiler-macro-function (car x)))
-                     (let ((form (funcall it x)))
-                       (unless (eq form x)
-                         (comp form env val? more?)))))
-               ((aif (and (symbolp (car x))
-                          (macro (car x) env))
-                     (comp-macroexpand it x env val? more?)
-                     (comp-call t (car x) (cdr x) env val? more?)))))))))
+             (let (it)
+               (cond
+                 ((setq it (and (symbolp (car x))
+                                (%get-symbol-prop (car x) 'compiler)))
+                  (let ((code (funcall it x env val? more? :compile-expr #'comp)))
+                    (if (listp code)
+                        (comp code env val? more?) ;; like define-compiler-macro
+                        code ;; otherwise it's direct assembly
+                        )))
+                 ((setq it (and (symbolp (car x))
+                                (compiler-macro-function (car x))))
+                  (let* ((*compiler-macro-val?* val?)
+                         (form (funcall it x)))
+                    (if (eq form x)
+                        (comp-call t (car x) (cdr x) env val? more?)
+                        (comp form env val? more?))))
+                 ((setq it (and (symbolp (car x))
+                                (macro (car x) env)))
+                  (comp-macroexpand it x env val? more?))
+                 (t
+                  (comp-call t (car x) (cdr x) env val? more?)))))))))
 
      (comp-op (opname args env val? more?)
        ;; We'll now compute the args (they'll remain on the stack) and generate
@@ -2839,7 +2824,9 @@
     (compile-bundle (list* "lisp/compiler.lisp" *core-files*) output)))
 
 (defun recompile-everything ()
-  (let ((files (list* "lisp/compiler.lisp" *core-files*)))
+  (let ((files (list* "lisp/compiler.lisp" ;; compile this one twice.
+                      "lisp/compiler.lisp"
+                      *core-files*)))
     ;; generate individual fasl-s
     (foreach files
       (lambda (file)

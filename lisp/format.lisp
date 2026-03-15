@@ -619,12 +619,16 @@
           `(let ((,vargs (list ,@args)))
              ,@(%expand-format (%parse-format format) vargs '*standard-output*))))
        ((eq stream nil)
-        (let ((vstream (gensym "stream"))
-              (vargs (gensym "args")))
-          `(let ((,vstream (%make-text-memory-output-stream))
-                 (,vargs (list ,@args)))
-             ,@(%expand-format (%parse-format format) vargs vstream)
-             (%get-output-stream-string ,vstream))))
+        (cond
+          (%:*compiler-macro-val?*
+           (let ((vstream (gensym "stream"))
+                 (vargs (gensym "args")))
+             `(let ((,vstream (%make-text-memory-output-stream))
+                    (,vargs (list ,@args)))
+                ,@(%expand-format (%parse-format format) vargs vstream)
+                (%get-output-stream-string ,vstream))))
+          (t
+           `(progn ,@args))))
        (t
         (let ((vstream (gensym "stream"))
               (vargs (gensym "args"))
@@ -639,6 +643,7 @@
                 (setf ,vstream (%make-text-memory-output-stream)
                       ,result t)))
              ,@(%expand-format (%parse-format format) vargs vstream)
-             (when ,result
-               (%get-output-stream-string ,vstream)))))))
+             ,@(when %:*compiler-macro-val?*
+                 `((when ,result
+                     (%get-output-stream-string ,vstream)))))))))
     (t form)))
