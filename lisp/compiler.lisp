@@ -1816,9 +1816,9 @@
              (arg-count x 1)
              (comp-unwind-protect (cadr x) (cddr x) env val? more?))
             ((funcall)
-             (comp-funcall (cadr x) (cddr x) env val? more?))
+             (comp-apply nil (cadr x) (cddr x) env val? more?))
             ((apply)
-             (comp-apply (cadr x) (cddr x) env val? more?))
+             (comp-apply t (cadr x) (cddr x) env val? more?))
             ((%op)
              (comp-op (cadr x) (cddr x) env val? more?))
             (otherwise
@@ -2141,7 +2141,7 @@
          (t
           (comp (car exps) env val? more?))))
 
-     (comp-funcall (f args env val? more?)
+     (comp-apply (apply? f args env val? more?)
        (if (or (safe-atom-p f)
                (and (consp f)
                     (or (%memq (car f) *lambda-syms*)
@@ -2151,21 +2151,9 @@
                      t
                      (and (safe-atom-p (car args))
                           (rec (cdr args))))))
-           (comp-call nil f args env val? more?)
-           (comp-call t 'funcall (list* f args) env val? more?)))
-
-     (comp-apply (f args env val? more?)
-       (if (or (safe-atom-p f)
-               (and (consp f)
-                    (or (%memq (car f) *lambda-syms*)
-                        (eq (car f) 'function)))
-               (let rec ((args args))
-                 (if (not args)
-                     t
-                     (and (safe-atom-p (car args))
-                          (rec (cdr args))))))
-           (comp-call nil f args env val? more? :apply t)
-           (comp-call t 'apply (list* f args) env val? more? :apply t)))
+           (comp-call nil f args env val? more? :apply apply?)
+           (comp-call t (if apply? 'apply 'funcall)
+                      (list* f args) env val? more? :apply apply?)))
 
      (comp-call (local f args env val? more? &key apply)
        (labels ((mkret (the-function)
