@@ -312,7 +312,7 @@
         (with-collectors (out)
           (doit (out val))
           out))
-       (null
+       ((null)
         (loop for seq in sequences
               do (assert (zerop (length seq))
                          "CONCATENATE: non-empty sequence with NULL output type"))

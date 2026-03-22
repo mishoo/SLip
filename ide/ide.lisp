@@ -186,7 +186,7 @@
         ((regexp-test #/[^:]/ query)
          (symbol-completion query (append (mapcar (lambda (pak)
                                                     (string (list pak ":")))
-                                                  (%:%list-packages))
+                                                  (list-all-packages))
                                           (as-list (%accessible-symbols *package* nil)))))
 
         ;; dunno what to do here, just return empty list
@@ -195,7 +195,7 @@
 
 (define-handler :list-packages ()
   (apply #'vector (sort (remove "%"
-                                (mapcar #'package-name (%list-packages))
+                                (mapcar #'package-name (list-all-packages))
                                 :test #'string=)
                         #'string<)))
 

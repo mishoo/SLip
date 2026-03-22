@@ -2167,7 +2167,7 @@ defp("find-package", false, function(m, nargs){
     return want_package(m.pop(), m);
 });
 
-defp("%list-packages", false, function(_, nargs){
+defp("list-all-packages", false, function(_, nargs){
     checknargs(nargs, 0, 0);
     return LispCons.fromArray([...new Set(Object.values(LispPackage.all()))]);
 });

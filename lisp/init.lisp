@@ -53,7 +53,7 @@
      symbol-value symbolp t tagbody tan third thread threadp throw type
      type-of typep unintern unless unsigned-byte unwind-protect upcase
      use-package values values-list vector vector-pop vector-push vectorp warn
-     when with-output-to-string zerop λ
+     when with-output-to-string zerop λ list-all-packages
 
      stream input-stream output-stream text-input-stream text-output-stream
 
