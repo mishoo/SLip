@@ -77,20 +77,24 @@
 
 (defun dsetq (var data)
   (cond
-    ((not var) nil)
+    ((not var) (list data))
     ((symbolp var)
      (unless (loop-variable-defined var)
        (list-add *loop-variables* var))
      (when data
        (list `(setf ,var ,data))))
     ((consp var)
-     (if data
-         (list `(let (($data ,data))
-                  ,@(dsetq (car var) `(car $data))
-                  ,@(dsetq (cdr var) `(cdr $data))))
-         (progn
-           (dsetq (car var) nil)
-           (dsetq (cdr var) nil))))))
+     (cond
+       ((eq data '$data)
+        `(,@(dsetq (car var) `(pop $data))
+          ,@(dsetq (cdr var) '$data)))
+       (data
+        (list `(let (($data ,data))
+                 ,@(dsetq (car var) `(pop $data))
+                 ,@(dsetq (cdr var) '$data))))
+       (t
+        (dsetq (car var) nil)
+        (dsetq (cdr var) nil))))))
 
 (defun init-dsetq (var data)
   (cond

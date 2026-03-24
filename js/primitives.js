@@ -62,6 +62,10 @@ const S_TEXT_OUTPUT_STREAM  = LispSymbol.get("TEXT-OUTPUT-STREAM");
 const S_STANDARD_OBJECT     = LispSymbol.get("STANDARD-OBJECT");
 const S_LOCAL_NICKNAMES     = LispSymbol.get("LOCAL-NICKNAMES");
 
+const S_K_INTERNAL          = LispSymbol.get("INTERNAL", KEYWORD_PACK);
+const S_K_EXTERNAL          = LispSymbol.get("EXTERNAL", KEYWORD_PACK);
+const S_K_INHERITED         = LispSymbol.get("INHERITED", KEYWORD_PACK);
+
 const LispList = {
     is: LispCons.isList,
     type: "list"
@@ -2103,12 +2107,32 @@ defp("unintern", true, function(m, nargs){
 });
 
 defp("find-symbol", false, function(m, nargs){
-    checknargs(nargs, 1, 2);
-    var pak = want_package(nargs == 2 ? m.pop() : false, m);
+    checknargs(nargs, 1, 3);
+    var err = nargs > 2 ? m.pop() : false;
+    var pak = want_package(nargs > 1 ? m.pop() : false, m);
     var name = as_string(m.pop());
     var sym = pak.find(name);
-    if (!sym) error("Symbol " + name + " not found in " + pak.name);
-    return sym;
+    if (sym) {
+        let status = sym.pak === pak
+            ? pak.exports.get(sym.name) === sym
+            ? S_K_EXTERNAL : S_K_INTERNAL : S_K_INHERITED;
+        m.stack.set_values_array([ sym, status ]);
+    } else if (err) {
+        error("Symbol " + name + " not found in " + pak.name);
+    } else {
+        return false;
+    }
+});
+
+defp("find-all-symbols", false, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    let name = checktype(m.pop(), LispString);
+    let syms = [];
+    [...new Set(Object.values(LispPackage.all()))].forEach(pak => {
+        let sym = pak.find_internal(name);
+        if (sym) syms.push(sym);
+    });
+    return LispCons.fromArray(syms);
 });
 
 defp("shadow", true, function(m, nargs){
