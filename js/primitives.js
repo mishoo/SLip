@@ -2043,7 +2043,7 @@ defp("%function-name", true, function(m, nargs){
     return f.name;
 });
 
-function want_package(designator, m) {
+function want_package(designator, m, noerr) {
     if (LispPackage.is(designator)) {
         return designator;
     }
@@ -2061,7 +2061,7 @@ function want_package(designator, m) {
         }
     }
     let pak = LispPackage.get_existing(designator);
-    if (!pak) {
+    if (!pak && !noerr) {
         error(`Cannot find package ${designator}`);
     }
     return pak;
@@ -2163,7 +2163,7 @@ defp("%symbol-accessible", false, function(m, nargs){
     var pak = want_package(m.pop(), m);
     var sym = m.pop();
     checktype(sym, LispSymbol);
-    return pak.all_accessible().indexOf(sym) >= 0; // XXX: optimize this
+    return pak.find(sym.name);
 });
 
 defp("%interned-symbols", false, function(m, nargs){
@@ -2188,12 +2188,23 @@ defp("%find-internal-symbol", false, function(m, nargs){
 
 defp("find-package", false, function(m, nargs){
     checknargs(nargs, 1, 1);
-    return want_package(m.pop(), m);
+    return want_package(m.pop(), m, true);
 });
 
 defp("list-all-packages", false, function(_, nargs){
     checknargs(nargs, 0, 0);
     return LispCons.fromArray([...new Set(Object.values(LispPackage.all()))]);
+});
+
+defp("delete-package", true, function(m, nargs){
+    checknargs(nargs, 1, 1);
+    var pak = want_package(m.pop(), m);
+    if (pak) {
+        LispPackage.delete(pak);
+        return true;
+    } else {
+        return false;
+    }
 });
 
 defp("package-name", false, function(m, nargs){

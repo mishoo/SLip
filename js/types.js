@@ -299,6 +299,15 @@ export class LispPackage {
     static all() {
         return LispPackage.#PACKAGES;
     };
+    static delete(pak) {
+        let name = pak.name;
+        pak.name = false;
+        for (let [ n, p ] of Object.entries(LispPackage.#PACKAGES)) {
+            if (p === pak) {
+                delete LispPackage.#PACKAGES[n];
+            }
+        }
+    }
     static get(name) {
         return LispPackage.#PACKAGES[name] || (
             LispPackage.#PACKAGES[name] = new LispPackage(name)
@@ -373,12 +382,17 @@ export class LispPackage {
         var ret = [ ...this.symbols.values() ];
         var a = this.uses;
         for (var i = a.length; --i >= 0;) {
-            ret.push(...a[i].exports.values());
+            ret.push(...a[i].all_exported());
         }
         return [ ...new Set(ret) ];
     }
     all_exported() {
-        return [ ...this.exports.values() ];
+        let a = new Set();
+        this.exports.forEach(name => {
+            let sym = this.find(name);
+            if (sym) a.add(sym);
+        });
+        return [ ...a ];
     }
     all_interned() {
         return this.symbols.values();

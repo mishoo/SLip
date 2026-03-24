@@ -54,7 +54,7 @@
      thread threadp throw type type-of typep unintern unless unsigned-byte
      unwind-protect upcase use-package values values-list vector vector-pop
      vector-push vectorp warn when with-output-to-string zerop λ
-     list-all-packages
+     list-all-packages delete-package
 
      stream input-stream output-stream text-input-stream text-output-stream
 
@@ -111,7 +111,7 @@
                     (destructuring-bind (source &rest names) (cdr opt)
                       (setq source (find-package source))
                       `(import ',(map1 (lambda (name)
-                                         (find-symbol name source))
+                                         (find-symbol name source t))
                                        names)
                                ,pak)))
                    (:local-nicknames

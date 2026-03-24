@@ -98,7 +98,8 @@
   (cond
     ((eq test #'eq)
      (%:%assq item list))
-    ((dolist (pair list)
+    (t
+     (dolist (pair list)
        (when (and pair (funcall test item (car pair)))
          (return pair))))))
 
