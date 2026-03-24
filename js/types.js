@@ -311,7 +311,7 @@ export class LispPackage {
     constructor(name) {
         this.name = name + "";
         this.symbols = new LispHash();
-        this.exports = new Map();
+        this.exports = new Set();
         this.uses = [];
         this.props = new Map();
     }
@@ -332,7 +332,7 @@ export class LispPackage {
         if (!sym) {
             sym = this.symbols.set(name, new LispSymbol(name, this));
             if (this === LispPackage.BASE_PACK) {
-                this.exports.set(name, sym);
+                this.exports.add(name);
             }
         }
         return sym;
@@ -343,9 +343,8 @@ export class LispPackage {
     }
     export(sym) {
         let name = LispSymbol.symname(sym);
-        sym = this.find(name);
-        if (sym && !this.exports.has(name)) {
-            this.exports.set(name, sym);
+        if (!this.exports.has(name)) {
+            this.exports.add(name);
             return true;
         }
         return false;
@@ -361,7 +360,11 @@ export class LispPackage {
         return sym;
     }
     find_exported(name) {
-        return this.exports.get(name) || false;
+        if (this.exports.has(name)) {
+            return this.find(name);
+        } else {
+            return false;
+        }
     }
     find_internal(name) {
         return this.symbols.get(name) || false;

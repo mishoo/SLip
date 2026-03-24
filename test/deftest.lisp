@@ -26,7 +26,7 @@
         `(flet ((,name ()
                   (let (,val ,exp ,comp ,ok)
                     (when *log*
-                      (format t "#'SL-TEST::~S ..." ',name))
+                      (format t "#'~S ..." ',name))
                     (setf ,exp ',expected)
                     (handler-bind
                         ((error (lambda (condition)

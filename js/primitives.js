@@ -2114,7 +2114,7 @@ defp("find-symbol", false, function(m, nargs){
     var sym = pak.find(name);
     if (sym) {
         let status = sym.pak === pak
-            ? pak.exports.get(sym.name) === sym
+            ? pak.exports.has(sym.name)
             ? S_K_EXTERNAL : S_K_INTERNAL : S_K_INHERITED;
         m.stack.set_values_array([ sym, status ]);
     } else if (err) {
@@ -2224,11 +2224,6 @@ defp("export", true, function(m, nargs){
     }
     checktype(pak, LispPackage);
     LispCons.forEach(syms, function(sym){
-        if (sym instanceof LispSymbol) {
-            sym = pak.intern(sym.name, sym);
-        } else if (LispString.is(sym)) {
-            sym = pak.intern(sym);
-        }
         pak.export(sym);
     });
     return pak;
