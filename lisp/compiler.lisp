@@ -199,8 +199,8 @@
 (defvar *load-timing* nil)
 (defvar *delay-eval* nil)
 
-(defvar *compiler-macros* (make-hash))
-(defvar *compiler-macro-val?*)
+(defvar *compiler-macros* (make-weak-hash))
+(defvar *compiler-macro-val?* t)
 
 (defvar *standard-output* (%make-text-memory-output-stream))
 (defvar *error-output* (%make-text-memory-output-stream))
@@ -1510,6 +1510,18 @@
                                      locally-special)))
                              env))))))
          ,@body))))
+
+(defun quote-if-you-must (x)
+  (cond
+    ((or (eq x t)
+         (eq x nil)
+         (stringp x)
+         (numberp x)
+         (characterp x)
+         (keywordp x))
+     x)
+    (t
+     `',x)))
 
 (defconstant *lambda-syms* '(lambda λ %fn))
 

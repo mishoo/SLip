@@ -14,7 +14,7 @@
           find maximizes minimizes that which below above))
 
 (defpackage :sl-loop
-  (:use :sl :%)
+  (:use :sl)
   (:import-from :sl #:with-collectors))
 
 (in-package :sl-loop)
@@ -55,10 +55,10 @@
 
 (defun register-parser (name parser)
   (cond
+    ((null name))
     ((consp name)
      (register-parser (car name) parser)
-     (when (cdr name)
-       (register-parser (cdr name) parser)))
+     (register-parser (cdr name) parser))
     ((symbolp name)
      (register-parser (symbol-name name) parser))
     ((stringp name)
@@ -314,13 +314,13 @@
            (list-add *loop-variables* `(,iter (hash-iterator ,hash-form)))
            (when vkey (list-add *loop-variables* vkey))
            (when vval (list-add *loop-variables* vval))
-           (let ((next-item `((multiple-value-bind ($more $entry) (iterator-next ,iter)
-                                (unless $more (go $loop-end))
-                                ,@(when vkey
-                                    `((setf ,vkey (svref $entry 0))))
-                                ,@(when vval
-                                    `((setf ,vval (svref $entry 1))))))))
-             (list-nconc *loop-body* next-item))))
+           (let ((next-item `(multiple-value-bind ($more $entry) (iterator-next ,iter)
+                               (unless $more (go $loop-end))
+                               ,@(when vkey
+                                   `((setf ,vkey (svref $entry 0))))
+                               ,@(when vval
+                                   `((setf ,vval (svref $entry 1)))))))
+             (list-add *loop-body* next-item))))
        args))))
 
 (defparser (for as) (args)
@@ -402,7 +402,7 @@
                   '$collect)))
     (aif (%:%assq name *loop-collect*)
          (list args name (cdr it))
-         (let ((tail (gensym (strcat name "-TAIL"))))
+         (let ((tail (gensym (%:strcat name "-TAIL"))))
            (when (eq name '$collect)
              (list-add *loop-finish* '$collect))
            (setf *loop-collect* (cons (cons name tail)

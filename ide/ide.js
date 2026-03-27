@@ -162,7 +162,7 @@ class Ymacs_SL extends Ymacs {
             };
         }
         var thread = MACHINE().eval_string("YMACS", "*THREAD*");
-        LispProcess.sendmsg(thread, what, LispCons.fromArray(args));
+        LispProcess.sendmsg(thread, what, args);
     }
     ls_set(src) {
         super.ls_set(src);

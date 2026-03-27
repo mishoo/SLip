@@ -292,8 +292,7 @@
   let handler = ev => {
     let target = ev.target;
     let send_signal = () =>
-      LispProcess.sendmsg(process || this.process, signal,
-                          LispCons.fromArray([ target, ev ]));
+      LispProcess.sendmsg(process || this.process, signal, [ target, ev ]);
     if (!selector)
       return send_signal();
     while (target instanceof Element) {

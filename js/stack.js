@@ -52,6 +52,7 @@ export class LispStack {
         }
     }
     pop_frame(len) {
+        if (len === 0) return [];
         let sp = this.sp;
         if (sp < len) {
             throw new LispPrimitiveError(`Insufficient stack elements in pop_frame (${this.sp}/${len})`);
@@ -60,6 +61,11 @@ export class LispStack {
         while (len > 0) frame[--len] = value(this.data[--sp]);
         this.sp = sp;
         return frame;
+    }
+    push_frame(args) {
+        for (let i = 0; i < args.length; ++i) {
+            this.data[this.sp++] = args[i];
+        }
     }
     copy() {
         return this.data.slice(0, this.sp);

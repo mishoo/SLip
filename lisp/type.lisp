@@ -73,7 +73,7 @@
     (let ((intname (intern (strcat (symbol-name name) "-SL-TYPE-INTERNAL")
                            (symbol-package name))))
       `(progn
-         (setf (fdefinition ',intname) (%:%fn ,name ,args ,@body))
+         (setf (symbol-function ',intname) (%:%fn ,name ,args ,@body))
          (setf (gethash ',name *ext-types*) ',intname)))))
 
 (defmacro defcomplex (name lambda-list form)
@@ -186,8 +186,7 @@
                (expand (funcall it (cdr tspec)))
                (let ((pred (gethash (car tspec) *ext-types*)))
                  (if (and pred (symbolp pred))
-                     `(,pred ,object ,@(mapcar (lambda (x) `',x)
-                                               (cdr tspec)))
+                     `(,pred ,object ,@(mapcar #'%:quote-if-you-must (cdr tspec)))
                      `(%typep ,object ',tspec))))))))))
 
 (defun expand (tspec object)

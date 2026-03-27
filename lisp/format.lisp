@@ -502,18 +502,6 @@
 ;;; although compilation time increases significantly (e.g. for the test
 ;;; suite).
 
-(defun quote-if-you-must (x)
-  (cond
-    ((or (eq x t)
-         (eq x nil)
-         (stringp x)
-         (numberp x)
-         (characterp x)
-         (keywordp x))
-     x)
-    (t
-     `',x)))
-
 (defun %expand-format (list args stream)
   (with-collectors (forms)
     (dolist (x list)
@@ -522,7 +510,7 @@
          (let ((handler (gethash (car x) *format-handlers*))
                (cmdargs (cdr x)))
            (forms `(setf ,args (,handler ,stream ,args
-                                ,@(mapcar #'quote-if-you-must cmdargs))))))
+                                ,@(mapcar #'%:quote-if-you-must cmdargs))))))
         (t
          (forms `(%stream-put ,stream ,x)))))
     forms))

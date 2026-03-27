@@ -58,7 +58,7 @@
              f)
             ((not (symbolp (car f)))
              (all-mexp f))
-            ((setq m (%get-symbol-prop (car f) :MEXP))
+            ((setq m (%get-symbol-prop (car f) '$MEXP))
              (funcall m f))
             ((not flag)
              (when *expand-compiler-macros*
@@ -239,8 +239,10 @@
            (symbol-macrolet       symbol-macrolet-mexp)
            (multiple-value-bind   mvb-mexp))
   (lambda (x)
-    (%set-symbol-prop (car x) :MEXP (cadr x))))
+    (%set-symbol-prop (car x) '$MEXP (cadr x))))
 
 (defun macroexpand-all (f)
-  (let ((%:*compiler-env* (%:make-compiler-env)))
+  (let ((%:*compiler-env* (%:make-compiler-env))
+        ;; XXX: it would be nice to keep track of `val?' properly:
+        (%:*compiler-macro-val?* t))
     (mexp f)))

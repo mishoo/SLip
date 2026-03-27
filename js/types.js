@@ -96,12 +96,20 @@ export class LispClosure {
         this.code = code;
         this.name = name || false;
         this.env = env || false;
+        this.call_count = 0;
+        this._jiten = false;
     }
     copy() {
         return new LispClosure(this.code, this.name, this.env);
     }
     toString() {
         return "#<FUNCTION" + (this.name ? " " + this.name : "") + ">";
+    }
+    jit_enable() {
+        if (!this._jiten) {
+            this.code = this.code.slice();
+            this._jiten = true;
+        }
     }
 }
 
@@ -618,7 +626,7 @@ const start = () => {
             if (process.m.status === STATUS_RUNNING) {
                 if (pe && pe.function) {
                     // RETHROW as Lisp error.
-                    process.m._callnext(pe.function, LispCons.fromArray(["~A", ex.message]));
+                    process.m._callnext(pe.function, ["~A", ex.message]);
                 }
                 QUEUE.reenq(cell);
             }

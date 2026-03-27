@@ -2478,8 +2478,7 @@ defp("%thread-join", true, function(m, nargs){
 
 defp("%sendmsg", true, function(m, nargs){
     checknargs(nargs, 2);
-    var args = false;
-    while (nargs-- > 2) args = new LispCons(m.pop(), args);
+    var args = m.stack.pop_frame(nargs - 2);
     var signal = m.pop(), process = m.pop();
     checktype(process, LispProcess);
     return LispProcess.sendmsg(process, signal, args);
@@ -2572,8 +2571,7 @@ defp("dom.subscribe", true, function(m, nargs){
                 "TARGET"   : ev.target,
                 "RELATED"  : ev.relatedTarget
             });
-            args = new LispCons(args, false);
-            LispProcess.sendmsg(process, e, args);
+            LispProcess.sendmsg(process, e, [ args ]);
         }, true);
     });
     return false;
@@ -2684,7 +2682,7 @@ defp("%eval-opcode", true, function(m, nargs){
     checktype(code, LispVector);
     code = LispMachine.assemble(code);
     var f = new LispClosure(code, false, new LispCons([], false));
-    return m._callnext(f, false);
+    return m._callnext(f, []);
 });
 
 defp("%assemble-opcode", false, function(m, nargs){
@@ -2703,7 +2701,7 @@ defp("%eval-code", true, function(m, nargs){
         [ "RET" ],
     ])];
     let f = new LispClosure(code, false, new LispCons([], false));
-    return m._callnext(f, false);
+    return m._callnext(f, []);
 });
 
 // The following is called only in COMPILE-STRING (that is, at
@@ -2725,7 +2723,7 @@ defp("%assemble-and-exec-opcode", true, function(m, nargs){
         [ "RET" ]
     ]));
     var f = new LispClosure(code, false, new LispCons([], false));
-    return m._callnext(f, false);
+    return m._callnext(f, []);
 });
 
 defp("%relocate-code", true, function(m, nargs){

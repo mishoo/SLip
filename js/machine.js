@@ -251,7 +251,6 @@ export class LispRet {
         this.pc = pc;
         this.env = m.env;
         this.denv = m.denv;
-        //if (m.trace) this.trace = m.trace.slice();
     }
     run(m, retval) {
         m.f = this.f;
@@ -260,7 +259,6 @@ export class LispRet {
         m.env = this.env;
         m.denv = this.denv;
         m.push(retval);
-        //if (this.trace) m.trace = this.trace;
     }
 }
 
@@ -292,7 +290,6 @@ class LispLongRet {
         this.env = m.env;
         this.denv = m.denv;
         this.slen = m.stack.sp;
-        //if (m.trace) this.trace = m.trace.slice();
     }
     unwind(m, addr) {
         m.f = this.f;
@@ -301,7 +298,6 @@ class LispLongRet {
         m.denv = this.denv;
         m.stack.sp = this.slen;
         m.pc = addr;
-        //if (this.trace) m.trace = this.trace;
     }
     run(m, addr, retval) {
         // figure out if we need to execute cleanup hooks
@@ -324,12 +320,10 @@ class LispCC {
     constructor(m) {
         this.stack = m.stack.copy();
         this.denv = m.denv;
-        //if (m.trace) this.trace = m.trace.slice();
     }
     run(m) {
         m.stack.restore(this.stack);
         m.denv = this.denv;
-        //if (this.trace) m.trace = this.trace.slice();
     }
 }
 
@@ -1345,7 +1339,6 @@ export class LispMachine {
         this.status = STATUS_RUNNING;
         this.process = null;
         this.f = null;
-        //this.trace = [];
     }
 
     find_dvar(symbol) {
@@ -1415,7 +1408,7 @@ export class LispMachine {
             if (ex instanceof LispPrimitiveError) {
                 var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
                 if (pe && pe.function) {
-                    this._callnext(pe.function, LispCons.fromArray(["~A", ex.message]));
+                    this._callnext(pe.function, ["~A", ex.message]);
                     return this.loop();
                 }
             } else {
@@ -1427,7 +1420,6 @@ export class LispMachine {
     }
 
     atomic_call(closure, args) {
-        if (!args) args = [];
         // stop the world, call closure, resume the world
         var save_code = this.code;
         var save_env = this.env;
@@ -1436,18 +1428,15 @@ export class LispMachine {
         var save_nargs = this.n_args;
         var save_pc = this.pc;
         var save_f = this.f;
-        //var save_trace = this.trace;
         this.code = closure.code;
         this.env = closure.env;
         this.stack = new LispStack().restore([ this.mkret(-1) ].concat(args));
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
-        //if (this.trace) this.trace = [ closure, args ];
         try {
             return this.loop();
         } finally {
-            //this.trace = save_trace;
             this.f = save_f;
             this.pc = save_pc;
             this.n_args = save_nargs;
@@ -1468,16 +1457,10 @@ export class LispMachine {
     }
 
     _callnext(closure, args) {
-        //if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
-        if (args !== undefined) {
+        if (args) {
             this.push(this.mkret(this.pc));
-            let n = 0;
-            while (args !== false) {
-                this.push(args.car);
-                args = args.cdr;
-                n++;
-            }
-            this.n_args = n;
+            this.stack.push_frame(args);
+            this.n_args = args.length;
         }
         this.code = closure.code;
         this.env = closure.env;
@@ -1493,11 +1476,10 @@ export class LispMachine {
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
-        //if (this.trace) this.trace = [ closure, args ];
     }
 
     lisp_error(...args) {
-        this._callnext(LispSymbol.get("ERROR").function, LispCons.fromArray(args));
+        this._callnext(LispSymbol.get("ERROR").function, args);
     }
 
     run(quota) {
@@ -1672,7 +1654,6 @@ let OP_RUN = [
         let closure = arg instanceof LispSymbol ? arg.function : arg;
         if (!(closure instanceof LispClosure))
             error("OP.CALL invalid function: " + dump(arg));
-        //if (m.trace) m.trace.push([ closure, m.stack.slice(-count) ]);
         m.n_args = count;
         m.code = closure.code;
         m.env = closure.env;
@@ -2076,7 +2057,6 @@ let OP_RUN = [
         let closure = arg instanceof LispSymbol ? arg.function : arg;
         if (!(closure instanceof LispClosure))
             error("OP.APPLY invalid function: " + dump(arg));
-        //if (m.trace) m.trace.push([ closure, m.stack.slice(-count) ]);
         arg = m.pop();          // rest arguments
         while (arg !== false) {
             m.push(LispCons.car(arg));
