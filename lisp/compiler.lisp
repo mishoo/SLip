@@ -2559,23 +2559,15 @@
            (prog2
                (incf *tagbody-dynest*)
                (let ((k1 (mklabel)))
-                 (cond
-                   ((not val?)
-                    (%seq (comp tag env t t)
-                          (gen "CATCH" k1)
-                          ;; we still want body to leave the value on the stack,
-                          ;; so in normal termination it wouldn't be popped twice.
-                          (comp-seq body env t more?)
-                          (vector k1)
-                          (gen "POP")))
-                   (t
-                    (%seq (comp tag env t t)
-                          (gen "CATCH" k1)
-                          (comp-seq body env t more?)
-                          (vector k1)
-                          (if more?
-                              (gen "UNFR" 0 1)
-                              (gen "RET"))))))
+                 (%seq (comp tag env t t)
+                       (gen "CATCH" k1)
+                       ;; we still want body to leave the value on the stack,
+                       ;; so in normal termination it wouldn't be popped twice.
+                       (comp-seq body env t more?)
+                       (gen "UNFR" 0 1)
+                       (vector k1)
+                       (unless val? (gen "POP"))
+                       (unless more? (gen "RET"))))
              (decf *tagbody-dynest*))
            (comp-const nil val? more?)))
 
