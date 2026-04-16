@@ -296,7 +296,8 @@
     args))
 
 ;; integers (missing roman/english output)
-(defun %print-integer (output colmod? atmod? base mincol padchar commachar comma-interval number)
+(defun %print-integer (output colmod? atmod?
+                              base mincol padchar commachar comma-interval number)
   (let* ((x (floor number))
          (s (if (and atmod? (plusp x))
                 (strcat #\+ (number-string x))
@@ -306,23 +307,28 @@
     (%stream-put output (%pad-string (upcase s) mincol padchar t))))
 
 (def-format #\D ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-  (%print-integer output colmod? atmod? 10 mincol padchar commachar comma-interval (pop args))
+  (%print-integer output colmod? atmod?
+                  10 mincol padchar commachar comma-interval (pop args))
   args)
 
 (def-format #\B ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-  (%print-integer output colmod? atmod? 2 mincol padchar commachar comma-interval (pop args))
+  (%print-integer output colmod? atmod?
+                  2 mincol padchar commachar comma-interval (pop args))
   args)
 
 (def-format #\O ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-  (%print-integer output colmod? atmod? 8 mincol padchar commachar comma-interval (pop args))
+  (%print-integer output colmod? atmod?
+                  8 mincol padchar commachar comma-interval (pop args))
   args)
 
 (def-format #\X ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-  (%print-integer output colmod? atmod? 16 mincol padchar commachar comma-interval (pop args))
+  (%print-integer output colmod? atmod?
+                  16 mincol padchar commachar comma-interval (pop args))
   args)
 
 (def-format #\R ((base nil) (mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-  (%print-integer output colmod? atmod? base mincol padchar commachar comma-interval (pop args))
+  (%print-integer output colmod? atmod?
+                  base mincol padchar commachar comma-interval (pop args))
   args)
 
 ;; floating-point (incomplete)
@@ -678,7 +684,8 @@
           ,@(format-arg args colinc 1)
           ,@(format-arg args minpad 0)
           ,@(format-arg args padchar #\Space))
-       (%print-general ,output ,colmod? ,atmod? ,mincol ,colinc ,minpad ,padchar (pop ,args))
+       (%print-general ,output ,colmod? ,atmod?
+                       ,mincol ,colinc ,minpad ,padchar (pop ,args))
        ,args)))
 
 (define-compiler-macro internal-format-83 ;; #\S
@@ -691,7 +698,8 @@
           ,@(format-arg args colinc 1)
           ,@(format-arg args minpad 0)
           ,@(format-arg args padchar #\Space))
-       (%print-general ,output ,colmod? ,atmod? ,mincol ,colinc ,minpad ,padchar (pop ,args))
+       (%print-general ,output ,colmod? ,atmod?
+                       ,mincol ,colinc ,minpad ,padchar (pop ,args))
        ,args)))
 
 (define-compiler-macro format (&whole form stream format . args)

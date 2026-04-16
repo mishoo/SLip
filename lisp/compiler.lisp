@@ -23,9 +23,11 @@
   (when clauses
     (let ((first (car clauses)))
       (if (cdr first)
-          `(if ,(car first)
-               (progn ,@(cdr first))
-               (cond ,@(cdr clauses)))
+          (if (eq t (car first))
+              `(progn ,@(cdr first))
+              `(if ,(car first)
+                   (progn ,@(cdr first))
+                   (cond ,@(cdr clauses))))
           `(or ,(car first)
                (cond ,@(cdr clauses)))))))
 
@@ -1983,10 +1985,9 @@
 
      (comp-arguments (exps env)
        (with-seq-output <<
-         (let rec ((exps exps))
-           (when exps
-             (<< (comp (car exps) env t t))
-             (rec (cdr exps))))))
+         (foreach exps
+           (lambda (exp)
+             (<< (comp exp env t t))))))
 
      (comp-block (name forms env val? more?)
        (assert (symbolp name) (strcat "BLOCK expects a symbol, got: " name))

@@ -131,7 +131,7 @@
   (<< (if *print-escape* (%dump character) character)))
 
 (def-print (regexp)
-  (<< "#" (%dump regexp)))
+  (<< (%dump regexp)))
 
 (def-print (package)
   (<< "#<PACKAGE " (package-name package) ">"))

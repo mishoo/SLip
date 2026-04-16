@@ -5,8 +5,7 @@
           logtest logcount integer-length))
 
 (defpackage :sl-byte
-  (:use :sl)
-  (:import-from :% #:defcompiler))
+  (:use :sl))
 
 ;; (setq %:*enable-inline* t)
 
