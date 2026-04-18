@@ -606,7 +606,7 @@
   (let ((myargs (gensym "MYARGS")))
     `(let (,@(format-arg args maxn)
            (,myargs ,(if atmod? args `(pop ,args))))
-       (catch 'abort-format-iteration
+       (block abort-format-iteration
          ,(cond
             (maxn
              (cond
@@ -642,7 +642,7 @@
   (when (or colmod? atmod? a b c)
     (return-from internal-format-94 decline))
   `(progn
-     (unless ,args (throw 'abort-format-iteration nil))
+     (unless ,args (return-from abort-format-iteration nil))
      ,args))
 
 (defmacro define-integer-compiler-macro (char base)
@@ -709,7 +709,7 @@
        ((eq stream t)
         (let ((vargs (gensym "args")))
           `(let ((,vargs (list ,@args)))
-             (catch 'abort-format-iteration
+             (block abort-format-iteration
                ,@(%expand-format (%parse-format format) vargs '*standard-output*)))))
        ((eq stream nil)
         (cond
@@ -718,7 +718,7 @@
                  (vargs (gensym "args")))
              `(let ((,vstream (%make-text-memory-output-stream))
                     (,vargs (list ,@args)))
-                (catch 'abort-format-iteration
+                (block abort-format-iteration
                   ,@(%expand-format (%parse-format format) vargs vstream))
                 (%get-output-stream-string ,vstream))))
           (t
@@ -736,7 +736,7 @@
                ((eq ,vstream nil)
                 (setf ,vstream (%make-text-memory-output-stream)
                       ,result t)))
-             (catch 'abort-format-iteration
+             (block abort-format-iteration
                ,@(%expand-format (%parse-format format) vargs vstream))
              ,@(when %:*compiler-macro-val?*
                  `((when ,result
