@@ -70,7 +70,6 @@
       (save-excursion
        (incf sec0 (ease-elastic anim-pos))
        (right (* sec0 6))
-       (set-thickness 2)
        (without-pen (backward (* r 0.08)))
        (set-thickness 1)
        (set-color "#46d")
@@ -97,7 +96,7 @@
 
 (defun animate-clock ()
   (when *canvas*
-    (without-interrupts (draw-clock-frame))
+    (sl-thread:without-interrupts (draw-clock-frame))
     ;; this also works:
     ;;   (sleep 0.016)
     ;;   (animate-clock)
@@ -105,7 +104,7 @@
 
 (with-canvas
   (let ((iii 0))
-    (make-thread
+    (%:%make-thread
      (lambda ()
        (init-canvas 500 500)
        (hide-turtle)

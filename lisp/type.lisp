@@ -2,7 +2,9 @@
 
 (export '(type-of typep deftype typecase etypecase
           fixnum float input-stream output-stream satisfies mod
-          string-designator))
+          string-designator
+          simple-string simple-vector
+          simple-string-p simple-vector-p))
 
 (defpackage :sl-type
   (:use :sl :%)
@@ -10,6 +12,8 @@
            #:type-of-structure #:type-of-object))
 
 (in-package :sl-type)
+
+;; (setf %:*enable-inline* t)
 
 (defun integer-predicate (obj &optional (min '*) (max '*))
   (and (integerp obj)
@@ -69,7 +73,7 @@
     (let ((intname (intern (strcat (symbol-name name) "-SL-TYPE-INTERNAL")
                            (symbol-package name))))
       `(progn
-         (setf (fdefinition ',intname) (%:%fn ,name ,args ,@body))
+         (setf (symbol-function ',intname) (%:%fn ,name ,args ,@body))
          (setf (gethash ',name *ext-types*) ',intname)))))
 
 (defmacro defcomplex (name lambda-list form)
@@ -119,8 +123,8 @@
 
 (defpredicate %cons (obj &optional (left '*) (right '*))
   (and (consp obj)
-       (if (eq left '*) t (typep (car obj) left))
-       (if (eq right '*) t (typep (cdr obj) right))))
+       (or (eq left '*) (typep (car obj) left))
+       (or (eq right '*) (typep (cdr obj) right))))
 
 (defun %typep (object typespec)
   (cond
@@ -182,8 +186,7 @@
                (expand (funcall it (cdr tspec)))
                (let ((pred (gethash (car tspec) *ext-types*)))
                  (if (and pred (symbolp pred))
-                     `(,pred ,object ,@(mapcar (lambda (x) `',x)
-                                               (cdr tspec)))
+                     `(,pred ,object ,@(mapcar #'%:quote-if-you-must (cdr tspec)))
                      `(%typep ,object ',tspec))))))))))
 
 (defun expand (tspec object)
@@ -246,7 +249,7 @@
   `(eql nil))
 
 (deftype boolean ()
-  `(or (eql t) (eql nil)))
+  `(or (eql t) null))
 
 (deftype mod (n)
   `(integer 0 ,(1- n)))
@@ -327,3 +330,11 @@
 
 ;; we no longer touch *built-in-types* from this point on
 (setq *ext-types* (%:hash-copy *ext-types*))
+
+(declaim (inline simple-string-p))
+(defun simple-string-p (thing)
+  (typep thing 'string))
+
+(declaim (inline simple-vector-p))
+(defun simple-vector-p (thing)
+  (typep thing 'vector))

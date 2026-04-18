@@ -2,7 +2,7 @@
 ;;;; Created:  Wed Aug 28 21:15:33 2002
 ;;;; Contains: Tests for SUBSTITUTE
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest substitute-list.1
   (let ((x '())) (values (substitute 'b 'a x) x))
@@ -201,3 +201,255 @@
     (and (equal orig x)
          result))
   ((a 1) (a 10) (a 3) (a 10) (a 10) (a 6) (a 10)))
+
+;;; Tests on vectors
+
+(deftest substitute-vector.1
+  (let ((x #())) (values (substitute 'b 'a x) x))
+  #() #())
+
+(deftest substitute-vector.2
+  (let ((x #(a b a c))) (values (substitute 'b 'a x) x))
+  #(b b b c)
+  #(a b a c))
+
+(deftest substitute-vector.3
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :count nil) x))
+  #(b b b c)
+  #(a b a c))
+
+(deftest substitute-vector.4
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :count 2) x))
+  #(b b b c)
+  #(a b a c))
+
+(deftest substitute-vector.5
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :count 1) x))
+  #(b b a c)
+  #(a b a c))
+
+(deftest substitute-vector.6
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :count 0) x))
+  #(a b a c)
+  #(a b a c))
+
+(deftest substitute-vector.7
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :count -1) x))
+  #(a b a c)
+  #(a b a c))
+
+(deftest substitute-vector.8
+  (let ((x #())) (values (substitute 'b 'a x :from-end t) x))
+  #() #())
+
+(deftest substitute-vector.9
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :from-end t) x))
+  #(b b b c)
+  #(a b a c))
+
+(deftest substitute-vector.10
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :from-end t :count nil) x))
+  #(b b b c)
+  #(a b a c))
+
+(deftest substitute-vector.11
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :count 2 :from-end t) x))
+  #(b b b c)
+  #(a b a c))
+
+(deftest substitute-vector.12
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :count 1 :from-end t) x))
+  #(a b b c)
+  #(a b a c))
+
+(deftest substitute-vector.13
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :count 0 :from-end t) x))
+  #(a b a c)
+  #(a b a c))
+
+(deftest substitute-vector.14
+  (let ((x #(a b a c))) (values (substitute 'b 'a x :count -1 :from-end t) x))
+  #(a b a c)
+  #(a b a c))
+
+;; (deftest substitute-vector.15
+;;   (loop for i from 0 to 9 always
+;;         (loop for j from i to 10 always
+;;               (let* ((orig #(a a a a a a a a a a))
+;;                      (x (copy-seq orig))
+;;                      (y (substitute 'x 'a x :start i :end j)))
+;;                 (and (equalp orig x)
+;;                      (equalp y (concatenate 'simple-vector
+;;                                            (make-array i :initial-element 'a)
+;;                                            (make-array (- j i) :initial-element 'x)
+;;                                            (make-array (- 10 j) :initial-element 'a)))))))
+;;   t)
+
+;; (deftest substitute-vector.16
+;;   (loop for i from 0 to 9 always
+;;         (loop for j from i to 10 always
+;;               (let* ((orig #(a a a a a a a a a a))
+;;                      (x (copy-seq orig))
+;;                      (y (substitute 'x 'a x :start i :end j :from-end t)))
+;;                 (and (equalp orig x)
+;;                      (equalp y (concatenate 'simple-vector
+;;                                            (make-array i :initial-element 'a)
+;;                                            (make-array (- j i) :initial-element 'x)
+;;                                            (make-array (- 10 j) :initial-element 'a)))))))
+;;   t)
+
+;; (deftest substitute-vector.17
+;;   (loop for i from 0 to 9 always
+;;         (loop for j from i to 10 always
+;;               (loop for c from 0 to (- j i) always
+;;                     (let* ((orig #(a a a a a a a a a a))
+;;                            (x (copy-seq orig))
+;;                            (y (substitute 'x 'a x :start i :end j :count c)))
+;;                       (and (equalp orig x)
+;;                            (equalp y (concatenate 'simple-vector
+;;                                                  (make-array i :initial-element 'a)
+;;                                                  (make-array c :initial-element 'x)
+;;                                                  (make-array (- 10 (+ i c)) :initial-element 'a))))))))
+;;   t)
+
+;; (deftest substitute-vector.18
+;;   (loop for i from 0 to 9 always
+;;         (loop for j from i to 10 always
+;;               (loop for c from 0 to (- j i) always
+;;                     (let* ((orig #(a a a a a a a a a a))
+;;                            (x (copy-seq orig))
+;;                            (y (substitute 'x 'a x :start i :end j :count c :from-end t)))
+;;                       (and (equalp orig x)
+;;                            (equalp y (concatenate 'simple-vector
+;;                                                  (make-array (- j c) :initial-element 'a)
+;;                                                  (make-array c :initial-element 'x)
+;;                                                  (make-array (- 10 j) :initial-element 'a))))))))
+;;   t)
+
+(deftest substitute-vector.19
+  (let* ((orig #(1 2 3 4 5 6 7 8 9))
+         (x (copy-seq orig))
+         (result (substitute 'x 5 x :test #'(lambda (a b) (<= (abs (- a b)) 2)))))
+    (and (equalp orig x)
+         result))
+  #(1 2 x x x x x 8 9))
+
+(deftest substitute-vector.20
+  (let* ((orig #(1 2 3 4 5 6 7 8 9))
+         (x (copy-seq orig))
+         (c -4)
+         (result (substitute 'x 5 x :test #'(lambda (a b) (incf c 2) (= (+ b c) a)))))
+    (and (equalp orig x)
+         result))
+  #(1 2 x 4 5 6 7 8 9))
+
+
+(deftest substitute-vector.21
+  (let* ((orig #(1 2 3 4 5 6 7 8 9))
+         (x (copy-seq orig))
+         (c 5)
+         (result (substitute 'x 9 x :test #'(lambda (a b) (incf c -2) (= (+ b c) a))
+                             :from-end t)))
+    (and (equalp orig x)
+         result))
+  #(1 2 3 4 5 6 7 x 9))
+
+(deftest substitute-vector.22
+  (let* ((orig #(1 2 3 4 5 6 7 8 9))
+         (x (copy-seq orig))
+         (c -4)
+         (result (substitute 'x 5 x :test-not #'(lambda (a b) (incf c 2) (/= (+ b c) a)))))
+    (and (equalp orig x)
+         result))
+  #(1 2 x 4 5 6 7 8 9))
+
+
+(deftest substitute-vector.23
+  (let* ((orig #(1 2 3 4 5 6 7 8 9))
+         (x (copy-seq orig))
+         (c 5)
+         (result (substitute 'x 9 x :test-not #'(lambda (a b) (incf c -2) (/= (+ b c) a))
+                             :from-end t)))
+    (and (equalp orig x)
+         result))
+  #(1 2 3 4 5 6 7 x 9))
+
+(deftest substitute-vector.24
+  (let* ((orig #((a 1) (b 2) (a 3) (c 4) (d 5) (a 6) (e 7)))
+         (x (copy-seq orig))
+         (result (substitute '(a 10) 'a x :key #'car)))
+    (and (equalp orig x)
+         result))
+  #((a 10) (b 2) (a 10) (c 4) (d 5) (a 10) (e 7)))
+
+(deftest substitute-vector.25
+  (let* ((orig #((a 1) (b 2) (a 3) (c 4) (d 5) (a 6) (e 7)))
+         (x (copy-seq orig))
+         (result (substitute '(a 10) 'a x :key #'car :start 1 :end 5)))
+    (and (equalp orig x)
+         result))
+  #((a 1) (b 2) (a 10) (c 4) (d 5) (a 6) (e 7)))
+
+(deftest substitute-vector.26
+  (let* ((orig #((a 1) (b 2) (a 3) (c 4) (d 5) (a 6) (e 7)))
+         (x (copy-seq orig))
+         (result (substitute '(a 10) 'a x :key #'car :test (complement #'eql))))
+    (and (equalp orig x)
+         result))
+  #((a 1) (a 10) (a 3) (a 10) (a 10) (a 6) (a 10)))
+
+(deftest substitute-vector.27
+  (let* ((orig #((a 1) (b 2) (a 3) (c 4) (d 5) (a 6) (e 7)))
+         (x (copy-seq orig))
+         (result (substitute '(a 10) 'a x :key #'car :test-not #'eql)))
+    (and (equalp orig x)
+         result))
+  #((a 1) (a 10) (a 3) (a 10) (a 10) (a 6) (a 10)))
+
+;; (deftest substitute-vector.28
+;;   (let* ((x (make-array '(10) :initial-contents '(a b a c b a d e a f)
+;;                        :fill-pointer 5))
+;;          (result (substitute 'z 'a x)))
+;;     result)
+;;   #(z b z c b))
+
+;; (deftest substitute-vector.29
+;;   (let* ((x (make-array '(10) :initial-contents '(a b a c b a d e a f)
+;;                        :fill-pointer 5))
+;;          (result (substitute 'z 'a x :from-end t)))
+;;     result)
+;;   #(z b z c b))
+
+;; (deftest substitute-vector.30
+;;   (let* ((x (make-array '(10) :initial-contents '(a b a c b a d e a f)
+;;                        :fill-pointer 5))
+;;          (result (substitute 'z 'a x :count 1)))
+;;     result)
+;;   #(z b a c b))
+
+;; (deftest substitute-vector.31
+;;   (let* ((x (make-array '(10) :initial-contents '(a b a c b a d e a f)
+;;                        :fill-pointer 5))
+;;          (result (substitute 'z 'a x :from-end t :count 1)))
+;;     result)
+;;   #(a b z c b))
+
+;; (deftest substitute-vector.32
+;;   (let* ((v1 (copy-seq #(a b c d a b c d a b c d a b c d)))
+;;          (v2 (make-array '(8) :displaced-to v1
+;;                          :displaced-index-offset 3)))
+;;     (values
+;;      (substitute 'x 'c v2 :count 1)
+;;      v1))
+;;   #(d a b x d a b c)
+;;   #(a b c d a b c d a b c d a b c d))
+
+;; (deftest substitute-vector.33
+;;   (let* ((v1 (copy-seq #(a b c d a b c d a b c d a b c d)))
+;;          (v2 (make-array '(8) :displaced-to v1
+;;                          :displaced-index-offset 3)))
+;;     (values
+;;      (substitute 'x 'c v2 :count 1 :from-end t)
+;;      v1))
+;;   #(d a b c d a b x)
+;;   #(a b c d a b c d a b c d a b c d))

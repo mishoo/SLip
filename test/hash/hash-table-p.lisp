@@ -2,7 +2,7 @@
 ;;;; Created:  Tue Sep 16 21:58:37 2003
 ;;;; Contains: Tests for HASH-TABLE-P
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 ;; (deftest hash-table-p.1
 ;;   (loop for e in '(nil t 1 10.0 (a b c) #(a b c) #*1011

@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Apr 19 22:36:46 2003
 ;;;; Contains: Tests of APPEND
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest append.1
   (append)

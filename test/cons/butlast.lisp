@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Apr 19 22:41:14 2003
 ;;;; Contains: Tests of BUTLAST
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest butlast.1
   (let ((x (list 'a 'b 'c 'd 'e)))

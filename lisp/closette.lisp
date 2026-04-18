@@ -1388,7 +1388,7 @@
     ((charp x)                                        <character>)
     ((stringp x)                                      <string>)
     ((sl-struct::structurep x 'sl-struct::structure)  <structure-class>)
-    ((sl-struct::structurep x)                        <structure-object>)
+    ((%:%structp x)                                   <structure-object>)
     ((vectorp x)                                      <vector>)
     ((arrayp x)                                       <array>)
     ((functionp x)                                    <function>)

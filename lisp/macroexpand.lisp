@@ -11,6 +11,25 @@
 
 (defparameter *expand-compiler-macros* nil)
 
+(defun flatten (sym forms)
+  (let dig ((forms forms)
+            (result nil)
+            (rest nil))
+    (cond
+      ((null forms)
+       (if rest
+           (dig (car rest) result (cdr rest))
+           (nreverse result)))
+      ((and (consp (car forms))
+            (eq sym (caar forms)))
+       (dig (cdar forms)
+            result
+            (cons (cdr forms) rest)))
+      (t
+       (dig (cdr forms)
+            (cons (car forms) result)
+            rest)))))
+
 (defun %with-local-vars (names thunk)
   (if names
       (let ((defs (nreverse
@@ -39,7 +58,7 @@
              f)
             ((not (symbolp (car f)))
              (all-mexp f))
-            ((setq m (%get-symbol-prop (car f) :MEXP))
+            ((setq m (%get-symbol-prop (car f) '$MEXP))
              (funcall m f))
             ((not flag)
              (when *expand-compiler-macros*
@@ -135,19 +154,7 @@
       arg))
 
 (defun lambda-list-names (lst)
-  (let rec ((lst lst)
-            (ret nil))
-    (cond
-      ((null lst)
-       (nreverse ret))
-      ((atom lst)
-       (nreconc ret (list lst)))
-      ((consp (car lst))
-       (rec (cdr lst) (cons (caar lst) ret)))
-      ((and (symbolp (car lst))
-            (not (%:lambda-keyword-p (car lst))))
-       (rec (cdr lst) (cons (car lst) ret)))
-      ((rec (cdr lst) ret)))))
+  (getf (%:parse-lambda-list lst) :names))
 
 (defun lambda-list-mexp (lst)
   (let rec ((lst lst)
@@ -183,7 +190,7 @@
 
 (defun progn-mexp (f)
   (if (cddr f)
-      (%:flatten 'progn `(progn ,@(all-mexp (cdr f))))
+      (flatten 'progn `(progn ,@(all-mexp (cdr f))))
       (mexp (cadr f))))
 
 (defun macrolet-mexp (f)
@@ -232,8 +239,10 @@
            (symbol-macrolet       symbol-macrolet-mexp)
            (multiple-value-bind   mvb-mexp))
   (lambda (x)
-    (%set-symbol-prop (car x) :MEXP (cadr x))))
+    (%set-symbol-prop (car x) '$MEXP (cadr x))))
 
 (defun macroexpand-all (f)
-  (let ((%:*compiler-env* (%:make-compiler-env)))
+  (let ((%:*compiler-env* (%:make-compiler-env))
+        ;; XXX: it would be nice to keep track of `val?' properly:
+        (%:*compiler-macro-val?* t))
     (mexp f)))

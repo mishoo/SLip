@@ -162,7 +162,7 @@ class Ymacs_SL extends Ymacs {
             };
         }
         var thread = MACHINE().eval_string("YMACS", "*THREAD*");
-        LispProcess.sendmsg(thread, what, LispCons.fromArray(args));
+        LispProcess.sendmsg(thread, what, args);
     }
     ls_set(src) {
         super.ls_set(src);
@@ -240,7 +240,7 @@ function find_toplevel_sexp(buffer, blink, noerror) {
     if (blink) {
         flash_region(buffer, exp.start, exp.end);
     }
-    return [ exp.start, exp.end ];
+    return [ exp.start, exp.end, exp ];
 };
 
 function find_in_package(buffer, start) {
@@ -364,13 +364,15 @@ Ymacs_Buffer.newCommands({
         if (point >= m) {
             this.cmd("sl_repl_eval");
         } else if (point < m) {
-            var exp = find_toplevel_sexp(this, false, true);
-            if (exp && point >= exp[0] && point <= exp[1]) {
-                set_repl_input(this, this.cmd("buffer_substring", exp[0], exp[1]));
-                this.cmd("goto_char", m + exp[1] - exp[0]);
+            let rc = this._positionToRowCol(point);
+            let mc = this._positionToRowCol(m);
+            if (rc.row < mc.row) {
+                let [begin, end, exp] = find_toplevel_sexp(this, false, true);
+                if (exp?.type !== "comment" && point >= begin && point <= end) {
+                    set_repl_input(this, this.cmd("buffer_substring", begin, end));
+                    this.cmd("goto_char", m + end - begin);
+                }
             }
-            else
-                this.cmd("newline_and_indent");
         }
     }),
     sl_repl_beginning_of_input: Ymacs_Interactive("d", function(point){
@@ -515,7 +517,7 @@ Ymacs_Buffer.newCommands({
         var h = self.getq("sl_repl_history");
         if (h[0] != code) {
             h.unshift(code);
-            localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 1000)));
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 5000)));
         }
         self.cmd("goto_char", expr.end);
         self.cmd("sl_repl_prompt");
@@ -602,10 +604,15 @@ Ymacs_Buffer.newCommands({
             this.cmd("indent_line");
     }),
     sl_get_symbol_completions: function(query) {
-        return LispCons.toArray(MACHINE().eval_string(
-            find_package(this),
-            "(ymacs::exec-list-symbol-completions " + JSON.stringify(query) + ")"
-        ));
+        let pak = find_package(this);
+        let cmpl = MACHINE().eval_string(
+            pak,
+            "(sl:ignore-errors (ymacs::exec-list-symbol-completions " + JSON.stringify(query) + "))"
+        );
+        if (!LispCons.isList(cmpl)) {
+            return [];          // XXX: why's that?
+        }
+        return LispCons.toArray(cmpl);
     },
     sl_compile_file: Ymacs_Interactive(function() {
         var self = this;
@@ -732,15 +739,16 @@ Ymacs_Buffer.newCommands({
                 repl.cmd("sl_repl_eval");
             },
             "DEMO: chess viewer": () => {
-                repl.ymacs.run_lisp("READ-EVAL", false, `(unless (ignore-errors (find-package :pgn-viewer))
-                                                           (sl:load "examples/pgn-viewer.lisp"))`, () => {
-                    set_repl_input(repl, `(pgn-viewer::lichess "vlbz")`);
-                    repl.cmd("sl_repl_eval");
-                });
+                repl.ymacs.run_lisp("READ-EVAL", false, `(sl:unless (sl:ignore-errors (find-package :pgn-viewer))
+                                                           (sl:load "examples/pgn-viewer.lisp"))`,
+                                    () => {
+                                        set_repl_input(repl, `(pgn-viewer::lichess "vlbz")`);
+                                        repl.cmd("sl_repl_eval");
+                                    });
             },
             "Load/run test suite": () => {
                 repl.ymacs.run_lisp("READ-EVAL", false, `(sl:load "test/all.lisp")`, () => {
-                    set_repl_input(repl, `(sl-user::run-tests :log nil :all t)`);
+                    set_repl_input(repl, `(sl-test:run-tests :log nil :all t)`);
                     repl.cmd("sl_repl_eval");
                 });
             },
@@ -895,6 +903,7 @@ Ymacs_Buffer.newMode("sl_mode", function(){
         var pak = find_in_package(this, this.point());
         if (pak) {
             pak = pak.replace(/^\(in-package\s*/, "(%::find-package '"); // that's a pervert hack
+            pak = `(sl:ignore-errors ${pak})`;
             try {
                 pak = MACHINE().eval_string(false, pak);
             } catch(ex) {

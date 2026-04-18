@@ -1,19 +1,21 @@
-(in-package :sl-user)
+(defpackage :sl-test
+  (:use :sl)
+  (:export #:run-tests))
+
+(in-package :sl-test)
 
 (cond
   ((and (boundp '*has-slip-tests*)
         (symbol-value '*has-slip-tests*))
    (format t ";; Tests already loaded - skipping~%~
-              ;; Evaluate this to override:~%~%    ~A~%~%"
-           '(setf *has-slip-tests* nil)))
+              ;; Evaluate this to override:~%~%    ~
+                  (DELETE-PACKAGE :SL-TEST)~%~%"))
   (t
    (defparameter *has-slip-tests* t)
 
    (format t "Loading tests takes a few seconds, please wait...~%")
 
-   (let* ((timing (list 0 0))
-          (%:*load-timing* timing)
-          (files (list "test/deftest.lisp"
+   (let* ((files (list "test/deftest.lisp"
                        "test/apply.lisp"
                        "test/funcall.lisp"
                        "test/prog1.lisp"
@@ -68,6 +70,11 @@
                        "test/hash/maphash.lisp"
                        "test/hash/remhash.lisp"
                        "test/hash/with-hash-table-iterator.lisp"
+                       "test/cons/make-list.lisp"
+                       "test/cons/mapc.lisp"
+                       "test/cons/mapcar.lisp"
+                       "test/cons/mapcan.lisp"
+                       "test/cons/maplist.lisp"
                        "test/cons/append.lisp"
                        "test/cons/member.lisp"
                        "test/cons/adjoin.lisp"
@@ -108,17 +115,13 @@
                        "test/seq/nsubstitute-if-not.lisp"
                        "test/seq/subseq.lisp"
                        "test/seq/remove.lisp"
+                       "test/seq/concatenate.lisp"
                        "test/struct/structures-01.lisp")))
 
-     (loop for count = (length files)
+     (loop with count = (length files)
            for file in files
            for i from 1
            do (progn
                 (format t ";; ~D/~D Loading ~A~%" i count file)
                 (with-output-to-string (*trace-output*)
-                  (load file))))
-
-     (format t "Network time: ~,2Fms~%~
-             Compile time: ~,2Fms~%"
-             (car timing)
-             (cadr timing)))))
+                  (load file)))))))

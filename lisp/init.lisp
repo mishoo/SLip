@@ -1,8 +1,4 @@
-(setq *package* (find-package "%"))
-
-"
 (in-package :%)
-" ;; hack for Ymacs
 
 (let ((main (make-package "SL"))
       (boot (find-package "%"))
@@ -25,28 +21,28 @@
      char-not-greaterp char-not-lessp char/= char< char<= char= char> char>=
      char-upcase char-downcase charp clear-timeout code-char compile
      compiler-macro-function complement cond cons consp constantly copy-list
-     copy-seq copy-tree cos current-thread debug decf declare declaim inline
-     defconstant defglobal define-compiler-macro define-modify-macro
-     define-setf-expander defmacro defpackage defparameter defsetf defun
-     defvar destructuring-bind digitp digit-char-p disassemble do do* dolist
-     dotimes downcase ecase elt eq eql equal equalp error eval evenp every exp
-     export expt fboundp fdefinition fifth find-package find-symbol first
-     fixnum flet float floatp floor fmakunbound foreach fourth funcall
-     function functionp gensym get get-internal-run-time get-setf-expansion
-     getf gethash go hash-copy hash-iterator hash-keys hash-table hash-table-p
+     copy-seq copy-tree cos debug decf declare declaim inline defconstant
+     defglobal define-compiler-macro define-modify-macro define-setf-expander
+     defmacro defpackage defparameter defsetf defun defvar destructuring-bind
+     digitp digit-char-p disassemble do do* dolist dotimes downcase ecase elt
+     eq eql equal equalp error eval evenp every exp export expt fboundp
+     fdefinition fifth find-package find-symbol find-all-symbols first fixnum
+     flet float floatp floor fmakunbound foreach fourth funcall function
+     functionp gensym get get-internal-run-time get-setf-expansion getf
+     gethash go hash-copy hash-iterator hash-keys hash-table hash-table-p
      hash-values identity if ignore import in-package incf integer integerp
      intern it iterator-next keywordp labels lambda lambda-list-keywords last
-     length let let* letterp list list* listp load locally log macroexpand
-     macroexpand-1 macrolet make-array make-hash make-list make-package
-     make-regexp make-symbol make-thread make-vector makunbound mapc mapcar
+     length let let* letterp list list* listp load locally log macro-function
+     macroexpand macroexpand-1 macrolet make-array make-hash make-list
+     make-package make-regexp make-symbol make-vector makunbound mapc mapcar
      mapcan maplist max member min minusp mod most-negative-fixnum
      most-positive-fixnum multiple-value-bind multiple-value-call
      multiple-value-list multiple-value-prog1 multiple-value-setq name-char
      nconc nil not notany notevery nreconc nreverse nth nthcdr null endp
      number-fixed number-string number numberp oddp optimize or otherwise
-     package-name package packagep parse-integer parse-number pi plusp pop prog
-     prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote quote
-     quote-regexp random regexp regexp-exec regexp-test regexpp remhash
+     package-name package packagep parse-integer parse-number pi plusp pop
+     prog prog* prog1 prog2 progn progv psetf psetq push pushnew quasiquote
+     quote quote-regexp random regexp regexp-exec regexp-test regexpp remhash
      replace-regexp rest return return-from revappend reverse rotatef round
      rplaca rplacd schar second set-timeout setf setq shadow shiftf sin sleep
      some space special speed sqrt standard-object string string-capitalize
@@ -57,8 +53,8 @@
      symbol-package symbol-plist symbol-value symbolp t tagbody tan third
      thread threadp throw type type-of typep unintern unless unsigned-byte
      unwind-protect upcase use-package values values-list vector vector-pop
-     vector-push vectorp warn when with-output-to-string without-interrupts
-     zerop λ
+     vector-push vectorp warn when with-output-to-string zerop λ
+     list-all-packages delete-package
 
      stream input-stream output-stream text-input-stream text-output-stream
 
@@ -68,12 +64,12 @@
   (export exported main)
   (setq *package* main))
 
-"
 (in-package :sl)
-"
 
-(defun assert (test . arguments)
-  (unless test (apply #'error arguments)))
+;; (setq %:*enable-inline* t)
+
+(defmacro assert (test . arguments)
+  `(unless ,test (error ,@arguments)))
 
 (defun package-local-nicknames (&optional (package *package*))
   (%:%get-package-prop package '%:local-nicknames))
@@ -115,7 +111,7 @@
                     (destructuring-bind (source &rest names) (cdr opt)
                       (setq source (find-package source))
                       `(import ',(map1 (lambda (name)
-                                         (find-symbol name source))
+                                         (find-symbol name source t))
                                        names)
                                ,pak)))
                    (:local-nicknames
@@ -126,14 +122,17 @@
                options)
        ,pak)))
 
-(defmacro in-package (name)
-  `(setq *package* (find-package ',name)))
-
+(declaim (inline some1))
 (defun some1 (test list)
-  (let rec ((list list))
-    (when list
-      (or (funcall test (%pop list))
-          (rec list)))))
+  (let (val)
+    (tagbody
+     :next
+       (when list
+         (when (setq val (funcall test (%pop list)))
+           (go :end))
+         (go :next))
+     :end)
+    val))
 
 (defun finished (tails)
   (some1 #'null tails))
@@ -156,22 +155,29 @@
      `(map1 ,func ,@lists))
     ((null (cddr lists))
      `(map2 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
+(declaim (inline mapc1))
 (defun mapc1 (f list)
-  (let rec ((p list))
-    (if (not p) list
-        (progn
-          (funcall f (%pop p))
-          (rec p)))))
+  (let ((p list))
+    (tagbody
+     :next
+       (when p
+         (funcall f (%pop p))
+         (go :next)))
+    list))
 
+(declaim (inline mapc2))
 (defun mapc2 (f list1 list2)
-  (let rec ((p list1)
-            (q list2))
-    (if (not (and p q)) list1
-        (progn
-          (funcall f (%pop p) (%pop q))
-          (rec p q)))))
+  (let ((p list1)
+        (q list2))
+    (tagbody
+     :next
+       (when (and p q)
+         (funcall f (%pop p) (%pop q))
+         (go :next)))
+    list1))
 
 (defun mapc (f . lists)
   (let ((first (car lists)))
@@ -189,21 +195,31 @@
      `(mapc1 ,func ,@lists))
     ((null (cddr lists))
      `(mapc2 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
+(declaim (inline maplist1))
 (defun maplist1 (func lst)
-  (let rec ((ret nil) (lst lst))
-    (if lst
-        (rec (cons (funcall func lst) ret)
-             (cdr lst))
-        (nreverse ret))))
+  (let ((ret '()))
+    (tagbody
+     :next
+       (when lst
+         (setq ret (cons (funcall func lst) ret)
+               lst (cdr lst))
+         (go :next)))
+    (nreverse ret)))
 
+(declaim (inline maplist2))
 (defun maplist2 (func lst1 lst2)
-  (let rec ((ret nil) (lst1 lst1) (lst2 lst2))
-    (if (and lst1 lst2)
-        (rec (cons (funcall func lst1 lst2) ret)
-             (cdr lst1) (cdr lst2))
-        (nreverse ret))))
+  (let ((ret '()))
+    (tagbody
+     :next
+       (when (and lst1 lst2)
+         (setq ret (cons (funcall func lst1 lst2) ret)
+               lst1 (cdr lst1)
+               lst2 (cdr lst2))
+         (go :next)))
+    (nreverse ret)))
 
 (defun maplist (f . lists)
   (let rec (ret (tails lists))
@@ -220,7 +236,8 @@
      `(maplist1 ,func ,@lists))
     ((null (cddr lists))
      `(maplist2 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;; every returns false as soon as any invocation of predicate
 ;; returns false. If the end of a sequence is reached, every returns
@@ -233,10 +250,10 @@
              (scan (mapcar #'cdr tails))))))
 
 (defun every1 (test list)
-  (let rec ((list list))
+  (let rec ()
     (if (not list) t
         (when (funcall test (%pop list))
-          (rec list)))))
+          (rec)))))
 
 (define-compiler-macro every (&whole form func &rest lists)
   (cond
@@ -244,7 +261,8 @@
      (error "Missing list argument to EVERY"))
     ((null (cdr lists))
      `(every1 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;; some returns the first non-nil value which is returned by an
 ;; invocation of predicate. If the end of a sequence is reached
@@ -263,7 +281,8 @@
      (error "Missing list argument to SOME"))
     ((null (cdr lists))
      `(some1 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;; notany returns false as soon as any invocation of predicate
 ;; returns true. If the end of a sequence is reached, notany returns
@@ -277,11 +296,11 @@
             (scan (mapcar #'cdr tails))))))
 
 (defun notany1 (test list)
-  (let rec ((list list))
+  (let rec ()
     (if (not list) t
         (if (funcall test (%pop list))
             nil
-            (rec list)))))
+            (rec)))))
 
 (define-compiler-macro notany (&whole form func &rest lists)
   (cond
@@ -289,7 +308,8 @@
      (error "Missing list argument to NOTANY"))
     ((null (cdr lists))
      `(notany1 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;; notevery returns true as soon as any invocation of predicate
 ;; returns false. If the end of a sequence is reached, notevery
@@ -303,10 +323,10 @@
             t))))
 
 (defun notevery1 (test list)
-  (let rec ((list list))
+  (let rec ()
     (when list
       (if (funcall test (%pop list))
-          (rec list)
+          (rec)
           t))))
 
 (define-compiler-macro notevery (&whole form func &rest lists)
@@ -315,7 +335,8 @@
      (error "Missing list argument to NOTEVERY"))
     ((null (cdr lists))
      `(notevery1 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 (defmacro with-collectors ((&rest names) &body body)
   (let (lists tails syms adders)
@@ -336,7 +357,8 @@
                  (push `(,vconc (lst)
                          `(let ((tmp ,lst))
                             (when tmp
-                              (setq ,',vtail (last (%rplacd ,',vtail tmp))))))
+                              (when (consp (setq ,',vtail (%rplacd ,',vtail tmp)))
+                                (setq ,',vtail (last ,',vtail))))))
                        adders)))))
       (foreach names #'mk-collector)
       `(let (,@(mapcar (lambda (name) `(,name (list nil))) lists))
@@ -378,7 +400,8 @@
      `(mapcan1 ,func ,@lists))
     ((null (cddr lists))
      `(mapcan2 ,func ,@lists))
-    (form)))
+    (t
+     form)))
 
 ;;; setf
 
@@ -470,15 +493,19 @@
                  vals
                  store-form
                  `(,(car form) ,@temps)))))
-    ((error (strcat "Invalid SETF place " form)))))
+    (t
+     (error (strcat "Invalid SETF place " form)))))
+
+(defun %setf-safe-val (val)
+  (or (safe-atom-p val)
+      (and (consp val)
+           (eq 'quote (car val)))))
 
 (defun %call-default-setter (form value)
   (let ((setter (maybe-setter `(setf ,(car form)))))
     (cond
-      ((or (safe-atom-p value)
-           (and (consp value)
-                (eq 'quote (car value)))
-           (every #'safe-atom-p (cdr form)))
+      ((or (%setf-safe-val value)
+           (every #'%setf-safe-val (cdr form)))
        ;; it's safe to compute the value first.
        `(,setter ,value ,@(cdr form)))
       (t
@@ -502,12 +529,12 @@
             ,(cond
                ((cdr stores)
                 `(multiple-value-bind ,stores ,value ,set))
-               ((safe-atom-p value)
+               ((%setf-safe-val value)
                 `(symbol-macrolet ((,(car stores) ,value)) ,set))
                (t
                 `(let ((,(car stores) ,value)) ,set))))))
       ((let* ((val (%pop vals))
-              (safe? (safe-atom-p val)))
+              (safe? (%setf-safe-val val)))
          (rec (if safe?
                   ;; if safe, we add it to the “simple” list (symbol-macrolet)
                   (cons (list (%pop temps) val) simple)
@@ -648,11 +675,6 @@
 
 (defun (setf get) (value symbol indicator &optional default)
   (setf (getf (symbol-plist symbol) indicator default) value))
-
-(defun constantly (value)
-  (lambda args
-    (declare (ignore args))
-    value))
 
 (defun (setf svref) (value vector index)
   (vector-set value vector index))
@@ -1102,6 +1124,12 @@
                (let (,@store-other-vars)
                  ,@setters
                  ,oldvalue))))))))
+
+(defun macro-function (symbol)
+  (%:%macro symbol))
+
+(defun (setf macro-function) (func symbol)
+  (%:%macro! symbol func))
 
 (defglobal lambda-list-keywords '(&key &rest &body &whole &optional &aux &allow-other-keys))
 

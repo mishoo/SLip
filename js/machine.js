@@ -103,7 +103,7 @@ export const OP = {
     FJUMPK: 79,
     VALUES: 80,
     MVB: 81,
-    POPBACK: 82,
+    POPBACK: 82,                // XXX: unused
     ADD: 83,
     SUB: 84,
     INC: 85,
@@ -124,7 +124,9 @@ export const OP = {
     BASH: 100,
     BCNT: 101,
     BNOT: 102,
-    CASE: 103,
+    LDB: 103,
+    DPB: 104,
+    CASE: 105,
 };
 
 const OP_LEN = [
@@ -231,6 +233,8 @@ const OP_LEN = [
     0 /* BASH */,
     0 /* BCNT */,
     0 /* BNOT */,
+    2 /* LDB */,
+    2 /* DPB */,
     1 /* CASE */,
 ];
 
@@ -241,14 +245,12 @@ export function want_bound(name, val) {
 
 // normal RET context
 export class LispRet {
-    constructor(m, pc, noretval) {
+    constructor(m, pc) {
         this.f = m.f;
         this.code = m.code;
         this.pc = pc;
         this.env = m.env;
         this.denv = m.denv;
-        this.noretval = noretval;
-        //if (m.trace) this.trace = m.trace.slice();
     }
     run(m, retval) {
         m.f = this.f;
@@ -256,10 +258,17 @@ export class LispRet {
         m.pc = this.pc;
         m.env = this.env;
         m.denv = this.denv;
-        if (!this.noretval) {
-            m.push(retval);
-        }
-        //if (this.trace) m.trace = this.trace;
+        m.push(retval);
+    }
+}
+
+export class LispRetNoVal extends LispRet {
+    run(m) {
+        m.f = this.f;
+        m.code = this.code;
+        m.pc = this.pc;
+        m.env = this.env;
+        m.denv = this.denv;
     }
 }
 
@@ -281,7 +290,6 @@ class LispLongRet {
         this.env = m.env;
         this.denv = m.denv;
         this.slen = m.stack.sp;
-        //if (m.trace) this.trace = m.trace.slice();
     }
     unwind(m, addr) {
         m.f = this.f;
@@ -290,7 +298,6 @@ class LispLongRet {
         m.denv = this.denv;
         m.stack.sp = this.slen;
         m.pc = addr;
-        //if (this.trace) m.trace = this.trace;
     }
     run(m, addr, retval) {
         // figure out if we need to execute cleanup hooks
@@ -313,12 +320,10 @@ class LispCC {
     constructor(m) {
         this.stack = m.stack.copy();
         this.denv = m.denv;
-        //if (m.trace) this.trace = m.trace.slice();
     }
     run(m) {
         m.stack.restore(this.stack);
         m.denv = this.denv;
-        //if (this.trace) m.trace = this.trace.slice();
     }
 }
 
@@ -468,6 +473,17 @@ var optimize = (function(){
                 code.splice(i + 1, len);
                 return true;
             }
+        }
+        if (i + 3 < code.length
+            && code[i][0] == "CONST"
+            && typeof code[i][1] == "number"
+            && code[i][1] < 0
+            && code[i+1][0] == "BASH"
+            && code[i+2][0] == "CONST"
+            && code[i+3][0] == "BAND")
+        {
+            code.splice(i, 4, [ "LDB", -code[i][1], code[i+2][1] ]);
+            return true;
         }
         switch (el[0]) {
           case "VARS":
@@ -645,11 +661,27 @@ var optimize = (function(){
                     code.splice(i, 1);
                     return true;
                 }
-                if ([ "LRET", "LJUMP" ].includes(code[i+1][0]) && el[2] === 0) {
+                if (el[2] === 0 && [ "LRET", "LJUMP" ].includes(code[i+1][0])) {
                     code[i+1][2] += el[1];
                     code.splice(i, 1);
                     return true;
                 }
+                if ([ "NIL", "T", "CONST", "VALUES", "PRIM", "POP", "CALL", "APPLY",
+                      "CONS", "LIST", "LIST_" ].includes(code[i+1][0])
+                    || /^(?:C[AD]+R)$/.test(code[i+1][0]))
+                {
+                    [ code[i], code[i+1] ] = [ code[i+1], code[i] ];
+                    return true;
+                }
+                if (el[2] === 0 && [ "GVAR" ].includes(code[i+1][0])) {
+                    [ code[i], code[i+1] ] = [ code[i+1], code[i] ];
+                    return true;
+                }
+                // if ([ "LVAR" ].includes(code[i+1][0])) {
+                //     code[i+1][1] += el[1];
+                //     [ code[i], code[i+1] ] = [ code[i+1], code[i] ];
+                //     return true;
+                // }
             }
             break;
         }
@@ -901,6 +933,7 @@ function dump(thing, dumped = new Map()) {
         if (thing === false) return "NIL";
         if (thing === true) return "T";
         if (typeof thing === "string") return JSON.stringify(LispChar.sanitize(thing));
+        if (thing instanceof RegExp) return "#" + thing;
         if (LispSymbol.is(thing)) {
             if (thing.pak === KEYWORD_PACK) return ":" + thing.name;
             if (thing.pak && thing.pak !== LispPackage.BASE_PACK)
@@ -1303,11 +1336,9 @@ export class LispMachine {
         this.env = false;
         this.denv = pm ? pm.denv : false;
         this.n_args = null;
-        this.status = STATUS_FINISHED;
-        this.error = null;
+        this.status = STATUS_RUNNING;
         this.process = null;
         this.f = null;
-        //this.trace = [];
     }
 
     find_dvar(symbol) {
@@ -1377,7 +1408,7 @@ export class LispMachine {
             if (ex instanceof LispPrimitiveError) {
                 var pe = LispSymbol.get("PRIMITIVE-ERROR", LispPackage.get("SL"));
                 if (pe && pe.function) {
-                    this._callnext(pe.function, LispCons.fromArray(["~A", ex.message]));
+                    this._callnext(pe.function, ["~A", ex.message]);
                     return this.loop();
                 }
             } else {
@@ -1389,7 +1420,6 @@ export class LispMachine {
     }
 
     atomic_call(closure, args) {
-        if (!args) args = [];
         // stop the world, call closure, resume the world
         var save_code = this.code;
         var save_env = this.env;
@@ -1398,18 +1428,15 @@ export class LispMachine {
         var save_nargs = this.n_args;
         var save_pc = this.pc;
         var save_f = this.f;
-        //var save_trace = this.trace;
         this.code = closure.code;
         this.env = closure.env;
-        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
+        this.stack = new LispStack().restore([ this.mkret(-1) ].concat(args));
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
-        //if (this.trace) this.trace = [ closure, args ];
         try {
             return this.loop();
         } finally {
-            //this.trace = save_trace;
             this.f = save_f;
             this.pc = save_pc;
             this.n_args = save_nargs;
@@ -1430,16 +1457,10 @@ export class LispMachine {
     }
 
     _callnext(closure, args) {
-        //if (this.trace) this.trace.push([ closure, LispCons.toArray(args) ]);
-        if (args !== undefined) {
+        if (args) {
             this.push(this.mkret(this.pc));
-            let n = 0;
-            while (args !== false) {
-                this.push(args.car);
-                args = args.cdr;
-                n++;
-            }
-            this.n_args = n;
+            this.stack.push_frame(args);
+            this.n_args = args.length;
         }
         this.code = closure.code;
         this.env = closure.env;
@@ -1449,17 +1470,16 @@ export class LispMachine {
     }
 
     set_closure(closure, ...args) {
-        this.stack = new LispStack().restore([ new LispRet(this, -1) ].concat(args));
+        this.stack = new LispStack().restore([ this.mkret(-1) ].concat(args));
         this.code = closure.code;
         this.env = closure.env;
         this.n_args = args.length;
         this.pc = 0;
         this.f = closure;
-        //if (this.trace) this.trace = [ closure, args ];
     }
 
     lisp_error(...args) {
-        this._callnext(LispSymbol.get("ERROR").function, LispCons.fromArray(args));
+        this._callnext(LispSymbol.get("ERROR").function, args);
     }
 
     run(quota) {
@@ -1493,6 +1513,10 @@ export class LispMachine {
             LispSymbol.keyword("FUNCTION"), this.f,
             LispSymbol.keyword("STACKTRACE"), stacktrace,
         ];
+    }
+
+    fn_name(def) {
+        return this.f?.name || def;
     }
 
 }
@@ -1562,7 +1586,7 @@ let OP_RUN = [
         name.function = m.top();
     },
     /*OP.POP*/ (m) => {
-        m.pop();
+        --m.stack.sp;
     },
     /*OP.CONST*/ (m) => {
         let val = m.code[m.pc++];
@@ -1630,7 +1654,6 @@ let OP_RUN = [
         let closure = arg instanceof LispSymbol ? arg.function : arg;
         if (!(closure instanceof LispClosure))
             error("OP.CALL invalid function: " + dump(arg));
-        //if (m.trace) m.trace.push([ closure, m.stack.slice(-count) ]);
         m.n_args = count;
         m.code = closure.code;
         m.env = closure.env;
@@ -1877,10 +1900,10 @@ let OP_RUN = [
         let min = required;
         let max = rest || key || allow_other_keys ? false : required + optional;
         if (n < required) {
-            error(`XARGS: Expecting at least ${min} arguments`);
+            error(`${dump(m.fn_name('XARGS'))}: Expecting at least ${min} arguments`);
         }
         if (max !== false && n > max) {
-            error(`XARGS: Expecting at most ${max} arguments`);
+            error(`${dump(m.fn_name('XARGS'))}: Expecting at most ${max} arguments`);
         }
         let frame = new Array(frame_len).fill(false);
         let stack = m.stack.pop_frame(n);
@@ -1899,7 +1922,7 @@ let OP_RUN = [
             }
             if (kl) {
                 if ((n - i) & 1) {
-                    error("XARGS: Uneven number of &key arguments");
+                    error(`${dump(m.fn_name('XARGS'))}: Odd number of &key arguments`);
                 }
                 let unknown = false, s_aok_seen = false;
                 for (let s = i; s < n; s += 2) {
@@ -1934,8 +1957,14 @@ let OP_RUN = [
         let j = m.code[m.pc++];
         let fr = frame(m.env, i);
         let lst = fr[j];
-        fr[j] = LispCons.cdr(lst);
-        m.push(LispCons.car(lst));
+        if (lst === false) {
+            m.push(false);
+        } else if (lst instanceof LispCons) {
+            fr[j] = lst.cdr;
+            m.push(lst.car);
+        } else {
+            error(`Expecting cons cell in LPOP`);
+        }
     },
     /*OP.EQ*/ (m) => {
         m.push(eq(m.pop(), m.pop()));
@@ -1944,13 +1973,19 @@ let OP_RUN = [
         let sym = m.code[m.pc++];
         let binding = m.find_dvar(sym);
         let lst = want_bound(sym, binding.value);
-        m.push(LispCons.car(lst));
-        binding.value = LispCons.cdr(lst);
+        if (lst === false) {
+            m.push(false);
+        } else if (lst instanceof LispCons) {
+            binding.value = lst.cdr;
+            m.push(lst.car);
+        } else {
+            error(`Expecting cons cell in GLPOP`);
+        }
     },
     /*OP.TJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
         if (m.top() === false) {
-            m.pop();
+            --m.stack.sp;
         } else {
             m.pc = addr;
         }
@@ -1958,14 +1993,14 @@ let OP_RUN = [
     /*OP.FJUMPK*/ (m) => {
         let addr = m.code[m.pc++];
         if (m.top() === false) {
-            m.pop();
+            --m.stack.sp;
             m.pc = addr;
         }
     },
     /*OP.VALUES*/ (m) => {
         let nargs = m.code[m.pc++];
         if (nargs === 1) {
-            m.stack.push(m.stack.pop());
+            m.top();            // converts to one_value
         } else {
             m.stack.set_values(nargs);
         }
@@ -1978,12 +2013,7 @@ let OP_RUN = [
         frame.length = n;
     },
     /*OP.POPBACK*/ (m) => {
-        let n = m.code[m.pc++];
-        if (n < 0) {
-            m.stack.push(m.stack.remove(n));
-        } else {
-            m.stack.replace(-n-1, m.stack.pop_ret());
-        }
+        // XXX: unused.
     },
     /*OP.ADD*/ (m) => {
         m.push(m.pop_number() + m.pop_number());
@@ -2027,7 +2057,6 @@ let OP_RUN = [
         let closure = arg instanceof LispSymbol ? arg.function : arg;
         if (!(closure instanceof LispClosure))
             error("OP.APPLY invalid function: " + dump(arg));
-        //if (m.trace) m.trace.push([ closure, m.stack.slice(-count) ]);
         arg = m.pop();          // rest arguments
         while (arg !== false) {
             m.push(LispCons.car(arg));
@@ -2083,6 +2112,18 @@ let OP_RUN = [
     /*OP.BNOT*/ (m) => {
         m.push(~m.pop_integer());
     },
+    /*OP.LDB*/ (m) => {
+        let shift = m.code[m.pc++];
+        let mask = m.code[m.pc++];
+        m.push((m.pop_integer() >> shift) & mask);
+    },
+    /*OP.DPB*/ (m) => {
+        let shift = m.code[m.pc++];
+        let mask = m.code[m.pc++];
+        let integer = m.pop_integer();
+        let newbyte = m.pop_integer();
+        m.push((integer & ~(mask << shift)) | ((newbyte & mask) << shift));
+    },
     /*OP.CASE*/ (m) => {
         let jumptable = m.code[m.pc++];
         let cases = m.pop();
@@ -2097,5 +2138,5 @@ let OP_RUN = [
 ];
 
 function vmrun(m) {
-    OP_RUN[m.code[m.pc++]](m);
+    return OP_RUN[m.code[m.pc++]](m);
 }

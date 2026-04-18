@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Oct 12 14:41:16 2002
 ;;;; Contains: Tests of UNWIND-PROTECT
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest unwind-protect.1
   (let ((x nil))

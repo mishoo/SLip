@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Mar 28 07:38:57 1998
 ;;;; Contains: Tests of MEMBER
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest member.1
   (let* ((x (copy-tree '(a b c d e f)))

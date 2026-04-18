@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Jan 26 21:36:33 2003
 ;;;; Contains: Tests for MAKE-HASH-TABLE
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest make-hash-table.1
   (let ((ht (make-hash-table)))

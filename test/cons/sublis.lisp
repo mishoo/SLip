@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Apr 19 21:32:50 2003
 ;;;; Contains: Tests of SUBLIS
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest sublis.1
   (check-sublis '((a b) g (d e 10 g h) 15 . g)

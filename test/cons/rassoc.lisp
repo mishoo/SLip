@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:33:49 2003
 ;;;; Contains: Tests of RASSOC
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest rassoc.1
   (rassoc nil nil)

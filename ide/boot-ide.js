@@ -1,179 +1,125 @@
 import { LispMachine } from "../js/machine.js";
-import { LispSymbol, LispPackage } from "../js/types.js";
-import { LispCons } from "../js/list.js";
+import { LispSymbol, LispPackage, LispProcess } from "../js/types.js";
 import { make_desktop } from "./ide.js";
 import "../js/primitives.js";
 
-(function(window){
+(function (window) {
 
     Object.assign(LispMachine.prototype, {
-        read: function(pak, str) {
+        read: function (pak, str) {
             var f = LispSymbol.get("EXEC-READ", LispPackage.get("YMACS")).function;
-            return this.atomic_call(f, [ pak, str ]);
+            return this.atomic_call(f, [pak, str]);
         },
-        eval: function(expr) {
+        eval: function (expr) {
             var f = LispSymbol.get("EXEC-EVAL", LispPackage.get("YMACS")).function;
-            return this.atomic_call(f, [ expr ]);
+            return this.atomic_call(f, [expr]);
         },
-        eval_string: function(pak, str) {
+        eval_string: function (pak, str) {
             var f = LispSymbol.get("EXEC-EVAL-STRING", LispPackage.get("YMACS")).function;
-            return this.atomic_call(f, [ pak, str ]);
+            return this.atomic_call(f, [pak, str]);
         },
     });
 
-    function outdated(url) {
-        if (/\.fasl$/.test(url)) {
-            if (window.SLIP_COMMIT && window.SLIP_COMMIT != localStorage.getItem(".slip_commit")) {
-                return true;
-            }
-        }
-    }
-
     function load(url, callback) {
         var xhr = new XMLHttpRequest();
-        if (!/^https?:\/\//i.test(url) && !outdated(url)) {
-            // local storage takes priority
-            let content = LispMachine.ls_get_file_contents(url);
-            if (content != null) {
-                setTimeout(() => callback(content), 0);
-                return;
-            }
-        }
         xhr.open("GET", url + "?killCache=" + Date.now(), true);
-        xhr.onreadystatechange = function() {
+        xhr.onreadystatechange = function () {
             if (xhr.readyState == 4) {
                 callback(xhr.responseText);
             }
         };
         xhr.send(null);
-    };
-
-    function save(url, content, callback) {
-        if (!/^https?:\/\//i.test(url)) {
-            // save to localStorage as well
-            if (window.SLIP_COMMIT)
-                LispMachine.ls_set_file_contents(url, content);
-        }
-        var xhr = new XMLHttpRequest();
-        xhr.open("PUT", url, true);
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState == 4) {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    callback(false);
-                } else {
-                    callback(true);
-                }
-            }
-        };
-        xhr.send(content);
-    };
+    }
 
     let machine = new LispMachine();
 
     function load_fasls(files, cont) {
         var count = files.length;
         var fasls = [];
-        files = files.map(filename => filename.replace(/(\.lisp)?$/, ".fasl"));
-        files.forEach(function(filename, i){
-            log("Loading: " + filename);
-            load(filename, function(code){
+        files = files.map(filename => filename.replace(/(\.lisp|\.fasl)?$/, ".fasl"));
+        files.forEach(function (filename, i) {
+            load(filename, function (code) {
                 fasls[i] = LispMachine.unserialize(code);
                 if (--count == 0) {
-                    console.time("Boot");
-                    fasls.forEach((code, i) => {
-                        log("Executing: " + files[i]);
-                        machine._exec(code);
-                    });
-                    console.timeEnd("Boot");
+                    fasls.forEach(code => machine._exec(code));
                     console.log("Loaded " + files.join(", "));
                     cont();
                 }
             });
         });
-    };
-
-    function log(str) {
-        var div = document.createElement("div");
-        div.innerHTML = str;
-        div.className = "lisp-log";
-        document.body.appendChild(div);
-        div.scrollIntoView();
-    };
-
-    let total_time = 0;
-    let total_size = 0;
-
-    function compile(files, cont, nosave) {
-        if (files.length == 0) return cont ? cont() : null;
-        var filename = files[0];
-        var time = performance.now();
-        if (!nosave) log(`<b>Compiling ${filename}</b>`);
-        var bytecode = machine.atomic_call(LispSymbol.get("%LOAD").function, [ filename ]);
-        if (!nosave) {
-            let diff = performance.now() - time;
-            total_time += diff;
-            total_size += bytecode.length;
-            log(`... <span style='color: green'>${diff.toFixed(2)}ms, ${bytecode.length} chars</span>`);
-            var fasl = filename.replace(/(\.lisp)?$/, ".fasl");
-            save(fasl, bytecode, function(error){
-                if (error) {
-                    console.log(`Saving ${fasl} via webdav failed; it was saved in localStorage. Continuing...`);
-                } else {
-                    log("... " + fasl + " saved.");
-                }
-                compile(files.slice(1), cont);
-            });
-        } else {
-            compile(files.slice(1), cont);
-        }
-    };
+    }
 
     function recompile_all() {
-        total_time = 0;
-        document.addEventListener("ymacs-slip-warning", (ev) => {
-            ev.preventDefault();
-            log(`<span style='color: red'>WARN: ${ev.message}</span>`);
-        });
-        document.addEventListener("ymacs-slip-error", (ev) => {
-            log(`<span style='color: red'>ERROR: ${ev.error}</span>`);
-        });
-        load_fasls([ "lisp/compiler.lisp" ], function(){
-            compile([ "lisp/compiler.lisp" ], function(){
-                total_size = 0;
-                compile([ "lisp/compiler.lisp" ], function () {
-                    let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
-                    //lisp_files.unshift("lisp/compiler.lisp");
-                    compile(lisp_files, function () {
-                        log(`<span style='color: blue'>Total compile time: ${total_time.toFixed(2)}ms</span>`);
-                        log(`<span style='color: blue'>Total “bytecode” size: ${total_size} characters</span>`);
-                        log("<span style='color: green'><b>DONE — press ENTER to reload</b></span>");
-                        document.addEventListener("keydown", ev => {
-                            if (ev.key == "Enter") {
-                                //window.location.replace((""+window.location).replace(/\?recompile$/, ""));
-                                window.location.replace(document.referrer);
-                            }
-                        });
-                    });
-                });
+        let t1 = performance.now();
+        load_fasls(["lisp/compiler.fasl"], function () {
+            document.body.innerHTML = "";
+            document.body.style.padding = "2em";
+            document.body.style.whiteSpace = "pre";
+            document.body.style.fontFamily = "monospace";
+            [
+                LispSymbol.get("*STANDARD-OUTPUT*"),
+                LispSymbol.get("*ERROR-OUTPUT*"),
+                LispSymbol.get("*TRACE-OUTPUT*"),
+            ].forEach(sym => {
+                let stream = sym.value;
+                stream.onData = (_, str) => {
+                    let txt = document.createTextNode(str);
+                    document.body.appendChild(txt);
+                    window.scrollTo(0, document.body.scrollHeight);
+                };
             });
+            let proc = new LispProcess(machine, LispSymbol.get("RECOMPILE-EVERYTHING").function);
+            proc.watchers.push({
+                resume() {
+                    let t2 = performance.now();
+                    let el = document.createElement("div");
+                    el.innerHTML = `<span style='color: green; font-weight: bold;'>That took ${(t2 - t1).toFixed(2)}ms.<br/>Press ENTER to reload, T to run tests.</span>`;
+                    document.body.appendChild(el);
+                    window.scrollTo(0, document.body.scrollHeight);
+                    document.addEventListener("keydown", ev => {
+                        if (ev.key == "Enter") {
+                            window.location.replace(document.referrer);
+                        } else if (ev.key.toLowerCase() == "t") {
+                            let p = new LispProcess(machine, LispSymbol.get("LOAD").function, false, "test/all.lisp");
+                            p.watchers.push({
+                                resume() {
+                                    let p = new LispProcess(machine, LispSymbol.get("RUN-TESTS", LispPackage.get("SL-TEST")).function);
+                                    p.resume();
+                                }
+                            });
+                            p.resume();
+                        }
+                    });
+                }
+            });
+            proc.resume();
         });
-    };
-
-    // recompile_all();
+    }
 
     var startup_files = [];
 
     function init() {
-        load_fasls([ "lisp/compiler.lisp" ], function(){
-            let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
-            load_fasls(lisp_files, function(){
-                window.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
-                [ ...document.querySelectorAll(".lisp-log") ].forEach(el => el.remove());
-                let done = make_desktop(startup_files);
-                compile(startup_files, done, true);
-            });
-        });
-    };
+        console.time("Boot");
+
+        load_fasls(["slip-bundle.fasl"], done);
+
+        // load_fasls([ "lisp/compiler.lisp" ], function(){
+        //     let lisp_files = LispCons.toArray(LispSymbol.get("*CORE-FILES*").value);
+        //     load_fasls(lisp_files, done);
+        // });
+
+        function done() {
+            console.timeEnd("Boot");
+            window.MACHINE = LispSymbol.get("*THREAD*", LispPackage.get("YMACS")).value.m;
+            [...document.querySelectorAll(".lisp-log")].forEach(el => el.remove());
+            let done = make_desktop(startup_files);
+            done();
+            if (startup_files.length > 0) {
+                let p = new LispProcess(machine, LispSymbol.get("LOAD").function, false, startup_files[0]);
+                p.resume();
+            }
+        }
+    }
 
     if (/\?recompile$/.test(window.location)) {
         recompile_all();

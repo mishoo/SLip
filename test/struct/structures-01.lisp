@@ -2,7 +2,7 @@
 ;;;; Created:  Sat May  2 21:45:32 1998
 ;;;; Contains: Test code for structures, part 01
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 ;;; Tests for structures
 ;;;

@@ -2,7 +2,7 @@
 ;;;; Created:  Wed Oct  9 21:45:07 2002
 ;;;; Contains: Tests of FUNCALL
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest funcall.1
   (let ((fn #'cons))

@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:27:20 2003
 ;;;; Contains: Tests of ASSOC
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest assoc.1
     (assoc nil nil)

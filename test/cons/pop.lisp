@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Apr 19 22:27:18 2003
 ;;;; Contains: Tests of POP
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest pop.1
   (let ((x (copy-tree '(a b c))))

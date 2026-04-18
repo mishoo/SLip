@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Apr 19 21:37:56 2003
 ;;;; Contains: Tests of SUBST
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (defvar *subst-tree-1* '(10 (30 20 10) (20 10) (10 20 30 40)))
 

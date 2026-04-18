@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Nov 28 09:36:58 2003
 ;;;; Contains: Test of MAPHASH
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest maphash.1
   (let ((table (make-hash-table)))

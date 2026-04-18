@@ -1,6 +1,7 @@
 #! /bin/bash
 
 pushd ~/work/my/ymacs/
+rm -rf dist/
 npx parcel build
 popd
 

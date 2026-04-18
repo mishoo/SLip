@@ -1,4 +1,4 @@
-(in-package :sl-user)
+(in-package :sl-test)
 
 (defparameter *tests* (list))
 (defparameter *compile-time* 0)
@@ -71,13 +71,13 @@
     (destructuring-bind (&key (all match-name allp)
                               (log t logp)
                               (match match-name))
-                        args
+        args
       (let ((*compile-time* 0)
             (*run-time* 0)
             (*log* log))
         (loop with ok
               for (test name) on (reverse *tests*) by #'cddr
-              for index from 1
+              for index from 0
               for notes = (gethash :notes test)
               for this-slow = (getf notes :slow)
               when (or (and all allp (not match))
@@ -101,8 +101,7 @@
                                  Compile time: ~,2Fms~%~
                                  Run time: ~,2Fms~%"
                               index skipped success failed
-                              compile-time run-time))
-        'done))))
+                              compile-time run-time))))))
 
 ;;;; utils from ansi-test
 
@@ -391,3 +390,6 @@
                                (not (member e z :key key :test test))
                              (member e z :key key :test test)))
    t))
+
+(defun break ()
+  (error "BREAK has been called"))

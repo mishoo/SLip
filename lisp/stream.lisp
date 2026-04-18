@@ -3,7 +3,7 @@
 (export '(peek-char read-char read-line write-char write-string write-line
           peek-byte read-byte read-sequence write-sequence
           with-input-from-string file-position finish-output stream-error
-          stream-error-stream end-of-file))
+          stream-error-stream end-of-file close))
 
 (defpackage :sl-stream
   (:use :sl :%)
@@ -104,9 +104,13 @@
 (defun file-position (stream &optional position)
   (%stream-pos stream position))
 
-(defun open-url (url &optional binary)
-  (%:%http-input-stream url binary))
+(defun open-url (url &key binary headers method body)
+  (%:%http-request url binary headers method body))
 
 (defun finish-output (&optional (output-stream *standard-output*))
   ;; XXX: implement this.
   )
+
+(defun close (stream &key abort)
+  (check-type stream stream)
+  (%:%stream-close stream))

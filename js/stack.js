@@ -3,14 +3,12 @@ import { LispPrimitiveError } from "./error.js";
 export class Values {
     constructor(vals) {
         this.vals = vals;
-    }
-    first() {
-        return this.vals.length > 0 ? this.vals[0] : false;
+        this.one_value = vals.length === 0 ? false : vals[0];
     }
 }
 
-export function value(el) {
-    return el instanceof Values ? el.first() : el;
+function value(el) {
+    return el instanceof Values ? el.one_value : el;
 }
 
 export class LispStack {
@@ -40,20 +38,10 @@ export class LispStack {
             throw new LispPrimitiveError("top() with an empty stack");
         }
     }
-    at(index) {
-        if (index < 0) index += this.sp;
-        return value(this.data.at(index));
-    }
     replace(index, newval) {
         if (index < 0) index += this.sp;
         let val = value(this.data[index]);
         this.data[index] = newval;
-        return val;
-    }
-    remove(index) {
-        if (index < 0) index += this.sp;
-        let val = this.data[index];
-        this.data.copyWithin(index, index + 1, this.sp--);
         return val;
     }
     push(val) {
@@ -64,6 +52,7 @@ export class LispStack {
         }
     }
     pop_frame(len) {
+        if (len === 0) return [];
         let sp = this.sp;
         if (sp < len) {
             throw new LispPrimitiveError(`Insufficient stack elements in pop_frame (${this.sp}/${len})`);
@@ -72,6 +61,11 @@ export class LispStack {
         while (len > 0) frame[--len] = value(this.data[--sp]);
         this.sp = sp;
         return frame;
+    }
+    push_frame(args) {
+        for (let i = 0; i < args.length; ++i) {
+            this.data[this.sp++] = args[i];
+        }
     }
     copy() {
         return this.data.slice(0, this.sp);

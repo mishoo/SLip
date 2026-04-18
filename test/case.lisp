@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Oct 18 19:56:44 2002
 ;;;; Contains: Tests of CASE
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest case.1
   (case 'a)

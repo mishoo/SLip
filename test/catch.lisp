@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Oct 12 13:04:02 2002
 ;;;; Contains: Tests of CATCH and THROW
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest catch.1
   (catch 'foo)

@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Jan  8 07:26:48 2005
 ;;;; Contains: Tests of DOLIST
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest dolist.1
   (let ((count 0))

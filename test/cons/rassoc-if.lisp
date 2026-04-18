@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:34:59 2003
 ;;;; Contains: Tests of RASSOC-IF
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest rassoc-if.1
     (let* ((x (rev-assoc-list '((1 . a) (3 . b) (6 . c) (7 . d))))

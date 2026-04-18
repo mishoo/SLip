@@ -1,7 +1,7 @@
 (in-package :sl-user)
 
 (defparameter t1
-  (make-thread
+  (%:%make-thread
    (lambda ()
      (%:%catch-all-errors)
      (let* ((rec2 (make-hash

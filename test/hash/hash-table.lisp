@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Jan 26 21:30:42 2003
 ;;;; Contains: Tests of HASH-TABLE and related interface
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest hash-table.1
   (notnot-mv (find-class 'hash-table))

@@ -3,8 +3,7 @@
 
 (in-package :sl-print)
 
-(import '(sl-struct::find-structure
-          sl-struct::structure-name
+(import '(sl-struct::structure-name
           sl-struct::structure-slots
           sl-struct::structure-print-object
           sl-struct::structure-print-function
@@ -132,7 +131,7 @@
   (<< (if *print-escape* (%dump character) character)))
 
 (def-print (regexp)
-  (<< "#" (%dump regexp)))
+  (<< (%dump regexp)))
 
 (def-print (package)
   (<< "#<PACKAGE " (package-name package) ">"))
@@ -299,11 +298,7 @@
 
 (def-pretty-print quote (&rest forms)
   (<< "'")
-  (cond
-    ((consp (car forms))
-     (%pp-list (car forms)))
-    (t
-     (%pp-object (car forms)))))
+  (%pp-object (car forms)))
 
 (def-pretty-print quasiquote (&rest forms)
   (<< "`")

@@ -158,19 +158,24 @@
         aspect-ratio: 1;
         transition: transform 0.5s;
         outline: 2px solid #000;
-        background-color: #ffe;
 
-        &::before {
-            content: "";
-            background-image: url("data:image/svg+xml,%3Csvg fill='currentColor' viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M255.9.2h-64v64h64zM0 64.17v64h64v-64zM128 .2H64v64h64zm64 255.9v64h64v-64zM0 192.12v64h64v-64zM383.85.2h-64v64h64zm128 0h-64v64h64zM128 256.1H64v64h64zM511.8 448v-64h-64v64zm0-128v-64h-64v64zM383.85 512h64v-64h-64zm128-319.88v-64h-64v64zM128 512h64v-64h-64zM0 512h64v-64H0zm255.9 0h64v-64h-64zM0 320.07v64h64v-64zm319.88-191.92v-64h-64v64zm-64 128h64v-64h-64zm-64 128v64h64v-64zm128-64h64v-64h-64zm0-127.95h64v-64h-64zm0 191.93v64h64v-64zM64 384.05v64h64v-64zm128-255.9v-64h-64v64zm191.92 255.9h64v-64h-64zm-128-191.93v-64h-64v64zm128-127.95v64h64v-64zm-128 255.9v64h64v-64zm-64-127.95H128v64h64zm191.92 64h64v-64h-64zM128 128.15H64v64h64zm0 191.92v64h64v-64z'/%3E%3C/svg%3E");
-            display: block;
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background-repeat: no-repeat;
-            background-size: 100% 100%;
-            opacity: 0.15;
-        }
+        /* what a magic hack for checkerboard background! */
+        background: 0 0 / 25% 25% repeating-conic-gradient(#00000010 0 25%, #ffe 0 50%);
+
+        /*
+         * background-color: #ffe;
+         * &::before {
+         *     content: "";
+         *     background-image: url("data:image/svg+xml,%3Csvg fill='currentColor' viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M255.9.2h-64v64h64zM0 64.17v64h64v-64zM128 .2H64v64h64zm64 255.9v64h64v-64zM0 192.12v64h64v-64zM383.85.2h-64v64h64zm128 0h-64v64h64zM128 256.1H64v64h64zM511.8 448v-64h-64v64zm0-128v-64h-64v64zM383.85 512h64v-64h-64zm128-319.88v-64h-64v64zM128 512h64v-64h-64zM0 512h64v-64H0zm255.9 0h64v-64h-64zM0 320.07v64h64v-64zm319.88-191.92v-64h-64v64zm-64 128h64v-64h-64zm-64 128v64h64v-64zm128-64h64v-64h-64zm0-127.95h64v-64h-64zm0 191.93v64h64v-64zM64 384.05v64h64v-64zm128-255.9v-64h-64v64zm191.92 255.9h64v-64h-64zm-128-191.93v-64h-64v64zm128-127.95v64h64v-64zm-128 255.9v64h64v-64zm-64-127.95H128v64h64zm191.92 64h64v-64h-64zM128 128.15H64v64h64zm0 191.92v64h64v-64z'/%3E%3C/svg%3E");
+         *     background-repeat: no-repeat;
+         *     background-size: 100% 100%;
+         *     opacity: 0.15;
+         *     display: block;
+         *     position: absolute;
+         *     width: 100%;
+         *     height: 100%;
+         * }
+         */
 
         .piece {
             position: absolute;

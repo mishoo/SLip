@@ -7,7 +7,7 @@
           substitute substitute-if substitute-if-not
           nsubstitute nsubstitute-if nsubstitute-if-not
           remove-duplicates delete-duplicates
-          subseq))
+          subseq concatenate map))
 
 (defpackage :sl-seq
   (:use :sl :%))
@@ -60,7 +60,7 @@
   (remove-if (lambda (el) (funcall test item el)) list
              :start start :end end :count count :from-end from-end))
 
-(defun %erase-if (list predicate)
+(defun %list-delete-if (predicate list)
   (let* ((ret (cons nil list))
          (p ret))
     (tagbody
@@ -72,32 +72,32 @@
          (go :loop)))
     (cdr ret)))
 
-(defun %delete-duplicates (list test)
-  (tagbody
-   :loop
-     (when list
-       (let ((current (car list)))
-         (setf list
-               (setf (cdr list)
-                     (%erase-if (cdr list)
-                                (lambda (x)
-                                  (funcall test current x)))))
+(defun %list-delete-duplicates (list test)
+  (flet ((same-as-first (x)
+           (funcall test (car list) x)))
+    (tagbody
+     :loop
+       (when list
+         (setf list (setf (cdr list)
+                          (%list-delete-if #'same-as-first (cdr list))))
          (go :loop)))))
 
 (defun remove-duplicates (list &key key test test-not from-end)
   (setf list (if from-end (copy-seq list) (reverse list)))
-  (%delete-duplicates list (make-subject-test test test-not key t))
+  (%list-delete-duplicates list (make-subject-test test test-not key t))
   (if from-end list (nreverse list)))
 
 (defun delete-duplicates (list &key key test test-not from-end)
   (unless from-end (setf list (nreverse list)))
-  (%delete-duplicates list (make-subject-test test test-not key t))
+  (%list-delete-duplicates list (make-subject-test test test-not key t))
   (if from-end list (nreverse list)))
 
 (defconstant +no-value+ '(done))
 
 (defun seq-iterator (seq)
   (cond
+    ((null seq)
+     (constantly +no-value+))
     ((listp seq)
      (lambda ()
        (if seq (pop seq) +no-value+)))
@@ -119,7 +119,9 @@
         (alt-el (when alt (intern (strcat alt "-EL")))))
     `(macrolet (,@(when replace
                     `((replace-with (val)
-                                    `(setf (car ,',tail) ,val)))))
+                                    `(setf (car ,',tail) ,val))))
+                (return-sequence ()
+                  `(return (if from-end (nreverse list) list))))
        (cond
          ,(when from-end
             `(from-end
@@ -171,7 +173,9 @@
         (alt-el (when alt (intern (strcat alt "-EL")))))
     `(macrolet (,@(when replace
                     `((replace-with (val)
-                                    `(setf (svref list index) ,val)))))
+                                    `(setf (svref list index) ,val))))
+                (return-sequence ()
+                  `(return list)))
        (unless end
          (setf end (length list)))
        (cond
@@ -197,7 +201,7 @@
           (stringp list))
       (with-vector-frobnicator ,args ,@body))
      (t
-      (error "TODO: sequence functions only operate on lists for now"))))
+      (error (error "WITH-SEQ-FROBNICATOR: unknown sequence")))))
 
 (defun find-if (predicate list &key key (start 0) end from-end)
   (update-for-key predicate key)
@@ -251,8 +255,8 @@
           (replace-with newitem)
           (when count
             (unless (plusp (decf count))
-              (return (if from-end (nreverse list) list)))))
-    :finally (return (if from-end (nreverse list) list))))
+              (return-sequence))))
+    :finally (return-sequence)))
 
 (defun substitute-if-not (newitem predicate list &rest args)
   (apply #'substitute-if newitem (complement predicate) list args))
@@ -270,8 +274,8 @@
           (replace-with newitem)
           (when count
             (unless (plusp (decf count))
-              (return (if from-end (nreverse list) list)))))
-    :finally (return (if from-end (nreverse list) list))))
+              (return-sequence))))
+    :finally (return-sequence)))
 
 (defun nsubstitute-if (newitem predicate list &rest args)
   (apply #'substitute-if newitem predicate list :destructive t args))
@@ -290,3 +294,49 @@
   (with-seq-frobnicator (:from-end nil :alt newseq :replace t)
     :do (replace-with newseq-el)
     :finally (return newseq)))
+
+;; this macro simply serves the role of copy/paste. indeed, it is horrible.
+(defmacro concafrob ()
+  `(progn
+     (when (consp result-type)
+       (setf result-type (car result-type)))
+     (ecase result-type
+       ((string simple-string)
+        (with-output-to-string (out)
+          (doit (%stream-put out val))))
+       ((array vector simple-vector)
+        (let ((out (make-array 0 :fill-pointer 0 :adjustable t)))
+          (doit (vector-push-extend val out))
+          out))
+       ((list cons)
+        (with-collectors (out)
+          (doit (out val))
+          out))
+       ((null)
+        (loop for seq in sequences
+              do (assert (zerop (length seq))
+                         "CONCATENATE: non-empty sequence with NULL output type"))
+        nil))))
+
+(defun concatenate (result-type &rest sequences)
+  (macrolet ((doit (add)
+               `(loop for seq in sequences
+                      for it = (seq-iterator seq)
+                      do (loop for val = (funcall it)
+                               until (eq val +no-value+)
+                               do ,add))))
+    (concafrob)))
+
+;; XXX: in terms of performance, this is, of course, horrendous.
+(defun map (result-type function &rest sequences)
+  (let ((iterators (mapcar #'seq-iterator sequences)))
+    (macrolet ((doit (add)
+                 `(loop named outer
+                        for args = (loop for it in iterators
+                                         for arg = (funcall it)
+                                         if (eq arg +no-value+)
+                                         do (return-from outer nil)
+                                         else collect arg)
+                        for val = (apply function args)
+                        do ,add)))
+      (concafrob))))

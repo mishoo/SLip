@@ -2,7 +2,7 @@
 ;;;; Created:  Fri Oct 18 23:16:23 2002
 ;;;; Contains: Tests for MULTIPLE-VALUE-BIND
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest multiple-value-bind.1
   (multiple-value-bind (x y z) (values 1 2 3)

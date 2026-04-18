@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Apr 19 22:05:34 2003
 ;;;; Contains: Tests of PUSH
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 ;;; See also places.lsp
 

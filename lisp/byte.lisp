@@ -2,10 +2,10 @@
 
 (export '(ash byte byte-size byte-position ldb ldb-test dpb logand logandc1
           logandc2 logeqv logior lognand lognor lognot logorc1 logorc2 logxor
-          logtest logcount))
+          logtest logcount integer-length))
 
 (defpackage :sl-byte
-  (:use :sl :%))
+  (:use :sl))
 
 ;; (setq %:*enable-inline* t)
 
@@ -38,23 +38,39 @@
 (define-compiler-macro byte-position (byte)
   `(cdr ,byte))
 
-(define-compiler-macro op-and (b1 b2)
+(defun constant-bytespec-p (form)
+  (and (consp form)
+       (eq 'byte (car form))
+       (integerp (cadr form))
+       (integerp (caddr form))))
+
+(defmacro with-constant-bytespec ((bytespec size pos) &body body)
+  `(when (constant-bytespec-p ,bytespec)
+     (let ((,size (cadr ,bytespec))
+           (,pos (caddr ,bytespec)))
+       ,@body)))
+
+(defmacro op-and (b1 b2)
   `(%:%op BAND ,b1 ,b2))
 
-(define-compiler-macro op-ior (b1 b2)
+(defmacro op-ior (b1 b2)
   `(%:%op BIOR ,b1 ,b2))
 
-(define-compiler-macro op-xor (b1 b2)
+(defmacro op-xor (b1 b2)
   `(%:%op BXOR ,b1 ,b2))
 
-(define-compiler-macro op-ash (num count)
+(defmacro op-ash (num count)
   `(%:%op BASH ,num ,count))
 
-(define-compiler-macro op-cnt (num)
+(defmacro op-cnt (num)
   `(%:%op BCNT ,num))
 
-(define-compiler-macro op-not (num)
+(defmacro op-not (num)
   `(%:%op BNOT ,num))
+
+(defmacro op-dpb (newbyte pos mask integer)
+  `(%:%op ,(vector (vector "DPB" pos mask))
+          ,newbyte ,integer))
 
 (defun logand (&rest integers)
   (do ((ret -1)
@@ -157,12 +173,7 @@
 
 (define-compiler-macro ldb (&whole form bytespec integer)
   (cond
-    ((and (consp bytespec)
-          (eq 'byte (car bytespec))
-          (integerp (cadr bytespec))
-          (integerp (caddr bytespec)))
-     (let* ((size (cadr bytespec))
-            (pos (caddr bytespec)))
+    ((with-constant-bytespec (bytespec size pos)
        `(logand (ash ,integer ,(- pos)) ,(1- (ash 1 size)))))
     (t form)))
 
@@ -174,14 +185,9 @@
 
 (define-compiler-macro ldb-test (&whole form bytespec integer)
   (cond
-    ((and (consp bytespec)
-          (eq 'byte (car bytespec))
-          (integerp (cadr bytespec))
-          (integerp (caddr bytespec)))
-     (let* ((size (cadr bytespec))
-            (pos (caddr bytespec))
-            (mask (1- (ash 1 size))))
-       `(/= 0 (logand ,integer ,(ash mask pos)))))
+    ((with-constant-bytespec (bytespec size pos)
+       (let ((mask (1- (ash 1 size))))
+         `(/= 0 (logand ,integer ,(ash mask pos))))))
     (t form)))
 
 (defun dpb (newbyte bytespec integer)
@@ -192,38 +198,51 @@
 
 (define-compiler-macro dpb (&whole form newbyte bytespec integer)
   (cond
-    ((and (consp bytespec)
-          (eq 'byte (car bytespec))
-          (integerp (cadr bytespec))
-          (integerp (caddr bytespec)))
-     (let* ((size (cadr bytespec))
-            (pos (caddr bytespec))
-            (mask (1- (ash 1 size)))
-            (tmask (ash mask pos)))
-       (cond
-         ((integerp newbyte)
-          `(logior (logand ,integer ,(lognot tmask))
-                   ,(ash (logand newbyte mask) pos)))
-         (t
-          `(logior (logand ,integer ,(lognot tmask))
-                   (ash (logand ,newbyte ,mask) ,pos))))))
+    ((with-constant-bytespec (bytespec size pos)
+       (let ((mask (1- (ash 1 size))))
+         (cond
+           ((integerp newbyte)
+            (let ((dep (ash (logand newbyte mask) pos)))
+              (if (= (logcount dep) size)
+                  `(logior ,integer ,dep)
+                  `(op-dpb ,newbyte ,pos ,mask ,integer))))
+           (t
+            `(op-dpb ,newbyte ,pos ,mask ,integer))))))
     (t form)))
 
-;; this is taken straight from the spec.
-;; https://novaspec.org/cl/f_define-setf-expander
 (define-setf-expander ldb (bytespec int)
   (multiple-value-bind (temps vals stores store-form access-form)
       (get-setf-expansion int)   ;Get setf expansion for int.
-    (let ((btemp (gensym))     ;Temp var for byte specifier.
-          (store (gensym))     ;Temp var for byte to store.
-          (stemp (first stores))) ;Temp var for int to store.
-      (if (cdr stores) (error "Can't expand this."))
-      ;;; Return the setf expansion for LDB as five values.
-      (values (cons btemp temps)       ;Temporary variables.
-              (cons bytespec vals)     ;Value forms.
-              (list store)             ;Store variables.
-              `(let ((,stemp (dpb ,store ,btemp ,access-form)))
-                 ,store-form
-                 ,store)               ;Storing form.
-              `(ldb ,btemp ,access-form) ;Accessing form.
-              ))))
+    (if (cdr stores) (error "Can't expand this."))
+    (cond
+      ((constant-bytespec-p bytespec)
+       (let ((store (gensym))
+             (stemp (first stores)))
+         (values temps
+                 vals
+                 (list store)
+                 `(let ((,stemp (dpb ,store ,bytespec ,access-form)))
+                    ,store-form
+                    ,store)
+                 `(ldb ,bytespec ,access-form))))
+      (t
+       ;; this is taken straight from the spec.
+       ;; https://novaspec.org/cl/f_define-setf-expander
+       (let ((btemp (gensym))     ;Temp var for byte specifier.
+             (store (gensym))     ;Temp var for byte to store.
+             (stemp (first stores))) ;Temp var for int to store.
+         ;;; Return the setf expansion for LDB as five values.
+         (values (cons btemp temps)       ;Temporary variables.
+                 (cons bytespec vals)     ;Value forms.
+                 (list store)             ;Store variables.
+                 `(let ((,stemp (dpb ,store ,btemp ,access-form)))
+                    ,store-form
+                    ,store)               ;Storing form.
+                 `(ldb ,btemp ,access-form) ;Accessing form.
+                 ))))))
+
+(defun integer-length (integer)
+  (values (ceiling (log (if (minusp integer)
+                            (- integer)
+                            (1+ integer))
+                        2))))

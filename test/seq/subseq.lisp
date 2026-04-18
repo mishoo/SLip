@@ -2,7 +2,7 @@
 ;;;; Created:  Sat Oct 12 19:41:14 2002
 ;;;; Contains: Tests on SUBSEQ
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; subseq, on lists

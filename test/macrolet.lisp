@@ -2,7 +2,7 @@
 ;;;; Created:  Wed Oct  9 19:41:24 2002
 ;;;; Contains: Tests of MACROLET
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest macrolet.1
   (let ((z (list 3 4)))

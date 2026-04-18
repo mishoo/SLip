@@ -2,7 +2,7 @@
 ;;;; Created:  Mon Feb 17 06:38:07 2003
 ;;;; Contains: Tests of MULTIPLE-VALUE-LIST
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest multiple-value-list.1
   (multiple-value-list 'a)

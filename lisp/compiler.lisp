@@ -8,11 +8,10 @@
 ;;;;
 ;;;; Don't customize the reader in this file.
 
-"
-(in-package :%)
-" ;; hack for Ymacs to get the right package
+(defmacro in-package (name)
+  `(setq *package* (find-package ',name)))
 
-(setq %::*package* (find-package "%"))
+(in-package :%)
 
 (defmacro when (pred . body)
   `(if ,pred (progn ,@body)))
@@ -24,9 +23,11 @@
   (when clauses
     (let ((first (car clauses)))
       (if (cdr first)
-          `(if ,(car first)
-               (progn ,@(cdr first))
-               (cond ,@(cdr clauses)))
+          (if (eq t (car first))
+              `(progn ,@(cdr first))
+              `(if ,(car first)
+                   (progn ,@(cdr first))
+                   (cond ,@(cdr clauses))))
           `(or ,(car first)
                (cond ,@(cdr clauses)))))))
 
@@ -95,7 +96,9 @@
           ((or (numberp x)
                (stringp x)
                (regexpp x)
-               (vectorp x))
+               (characterp x)
+               (vectorp x)
+               (hash-table-p x))
            x)
           ((not (consp x))
            (if x (list 'quote x)))
@@ -198,7 +201,8 @@
 (defvar *load-timing* nil)
 (defvar *delay-eval* nil)
 
-(defvar *compiler-macros* (make-hash))
+(defvar *compiler-macros* (make-weak-hash))
+(defvar *compiler-macro-val?* t)
 
 (defvar *standard-output* (%make-text-memory-output-stream))
 (defvar *error-output* (%make-text-memory-output-stream))
@@ -206,7 +210,7 @@
 (defvar *standard-input*)
 
 ;; XXX: only for global functions for now, and it's risky if they use globals
-;; which are not special (introduced with defvar or defglobal).
+;; which are not special (introduced with defconstant or defglobal).
 (defparameter *enable-inline* nil)
 
 (defvar *build-count* 0)
@@ -249,76 +253,78 @@
       `(%pop ,name)
       (error "POP: we don't have POP yet")))
 
-(defun map1 (func lst)
-  (let rec ((ret nil) (lst lst))
-    (if lst
-        (rec (cons (funcall func (pop lst)) ret)
-             lst)
-        (nreverse ret))))
-
-(defun map1-vector (func lst)
-  (let ((ret (vector)))
-    (let rec ((lst lst))
-      (if lst (progn
-                (%vector-push ret (funcall func (pop lst)))
-                (rec lst))
-          ret))))
-
-(defun map2-vector (func lst1 lst2)
-  (let ((ret (vector)))
-    (let rec ((lst1 lst1)
-              (lst2 lst2))
-      (if (and lst1 lst2)
-          (progn
-            (%vector-push ret (funcall func (pop lst1) (pop lst2)))
-            (rec lst1 lst2))
-          ret))))
-
-(defun map2 (func lst1 lst2)
-  (let rec ((ret nil) (lst1 lst1) (lst2 lst2))
-    (if (and lst1 lst2)
-        (rec (cons (funcall func (pop lst1) (pop lst2)) ret)
-             lst1 lst2)
-        (nreverse ret))))
-
-(defun foreach (lst func)
-  (let rec ((lst lst))
-    (when lst
-      (funcall func (pop lst))
-      (rec lst))))
-
-(defun foreach-index (lst func)
-  (let rec ((lst lst) (index 0))
-    (when lst
-      (funcall func (pop lst) index)
-      (rec lst (1+ index)))))
-
 (defmacro incf (var)
   `(setq ,var (1+ ,var)))
 
 (defmacro decf (var)
   `(setq ,var (1- ,var)))
 
-(defun identity (x) x)
+(defmacro push (obj place)
+  `(setq ,place (cons ,obj ,place)))
 
-(defun complement (f)
-  (lambda args
-    (not (apply f args))))
+(defun map1 (func lst)
+  (let ((ret '()))
+    (tagbody
+     :next
+       (when lst
+         (push (funcall func (pop lst)) ret)
+         (go :next)))
+    (nreverse ret)))
 
-(defun constantly (value)
-  (lambda args
-    (declare (ignore args))
-    value))
+(defun map2 (func lst1 lst2)
+  (let ((ret '()))
+    (tagbody
+     :next
+       (when (and lst1 lst2)
+         (push (funcall func (pop lst1) (pop lst2)) ret)
+         (go :next)))
+    (nreverse ret)))
+
+(defun map1-vector (func lst)
+  (let ((ret (vector)))
+    (tagbody
+     :next
+       (when lst
+         (vector-push (funcall func (pop lst))
+                      ret)
+         (go :next)))
+    ret))
+
+(defun map2-vector (func lst1 lst2)
+  (let ((ret (vector)))
+    (tagbody
+     :next
+       (when (and lst1 lst2)
+         (vector-push (funcall func (pop lst1) (pop lst2))
+                      ret)
+         (go :next)))
+    ret))
+
+(defun foreach (lst func)
+  (tagbody
+   :next
+     (when lst
+       (funcall func (pop lst))
+       (go :next))))
+
+(defun foreach-index (lst func)
+  (let ((index -1))
+    (tagbody
+     :next
+       (when lst
+         (funcall func (pop lst) (incf index))
+         (go :next)))))
 
 (defun filter (lst pred)
-  (let rec ((lst lst)
-            (ret nil))
-    (if lst
-        (rec (cdr lst)
-             (if (funcall pred (car lst))
-                 (cons (car lst) ret)
-                 ret))
-        (nreverse ret))))
+  (let ((ret nil))
+    (tagbody
+     :loop
+       (when lst
+         (when (funcall pred (car lst))
+           (setq ret (cons (car lst) ret)))
+         (setq lst (cdr lst))
+         (go :loop)))
+    (nreverse ret)))
 
 (defmacro prog2 (exp1 exp2 . body)
   `(progn
@@ -345,8 +351,9 @@
                     (cond
                       ((cdaar cases)
                        (when errorp
-                         (foreach (caar cases) (lambda (x)
-                                                 (push x exps))))
+                         (foreach (caar cases)
+                           (lambda (x)
+                             (push x exps))))
                        `(if (%memq ,vexpr ',(caar cases))
                             (progn ,@(cdar cases))
                             ,(recur (cdr cases))))
@@ -381,9 +388,6 @@
   `(let ((it ,cond))
      (if it ,@rest)))
 
-(defmacro push (obj place)
-  `(setq ,place (cons ,obj ,place)))
-
 (defconstant +keyword-package+ (find-package "KEYWORD"))
 
 ;;;; parser/compiler
@@ -413,7 +417,9 @@
          (croak (msg)
            (when *current-file*
              (setq *current-pos* (%stream-line input)))
-           (error/wp (strcat msg ", line: " (%stream-line input) ", col: " (%stream-col input))))
+           (error/wp (strcat msg
+                             ", line: " (%stream-line input)
+                             ", col: " (%stream-col input))))
 
          (skip-ws ()
            (read-while #'whitespacep))
@@ -449,7 +455,7 @@
                  (mods (read-while
                         (lambda (ch)
                           (%memq (downcase ch)
-                                 '(#\g #\m #\i #\y #\u))))))
+                                 #(#\g #\m #\i #\y #\u))))))
              (make-regexp str (downcase mods))))
 
          (skip-comment ()
@@ -473,7 +479,7 @@
                 (rec)))))
 
          (symbol-char-p (ch)
-           (not (%memq ch '(#\( #\) #\[ #\] #\{ #\}
+           (not (%memq ch #(#\( #\) #\[ #\] #\{ #\}
                             #\# #\; #\` #\' #\" #\|
                             #\SPACE
                             #\NEWLINE
@@ -592,7 +598,7 @@
          (read-quasiquote ()
            (skip #\`)
            (skip-ws)
-           (if (%memq (peek) '(#\( #\` #\' #\,))
+           (if (%memq (peek) #(#\( #\` #\' #\,))
                (let* ((qq (list nil))
                       (in-qq (cons qq in-qq))
                       (token (read-token)))
@@ -638,9 +644,11 @@
            (let ((reader (and *read-table* (gethash (peek) *read-table*))))
              (cond
                (reader
-                (let ((tok (multiple-value-list
-                            (funcall reader input (next) #'the-reader))))
-                  (if tok (car tok) (read-token))))
+                (multiple-value-bind (token decline)
+                    (funcall reader input (next) #'the-reader)
+                  (if decline
+                      (read-token)
+                      token)))
                (t
                 (case (peek)
                   (#\; (skip-comment) (read-token))
@@ -682,20 +690,14 @@
          nil)
        ,seq)))
 
-(defmacro without-interrupts body
-  `(let ((old (%no-interrupts t)))
-     (unwind-protect
-         (progn ,@body)
-       (%no-interrupts old))))
-
 (defmacro return (&optional val)
   `(return-from nil ,val))
 
 (defun lambda-keyword-p (sym)
-  (%memq sym '(&optional &rest &body &key &aux &allow-other-keys)))
+  (%memq sym #(&optional &rest &body &key &aux &allow-other-keys)))
 
 (defun macro-keyword-p (sym)
-  (%memq sym '(&whole &environment)))
+  (%memq sym #(&whole &environment)))
 
 (defun ordinary-lambda-list-p (args)
   (let dig ((args args)
@@ -707,7 +709,7 @@
       ((listp (car args))
        (when (and seen (symbolp (caar args)))
          (dig (cdr args) t)))
-      ((%memq (car args) '(&rest &body))
+      ((%memq (car args) #(&rest &body))
        (when (symbolp (cadr args))
          (dig (cddr args) seen)))
       ((lambda-keyword-p (car args))
@@ -716,6 +718,9 @@
        nil)
       (t
        (dig (cdr args) seen)))))
+
+(defmacro assert (p msg)
+  `(or ,p (error/wp ,msg)))
 
 (defun parse-lambda-list (args)
   (let ((all nil)
@@ -727,10 +732,7 @@
         (aux nil)
         (allow-other-keys nil))
     (labels
-        ((assert (p msg)
-           (if p p (error/wp msg)))
-
-         (symp (x)
+        ((symp (x)
            (and x (symbolp x)
                 (not (eq x t))
                 (not (lambda-keyword-p x))))
@@ -1343,18 +1345,42 @@
   (define-compiler-macro minusp (val)
     `(%op MINUSP ,(reduce-form val))))
 
+(defun identity (x) x)
+
 (define-compiler-macro identity (x) x)
+
+(defun complement (f)
+  (lambda args
+    (not (apply f args))))
+
+(define-compiler-macro complement (f)
+  `(lambda $_
+     (not (apply ,f $_))))
+
+(defun constantly (value)
+  (lambda args
+    (declare (ignore args))
+    value))
+
+(define-compiler-macro constantly (value)
+  `(lambda $_
+     (declare (ignore $_))
+     ,value))
 
 (define-compiler-macro zerop (value)
   (cond
     ((eq value 0) t)
     (t `(= 0 ,value))))
 
-(define-compiler-macro eq (&whole form a b)
-  (cond
-    ((not a) `(not ,b))
-    ((not b) `(not ,a))
-    (t form)))
+(flet ((eq-cm (form a b)
+         (cond
+           ((not a) `(not ,b))
+           ((not b) `(not ,a))
+           (t form))))
+  (define-compiler-macro eq (&whole form a b)
+    (eq-cm form a b))
+  (define-compiler-macro eql (&whole form a b)
+    (eq-cm form a b)))
 
 (define-compiler-macro endp (lst)
   `(not ,lst))
@@ -1397,7 +1423,7 @@
          (stringp form)
          (keywordp form)
          (regexpp form)
-         (charp form)
+         (characterp form)
          (vectorp form)
          (functionp form)
          (%:%std-instance-p form)
@@ -1487,24 +1513,17 @@
                              env))))))
          ,@body))))
 
-(defun flatten (sym forms)
-  (let dig ((forms forms)
-            (result nil)
-            (rest nil))
-    (cond
-      ((null forms)
-       (if rest
-           (dig (car rest) result (cdr rest))
-           (nreverse result)))
-      ((and (consp (car forms))
-            (eq sym (caar forms)))
-       (dig (cdar forms)
-            result
-            (cons (cdr forms) rest)))
-      (t
-       (dig (cdr forms)
-            (cons (car forms) result)
-            rest)))))
+(defun quote-if-you-must (x)
+  (cond
+    ((or (eq x t)
+         (eq x nil)
+         (stringp x)
+         (numberp x)
+         (characterp x)
+         (keywordp x))
+     x)
+    (t
+     `',x)))
 
 (defconstant *lambda-syms* '(lambda λ %fn))
 
@@ -1660,7 +1679,9 @@
                               (%get-symbol-prop name :constant))
                      (let ((val (symbol-value name)))
                        (when (or (numberp val)
-                                 (charp val))
+                                 (characterp val)
+                                 (symbolp val)
+                                 (stringp val))
                          (gen "CONST" val)))))
                   (t
                    (gen "GVAR" (unknown-variable name env)))))))
@@ -1737,7 +1758,7 @@
              (arg-count x 2 3)
              (comp-if (cadr x) (caddr x) (cadddr x) env val? more?))
             ((or)
-             (comp-or (flatten 'or (cdr x)) env val? more?))
+             (comp-or (cdr x) env val? more?))
             ((not null)
              (arg-count x 1 1)
              (if val?
@@ -1809,25 +1830,33 @@
              (arg-count x 1)
              (comp-unwind-protect (cadr x) (cddr x) env val? more?))
             ((funcall)
-             (comp-funcall (cadr x) (cddr x) env val? more?))
+             (comp-apply nil (cadr x) (cddr x) env val? more?))
             ((apply)
-             (comp-apply (cadr x) (cddr x) env val? more?))
+             (comp-apply t (cadr x) (cddr x) env val? more?))
             ((%op)
              (comp-op (cadr x) (cddr x) env val? more?))
             (otherwise
-             (cond
-               ((aif (and (symbolp (car x))
-                          (%get-symbol-prop (car x) 'compiler))
-                     (funcall it x env val? more? :compile-expr #'comp)))
-               ((aif (and (symbolp (car x))
-                          (compiler-macro-function (car x)))
-                     (let ((form (funcall it x)))
-                       (unless (eq form x)
-                         (comp form env val? more?)))))
-               ((aif (and (symbolp (car x))
-                          (macro (car x) env))
-                     (comp-macroexpand it x env val? more?)
-                     (comp-call t (car x) (cdr x) env val? more?)))))))))
+             (let (it)
+               (cond
+                 ((setq it (and (symbolp (car x))
+                                (%get-symbol-prop (car x) 'compiler)))
+                  (let ((code (funcall it x env val? more? :compile-expr #'comp)))
+                    (if (listp code)
+                        (comp code env val? more?) ;; like define-compiler-macro
+                        code ;; otherwise it's direct assembly
+                        )))
+                 ((setq it (and (symbolp (car x))
+                                (compiler-macro-function (car x))))
+                  (let* ((*compiler-macro-val?* val?)
+                         (form (funcall it x)))
+                    (if (eq form x)
+                        (comp-call t (car x) (cdr x) env val? more?)
+                        (comp form env val? more?))))
+                 ((setq it (and (symbolp (car x))
+                                (macro (car x) env)))
+                  (comp-macroexpand it x env val? more?))
+                 (t
+                  (comp-call t (car x) (cdr x) env val? more?)))))))))
 
      (comp-op (opname args env val? more?)
        ;; We'll now compute the args (they'll remain on the stack) and generate
@@ -1840,7 +1869,9 @@
           (comp-seq args env nil t))
          (t
           (%seq (comp-arguments args env)
-                (gen (strcat opname))
+                (if (vectorp opname)
+                    opname
+                    (gen (strcat opname)))
                 (unless more? (gen "RET"))))))
 
      (comp-one-setq (name value env val? more?)
@@ -1876,9 +1907,10 @@
                                   (value (cadr exps)))
                               (<< (comp value env t t))
                               (rec (cddr exps) (cons name ret)))))))
-           (foreach names (lambda (name)
-                            (<< (gen-set name env)
-                                (gen "POP")))))
+           (foreach names
+             (lambda (name)
+               (<< (gen-set name env)
+                   (gen "POP")))))
          (<< (comp-const nil val? more?))))
 
      (comp-const (x val? more?)
@@ -1953,10 +1985,9 @@
 
      (comp-arguments (exps env)
        (with-seq-output <<
-         (let rec ((exps exps))
-           (when exps
-             (<< (comp (car exps) env t t))
-             (rec (cdr exps))))))
+         (foreach exps
+           (lambda (exp)
+             (<< (comp exp env t t))))))
 
      (comp-block (name forms env val? more?)
        (assert (symbolp name) (strcat "BLOCK expects a symbol, got: " name))
@@ -1986,7 +2017,7 @@
                    (gen "LRET" label (car block))
                    (gen "LJUMP" label (car block))))))
 
-     (comp-tagbody (forms env val? more?)
+     (comp-tagbody (forms env val? more? &optional no-long-jumps)
        ;; a TAGBODY introduces a single return point in the lexical
        ;; environment; this is necessary because we can jump to a tag
        ;; from a nested environment, so the runtime will need to save
@@ -1996,7 +2027,8 @@
        ;; specified index.
        (with-seq-output <<
          (let ((tags (list nil))
-               (tbody (gensym "tagbody")))
+               (tbody (gensym "tagbody"))
+               (opts (list :long nil)))
            ;; pass 1: fetch tags
            (let rec ((forms forms)
                      (p tags))
@@ -2011,16 +2043,33 @@
              ((null tags)
               (<< (comp-seq forms env nil t)
                   (comp-const nil val? more?)))
-             ((with-extenv (:tags (as-vector tags) :lex (vector (list tbody :tagbody)))
-                (<< (gen "BLOCK"))           ; define the tagbody entry
-                (let ((*tagbody-dynest* 0))
-                  (foreach forms (lambda (x)
-                                   (if (atom x)
-                                       (<< (vector (cadddr (pop tags)))) ; label
-                                       (<< (comp x env nil t))))))
-                (when val? (<< (gen "NIL"))) ; tagbody returns NIL
-                (<< (gen "UNFR" 1 0))        ; pop the tagbody from the env
-                (unless more? (<< (gen "RET")))))))))
+             ((let ((orig-env env)
+                    (frame (vector (list* tbody :tagbody opts))))
+                (when no-long-jumps
+                  (setq frame (cons '%skip-count frame)))
+                (with-extenv (:tags (as-vector tags) :lex frame)
+                  (unless no-long-jumps
+                    (<< (gen "BLOCK")))           ; define the tagbody entry
+                  (let ((*tagbody-dynest* 0))
+                    (foreach forms
+                      (lambda (x)
+                        (if (atom x)
+                            (<< (vector (cadddr (pop tags)))) ; label
+                            (<< (comp x env nil t))))))
+
+                  ;; When no LJUMP has been compiled for this TAGBODY, redo
+                  ;; everything with long jumps disabled. This is a bit ugly
+                  ;; as we start from scratch, but it's easiest to implement
+                  ;; this way.
+                  (when (and (not no-long-jumps)
+                             (not (getf opts :long)))
+                    (return-from comp-tagbody
+                      (comp-tagbody forms orig-env val? more? t)))
+
+                  (when val? (<< (gen "NIL"))) ; tagbody returns NIL
+                  (unless no-long-jumps
+                    (<< (gen "UNFR" 1 0)))        ; pop the tagbody from the env
+                  (unless more? (<< (gen "RET"))))))))))
 
      (comp-go (tag env)
        (let ((pos (find-tag tag env)))
@@ -2032,6 +2081,7 @@
                    (zerop *tagbody-dynest*))
               (gen "JUMP" (cadddr pos)))
              (t
+              (%putf (cddr tbody) :long t)
               (gen "LJUMP" (cadddr pos) i))))))
 
      (comp-if (pred then else env val? more?)
@@ -2041,7 +2091,7 @@
          ((always-false-p pred)
           (comp else env val? more?))
          ((and (consp pred)
-               (%memq (car pred) '(not null)))
+               (%memq (car pred) #(not null)))
           (comp-if (cadr pred) else then env val? more?))
          (t
           (let ((pcode (comp pred env t t))
@@ -2104,7 +2154,7 @@
          (t
           (comp (car exps) env val? more?))))
 
-     (comp-funcall (f args env val? more?)
+     (comp-apply (apply? f args env val? more?)
        (if (or (safe-atom-p f)
                (and (consp f)
                     (or (%memq (car f) *lambda-syms*)
@@ -2114,21 +2164,9 @@
                      t
                      (and (safe-atom-p (car args))
                           (rec (cdr args))))))
-           (comp-call nil f args env val? more?)
-           (comp-call t 'funcall (list* f args) env val? more?)))
-
-     (comp-apply (f args env val? more?)
-       (if (or (safe-atom-p f)
-               (and (consp f)
-                    (or (%memq (car f) *lambda-syms*)
-                        (eq (car f) 'function)))
-               (let rec ((args args))
-                 (if (not args)
-                     t
-                     (and (safe-atom-p (car args))
-                          (rec (cdr args))))))
-           (comp-call nil f args env val? more? :apply t)
-           (comp-call t 'apply (list* f args) env val? more? :apply t)))
+           (comp-call nil f args env val? more? :apply apply?)
+           (comp-call t (if apply? 'apply 'funcall)
+                      (list* f args) env val? more? :apply apply?)))
 
      (comp-call (local f args env val? more? &key apply)
        (labels ((mkret (the-function)
@@ -2158,8 +2196,9 @@
            ((or (numberp f)
                 (stringp f)
                 (regexpp f)
-                (charp f)
-                (vectorp f))
+                (characterp f)
+                (vectorp f)
+                (hash-table-p f))
             (error/wp (strcat f " is not a function")))
            ((and local (symbolp f))
             (let ((localfun (find-func f env)))
@@ -2206,31 +2245,14 @@
                        (comp-inner-lambda name args body env val? more?))))))
            (t (mkret (comp f env t t))))))
 
-     (gen-simple-args (args n names)
-       (cond
-         ((null args) (gen "ARGS" n))
-         ((symbolp args)
-          (when (%memq args names)
-            (error/wp (strcat "Duplicate function argument " args)))
-          (gen "ARG_" n))
-         ((%memq (car args) names)
-          (error/wp (strcat "Duplicate function argument " (car args))))
-         (t
-          (gen-simple-args (cdr args)
-                           (1+ n)
-                           (cons (car args) names)))))
-
-     (make-true-list (lst)
-       (when lst
-         (if (atom lst)
-             (list lst)
-             (cons (car lst) (make-true-list (cdr lst))))))
-
-     (comp-simple-lambda (name args body env val? more?)
+     (comp-simple-lambda (name required rest body env val? more?)
        (with-seq-output <<
          (with-declarations body
-           (<< (gen-simple-args args 0 nil))
-           (let ((args (make-true-list args))
+           (<< (gen (if rest "ARG_" "ARGS")
+                    (length required)))
+           (let ((args (if rest
+                           (append required (list rest))
+                           required))
                  (specials 0))
              (foreach-index args
                (lambda (name index)
@@ -2319,12 +2341,7 @@
                 (getf parsed :aux))
             (apply #'comp-extended-lambda name body env val? more? parsed))
            (t
-            (comp-simple-lambda name (cond
-                                       ((and required rest)
-                                        `(,@required . ,rest))
-                                       (required)
-                                       (rest))
-                                body env val? more?)))))
+            (comp-simple-lambda name required rest body env val? more?)))))
 
      (comp-lambda (name args body env)
        (prog2
@@ -2339,46 +2356,49 @@
 
      (get-bindings (bindings vars?)
        (let (names vals)
-         (foreach bindings (lambda (x)
-                             (if (consp x)
-                                 (progn (push (if vars? (cadr x) (cdr x)) vals)
-                                        (setq x (car x)))
-                                 (if vars?
-                                     (push nil vals)
-                                     (error/wp "Malformed LABELS/FLET/MACROLET")))
-                             (unless vars?
-                               (setq x (function-name x)))
-                             (when (and (not vars?)
-                                        (%memq x names))
-                               (error/wp "Duplicate name in LABELS/FLET/MACROLET"))
-                             (push x names)))
+         (foreach bindings
+           (lambda (x)
+             (if (consp x)
+                 (progn (push (if vars? (cadr x) (cdr x)) vals)
+                        (setq x (car x)))
+                 (if vars?
+                     (push nil vals)
+                     (error/wp "Malformed LABELS/FLET/MACROLET")))
+             (unless vars?
+               (setq x (function-name x)))
+             (when (and (not vars?)
+                        (%memq x names))
+               (error/wp "Duplicate name in LABELS/FLET/MACROLET"))
+             (push x names)))
          (list (nreverse names) (nreverse vals))))
 
      (comp-flets (bindings body env labels? val? more?)
-       (if bindings
-           (with-seq-output <<
-             (let* ((bindings (get-bindings bindings nil))
-                    (names (car bindings))
-                    (funcs (cadr bindings))
-                    (len (length names)))
-               (flet ((extenv ()
-                        (setq env (extenv env :lex (map1-vector (lambda (name)
-                                                                  (list name :func))
-                                                                names)))
-                        (<< (gen "FRAME"))))
-                 (when labels? (extenv))
-                 (map2 (lambda (name func)
-                         (<< (with-env (comp-lambda name (car func) (cdr func) env))))
-                       names funcs)
-                 (unless labels? (extenv))
-                 (<< (if (> len 1) (gen "VARS" len) (gen "VAR")))
-                 (cond
-                   (more?
-                    (<< (with-env (comp-decl-seq body env val? t))
-                        (gen "UNFR" 1 0)))
-                   (t
-                    (<< (with-env (comp-decl-seq body env val? nil))))))))
-           (comp-decl-seq body env val? more?)))
+       (cond
+         (bindings
+          (with-seq-output <<
+            (let* ((bindings (get-bindings bindings nil))
+                   (names (car bindings))
+                   (funcs (cadr bindings))
+                   (len (length names)))
+              (flet ((extenv ()
+                       (setq env (extenv env :lex (map1-vector (lambda (name)
+                                                                 (list name :func))
+                                                               names)))
+                       (<< (gen "FRAME"))))
+                (when labels? (extenv))
+                (map2 (lambda (name func)
+                        (<< (with-env (comp-lambda name (car func) (cdr func) env))))
+                      names funcs)
+                (unless labels? (extenv))
+                (<< (if (> len 1) (gen "VARS" len) (gen "VAR")))
+                (cond
+                  (more?
+                   (<< (with-env (comp-decl-seq body env val? t))
+                       (gen "UNFR" 1 0)))
+                  (t
+                   (<< (with-env (comp-decl-seq body env val? nil)))))))))
+         (t
+          (comp-decl-seq body env val? more?))))
 
      (comp-macrolet-function (def)
        (let ((name (car def))
@@ -2498,6 +2518,8 @@
        (cond
          ((null bindings)
           (comp-decl-seq body env val? more?))
+         ((null (cdr bindings))
+          (comp-let bindings body env val? more?))
          ((and (null (cdr body))
                (consp (car body))
                (eq 'let* (caar body)))
@@ -2538,23 +2560,15 @@
            (prog2
                (incf *tagbody-dynest*)
                (let ((k1 (mklabel)))
-                 (cond
-                   ((not val?)
-                    (%seq (comp tag env t t)
-                          (gen "CATCH" k1)
-                          ;; we still want body to leave the value on the stack,
-                          ;; so in normal termination it wouldn't be popped twice.
-                          (comp-seq body env t more?)
-                          (vector k1)
-                          (gen "POP")))
-                   (t
-                    (%seq (comp tag env t t)
-                          (gen "CATCH" k1)
-                          (comp-seq body env t more?)
-                          (vector k1)
-                          (if more?
-                              (gen "UNFR" 0 1)
-                              (gen "RET"))))))
+                 (%seq (comp tag env t t)
+                       (gen "CATCH" k1)
+                       ;; we still want body to leave the value on the stack,
+                       ;; so in normal termination it wouldn't be popped twice.
+                       (comp-seq body env t more?)
+                       (gen "UNFR" 0 1)
+                       (vector k1)
+                       (unless val? (gen "POP"))
+                       (unless more? (gen "RET"))))
              (decf *tagbody-dynest*))
            (comp-const nil val? more?)))
 
@@ -2584,9 +2598,8 @@
                "Expecting (LAMBDA (...) ...) in COMPILE")
        (%eval-opcode (comp exp (make-environment) t nil)))
 
-     (compile-string (str &optional (filename *current-file*))
-       (let ((*current-file* filename)
-             (reader (lisp-reader str 'EOF))
+     (compile-string (str &optional (*current-file* *current-file*) progress)
+       (let ((reader (lisp-reader str 'EOF))
              (all-code (vector))
              (link-addr 0)
              (*xref-info* (vector))
@@ -2606,7 +2619,13 @@
                   (rec ()
                     (let* ((token (funcall reader 'next))
                            (form (cdr token)))
+                      (when (or (eq form 'EOF)
+                                (zerop (mod (%stream-col *trace-output*) 70)))
+                        (when progress
+                          (%stream-put *trace-output* #\Newline)))
                       (unless (eq form 'EOF)
+                        (when progress
+                          (%stream-put *trace-output* "."))
                         (let ((*current-pos* (car token))
                               (*delay-eval* nil))
                           (comp1 form))
@@ -2618,10 +2637,55 @@
                (comp1 `(%grok-xref-info ,*current-file* ,xref))))
            (unwind-protect
                (%serialize-code all-code (make-hash))
-             (foreach (nreverse delayed) #'%eval-code))))))
+             (foreach (nreverse delayed) #'%eval-code)))))
+
+     (compile-bundle (files output)
+       (let ((all-code (vector))
+             (link-addr 0)
+             (env (make-environment)))
+         (labels
+             ((comp-one-form (form)
+                (let ((code (with-env (comp form env nil t))))
+                  (when code
+                    (setq code (%assemble-and-exec-opcode code))
+                    (setq code (copy-seq code))
+                    (%relocate-code code link-addr)
+                    (setq link-addr (+ link-addr (length code)))
+                    (%seq-cat all-code (list code)))))
+
+              (comp-forms (reader)
+                (let* ((token (funcall reader 'next))
+                       (form (cdr token)))
+                  (unless (eq form 'EOF)
+                    (let ((*current-pos* (car token)))
+                      (comp-one-form form))
+                    (comp-forms reader)))))
+
+           (foreach files
+             (lambda (file)
+               (%stream-put *trace-output* (strcat ";; Compiling " file "..." #\Newline))
+               (%gensym-reset)
+               (let* ((*package* *package*)
+                      (*read-table* *read-table*)
+                      (*enable-inline* *enable-inline*)
+                      (*current-file* file)
+                      (*xref-info* (vector))
+                      (input (%:%http-request (make-url file)))
+                      (reader (lisp-reader input 'EOF)))
+                 (comp-forms reader)
+                 (when (plusp (length *xref-info*))
+                   (comp-one-form `(%grok-xref-info ,*current-file* ,*xref-info*))))))
+
+           (let ((serial (%:%serialize-code all-code (make-hash))))
+             (when output
+               (%:%http-request output nil nil "PUT" serial))
+             (%stream-put *trace-output* ";; writing " (length serial)
+                          " characters to " output #\Newline)
+             nil)))))
 
   (set-symbol-function! 'compile #'compile)
-  (set-symbol-function! '%compile-string #'compile-string))
+  (set-symbol-function! '%compile-string #'compile-string)
+  (set-symbol-function! 'compile-bundle #'compile-bundle))
 
 ;; (if (if *xref-info*
 ;;         (< (setq *build-count* (1+ *build-count*)) 3))
@@ -2672,33 +2736,13 @@
                           (cdr (funcall reader 'next))))))
         (rec nil (cdr (funcall reader 'next)))))))
 
-(defmacro with-load-timings body
-  `(cond
-     (*load-timing*
-      ,(let ((t-load (gensym))
-             (t-comp (gensym)))
-         `(flet ((%get-file-contents args
-                   (let ((,t-load (get-internal-run-time)))
-                     (prog1 (apply #'%get-file-contents args)
-                       (%rplaca *load-timing*
-                                (+ (car *load-timing*)
-                                   (- (get-internal-run-time) ,t-load))))))
-                 (compile-string args
-                   (let ((,t-comp (get-internal-run-time)))
-                     (prog1 (apply #'compile-string args)
-                       (%rplaca (cdr *load-timing*)
-                                (+ (cadr *load-timing*)
-                                   (- (get-internal-run-time) ,t-comp)))))))
-            ,@body)))
-     (t ,@body)))
-
 (defun %load (url)
   (%stream-put *trace-output* (strcat ";; Loading " url #\Newline))
-  (with-load-timings
-    (let ((code (%get-file-contents (make-url url))))
-      (unless code (error (strcat "Unable to load file: " url)))
-      (with-undefined-warnings
-        (compile-string code url)))))
+  (let ((code (%:%http-request (make-url url))))
+    (unless code (error (strcat "Unable to load file: " url)))
+    (with-undefined-warnings
+      (%gensym-reset)
+      (compile-string code url))))
 
 (defun make-url (url)
   (if *url-prefix*
@@ -2725,12 +2769,12 @@
 (defun macroexpand-1 (form &optional (*compiler-env* *compiler-env*))
   (cond
     ((atom form)
-     (or (%:find-symbol-macrolet-in-compiler-env form) form))
+     (or (find-symbol-macrolet-in-compiler-env form) form))
     ((and (eq 'progn (car form))
           (null (cdr form)))
      nil)
     (t
-     (aif (or (%:find-macrolet-in-compiler-env (car form))
+     (aif (or (find-macrolet-in-compiler-env (car form))
               (%macro (car form)))
           (funcall it form)
           form))))
@@ -2740,6 +2784,12 @@
     (if (eq result form)
         result
         (macroexpand result))))
+
+(defcompiler case (&rest args)
+  (apply #'compile-case args))
+
+(defcompiler ecase (&rest args)
+  (apply #'compile-case args))
 
 (defconstant *core-files*
   '("lisp/init.lisp"
@@ -2756,15 +2806,37 @@
     "lisp/closette.lisp"
     "lisp/printer.lisp"
     "lisp/conditions.lisp"
+    "lisp/thread.lisp"
     "lisp/stream.lisp"
     "lisp/ffi.lisp"
     "ide/ide.lisp"))
 
-(defcompiler case (&rest args)
-  (apply #'compile-case args))
+(defun make-fasl-bundle (&optional (output "slip-bundle.fasl"))
+  (%gensym-reset)
+  (with-undefined-warnings
+    (compile-bundle (list* "lisp/compiler.lisp" *core-files*) output)))
 
-(defcompiler ecase (&rest args)
-  (apply #'compile-case args))
+(defun recompile-everything ()
+  (let ((files (list* "lisp/compiler.lisp" ;; compile this one twice.
+                      "lisp/compiler.lisp"
+                      *core-files*)))
+    ;; generate individual fasl-s
+    (foreach files
+      (lambda (file)
+        (let* ((file (make-url file))
+               (input (%:%http-request file))
+               (code (with-undefined-warnings
+                       (%stream-put *trace-output* "Compiling " file)
+                       (%gensym-reset)
+                       (let ((*package* *package*)
+                             (*read-table* *read-table*)
+                             (*enable-inline* *enable-inline*))
+                         (compile-string input file t))))
+               (output (%:replace-regexp #/\.lisp$/ file ".fasl")))
+          (%stream-put *trace-output* "✓ " output " (" (length code) " characters)" #\Newline #\Newline)
+          (%:%http-request output nil nil "PUT" code))))
+    (%stream-put *trace-output* #\Newline ";; Making the bundle" #\Newline)
+    (make-fasl-bundle)))
 
 ;;;
 

@@ -3,7 +3,8 @@ import { LispMachine,
          STATUS_WAITING,
          STATUS_LOCKED,
          STATUS_HALTED,
-         LispRet,
+         STATUS_FINISHED,
+         LispRetNoVal,
        } from "./machine.js";
 import { LispCons } from "./list.js";
 import { LispPrimitiveError } from "./error.js";
@@ -95,12 +96,20 @@ export class LispClosure {
         this.code = code;
         this.name = name || false;
         this.env = env || false;
+        this.call_count = 0;
+        this._jiten = false;
     }
     copy() {
         return new LispClosure(this.code, this.name, this.env);
     }
     toString() {
         return "#<FUNCTION" + (this.name ? " " + this.name : "") + ">";
+    }
+    jit_enable() {
+        if (!this._jiten) {
+            this.code = this.code.slice();
+            this._jiten = true;
+        }
     }
 }
 
@@ -273,8 +282,8 @@ export class LispArray extends Array {
 export class LispStruct {
     static type = "struct";
     static is(x) { return x instanceof LispStruct }
-    constructor(struct, data) {
-        this.struct = struct === false ? this : struct;
+    constructor(name, data) {
+        this.name = name;
         this.data = data;
     }
 }
@@ -298,6 +307,15 @@ export class LispPackage {
     static all() {
         return LispPackage.#PACKAGES;
     };
+    static delete(pak) {
+        let name = pak.name;
+        pak.name = false;
+        for (let [ n, p ] of Object.entries(LispPackage.#PACKAGES)) {
+            if (p === pak) {
+                delete LispPackage.#PACKAGES[n];
+            }
+        }
+    }
     static get(name) {
         return LispPackage.#PACKAGES[name] || (
             LispPackage.#PACKAGES[name] = new LispPackage(name)
@@ -310,7 +328,7 @@ export class LispPackage {
     constructor(name) {
         this.name = name + "";
         this.symbols = new LispHash();
-        this.exports = new Map();
+        this.exports = new Set();
         this.uses = [];
         this.props = new Map();
     }
@@ -331,7 +349,7 @@ export class LispPackage {
         if (!sym) {
             sym = this.symbols.set(name, new LispSymbol(name, this));
             if (this === LispPackage.BASE_PACK) {
-                this.exports.set(name, sym);
+                this.exports.add(name);
             }
         }
         return sym;
@@ -342,9 +360,8 @@ export class LispPackage {
     }
     export(sym) {
         let name = LispSymbol.symname(sym);
-        sym = this.find(name);
-        if (sym && !this.exports.has(name)) {
-            this.exports.set(name, sym);
+        if (!this.exports.has(name)) {
+            this.exports.add(name);
             return true;
         }
         return false;
@@ -360,7 +377,11 @@ export class LispPackage {
         return sym;
     }
     find_exported(name) {
-        return this.exports.get(name) || false;
+        if (this.exports.has(name)) {
+            return this.find(name);
+        } else {
+            return false;
+        }
     }
     find_internal(name) {
         return this.symbols.get(name) || false;
@@ -369,12 +390,17 @@ export class LispPackage {
         var ret = [ ...this.symbols.values() ];
         var a = this.uses;
         for (var i = a.length; --i >= 0;) {
-            ret.push(...a[i].exports.values());
+            ret.push(...a[i].all_exported());
         }
         return [ ...new Set(ret) ];
     }
     all_exported() {
-        return [ ...this.exports.values() ];
+        let a = new Set();
+        this.exports.forEach(name => {
+            let sym = this.find(name);
+            if (sym) a.add(sym);
+        });
+        return [ ...a ];
     }
     all_interned() {
         return this.symbols.values();
@@ -483,28 +509,52 @@ export class LispMutex {
         this.name = name || false;
         this.waiters = [];
         this.locked = false;
+        this.count = 0;
     }
-    acquire(process) {
-        if (!this.locked) {
-            this.locked = process;
+    acquire(process, timeout) {
+        if (this.locked === process) {
+            ++this.count;
             return process;
-        } else {
-            this.waiters.push(process);
-            process.m.status = STATUS_LOCKED;
+        } else if (!this.locked) {
+            this.locked = process;
+            this.count = 1;
+            return process;
+        } else if (timeout === false) {
             return false;
+        } else {
+            if (!this.waiters.includes(process)) {
+                this.waiters.push(process);
+            }
+            let timer;
+            if (timeout !== true) {
+                timer = setTimeout(() => {
+                    process.resume(false);
+                }, timeout * 1000);
+            }
+            process.lock((got_lock) => {
+                clearTimeout(timer);
+                if (got_lock) {
+                    this.locked = process;
+                    this.count = 1;
+                }
+                process.m.push(got_lock);
+            });
+            return void 0;      // must return undefined
         }
     }
-    release() {
+    release(process, force) {
         if (!this.locked) return false;
-        if (this.waiters.length > 0) {
-            var process = this.waiters.shift();
-            this.locked = process;
-            process.resume();
-            return process;
-        } else {
-            this.locked = false;
-            return true;
+        if (this.locked !== process) {
+            if (!force) return false;
+            console.warn(`Force release mutex by non-owner thread ${process}`);
         }
+        if (--this.count > 0) return true;
+        this.locked = false;
+        this.count = 0;
+        if (this.waiters.length > 0) {
+            this.waiters.shift().resume(true);
+        }
+        return true;
     }
 }
 
@@ -512,11 +562,9 @@ export class LispQueue {
     constructor() {
         this.list = new LispCons(false, false);
         this.tail = this.list;
-        this.size = 0;
     }
     push(el) {
         this.tail = this.tail.cdr = new LispCons(el, false);
-        ++this.size;
     }
     push_front(el) {
         if (!LispCons.find(this.list.cdr, el)) {
@@ -527,7 +575,6 @@ export class LispQueue {
     reenq(cell) {
         this.tail = this.tail.cdr = cell;
         cell.cdr = false;
-        ++this.size;
     }
     pop() {
         let cell = this.list.cdr;
@@ -535,7 +582,6 @@ export class LispQueue {
         if (!(this.list.cdr = cell.cdr)) {
             this.tail = this.list;
         }
-        --this.size;
         return cell;
     }
 }
@@ -552,16 +598,15 @@ class Message {
 
 let PID = 0;
 let QUEUE = new LispQueue();
+const HAS_SCHEDULER = typeof globalThis.scheduler?.postTask === "function";
 
 const start = () => {
-    let count = 0, startTime = Date.now(), process, cell;
+    let count = 0, startTime = performance.now(), process, cell;
     try {
         while (true) {
-            if ((++count & 255) === 0) {
-                if (Date.now() - startTime > 30) {
+            if ((++count & 15) === 0)
+                if (performance.now() - startTime > 10)
                     break;
-                }
-            }
             cell = QUEUE.pop();
             if (!cell) return;
             process = cell.car;
@@ -581,7 +626,7 @@ const start = () => {
             if (process.m.status === STATUS_RUNNING) {
                 if (pe && pe.function) {
                     // RETHROW as Lisp error.
-                    process.m._callnext(pe.function, LispCons.fromArray(["~A", ex.message]));
+                    process.m._callnext(pe.function, ["~A", ex.message]);
                 }
                 QUEUE.reenq(cell);
             }
@@ -595,7 +640,8 @@ const start = () => {
             console.log(process);
         }
     }
-    setTimeout(start, 0);
+    if (HAS_SCHEDULER) scheduler.postTask(start);
+    else setTimeout(start, 0);
 };
 
 export class LispProcess {
@@ -603,23 +649,29 @@ export class LispProcess {
     static is(x) { return x instanceof LispProcess }
     static timer_thread = null;
 
-    constructor(parent_machine, closure) {
+    constructor(parent_machine, closure, name = false, ...args) {
         this.pid = ++PID;
         var m = this.m = new LispMachine(parent_machine);
         this.receivers = false;
         this.mailbox = new LispQueue();
         this.noint = false;
         this.catch_all = false;
+        this.name = name;
+        this.watchers = [];
         m.process = this;
-        m.set_closure(closure);
-        this.resume();
+        m.set_closure(closure, ...args);
+        this._lock_callback = null;
     }
 
     toString() {
-        return "#<PROCESS " + this.pid + ">";
+        return `#<THREAD ${this.pid}${this.name ? ' ' + this.name : ''}>`;
     }
 
-    resume() {
+    resume(...args) {
+        if (this._lock_callback) {
+            this._lock_callback(...args);
+            this._lock_callback = null;
+        }
         this.m.status = STATUS_RUNNING;
         QUEUE.push_front(this);
         start();
@@ -629,10 +681,32 @@ export class LispProcess {
         this.m.status = STATUS_WAITING;
     }
 
+    lock(cb) {
+        this._lock_callback = cb;
+        this.m.status = STATUS_LOCKED;
+    }
+
+    join(thread) {
+        if (thread.m.status === STATUS_FINISHED) {
+            return thread.result;
+        } else {
+            thread.watchers.push(this);
+            this.lock(result => this.m.push(result));
+            return void 0; // must return undefined.
+        }
+    }
+
     run(quota) {
         do {
             this.m.run(quota);
         } while (this.noint && this.m.status === STATUS_RUNNING);
+        switch (this.m.status) {
+          case STATUS_FINISHED:
+            let result = this.result = this.m.stack.pop_ret();
+            this.watchers.forEach(thread => thread.resume(result));
+            this.watchers = [];
+            break;
+        }
     }
 
     static sendmsg(target, signal, args) {
@@ -681,8 +755,9 @@ export class LispProcess {
             let tt = use_this_thread ? this : LispProcess.timer_thread;
             if (!tt) {
                 LispProcess.timer_thread = new LispProcess(new LispMachine(), closure);
+                LispProcess.timer_thread.resume();
             } else {
-                tt.m.push(new LispRet(tt.m, tt.m.pc, true));
+                tt.m.push(new LispRetNoVal(tt.m, tt.m.pc));
                 tt.m.n_args = 0;
                 tt.m._callnext(closure);
                 tt.resume();

@@ -112,20 +112,22 @@
         ((read-sublist (end)
            (let looop ((ret '()))
              (case (peek)
-               (#\~ (next)
-                    (let ((tok (read-directive)))
-                      (if (consp tok)
-                          (if (eq end (car tok))
-                              (if (> (length tok) 3)
-                                  (error "End constructs ~~} and ~~] don't accept parameters")
-                                  (cons (cdr tok) (nreverse ret)))
-                              (looop (cons tok ret)))
-                          (if tok
-                              (looop (cons tok ret))
-                              (looop ret)))))
-               ((nil) (if end
-                          (error (strcat "Expecting " end))
-                          (nreverse ret)))
+               (#\~
+                (next)
+                (let ((tok (read-directive)))
+                  (if (consp tok)
+                      (if (eq end (car tok))
+                          (if (> (length tok) 3)
+                              (error "End constructs ~~} and ~~] don't accept parameters")
+                              (cons (cdr tok) (nreverse ret)))
+                          (looop (cons tok ret)))
+                      (if tok
+                          (looop (cons tok ret))
+                          (looop ret)))))
+               ((nil)
+                (if end
+                    (error (strcat "Expecting " end))
+                    (nreverse ret)))
                (t (looop (cons (read-text) ret))))))
 
          (read-directive ()
@@ -173,9 +175,14 @@
                       (or (parse-integer (read-while #'digitp))
                           (croak "Expecting an integer"))))
              (case (peek)
-               (#\- (next) (- (read-it)))
-               (#\+ (next) (read-it))
-               (t (read-it)))))
+               (#\-
+                (next)
+                (- (read-it)))
+               (#\+
+                (next)
+                (read-it))
+               (t
+                (read-it)))))
 
          (read-params ()
            (let ((ret '())
@@ -185,21 +192,33 @@
               t0 (case (upcase (peek))
                    ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9 #\+ #\-)
                     (push (read-number) ret))
-                   (#\' (next)
-                        (push (next) ret))
-                   (#\V (next)
-                        (push 'fetch ret))
-                   (#\# (next)
-                        (push 'count ret))
-                   (#\, (push nil ret))
-                   ((nil) (croak "Unterminated parameter list")))
+                   (#\'
+                    (next)
+                    (push (next) ret))
+                   (#\V
+                    (next)
+                    (push 'fetch ret))
+                   (#\#
+                    (next)
+                    (push 'count ret))
+                   (#\,
+                    (push nil ret))
+                   ((nil)
+                    (croak "Unterminated parameter list")))
               t1 (case (peek)
-                   (#\, (next)
-                        (if (or colmod? atmod?)
-                            (croak "Illegal comma")
-                            (go t0)))
-                   (#\: (next) (setf colmod? t) (go t1))
-                   (#\@ (next) (setf atmod? t) (go t1))))
+                   (#\,
+                    (next)
+                    (if (or colmod? atmod?)
+                        (croak "Illegal comma")
+                        (go t0)))
+                   (#\:
+                    (next)
+                    (setf colmod? t)
+                    (go t1))
+                   (#\@
+                    (next)
+                    (setf atmod? t)
+                    (go t1))))
              (list* colmod? atmod? (nreverse ret))))
 
          (read-text ()
@@ -254,52 +273,66 @@
   args)
 
 ;; general-purpose ~A and ~S
-(defun %print-general (output args colmod? atmod? mincol colinc minpad padchar)
+(defun %print-general (output colmod? atmod? mincol colinc minpad padchar object)
   (cond
     ((or (plusp mincol)
          (plusp minpad))
-     (let ((str (print-object-to-string (car args))))
+     (let ((str (print-object-to-string object)))
        (%stream-put output
                     (%pad-string str mincol padchar atmod? colinc minpad))))
     (t
-     (print-object (car args) output)))
-  (cdr args))
+     (print-object object output))))
 
 (def-format #\A ((mincol 0) (colinc 1) (minpad 0) (padchar #\Space))
   (let ((*print-readably* nil)
         (*print-escape* nil))
-    (%print-general output args colmod? atmod? mincol colinc minpad padchar)))
+    (%print-general output colmod? atmod? mincol colinc minpad padchar (pop args))
+    args))
 
 (def-format #\S ((mincol 0) (colinc 1) (minpad 0) (padchar #\Space))
-  (let ((*print-escape* t)
-        (*print-readably* t))
-    (%print-general output args colmod? atmod? mincol colinc minpad padchar)))
+  (let ((*print-readably* t)
+        (*print-escape* t))
+    (%print-general output colmod? atmod? mincol colinc minpad padchar (pop args))
+    args))
 
-;; integers (missing ~R for now)
-(defun %print-integer (output args colmod? atmod? mincol padchar commachar comma-interval base)
-  (let* ((x (floor (car args)))
+;; integers (missing roman/english output)
+(defun %print-integer (output colmod? atmod?
+                              base mincol padchar commachar comma-interval number)
+  (let* ((x (floor number))
          (s (if (and atmod? (plusp x))
                 (strcat #\+ (number-string x))
                 (number-string x base))))
     (when colmod?
       (setf s (%add-commas s commachar comma-interval)))
-    (%stream-put output (%pad-string (upcase s) mincol padchar t))
-    (cdr args)))
+    (%stream-put output (%pad-string (upcase s) mincol padchar t))))
 
 (def-format #\D ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-  (%print-integer output args colmod? atmod? mincol padchar commachar comma-interval 10))
+  (%print-integer output colmod? atmod?
+                  10 mincol padchar commachar comma-interval (pop args))
+  args)
 
 (def-format #\B ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-  (%print-integer output args colmod? atmod? mincol padchar commachar comma-interval 2))
+  (%print-integer output colmod? atmod?
+                  2 mincol padchar commachar comma-interval (pop args))
+  args)
 
 (def-format #\O ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-  (%print-integer output args colmod? atmod? mincol padchar commachar comma-interval 8))
+  (%print-integer output colmod? atmod?
+                  8 mincol padchar commachar comma-interval (pop args))
+  args)
 
 (def-format #\X ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
-  (%print-integer output args colmod? atmod? mincol padchar commachar comma-interval 16))
+  (%print-integer output colmod? atmod?
+                  16 mincol padchar commachar comma-interval (pop args))
+  args)
+
+(def-format #\R ((base nil) (mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
+  (%print-integer output colmod? atmod?
+                  base mincol padchar commachar comma-interval (pop args))
+  args)
 
 ;; floating-point (incomplete)
-(def-format #\f ((mincol 0) declen scale overflowchar padchar)
+(def-format #\F ((mincol 0) declen scale overflowchar padchar)
   (let ((x (car args)))
     (setf x (if declen
                 (number-fixed x declen)
@@ -496,23 +529,11 @@
 (defun warn args
   (%warn (apply #'format nil args)))
 
-;;; %:EOF - compiler macros. uncomment this to disable.
+;;; %:EOF ;; compiler macros. uncomment this to disable.
 
 ;;; I'm leaving them for now, they seem to help a little in runtime speed,
 ;;; although compilation time increases significantly (e.g. for the test
 ;;; suite).
-
-(defun quote-if-you-must (x)
-  (cond
-    ((or (eq x t)
-         (eq x nil)
-         (stringp x)
-         (numberp x)
-         (characterp x)
-         (keywordp x))
-     x)
-    (t
-     `',x)))
 
 (defun %expand-format (list args stream)
   (with-collectors (forms)
@@ -522,10 +543,23 @@
          (let ((handler (gethash (car x) *format-handlers*))
                (cmdargs (cdr x)))
            (forms `(setf ,args (,handler ,stream ,args
-                                ,@(mapcar #'quote-if-you-must cmdargs))))))
+                                ,@(mapcar #'%:quote-if-you-must cmdargs))))))
         (t
          (forms `(%stream-put ,stream ,x)))))
     forms))
+
+(defmacro format-arg (args name &optional default)
+  `(cond
+     ,@(when default
+         `(((not ,name)
+            (setf ,name ,default)
+            nil)))
+     ((equal ,name ''FETCH)
+      (setf ,name ',name)
+      `((,,name (pop ,args))))
+     ((equal ,name ''COUNT)
+      (setf ,name ',name)
+      `((,,name (length ,args))))))
 
 (defun repeater-compiler-macro (decline char output args count)
   (cond
@@ -569,46 +603,104 @@
             &optional sublist maxn)
   (when (or (not sublist) colmod?)
     (return-from internal-format-123 decline))
-  `(let (,@(when (equal maxn ''FETCH)
-             (setf maxn '$maxn)
-             `(($maxn (pop ,args))))
-         (myargs ,(if atmod? args `(pop ,args))))
-     (catch 'abort-format-iteration
-       ,(cond
-          (maxn
-           (cond
-             (ensure-once?
-              `(dotimes (#:i ,maxn)
-                 ,@(%expand-format (cadr sublist) 'myargs output)
-                 (unless myargs
-                   (return))))
-             (t
-              `(dotimes (#:i ,maxn)
-                 (unless myargs
-                   (return))
-                 ,@(%expand-format (cadr sublist) 'myargs output)))))
-          (t
-           (cond
-             (ensure-once?
-              `(tagbody
-                :loop
-                ,@(%expand-format (cadr sublist) 'myargs output)
-                  (when myargs
-                    (go :loop))))
-             (t
-              `(tagbody
-                :loop
-                  (when myargs
-                    ,@(%expand-format (cadr sublist) 'myargs output)
-                    (go :loop))))))))
-     ,(if atmod? 'myargs args)))
+  (let ((myargs (gensym "MYARGS")))
+    `(let (,@(format-arg args maxn)
+           (,myargs ,(if atmod? args `(pop ,args))))
+       (catch 'abort-format-iteration
+         ,(cond
+            (maxn
+             (cond
+               (ensure-once?
+                `(dotimes (#:i ,maxn)
+                   ,@(%expand-format (cadr sublist) myargs output)
+                   (unless ,myargs
+                     (return))))
+               (t
+                `(dotimes (#:i ,maxn)
+                   (unless ,myargs
+                     (return))
+                   ,@(%expand-format (cadr sublist) myargs output)))))
+            (t
+             (cond
+               (ensure-once?
+                `(tagbody
+                  :loop
+                  ,@(%expand-format (cadr sublist) myargs output)
+                    (when ,myargs
+                      (go :loop))))
+               (t
+                `(tagbody
+                  :loop
+                    (when ,myargs
+                      ,@(%expand-format (cadr sublist) myargs output)
+                      (go :loop))))))))
+       ,(if atmod? myargs args))))
 
 (define-compiler-macro internal-format-94 ;; #\^
     (&whole decline
             output args colmod? atmod? &optional a b c)
   (when (or colmod? atmod? a b c)
     (return-from internal-format-94 decline))
-  `(or ,args (throw 'abort-format-iteration nil)))
+  `(progn
+     (unless ,args (throw 'abort-format-iteration nil))
+     ,args))
+
+(defmacro define-integer-compiler-macro (char base)
+  (let ((funame (intern (strcat "INTERNAL-FORMAT-" (char-code (upcase char)))))
+        (radix-init (unless base
+                      `((format-arg args radix)))))
+    `(define-compiler-macro ,funame (output args colmod? atmod?
+                                            &optional
+                                            ,@(unless base
+                                                (setf base 'radix)
+                                                `(radix))
+                                            (mincol 0)
+                                            (padchar #\Space)
+                                            (commachar #\,)
+                                            (comma-interval 3))
+       `(symbol-macrolet
+            (,@,@radix-init
+             ,@(format-arg args mincol 0)
+             ,@(format-arg args padchar #\Space)
+             ,@(format-arg args commachar #\,)
+             ,@(format-arg args comma-interval 3))
+          (%print-integer ,output ,colmod? ,atmod?
+                          ,,base ,mincol ,padchar ,commachar ,comma-interval (pop ,args))
+          ,args))))
+
+(define-integer-compiler-macro #\D 10)
+(define-integer-compiler-macro #\B 2)
+(define-integer-compiler-macro #\O 8)
+(define-integer-compiler-macro #\X 16)
+(define-integer-compiler-macro #\R nil)
+
+(define-compiler-macro internal-format-65 ;; #\A
+    (output args colmod? atmod?
+            &optional mincol colinc minpad padchar)
+  `(let ((*print-readably* nil)
+         (*print-escape* nil))
+     (symbol-macrolet
+         (,@(format-arg args mincol 0)
+          ,@(format-arg args colinc 1)
+          ,@(format-arg args minpad 0)
+          ,@(format-arg args padchar #\Space))
+       (%print-general ,output ,colmod? ,atmod?
+                       ,mincol ,colinc ,minpad ,padchar (pop ,args))
+       ,args)))
+
+(define-compiler-macro internal-format-83 ;; #\S
+    (output args colmod? atmod?
+            &optional mincol colinc minpad padchar)
+  `(let ((*print-readably* t)
+         (*print-escape* t))
+     (symbol-macrolet
+         (,@(format-arg args mincol 0)
+          ,@(format-arg args colinc 1)
+          ,@(format-arg args minpad 0)
+          ,@(format-arg args padchar #\Space))
+       (%print-general ,output ,colmod? ,atmod?
+                       ,mincol ,colinc ,minpad ,padchar (pop ,args))
+       ,args)))
 
 (define-compiler-macro format (&whole form stream format . args)
   (cond
@@ -617,14 +709,20 @@
        ((eq stream t)
         (let ((vargs (gensym "args")))
           `(let ((,vargs (list ,@args)))
-             ,@(%expand-format (%parse-format format) vargs '*standard-output*))))
+             (catch 'abort-format-iteration
+               ,@(%expand-format (%parse-format format) vargs '*standard-output*)))))
        ((eq stream nil)
-        (let ((vstream (gensym "stream"))
-              (vargs (gensym "args")))
-          `(let ((,vstream (%make-text-memory-output-stream))
-                 (,vargs (list ,@args)))
-             ,@(%expand-format (%parse-format format) vargs vstream)
-             (%get-output-stream-string ,vstream))))
+        (cond
+          (%:*compiler-macro-val?*
+           (let ((vstream (gensym "stream"))
+                 (vargs (gensym "args")))
+             `(let ((,vstream (%make-text-memory-output-stream))
+                    (,vargs (list ,@args)))
+                (catch 'abort-format-iteration
+                  ,@(%expand-format (%parse-format format) vargs vstream))
+                (%get-output-stream-string ,vstream))))
+          (t
+           `(progn ,@args))))
        (t
         (let ((vstream (gensym "stream"))
               (vargs (gensym "args"))
@@ -638,7 +736,9 @@
                ((eq ,vstream nil)
                 (setf ,vstream (%make-text-memory-output-stream)
                       ,result t)))
-             ,@(%expand-format (%parse-format format) vargs vstream)
-             (when ,result
-               (%get-output-stream-string ,vstream)))))))
+             (catch 'abort-format-iteration
+               ,@(%expand-format (%parse-format format) vargs vstream))
+             ,@(when %:*compiler-macro-val?*
+                 `((when ,result
+                     (%get-output-stream-string ,vstream)))))))))
     (t form)))

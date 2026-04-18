@@ -2,7 +2,7 @@
 ;;;; Created:  Sun Apr 20 07:44:06 2003
 ;;;; Contains: Tests of SET-DIFFERENCE
 
-(in-package :sl-user)
+(in-package :sl-test)
 
 (deftest set-difference.1
   (set-difference nil nil)
