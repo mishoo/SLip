@@ -639,10 +639,16 @@
 (define-compiler-macro internal-format-94 ;; #\^
     (&whole decline
             output args colmod? atmod? &optional a b c)
-  (when (or colmod? atmod? a b c)
+  (when colmod?
     (return-from internal-format-94 decline))
-  `(progn
-     (unless ,args (return-from abort-format-iteration nil))
+  `(let (,@(format-arg args a)
+         ,@(format-arg args b)
+         ,@(format-arg args c))
+     (when (if ,a (if ,b (if ,c (<= ,a ,b ,c)
+                             (eql ,a ,b))
+                      (zerop ,a))
+               (not ,args))
+       (return-from abort-format-iteration nil))
      ,args))
 
 (defmacro define-integer-compiler-macro (char base)
