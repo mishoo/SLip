@@ -114,6 +114,7 @@
              (case (peek)
                (#\~
                 (next)
+                (read-while (lambda (ch) (eq ch #\Space)))
                 (let ((tok (read-directive)))
                   (if (consp tok)
                       (if (eq end (car tok))
@@ -168,7 +169,10 @@
                     (cond ((eq colmod? atmod?) (skip-ws) nil)
                           (colmod? nil)
                           (atmod? (skip-ws) #\Newline))))
-                 (t (cons directive params))))))
+                 (t
+                  (unless (gethash directive *format-handlers*)
+                    (croak (strcat "Unknown format directive #\\" directive)))
+                  (cons directive params))))))
 
          (read-number ()
            (labels ((read-it ()
@@ -228,14 +232,13 @@
       (read-sublist nil))))
 
 (defun %exec-format (list args stream)
-  (catch 'abort-format-iteration
-    (dolist (x list)
-      (cond ((listp x)
-             (let ((handler (gethash (car x) *format-handlers*))
-                   (cmdargs (cdr x)))
-               (setf args (apply handler stream args cmdargs))))
-            (t
-             (%stream-put stream x)))))
+  (dolist (x list)
+    (cond ((listp x)
+           (let ((handler (gethash (car x) *format-handlers*))
+                 (cmdargs (cdr x)))
+             (setf args (apply handler stream args cmdargs))))
+          (t
+           (%stream-put stream x))))
   args)
 
 ;;; directives
@@ -490,7 +493,8 @@
 
 (defun exec-format (parsed args stream)
   (labels ((doit (stream)
-             (%exec-format parsed args stream)))
+             (catch 'abort-format-iteration
+               (%exec-format parsed args stream))))
     (cond ((eq stream nil)
            (let ((out (%make-text-memory-output-stream)))
              (doit out)
@@ -561,7 +565,7 @@
       (setf ,name ',name)
       `((,,name (length ,args))))))
 
-(defun repeater-compiler-macro (decline char output args count)
+(defun repeater-compiler-macro (char output args count)
   (cond
     ((not count)
      `(progn (%stream-put ,output ,char)
@@ -569,20 +573,20 @@
     ((numberp count)
      `(progn (%stream-put ,output ,(%pad-string "" count char))
              ,args))
-    ((equal count ''FETCH)
-     `(progn (%stream-put ,output (%pad-string "" (pop ,args) ,char))
-             ,args))
-    (t decline)))
+    (t
+     `(symbol-macrolet (,@(format-arg args count))
+        (%stream-put ,output (%pad-string "" ,count ,char))
+        ,args))))
 
 (define-compiler-macro internal-format-37 ;; #\%
     (&whole decline
             output args colmod? atmod? &optional count)
-  (repeater-compiler-macro decline #\Newline output args count))
+  (repeater-compiler-macro #\Newline output args count))
 
 (define-compiler-macro internal-format-126 ;; #\~
     (&whole decline
             output args colmod? atmod? &optional count)
-  (repeater-compiler-macro decline #\~ output args count))
+  (repeater-compiler-macro #\~ output args count))
 
 (define-compiler-macro internal-format-67 ;; #\C
     (output args colmod? atmod?)
@@ -635,6 +639,43 @@
                       ,@(%expand-format (cadr sublist) myargs output)
                       (go :loop))))))))
        ,(if atmod? myargs args))))
+
+(define-compiler-macro internal-format-91 ;; #\[
+    (&whole decline
+            output args colmod? atmod? #:end-col? #:end-at?
+            &optional clauses n)
+  (unless (and (consp clauses)
+               (eq 'quote (car clauses)))
+    (return-from internal-format-91 decline))
+  (setf clauses (cadr clauses))
+  (cond
+    ((and colmod? atmod?)
+     (error "Both @ and : specified in FORMAT ~~[...~~]"))
+    (colmod?
+     (assert (= 2 (length clauses))
+             "Two clauses expected in FORMAT ~~:[...~~]")
+     `(progn
+        (if (pop ,args)
+            (progn ,@(%expand-format (cdadr clauses) args output))
+            (progn ,@(%expand-format (cdar clauses) args output)))
+        ,args))
+    (atmod?
+     (assert (= 1 (length clauses))
+             "One clause expected in FORMAT ~~@[...~~]")
+     `(if (car ,args)
+          (progn ,@(%expand-format (cdar clauses) args output))
+          (cdr ,args)))
+    (t
+     (let ((i -1))
+       `(let (,@(format-arg args n `(pop ,args)))
+          (case n
+            ,@(mapcar (lambda (clause)
+                        `(,(if (car clause)
+                               'otherwise
+                               (incf i))
+                          ,@(%expand-format (cdr clause) args output)))
+                      clauses))
+          ,args)))))
 
 (define-compiler-macro internal-format-94 ;; #\^
     (&whole decline
@@ -716,7 +757,8 @@
         (let ((vargs (gensym "args")))
           `(let ((,vargs (list ,@args)))
              (block abort-format-iteration
-               ,@(%expand-format (%parse-format format) vargs '*standard-output*)))))
+               ,@(%expand-format (%parse-format format) vargs '*standard-output*)
+               nil))))
        ((eq stream nil)
         (cond
           (%:*compiler-macro-val?*

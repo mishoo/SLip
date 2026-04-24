@@ -1458,12 +1458,26 @@ defp("parse-integer", false, function(m, nargs){
 });
 
 defp("number-fixed", false, function(m, nargs){
-    checknargs(nargs, 2);
-    var fixed = m.pop();
-    var number = m.pop();
+    checknargs(nargs, 2, 3);
+    let intlen = nargs >= 3 ? m.pop() : 1;
+    let fixed = m.pop();
+    let number = m.pop();
     checktype(number, LispNumber);
     checktype(fixed, LispNumber);
-    return number.toFixed(fixed);
+    let str = number.toFixed(fixed);
+    let n = str.indexOf(".");
+    if (n < 0) {
+        n = str.length;
+        str += ".";
+    }
+    if (intlen === 0) {
+        str = str.replace(/^0+\./, ".");
+    } else if (intlen > 1) {
+        for (let k = intlen - n; k > 0; --k) {
+            str = "0" + str;
+        }
+    }
+    return str;
 });
 
 defp("number-string", false, function(m, nargs){
