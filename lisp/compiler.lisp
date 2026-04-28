@@ -130,6 +130,7 @@
 (defmacro defun (name args . body)
   (multiple-value-bind (setter name) (%:maybe-setter name)
     (let ((target (or setter name)))
+      (check-not-locked target)
       (maybe-xref-info name (if setter 'setf 'defun))
       (let ((parsed-args (parse-lambda-list args)))
         (when (%get-symbol-prop target :inline-request)
@@ -212,6 +213,17 @@
 ;; XXX: only for global functions for now, and it's risky if they use globals
 ;; which are not special (introduced with defconstant or defglobal).
 (defparameter *enable-inline* nil)
+
+(defparameter *sealed-packages* (make-weak-hash))
+
+(defun check-not-locked (symbol)
+  (when *sealed-packages*
+    (let ((pak (symbol-package symbol)))
+      (when (and (not (eq pak *package*))
+                 (gethash pak *sealed-packages*))
+        ;; by the time we'll have locks, we should have the full version of `error'.
+        (error "Can't change global definition of ~S (package ~A is sealed)"
+               symbol (package-name pak))))))
 
 (defvar *build-count* 0)
 (defmacro delay-eval body
@@ -1215,6 +1227,7 @@
   (when (%primitivep name)
     (error/wp (strcat "We shall not DEFMACRO on " name " (primitive function)")))
   (%::maybe-xref-info name 'defmacro)
+  (check-not-locked name)
   `(%macro! ',name ,(macro-lambda name lambda-list body)))
 
 ;; let's define early some compiler macros, so that the compiler itself can
@@ -2809,6 +2822,7 @@
     "lisp/thread.lisp"
     "lisp/stream.lisp"
     "lisp/ffi.lisp"
+    "lisp/epilogue.lisp"
     "ide/ide.lisp"))
 
 (defun make-fasl-bundle (&optional (output "slip-bundle.fasl"))

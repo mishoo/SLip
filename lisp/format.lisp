@@ -579,13 +579,11 @@
         ,args))))
 
 (define-compiler-macro internal-format-37 ;; #\%
-    (&whole decline
-            output args colmod? atmod? &optional count)
+    (output args colmod? atmod? &optional count)
   (repeater-compiler-macro #\Newline output args count))
 
 (define-compiler-macro internal-format-126 ;; #\~
-    (&whole decline
-            output args colmod? atmod? &optional count)
+    (output args colmod? atmod? &optional count)
   (repeater-compiler-macro #\~ output args count))
 
 (define-compiler-macro internal-format-67 ;; #\C
