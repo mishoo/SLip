@@ -1533,7 +1533,12 @@
          (stringp x)
          (numberp x)
          (characterp x)
-         (keywordp x))
+         (keywordp x)
+         (regexpp x)
+         (vectorp x)
+         (functionp x)
+         (%structp x)
+         (%std-instance-p x))
      x)
     (t
      `',x)))
@@ -2789,7 +2794,8 @@
     (t
      (aif (or (find-macrolet-in-compiler-env (car form))
               (%macro (car form)))
-          (funcall it form)
+          (let ((%:*sealed-packages* nil))
+            (funcall it form))
           form))))
 
 (defun macroexpand (form &optional (*compiler-env* *compiler-env*))

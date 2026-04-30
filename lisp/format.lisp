@@ -300,39 +300,36 @@
 
 ;; integers (missing roman/english output)
 (defun %print-integer (output colmod? atmod?
-                              base mincol padchar commachar comma-interval number)
-  (let* ((x (floor number))
+                              base mincol padchar commachar comma-interval args)
+  (let* ((number (pop args))
+         (x (floor number))
          (s (if (and atmod? (plusp x))
                 (strcat #\+ (number-string x))
                 (number-string x base))))
     (when colmod?
       (setf s (%add-commas s commachar comma-interval)))
-    (%stream-put output (%pad-string (upcase s) mincol padchar t))))
+    (%stream-put output (%pad-string (upcase s) mincol padchar t))
+    args))
 
 (def-format #\D ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  10 mincol padchar commachar comma-interval (pop args))
-  args)
+                  10 mincol padchar commachar comma-interval args))
 
 (def-format #\B ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  2 mincol padchar commachar comma-interval (pop args))
-  args)
+                  2 mincol padchar commachar comma-interval args))
 
 (def-format #\O ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  8 mincol padchar commachar comma-interval (pop args))
-  args)
+                  8 mincol padchar commachar comma-interval args))
 
 (def-format #\X ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  16 mincol padchar commachar comma-interval (pop args))
-  args)
+                  16 mincol padchar commachar comma-interval args))
 
 (def-format #\R ((base nil) (mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  base mincol padchar commachar comma-interval (pop args))
-  args)
+                  base mincol padchar commachar comma-interval args))
 
 ;; floating-point (incomplete)
 (def-format #\F ((mincol 0) declen scale overflowchar padchar)
@@ -710,8 +707,7 @@
              ,@(format-arg args commachar #\,)
              ,@(format-arg args comma-interval 3))
           (%print-integer ,output ,colmod? ,atmod?
-                          ,,base ,mincol ,padchar ,commachar ,comma-interval (pop ,args))
-          ,args))))
+                          ,,base ,mincol ,padchar ,commachar ,comma-interval ,args)))))
 
 (define-integer-compiler-macro #\D 10)
 (define-integer-compiler-macro #\B 2)
