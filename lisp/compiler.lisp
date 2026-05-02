@@ -409,7 +409,8 @@
 (defun lisp-reader (input eof)
   (let ((input (if (stringp input)
                    (%make-text-memory-input-stream input)
-                   input)))
+                   input))
+        (references (make-hash)))
     (labels
         ((peek ()
            (%stream-peek input))
@@ -584,7 +585,29 @@
              ((#\b #\B) (next) (read-base2-number))
              ((#\o #\O) (next) (read-base8-number))
              ((#\x #\X) (next) (read-base16-number))
+             ((#\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9 #\0)
+              (let ((ref (parse-integer
+                          (read-while (lambda (ch)
+                                        (char<= #\0 ch #\9))))))
+                (case (peek)
+                  (#\=
+                   (next)
+                   (ref-set ref (read-token)))
+                  (#\#
+                   (next)
+                   (ref-get ref))
+                  (otherwise (croak (strcat "Bad character after reference #" ref (peek)))))))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
+
+         (ref-set (ref val)
+           (%hash-set val ref references))
+
+         (ref-get (ref)
+           (multiple-value-bind (val found)
+               (gethash ref references)
+             (if found
+                 val
+                 (croak (strcat "Reference to undefined label #" ref "#")))))
 
          (read-base2-number ()
            (let ((digits (read-symbol-name)))
