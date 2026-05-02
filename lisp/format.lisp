@@ -114,6 +114,7 @@
              (case (peek)
                (#\~
                 (next)
+                (read-while (lambda (ch) (eq ch #\Space)))
                 (let ((tok (read-directive)))
                   (if (consp tok)
                       (if (eq end (car tok))
@@ -168,7 +169,10 @@
                     (cond ((eq colmod? atmod?) (skip-ws) nil)
                           (colmod? nil)
                           (atmod? (skip-ws) #\Newline))))
-                 (t (cons directive params))))))
+                 (t
+                  (unless (gethash directive *format-handlers*)
+                    (croak (strcat "Unknown format directive #\\" directive)))
+                  (cons directive params))))))
 
          (read-number ()
            (labels ((read-it ()
@@ -228,14 +232,13 @@
       (read-sublist nil))))
 
 (defun %exec-format (list args stream)
-  (catch 'abort-format-iteration
-    (dolist (x list)
-      (cond ((listp x)
-             (let ((handler (gethash (car x) *format-handlers*))
-                   (cmdargs (cdr x)))
-               (setf args (apply handler stream args cmdargs))))
-            (t
-             (%stream-put stream x)))))
+  (dolist (x list)
+    (cond ((listp x)
+           (let ((handler (gethash (car x) *format-handlers*))
+                 (cmdargs (cdr x)))
+             (setf args (apply handler stream args cmdargs))))
+          (t
+           (%stream-put stream x))))
   args)
 
 ;;; directives
@@ -297,39 +300,36 @@
 
 ;; integers (missing roman/english output)
 (defun %print-integer (output colmod? atmod?
-                              base mincol padchar commachar comma-interval number)
-  (let* ((x (floor number))
+                              base mincol padchar commachar comma-interval args)
+  (let* ((number (pop args))
+         (x (floor number))
          (s (if (and atmod? (plusp x))
                 (strcat #\+ (number-string x))
                 (number-string x base))))
     (when colmod?
       (setf s (%add-commas s commachar comma-interval)))
-    (%stream-put output (%pad-string (upcase s) mincol padchar t))))
+    (%stream-put output (%pad-string (upcase s) mincol padchar t))
+    args))
 
 (def-format #\D ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  10 mincol padchar commachar comma-interval (pop args))
-  args)
+                  10 mincol padchar commachar comma-interval args))
 
 (def-format #\B ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  2 mincol padchar commachar comma-interval (pop args))
-  args)
+                  2 mincol padchar commachar comma-interval args))
 
 (def-format #\O ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  8 mincol padchar commachar comma-interval (pop args))
-  args)
+                  8 mincol padchar commachar comma-interval args))
 
 (def-format #\X ((mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  16 mincol padchar commachar comma-interval (pop args))
-  args)
+                  16 mincol padchar commachar comma-interval args))
 
 (def-format #\R ((base nil) (mincol 0) (padchar #\Space) (commachar #\,) (comma-interval 3))
   (%print-integer output colmod? atmod?
-                  base mincol padchar commachar comma-interval (pop args))
-  args)
+                  base mincol padchar commachar comma-interval args))
 
 ;; floating-point (incomplete)
 (def-format #\F ((mincol 0) declen scale overflowchar padchar)
@@ -490,7 +490,8 @@
 
 (defun exec-format (parsed args stream)
   (labels ((doit (stream)
-             (%exec-format parsed args stream)))
+             (catch 'abort-format-iteration
+               (%exec-format parsed args stream))))
     (cond ((eq stream nil)
            (let ((out (%make-text-memory-output-stream)))
              (doit out)
@@ -561,7 +562,7 @@
       (setf ,name ',name)
       `((,,name (length ,args))))))
 
-(defun repeater-compiler-macro (decline char output args count)
+(defun repeater-compiler-macro (char output args count)
   (cond
     ((not count)
      `(progn (%stream-put ,output ,char)
@@ -569,20 +570,18 @@
     ((numberp count)
      `(progn (%stream-put ,output ,(%pad-string "" count char))
              ,args))
-    ((equal count ''FETCH)
-     `(progn (%stream-put ,output (%pad-string "" (pop ,args) ,char))
-             ,args))
-    (t decline)))
+    (t
+     `(symbol-macrolet (,@(format-arg args count))
+        (%stream-put ,output (%pad-string "" ,count ,char))
+        ,args))))
 
 (define-compiler-macro internal-format-37 ;; #\%
-    (&whole decline
-            output args colmod? atmod? &optional count)
-  (repeater-compiler-macro decline #\Newline output args count))
+    (output args colmod? atmod? &optional count)
+  (repeater-compiler-macro #\Newline output args count))
 
 (define-compiler-macro internal-format-126 ;; #\~
-    (&whole decline
-            output args colmod? atmod? &optional count)
-  (repeater-compiler-macro decline #\~ output args count))
+    (output args colmod? atmod? &optional count)
+  (repeater-compiler-macro #\~ output args count))
 
 (define-compiler-macro internal-format-67 ;; #\C
     (output args colmod? atmod?)
@@ -636,13 +635,56 @@
                       (go :loop))))))))
        ,(if atmod? myargs args))))
 
+(define-compiler-macro internal-format-91 ;; #\[
+    (&whole decline
+            output args colmod? atmod? #:end-col? #:end-at?
+            &optional clauses n)
+  (unless (and (consp clauses)
+               (eq 'quote (car clauses)))
+    (return-from internal-format-91 decline))
+  (setf clauses (cadr clauses))
+  (cond
+    ((and colmod? atmod?)
+     (error "Both @ and : specified in FORMAT ~~[...~~]"))
+    (colmod?
+     (assert (= 2 (length clauses))
+             "Two clauses expected in FORMAT ~~:[...~~]")
+     `(progn
+        (if (pop ,args)
+            (progn ,@(%expand-format (cdadr clauses) args output))
+            (progn ,@(%expand-format (cdar clauses) args output)))
+        ,args))
+    (atmod?
+     (assert (= 1 (length clauses))
+             "One clause expected in FORMAT ~~@[...~~]")
+     `(if (car ,args)
+          (progn ,@(%expand-format (cdar clauses) args output))
+          (cdr ,args)))
+    (t
+     (let ((i -1))
+       `(let (,@(format-arg args n `(pop ,args)))
+          (case n
+            ,@(mapcar (lambda (clause)
+                        `(,(if (car clause)
+                               'otherwise
+                               (incf i))
+                          ,@(%expand-format (cdr clause) args output)))
+                      clauses))
+          ,args)))))
+
 (define-compiler-macro internal-format-94 ;; #\^
     (&whole decline
             output args colmod? atmod? &optional a b c)
-  (when (or colmod? atmod? a b c)
+  (when colmod?
     (return-from internal-format-94 decline))
-  `(progn
-     (unless ,args (return-from abort-format-iteration nil))
+  `(let (,@(format-arg args a)
+         ,@(format-arg args b)
+         ,@(format-arg args c))
+     (when (if ,a (if ,b (if ,c (<= ,a ,b ,c)
+                             (eql ,a ,b))
+                      (zerop ,a))
+               (not ,args))
+       (return-from abort-format-iteration nil))
      ,args))
 
 (defmacro define-integer-compiler-macro (char base)
@@ -665,8 +707,7 @@
              ,@(format-arg args commachar #\,)
              ,@(format-arg args comma-interval 3))
           (%print-integer ,output ,colmod? ,atmod?
-                          ,,base ,mincol ,padchar ,commachar ,comma-interval (pop ,args))
-          ,args))))
+                          ,,base ,mincol ,padchar ,commachar ,comma-interval ,args)))))
 
 (define-integer-compiler-macro #\D 10)
 (define-integer-compiler-macro #\B 2)
@@ -710,7 +751,8 @@
         (let ((vargs (gensym "args")))
           `(let ((,vargs (list ,@args)))
              (block abort-format-iteration
-               ,@(%expand-format (%parse-format format) vargs '*standard-output*)))))
+               ,@(%expand-format (%parse-format format) vargs '*standard-output*)
+               nil))))
        ((eq stream nil)
         (cond
           (%:*compiler-macro-val?*

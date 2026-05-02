@@ -941,7 +941,7 @@ function dump(thing, dumped = new Map()) {
             return thing.name;
         }
         if (dumped.has(thing)) {
-            return "#" + dumped.get(thing);
+            return "#" + dumped.get(thing) + "#";
         }
         let ret = "";
         if (cache.get(thing) > 1) {

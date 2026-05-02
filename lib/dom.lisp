@@ -1,5 +1,6 @@
 (defpackage :dom
   (:use :sl :ffi)
+  (:shadow #:class-name)
   (:export #:document #:document-element
            #:create-document-fragment
            #:element #:elementp #:node #:nodep

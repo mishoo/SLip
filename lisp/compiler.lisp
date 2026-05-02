@@ -130,6 +130,7 @@
 (defmacro defun (name args . body)
   (multiple-value-bind (setter name) (%:maybe-setter name)
     (let ((target (or setter name)))
+      (check-not-locked target)
       (maybe-xref-info name (if setter 'setf 'defun))
       (let ((parsed-args (parse-lambda-list args)))
         (when (%get-symbol-prop target :inline-request)
@@ -212,6 +213,17 @@
 ;; XXX: only for global functions for now, and it's risky if they use globals
 ;; which are not special (introduced with defconstant or defglobal).
 (defparameter *enable-inline* nil)
+
+(defparameter *sealed-packages* (make-weak-hash))
+
+(defun check-not-locked (symbol)
+  (when *sealed-packages*
+    (let ((pak (symbol-package symbol)))
+      (when (and (not (eq pak *package*))
+                 (gethash pak *sealed-packages*))
+        ;; by the time we'll have locks, we should have the full version of `error'.
+        (error "Can't change global definition of ~S (package ~A is sealed)"
+               symbol (package-name pak))))))
 
 (defvar *build-count* 0)
 (defmacro delay-eval body
@@ -397,7 +409,8 @@
 (defun lisp-reader (input eof)
   (let ((input (if (stringp input)
                    (%make-text-memory-input-stream input)
-                   input)))
+                   input))
+        (references (make-hash)))
     (labels
         ((peek ()
            (%stream-peek input))
@@ -572,7 +585,29 @@
              ((#\b #\B) (next) (read-base2-number))
              ((#\o #\O) (next) (read-base8-number))
              ((#\x #\X) (next) (read-base16-number))
+             ((#\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9 #\0)
+              (let ((ref (parse-integer
+                          (read-while (lambda (ch)
+                                        (char<= #\0 ch #\9))))))
+                (case (peek)
+                  (#\=
+                   (next)
+                   (ref-set ref (read-token)))
+                  (#\#
+                   (next)
+                   (ref-get ref))
+                  (otherwise (croak (strcat "Bad character after reference #" ref (peek)))))))
              (otherwise (croak (strcat "Unsupported sharp syntax #" (peek))))))
+
+         (ref-set (ref val)
+           (%hash-set val ref references))
+
+         (ref-get (ref)
+           (multiple-value-bind (val found)
+               (gethash ref references)
+             (if found
+                 val
+                 (croak (strcat "Reference to undefined label #" ref "#")))))
 
          (read-base2-number ()
            (let ((digits (read-symbol-name)))
@@ -1215,6 +1250,7 @@
   (when (%primitivep name)
     (error/wp (strcat "We shall not DEFMACRO on " name " (primitive function)")))
   (%::maybe-xref-info name 'defmacro)
+  (check-not-locked name)
   `(%macro! ',name ,(macro-lambda name lambda-list body)))
 
 ;; let's define early some compiler macros, so that the compiler itself can
@@ -1520,7 +1556,12 @@
          (stringp x)
          (numberp x)
          (characterp x)
-         (keywordp x))
+         (keywordp x)
+         (regexpp x)
+         (vectorp x)
+         (functionp x)
+         (%structp x)
+         (%std-instance-p x))
      x)
     (t
      `',x)))
@@ -2776,7 +2817,8 @@
     (t
      (aif (or (find-macrolet-in-compiler-env (car form))
               (%macro (car form)))
-          (funcall it form)
+          (let ((%:*sealed-packages* nil))
+            (funcall it form))
           form))))
 
 (defun macroexpand (form &optional (*compiler-env* *compiler-env*))
@@ -2809,6 +2851,7 @@
     "lisp/thread.lisp"
     "lisp/stream.lisp"
     "lisp/ffi.lisp"
+    "lisp/epilogue.lisp"
     "ide/ide.lisp"))
 
 (defun make-fasl-bundle (&optional (output "slip-bundle.fasl"))

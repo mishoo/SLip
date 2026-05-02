@@ -58,6 +58,7 @@
           slot-definition-name slot-definition-initfunction
           slot-definition-initform slot-definition-initargs
           slot-definition-readers slot-definition-writers
+          with-slots
           ;;
           ;; Class-related metaobject protocol
           ;;
@@ -1134,8 +1135,8 @@
 (defun %mk-writer (slot-name)
   (lambda (args next-emfun)
     (declare (ignore next-emfun))
-    (setf (slot-value (car args) slot-name)
-          (cadr args))))
+    (setf (slot-value (cadr args) slot-name)
+          (car args))))
 
 (defun add-writer-method (class fn-name slot-name)
   (ensure-method
@@ -1579,6 +1580,21 @@
 
 (defmethod initialize-instance :after ((gf standard-generic-function) &key)
   (finalize-generic-function gf))
+
+(defmacro with-slots ((&rest slot-entries) instance-form &body body)
+  (let ((object (gensym "object")))
+    `(let ((,object ,instance-form))
+       (symbol-macrolet
+           (,@(mapcar (lambda (entry)
+                        (let ((varname (if (consp entry) (car entry) entry))
+                              (slotname (if (consp entry) (cadr entry) entry)))
+                          (assert (symbolp varname)
+                                  "WITH-SLOTS: ~S is not a symbol (varname)" varname)
+                          (assert (symbolp slotname)
+                                  "WITH-SLOTS: ~S is not a symbol (slotname)" slotname)
+                          `(,varname (slot-value ,object ',slotname))))
+                      slot-entries))
+         ,@body))))
 
 ;;;
 ;;; Methods having to do with method metaobjects.
